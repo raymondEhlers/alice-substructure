@@ -8,12 +8,16 @@
 import enum
 import uuid
 from pathlib import Path
-from typing import Any, List, Type, TypeVar
+from typing import Any, List, Optional, Type, TypeVar
 
 import attr
 import numpy as np
 
 import ROOT
+
+
+# Type helpers
+AnalysisTask = ROOT.AliAnalysisTaskSE
 
 @attr.s
 class CppEnum:
@@ -136,6 +140,29 @@ def _run_add_task_macro(task_path: Path, task_class_name: str, *args: Any) -> An
     # And then retrieve and return the actual task.
     return getattr(ROOT, cpp_temp_task_name)
 
+def _add_physics_selection(is_MC: bool, beam_type: BeamType) -> AnalysisTask:
+    # Enable pileup rejection (second argument) for pp
+    #physics_selection_task = _run_add_task_macro(
+    #    "$ALICE_PHYSICS/OADB/macros/AddTaskPhysicsSelection.C", "AliPhysicsSelectionTask",
+    #    is_MC, beam_type == BeamType.pp
+    #)
+    physics_selection_task = ROOT.AliPhysicsSelectionTask.AddTaskPhysicsSelection(is_MC, beam_type == BeamType.pp)
+    return physics_selection_task
+
+def _add_mult_selection(is_run2_data: bool, physics_selection: int) -> Optional[AnalysisTask]:
+    # Works for both pp and PbPb for the periods that it is calibrated
+    # However, I seem to have trouble with pp MCs
+    if is_run2_data:
+        #multiplicity_selection_task = _run_add_task_macro(
+        #    "$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C",
+        #    "AliMultSelectionTask",
+        #    False
+        #)
+        multiplicity_selection_task = ROOT.AliMultSelectionTask.AddTaskMultSelection(False)
+        multiplicity_selection_task.SelectCollisionCandidates(physics_selection)
+        return multiplicity_selection_task
+    return None
+
 def run_dynamical_grooming(task_name: str,
                            period: str,
                            physics_selection: int,
@@ -167,24 +194,10 @@ def run_dynamical_grooming(task_name: str,
         input_handler = ROOT.AliAnalysisTaskEmcal.AddESDHandler()
 
     # Physics selection task
-    # Enable pileup rejection (second argument) for pp
-    #physics_selection_task = _run_add_task_macro(
-    #    "$ALICE_PHYSICS/OADB/macros/AddTaskPhysicsSelection.C", "AliPhysicsSelectionTask",
-    #    is_MC, beam_type == BeamType.pp
-    #)
-    physics_selection_task = ROOT.AliPhysicsSelectionTask.AddTaskPhysicsSelection(is_MC, beam_type == BeamType.pp)
+    physics_selection = _add_physics_selection(is_MC, beam_type)
 
-    # AliMultSelection
-    # Works for both pp and PbPb for the periods that it is calibrated
-    # However, I seem to have trouble with pp MCs
-    if is_run2_data:
-        #multiplicity_selection_task = _run_add_task_macro(
-        #    "$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C",
-        #    "AliMultSelectionTask",
-        #    False
-        #)
-        multiplicity_selection_task = ROOT.AliMultSelectionTask.AddTaskMultSelection(False)
-        multiplicity_selection_task.SelectCollisionCandidates(physics_selection)
+    # Multiplicity selection task.
+    multiplicity_selection_task = _add_mult_selection(is_run2_data = is_run2_data, physics_selection = physics_selection)
 
     ################
     # Debug settings
