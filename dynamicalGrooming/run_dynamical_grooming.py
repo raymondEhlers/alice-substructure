@@ -405,7 +405,10 @@ def run() -> None:
     # Setup and validation
     task_name = "DynamicalGrooming"
     period = _normalize_period("LHC18q")
-    physics_selection = ROOT.AliVEvent.kAnyINT
+    # NOTE: For some reason, kAnyINT will include some events where the centrality seems to be uncalibrated.
+    #       It's unclear why this occurs, but since we're only interested in semi-central at the moment, it
+    #       doesn't matter.
+    physics_selection = ROOT.AliVEvent.kSemiCentral
     data_type = DataType.AOD
     is_MC = False
     ROOT.AliTrackContainer.SetDefTrackCutsPeriod(period)
