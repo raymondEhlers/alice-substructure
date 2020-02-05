@@ -10,9 +10,21 @@ import uuid
 from pathlib import Path
 from typing import Any, List, Type, TypeVar
 
+import attr
 import numpy as np
 
 import ROOT
+
+@attr.s
+class CppEnum:
+    value: str = attr.ib()
+
+    def __str__(self) -> str:
+        """ Return the str without quotes by calling `str`.
+
+        This ensures that ROOT will evaluate the enum correctly when evaluating the AddTask.
+        """
+        return str(self.value)
 
 def _normalize_period(period: str) -> str:
     """ Normalize period name to have "LHC" in all caps.
@@ -121,14 +133,14 @@ def _run_add_task_macro(task_path: Path, task_class_name: str, *args: Any) -> An
     cpp_temp_task_name = "temp_" + str(uuid.uuid4()).replace("-","_")
     # Cast the task
     ROOT.gInterpreter.ProcessLine(f"auto * {cpp_temp_task_name} = reinterpret_cast<{task_class_name}*>({address});")
-    # And then return the actual task.
+    # And then retrieve and return the actual task.
     return getattr(ROOT, cpp_temp_task_name)
 
-def run_event_extractor(task_name: str,
-                        period: str,
-                        physics_selection: int,
-                        data_type: DataType,
-                        is_MC: bool) -> ROOT.AliAnalysisManager:
+def run_dynamical_grooming(task_name: str,
+                           period: str,
+                           physics_selection: int,
+                           data_type: DataType,
+                           is_MC: bool) -> ROOT.AliAnalysisManager:
     """ Run the event extractor.
 
     Args:
@@ -183,20 +195,40 @@ def run_event_extractor(task_name: str,
     #ROOT.AliLog.SetClassDebugLevel("AliJetContainer", AliLog::kDebug+7);
 
     # Setup
-    binning = np.array(
-        [0, 5, 7, 9, 12, 16, 21, 28, 36, 45, 57, 70, 85, 99, 115, 132, 150, 169, 190, 212, 235, 1000], dtype=np.int32
-    )
-    pt_hard_binning = ROOT.TArrayI()
-    pt_hard_binning.Set(len(binning));
-    for i, v in enumerate(binning):
-        pt_hard_binning[i] = v
+    #binning = np.array(
+    #    [0, 5, 7, 9, 12, 16, 21, 28, 36, 45, 57, 70, 85, 99, 115, 132, 150, 169, 190, 212, 235, 1000], dtype=np.int32
+    #)
+    #pt_hard_binning = ROOT.TArrayI()
+    #pt_hard_binning.Set(len(binning));
+    #for i, v in enumerate(binning):
+    #    pt_hard_binning[i] = v
 
-    # Event extractor
-    event_extractor_task = ROOT.AliAnalysisTaskEventExtractor.AddTaskEventExtractor("tracks", "mcparticles", "")
-    event_extractor_task.SelectCollisionCandidates(physics_selection)
-    event_extractor_task.SetIsPythia(True)
-    event_extractor_task.SetNumberOfPtHardBins(len(pt_hard_binning) - 1)
-    event_extractor_task.SetUserPtHardBinning(pt_hard_binning)
+    # Dynamical grooming
+    #task = _run_add_task_macro(
+    #    "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskJetDynamicalGrooming.C", "PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming",
+    #    "Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
+    #    "Jet_AKTChargedR040_tracks_pT0150_E_scheme", "", "", 0.4, "Rho",
+    #    "tracksSubR02", "tracks", "", "", "", "TPC", "V0M", physics_selection,
+    #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kData"),
+    #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kConstSub"),
+    #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kInclusive"),
+    #    0, 0, 0.6,
+    #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kSecondOrder"),
+    #    "Raw"
+    #)
+    ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
+        "Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
+        "Jet_AKTChargedR040_tracks_pT0150_E_scheme", "", "", 0.4, "Rho",
+        "tracksSubR02", "tracks", "", "", "", "TPC", "V0M", physics_selection,
+        ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kData,
+        ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kConstSub,
+        ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kInclusive,
+        0, 0, 0.6,
+        ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kSecondOrder,
+        "Raw"
+    )
+    #event_extractor_task.SetNumberOfPtHardBins(len(pt_hard_binning) - 1)
+    #event_extractor_task.SetUserPtHardBinning(pt_hard_binning)
 
     tasks = analysis_manager.GetTasks()
     for i in range(tasks.GetEntries()):
@@ -265,14 +297,15 @@ def run() -> None:
     is_run2_data = _is_run2_data(period) if not is_MC else False
     ROOT.AliTrackContainer.SetDefTrackCutsPeriod(period)
 
-    analysis_manager = run_event_extractor(
+    analysis_manager = run_dynamical_grooming(
         task_name=task_name,
         period=period,
         physics_selection=physics_selection,
         data_type=data_type,
         is_MC=is_MC,
-        is_run2_data=is_run2_data,
     )
+
+    exit(0)
 
     start_analysis_manager(analysis_manager = analysis_manager,
                            mode = "local",
