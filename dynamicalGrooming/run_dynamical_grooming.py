@@ -194,6 +194,87 @@ def run_dynamical_grooming(task_name: str,
     #ROOT.AliLog.SetClassDebugLevel("PWGJE::EMCALJetTasks::AliAnalysisTaskEmcalJetHPerformance", ROOT.AliLog::kDebug-1)
     #ROOT.AliLog.SetClassDebugLevel("AliJetContainer", AliLog::kDebug+7);
 
+    # Shared jet finding settings
+    ghost_area = 0.005
+
+    # Rho related
+    # Jet finder for rho. Wagon name: "JetFinderKtTpcQG_EScheme"
+    kt_jet_finder = ROOT.AliEmcalJetTask.AddTaskEmcalJet(
+        "usedefault","",ROOT.AliJetContainer.kt_algorithm,0.2,ROOT.AliJetContainer.kChargedJet,
+        0.15,0, ghost_area, ROOT.AliJetContainer.E_scheme,"Jet",0,False,False
+    )
+    kt_jet_finder.SelectCollisionCandidates(physics_selection)
+    kt_jet_finder.SetUseNewCentralityEstimation(True)
+    # Rho. Wagon name: AliAnalysisTaskQGRhoTpcExLJ_EScheme
+    rho_task = _run_add_task_macro(
+        "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskRhoNew.C", "AliAnalysisTaskRho",
+        "usedefault", "","Rho", 0.2,CppEnum("AliJetContainer::kTPCfid"),CppEnum("AliJetContainer::kChargedJet"),True,CppEnum("AliJetContainer::E_scheme")
+    )
+    rho_task.SetExcludeLeadJets(2)
+    rho_task.SelectCollisionCandidates(physics_selection)
+    rho_task.SetUseNewCentralityEstimation(True)
+    #rho_task.GetParticleContainer(0).SetMCTrackBitMap(TObject.kBitMask)
+    #rho_task.GetClusterContainer(0).SetMCClusterBitMap(TObject.kBitMask)
+    #rho_task.SetHistoBins(250,0,250)
+    rho_task.SetNeedEmcalGeom(False)
+    rho_task.SetZvertexDiffValue(0.1)
+    rho_task.SetVzRange(-10,10)
+    cont_rho = rho_task.GetJetContainer(0)
+    cont_rho.SetJetRadius(0.2)
+    cont_rho.SetJetAcceptanceType(ROOT.AliJetContainer.kTPCfid)
+    cont_rho.SetMaxTrackPt(100)
+
+    #cont.SetTpcHolePos(kHolePos)
+    #cont.SetTpcHoleWidth(kHoleWidth)
+
+    # Rho mass. Wagon name: "RhoMassQGTPC"
+    rho_mass = _run_add_task_macro(
+        "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskRhoMass.C", "AliAnalysisTaskRhoMass",
+        "Jet_KTChargedR020_tracks_pT0150_E_scheme","tracks","","Rhomass",0.2,"TPC",0.01,0,0,2,True,"RhoMass"
+    )
+    rho_mass.SelectCollisionCandidates(physics_selection)
+    rho_mass.SetUseNewCentralityEstimation(True)
+    rho_mass.SetHistoBins(250,0,250)
+    #rho_mass.SetScaleFunction(srhomfunc)
+    rho_mass.SetNeedEmcalGeom(False)
+    cont_rho_mass = rho_mass.GetJetContainer(0)
+    cont_rho_mass.SetJetRadius(0.2)
+    cont_rho_mass.SetJetAcceptanceType(ROOT.AliJetContainer.kTPCfid)
+    cont_rho_mass.SetMaxTrackPt(100)
+    rho_mass.SetNeedEmcalGeom(False)
+    rho_mass.SetZvertexDiffValue(0.1)
+    rho_mass.SetVzRange(-10,10)
+
+    #cont.SetTpcHolePos(kHolePos)
+    #cont.SetTpcHoleWidth(kHoleWidth)
+
+    # Standard akt jet finder. Wagon name: "JetFinderQGAKTCharged_R04_Escheme"
+    akt_jet_finder = ROOT.AliEmcalJetTask.AddTaskEmcalJet(
+        "tracks","",ROOT.AliJetContainer.antikt_algorithm,0.4,ROOT.AliJetContainer.kChargedJet,0.15,0.30,ghost_area,ROOT.AliJetContainer.E_scheme,"Jet",0,False,False
+    )
+    akt_jet_finder.SelectCollisionCandidates(physics_selection)
+
+    #AliEmcalJetUtilityConstSubtractor* constUtil = (AliEmcalJetUtilityConstSubtractor *)akt_jet_finder.AddUtility(new //AliEmcalJetUtilityConstSubtractor("ConstSubtractor"))
+    constUtil = akt_jet_finder.AddUtility(ROOT.AliEmcalJetUtilityEventSubtractor("EventSubtractor"))
+    genSub = akt_jet_finder.AddUtility(ROOT.AliEmcalJetUtilityGenSubtractor("GenSubtractor"))
+
+    genSub.SetGenericSubtractionJetMass(True)
+    genSub.SetGenericSubtractionExtraJetShapes(True)
+    genSub.SetUseExternalBkg(True)
+    genSub.SetRhoName("Rho")
+    genSub.SetRhomName("Rhomass")
+    constUtil.SetJetsSubName(f"{akt_jet_finder.GetName()}ConstSub")
+
+    constUtil.SetParticlesSubName("tracksSubR02")
+    constUtil.SetUseExternalBkg(True)
+    constUtil.SetRhoName("Rho")
+    constUtil.SetRhomName("Rhomass")
+    constUtil.SetMaxDelR(0.8)
+    akt_jet_finder.SetVzRange(-10,10)
+    akt_jet_finder.SetNeedEmcalGeom(False)
+    akt_jet_finder.SetZvertexDiffValue(0.1)
+    akt_jet_finder.SetUseNewCentralityEstimation(True)
+
     # Setup
     #binning = np.array(
     #    [0, 5, 7, 9, 12, 16, 21, 28, 36, 45, 57, 70, 85, 99, 115, 132, 150, 169, 190, 212, 235, 1000], dtype=np.int32
@@ -216,7 +297,7 @@ def run_dynamical_grooming(task_name: str,
     #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kSecondOrder"),
     #    "Raw"
     #)
-    ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
+    dynamical_grooming = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
         "Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
         "Jet_AKTChargedR040_tracks_pT0150_E_scheme", "", "", 0.4, "Rho",
         "tracksSubR02", "tracks", "", "", "", "TPC", "V0M", physics_selection,
@@ -227,8 +308,28 @@ def run_dynamical_grooming(task_name: str,
         ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kSecondOrder,
         "Raw"
     )
+    dynamical_grooming.SelectCollisionCandidates(physics_selection)
     #event_extractor_task.SetNumberOfPtHardBins(len(pt_hard_binning) - 1)
     #event_extractor_task.SetUserPtHardBinning(pt_hard_binning)
+    cont = dynamical_grooming.GetJetContainer(0)
+    cont.SetRhoName("Rho")
+    cont.SetRhoMassName("RhoMass")
+    cont.SetJetRadius(0.4)
+    cont.SetJetAcceptanceType(ROOT.AliJetContainer.kTPCfid)
+    cont.SetMaxTrackPt(100)
+    cont.SetJetPtCut(0)
+
+    dynamical_grooming.SetUseNewCentralityEstimation(True)
+    dynamical_grooming.SetJetPtThreshold(20)
+    dynamical_grooming.SetNeedEmcalGeom(False)
+    #dynamical_grooming.SetZvertexDiffValue(0.1)
+
+    #dynamical_grooming.SetDoTwoTrack(kTRUE)
+    dynamical_grooming.SetHardCutoff(0.1)
+    dynamical_grooming.SetMinCentrality(30)
+    dynamical_grooming.SetMaxCentrality(50)
+
+    dynamical_grooming.Initialize();
 
     tasks = analysis_manager.GetTasks()
     for i in range(tasks.GetEntries()):
@@ -290,11 +391,10 @@ def start_analysis_manager(analysis_manager: ROOT.AliAnalysisManager,
 def run() -> None:
     # Setup and validation
     task_name = "DynamicalGrooming"
-    period = _normalize_period("LHC18b8")
+    period = _normalize_period("LHC18q")
     physics_selection = ROOT.AliVEvent.kAnyINT
     data_type = DataType.AOD
     is_MC = False
-    is_run2_data = _is_run2_data(period) if not is_MC else False
     ROOT.AliTrackContainer.SetDefTrackCutsPeriod(period)
 
     analysis_manager = run_dynamical_grooming(
@@ -305,13 +405,18 @@ def run() -> None:
         is_MC=is_MC,
     )
 
-    exit(0)
-
     start_analysis_manager(analysis_manager = analysis_manager,
                            mode = "local",
-                           n_events = 1000,
+                           n_events = 5000,
                            input_files = [
-                               Path("/Users/re239/code/alice/data/LHC16j5/4/246945/AOD200/0001/AliAOD.root")
+                               Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/001/AliAOD.root"),
+                               Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/002/AliAOD.root"),
+                               Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/003/AliAOD.root"),
+                               Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/004/AliAOD.root"),
+                               Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/001/AliAOD.root"),
+                               Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/002/AliAOD.root"),
+                               Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/003/AliAOD.root"),
+                               Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/004/AliAOD.root"),
                            ])
 
 if __name__ == "__main__":
