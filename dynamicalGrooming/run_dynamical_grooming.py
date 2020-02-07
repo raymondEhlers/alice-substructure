@@ -194,7 +194,7 @@ def run_dynamical_grooming(task_name: str,
         input_handler = ROOT.AliAnalysisTaskEmcal.AddESDHandler()
 
     # Physics selection task
-    physics_selection = _add_physics_selection(is_MC, beam_type)
+    physics_selection_task = _add_physics_selection(is_MC, beam_type)
 
     # Multiplicity selection task.
     multiplicity_selection_task = _add_mult_selection(is_run2_data = is_run2_data, physics_selection = physics_selection)
