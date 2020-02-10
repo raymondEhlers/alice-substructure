@@ -2,10 +2,10 @@
 #include <TFile.h>
 #include <TTree.h>
 
-class TestObject : public TNamed {
+class TestObject {
  public:
-  TestObject(): TNamed("testObject", "testObject"), a(0), b(0) {}
-  TestObject(int a_, double b_): TNamed("testObject", "testObject"), a(a_), b(b_) {}
+  TestObject(): a(0), b(0) {}
+  TestObject(int a_, double b_): a(a_), b(b_) {}
   void SetA(int a_) { a = a_; }
   void SetB(double b_) { b = b_; }
 
