@@ -1,0 +1,48 @@
+[tool.poetry]
+name = "jet_substructure"
+version = "0.1.0"
+description = "Jet substructure analysis code"
+authors = ["Raymond Ehlers <raymond.ehlers@cern.ch>"]
+license = "BSD-3-Clause"
+
+[tool.poetry.dependencies]
+python = "^3.6.1"
+numpy = "^1.18.1"
+uproot = "^3.11.2"
+pandas = "^1.0.1"
+attrs = "^19.3.0"
+matplotlib = "^3.1.3"
+boost_histogram = "^0.6.2"
+pachyderm = {path = "../../pachyderm"}
+
+[tool.poetry.dev-dependencies]
+mypy = "^0.761"
+pytest = "^5.3.5"
+flake8 = "^3.7.9"
+flake8-colors = "^0.1.6"
+black = "^19.10b0"
+pre-commit = "^2.0.1"
+yamllint = "^1.20.0"
+isort = {extras = ["toml"], version = "^4.3.21"}
+IPython = "^7.12.0"
+
+[tool.isort]
+known_standard_library = ["setuptools"]
+known_third_party = ["numpy", "pytest"]
+known_first_party = []
+line_length = 120
+# Meaning a grouped grid of imports
+multi_line_output = 3
+lines_after_imports = 2
+force_grid_wrap = 0
+use_parentheses = true
+verbose = true
+skip = ["docs/conf.py"]
+skip_glob = ".*"
+
+[tool.black]
+line-length = 120
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"

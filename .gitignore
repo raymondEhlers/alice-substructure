@@ -1,6 +1,21 @@
 .DS_Store
 *.root
 
+# Data
+trains
+
+# Virtualenv
 env/
+.venv/
+
+# Misc
 temp/
 
+# Python
+__pycache__/
+ipynb_checkpoints/
+.ipynb_checkpoints/
+
+# Packaging
+dist/
+jet_substructure.egg-info/
