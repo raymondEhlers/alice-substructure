@@ -106,30 +106,47 @@ class SoftDropGroomingResult:
             grooming_result = GroomingResult.from_full_dataset(name = name, values = values, indices = indices, delta_R = delta_R, z=z, kt = kt, splitting_number = splitting_number),
         )
 
-def calculate_substructure_variables(arrays: Dict[str, T_Array], R: float, prefix: str = "") -> None:
+def calculate_substructure_variables(arrays: Dict[str, T_Array], R: float, prefix: str = "") -> Tuple[GroomingResult, GroomingResult, GroomingResult, SoftDropGroomingResult, GroomingResult, GroomingResult]:
+    """ Calculate jet substructure variables.
+
+    Note:
+        The array keys of the stored data need to be renamed using `normalize_array_names(...)`.
+
+    Args:
+        arrays: delta R, z, and kT arrays in one dict.
+        R: Jet radius.
+        prefix: Prefix for the keys in the arrays dict.
+    Returns:
+        z drop, kt drop, time drop, SD, kt leading, kt leading passing hard cutoff.
+    """
     # Validation
     if prefix:
         prefix = f"{prefix}_"
-
-    # TODO: Need to rename the arrays (use the function below, but probably should be called separately).
+    # Setup
+    delta_R_name = f"{prefix}deltaR"
+    z_name = f"{prefix}z"
+    kt_name = f"{prefix}kt"
+    # Ensure that the necessary variables are in stored in the arrays.
+    for name in [delta_R_name, z_name, kt_name]:
+        if name not in arrays:
+            raise ValueError(f"Array {name} is not present in the passed arrays. Keys: {arrays}.")
 
     # delta_R = Delta R between the two subjets.
     # z = subleading / (leading + subleading)
     # kt = subleading * sin(delta_R)
     # parent_pt = subleading / z = kt / sin(delta_R) / z
-    delta_R_name = f"{prefix}deltaR"
-    z_name = f"{prefix}z"
-    kt_name = f"{prefix}kt"
     parent_pt_name = f"{prefix}parent_pt"
     arrays[parent_pt_name] = arrays[kt_name] / np.sin(arrays[delta_R_name]) / arrays[z_name]
-    # TODO: Should actually return the arrays so we can take the splitting info.
-    #       For now, will try just return the argmax index.
+
+    # Calculate dynamical grooming variables.
+    # zDrop
     dynamical_z_values, dynamical_z_indices = calculate_z_drop(delta_R=arrays[delta_R_name],
                                                                z=arrays[z_name],
                                                                parent_pt = arrays[parent_pt_name],
                                                                R=R)
     dynamical_z = GroomingResult.from_full_dataset(name = "dynamical_z", values = dynamical_z_values, indices = dynamical_z_indices,
                                                    delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
+    # kt drop
     dynamical_kt_values, dynamical_kt_indices = calculate_kt_drop(delta_R=arrays[delta_R_name],
                                                                   z=arrays[z_name],
                                                                   parent_pt = arrays[parent_pt_name],
@@ -138,6 +155,7 @@ def calculate_substructure_variables(arrays: Dict[str, T_Array], R: float, prefi
     #       to use the standard kt value.
     dynamical_kt = GroomingResult.from_full_dataset(name = "dynamical_kt", values = dynamical_kt_values, indices = dynamical_kt_indices,
                                                     delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
+    # Time Drop
     dynamical_time_values, dynamical_time_indices = calculate_time_drop(delta_R=arrays[delta_R_name],
                                                                         z=arrays[z_name],
                                                                         parent_pt = arrays[parent_pt_name],
@@ -154,8 +172,8 @@ def calculate_substructure_variables(arrays: Dict[str, T_Array], R: float, prefi
     #z_indices = arrays[z_name].localindex((z_g_selection) & (z_g_selection.counts >= 1))[:, 0]
     ## Count from 1 instead of 0.
     #splitting_number_g = splitting_number_g + 1
+    # Soft Drop
     z_hard_cutoff = 0.2
-    # TODO: Does this count untagged correctly??
     z_g, n_sd, z_indices = calculate_soft_drop(z = arrays[z_name], z_hard_cutoff=z_hard_cutoff)
     soft_drop = SoftDropGroomingResult.from_full_dataset(name = "SD", values = z_g, indices = z_indices,
                                                          delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name],
@@ -169,7 +187,7 @@ def calculate_substructure_variables(arrays: Dict[str, T_Array], R: float, prefi
     leading_kt_hard_cutoff = GroomingResult.from_full_dataset(name = "leading_kt_hard_cutoff", values = leading_kt_hard_cutoff_values, indices = leading_kt_hard_cutoff_indices,
                                                               delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
 
-    # TODO: Keep thinking abut how to properly count the number of splittings.
+    # NOTE: The number of jets normalization is just len(jet_pt)
 
     return dynamical_z, dynamical_kt, dynamical_time, soft_drop, leading_kt, leading_kt_hard_cutoff
 
