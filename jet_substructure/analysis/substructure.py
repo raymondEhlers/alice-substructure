@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+
+""" Jet substructure related functionality.
+
+.. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
+"""
+
+import functools
+from typing import Callable, Dict, Mapping, Optional, Tuple, Type, TypeVar, Union
+
+import attr
+import awkward as ak
+import numpy as np
+
+#T_Input = TypeVar("T_Input")
+T_Array = Union[ak.JaggedArray, np.ndarray]
+T_Input = T_Array
+
+def _dynamical_hardness_measure(delta_R: T_Input, z: T_Input, parent_pt: T_Input, R: float, a: float) -> T_Input:
+    return z * (1 - z) * parent_pt * (delta_R / R) ** a
+
+_z_drop = functools.partial(_dynamical_hardness_measure, a=0.1)
+_kt_drop = functools.partial(_dynamical_hardness_measure, a=1.)
+_time_drop = functools.partial(_dynamical_hardness_measure, a=2.)
+
+def _calculate_dynamical_grooming(delta_R: T_Input, z: T_Input, parent_pt: T_Input,
+                                  R: float, grooming_func: Callable[[T_Input, T_Input, T_Input, float], T_Input]) -> Tuple[np.ndarray, np.ndarray]:
+    """ Calculate dynamical grooming using the giving grooming function.
+
+    Returns:
+        Dynamical grooming value, index of value.
+    """
+    values = grooming_func(delta_R, z, parent_pt, R)
+    arg_max = values.argmax()
+    return values[arg_max], arg_max
+
+calculate_z_drop = functools.partial(_calculate_dynamical_grooming, grooming_func=_z_drop)
+calculate_kt_drop = functools.partial(_calculate_dynamical_grooming, grooming_func=_kt_drop)
+calculate_time_drop = functools.partial(_calculate_dynamical_grooming, grooming_func=_time_drop)
+
+def calculate_kt_leading(kt: T_Input, z_hard_cutoff_mask: Optional[T_Input] = None) -> Tuple[np.ndarray, np.ndarray]:
+    if z_hard_cutoff_mask is not None:
+        kt = kt[z_hard_cutoff_mask]
+    arg_max = kt.argmax()
+    return kt[arg_max], arg_max
+
+def calculate_soft_drop(z: T_Input, z_hard_cutoff: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    z_cutoff_mask = z > z_hard_cutoff
+    #z_passing_cutoff = z[z_cutoff_mask]
+    #z_g = z_passing_cutoff[z_passing_cutoff.counts >= 1][:, 0]
+    # We use :1 because this maintains the jagged structure. That way, we can apply it to initial arrays.
+    z_indices = z.localindex[z_cutoff_mask][:, :1]
+    z_g = z[z_indices].flatten()
+    n_sd = z[z_cutoff_mask].count_nonzero()
+
+    #z_g_selection = z > z_hard_cutoff
+    #z_g = z[z_g_selection][z_g_selection.counts >= 1][:, 0]
+    #z_indices = z.localindex((z_g_selection) & (z_g_selection.counts >= 1))[:, 0]
+    #n_sd = z[z_g_selection].count_nonzero()
+
+    return z_g, n_sd, z_indices
+
+#@attr.s
+#class SubstructureResult:
+#    delta_R: T_Array = attr.ib()
+#    z: T_Array = attr.ib()
+#    kt: T_Array = attr.ib()
+#    splitting_number: T_Array = attr.ib()
+
+T_GroomingResult = TypeVar("T_GroomingResult", bound="GroomingResult")
+
+@attr.s
+class GroomingResult:
+    name: str = attr.ib()
+    values: T_Array = attr.ib()
+    indices: T_Array = attr.ib()
+    delta_R: T_Array = attr.ib()
+    z: T_Array = attr.ib()
+    kt: T_Array = attr.ib()
+    splitting_number: T_Array = attr.ib()
+
+    @classmethod
+    def from_full_dataset(cls: Type[T_GroomingResult], name: str, values: T_Array, indices: T_Array, delta_R: T_Array, z: T_Array, kt: T_Array, splitting_number: Optional[T_Array] = None) -> T_GroomingResult:
+        if splitting_number is None:
+            # +1 because splittings counts from 1, but indexing starts from 0.
+            splitting_number = indices + 1
+        return cls(
+            name = name, values = values, indices = indices,
+            delta_R = delta_R[indices].flatten(), z = z[indices].flatten(), kt = kt[indices].flatten(),
+            # +1 because splittings counts from 1, but indexing starts from 0.
+            splitting_number=splitting_number,
+        )
+
+T_SoftDropGroomingResult = TypeVar("T_SoftDropGroomingResult", bound="SoftDropGroomingResult")
+
+@attr.s
+class SoftDropGroomingResult:
+    hard_cutoff: float = attr.ib()
+    n_sd: T_Array = attr.ib()
+    grooming_result: GroomingResult = attr.ib()
+
+    @classmethod
+    def from_full_dataset(cls: Type[T_SoftDropGroomingResult], name: str, values: T_Array, indices: T_Array, delta_R: T_Array, z: T_Array, kt: T_Array, hard_cutoff: float, n_sd: T_Array, splitting_number: Optional[T_Array] = None) -> T_SoftDropGroomingResult:
+        return cls(
+            hard_cutoff = hard_cutoff, n_sd = n_sd,
+            grooming_result = GroomingResult.from_full_dataset(name = name, values = values, indices = indices, delta_R = delta_R, z=z, kt = kt, splitting_number = splitting_number),
+        )
+
+def calculate_substructure_variables(arrays: Dict[str, T_Array], R: float, prefix: str = "") -> None:
+    # Validation
+    if prefix:
+        prefix = f"{prefix}_"
+
+    # TODO: Need to rename the arrays (use the function below, but probably should be called separately).
+
+    # delta_R = Delta R between the two subjets.
+    # z = subleading / (leading + subleading)
+    # kt = subleading * sin(delta_R)
+    # parent_pt = subleading / z = kt / sin(delta_R) / z
+    delta_R_name = f"{prefix}deltaR"
+    z_name = f"{prefix}z"
+    kt_name = f"{prefix}kt"
+    parent_pt_name = f"{prefix}parent_pt"
+    arrays[parent_pt_name] = arrays[kt_name] / np.sin(arrays[delta_R_name]) / arrays[z_name]
+    # TODO: Should actually return the arrays so we can take the splitting info.
+    #       For now, will try just return the argmax index.
+    dynamical_z_values, dynamical_z_indices = calculate_z_drop(delta_R=arrays[delta_R_name],
+                                                               z=arrays[z_name],
+                                                               parent_pt = arrays[parent_pt_name],
+                                                               R=R)
+    dynamical_z = GroomingResult.from_full_dataset(name = "dynamical_z", values = dynamical_z_values, indices = dynamical_z_indices,
+                                                   delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
+    dynamical_kt_values, dynamical_kt_indices = calculate_kt_drop(delta_R=arrays[delta_R_name],
+                                                                  z=arrays[z_name],
+                                                                  parent_pt = arrays[parent_pt_name],
+                                                                  R=R)
+    # NOTE: Dynamical kt gives us the hardest kt, but to put into, for example, the Lund Plane, we need
+    #       to use the standard kt value.
+    dynamical_kt = GroomingResult.from_full_dataset(name = "dynamical_kt", values = dynamical_kt_values, indices = dynamical_kt_indices,
+                                                    delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
+    dynamical_time_values, dynamical_time_indices = calculate_time_drop(delta_R=arrays[delta_R_name],
+                                                                        z=arrays[z_name],
+                                                                        parent_pt = arrays[parent_pt_name],
+                                                                        R=R)
+    dynamical_time = GroomingResult.from_full_dataset(name = "dynamical_time", values = dynamical_time_values, indices = dynamical_time_indices,
+                                                      delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
+
+    #z_hard_cutoff = 0.2
+    #z_g_selection = arrays[z_name] > z_hard_cutoff
+    #z_g = arrays[z_name][z_g_selection][z_g_selection.counts >= 1][:, 0]
+    #r_g = arrays[delta_R_name][z_g_selection][z_g_selection.counts >= 1][:, 0]
+    #kt_g = arrays[kt_name][z_g_selection][z_g_selection.counts >= 1][:, 0]
+    #n_sd = arrays[z_name][z_g_selection].count_nonzero()
+    #z_indices = arrays[z_name].localindex((z_g_selection) & (z_g_selection.counts >= 1))[:, 0]
+    ## Count from 1 instead of 0.
+    #splitting_number_g = splitting_number_g + 1
+    z_hard_cutoff = 0.2
+    # TODO: Does this count untagged correctly??
+    z_g, n_sd, z_indices = calculate_soft_drop(z = arrays[z_name], z_hard_cutoff=z_hard_cutoff)
+    soft_drop = SoftDropGroomingResult.from_full_dataset(name = "SD", values = z_g, indices = z_indices,
+                                                         delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name],
+                                                         hard_cutoff=z_hard_cutoff, n_sd = n_sd)
+
+    ## Leading kt
+    leading_kt_values, leading_kt_indices = calculate_kt_leading(arrays[kt_name])
+    leading_kt = GroomingResult.from_full_dataset(name = "leading_kt", values = leading_kt_values, indices = leading_kt_indices,
+                                                  delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
+    leading_kt_hard_cutoff_values, leading_kt_hard_cutoff_indices = calculate_kt_leading(arrays[kt_name], z_hard_cutoff_mask = arrays[z_name] > z_hard_cutoff)
+    leading_kt_hard_cutoff = GroomingResult.from_full_dataset(name = "leading_kt_hard_cutoff", values = leading_kt_hard_cutoff_values, indices = leading_kt_hard_cutoff_indices,
+                                                              delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
+
+    # TODO: Keep thinking abut how to properly count the number of splittings.
+
+    return dynamical_z, dynamical_kt, dynamical_time, soft_drop, leading_kt, leading_kt_hard_cutoff
+
+def _normalize_key(key: str) -> str:
+    separator = "_"
+    key = key.replace(".f", separator)
+    index = key.find(separator) + len(separator)
+    # +1 to skip over the latter that's being modified.
+    return key[:index] + key[index].lower() + key[index + 1:]
+
+def normalize_array_names(arrays: Mapping[str, T_Array]) -> Dict[str, T_Array]:
+    return {_normalize_key(k): v for k, v in arrays.items()}
+
+def run() -> None:
+    ...
+
+if __name__ == "__main__":
+    run()
