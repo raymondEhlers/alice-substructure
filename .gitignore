@@ -15,6 +15,7 @@ temp/
 __pycache__/
 ipynb_checkpoints/
 .ipynb_checkpoints/
+.mypy_cache/
 
 # Packaging
 dist/
