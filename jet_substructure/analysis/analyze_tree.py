@@ -6,13 +6,11 @@
 """
 
 from pathlib import Path
-from typing import Sequence
-
-import uproot
+from typing import List, Sequence
 
 from jet_substructure.base import helpers
 
-def analyze_tree(filenames: Sequence[Path]) -> bool:
+def analyze_tree(filenames: Sequence[Path]) -> List[helpers.TTree]:
     trees = []
     for filename in filenames:
         trees.append(helpers.get_tree(filename = filename, name = "AliAnalysisTaskJetDynamicalGrooming_RawTree_Data_ConstSub_Incl"))
