@@ -56,18 +56,20 @@ def calculate_kt_leading(kt: T_Input, z_hard_cutoff_mask: Optional[T_Input] = No
 
 
 def calculate_soft_drop(z: T_Input, z_hard_cutoff: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """ Calculate Soft Drop.
+
+    Args:
+        z: Shared momentum fraction of the splitting.
+        z_hard_cutoff: Hard cutoff in z for SoftDrop.
+    Returns:
+        Soft drop z (1 per event), number of recusrive splittings passing soft drop (1 per event), index of
+            each selected splitting (1 per event, in a JaggedArray format so it can be applied elsewhere).
+    """
     z_cutoff_mask = z > z_hard_cutoff
-    # z_passing_cutoff = z[z_cutoff_mask]
-    # z_g = z_passing_cutoff[z_passing_cutoff.counts >= 1][:, 0]
     # We use :1 because this maintains the jagged structure. That way, we can apply it to initial arrays.
     z_indices = z.localindex[z_cutoff_mask][:, :1]
     z_g = z[z_indices].flatten()
     n_sd = z[z_cutoff_mask].count_nonzero()
-
-    # z_g_selection = z > z_hard_cutoff
-    # z_g = z[z_g_selection][z_g_selection.counts >= 1][:, 0]
-    # z_indices = z.localindex((z_g_selection) & (z_g_selection.counts >= 1))[:, 0]
-    # n_sd = z[z_g_selection].count_nonzero()
 
     return z_g, n_sd, z_indices
 
@@ -229,15 +231,6 @@ def calculate_substructure_variables(
         kt=arrays[kt_name],
     )
 
-    # z_hard_cutoff = 0.2
-    # z_g_selection = arrays[z_name] > z_hard_cutoff
-    # z_g = arrays[z_name][z_g_selection][z_g_selection.counts >= 1][:, 0]
-    # r_g = arrays[delta_R_name][z_g_selection][z_g_selection.counts >= 1][:, 0]
-    # kt_g = arrays[kt_name][z_g_selection][z_g_selection.counts >= 1][:, 0]
-    # n_sd = arrays[z_name][z_g_selection].count_nonzero()
-    # z_indices = arrays[z_name].localindex((z_g_selection) & (z_g_selection.counts >= 1))[:, 0]
-    ## Count from 1 instead of 0.
-    # splitting_number_g = splitting_number_g + 1
     # Soft Drop
     z_hard_cutoff = 0.2
     z_g, n_sd, z_indices = calculate_soft_drop(z=arrays[z_name], z_hard_cutoff=z_hard_cutoff)
