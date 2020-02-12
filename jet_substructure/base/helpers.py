@@ -3,14 +3,15 @@ from pathlib import Path
 from typing import Any, Dict, Sequence, Union
 
 import attr
-import awkward
+import awkward as ak
+import h5py
 import numpy as np
 import pandas as pd
 import uproot
 
 # Typing helpers
 TTree = Any
-UprootArray = Union[np.ndarray, awkward.JaggedArray]
+UprootArray = Union[np.ndarray, ak.JaggedArray]
 UprootArrays = Dict[str, UprootArray]
 
 @attr.s
@@ -25,6 +26,8 @@ class RangeSelector:
             df: Data to be used to define the mask. May be a pandas DataFrame or output from loading arrays
                 via uproot.
             attribute_name: Name of the attrbute (column) to be used in the mask.
+        Returns:
+            Mask of the df for the attribute values within the stored range.
         """
         # Range defined by what is shown in the paper.
         return ((df[attribute_name] >= self.min) & (df[attribute_name] < self.max))
@@ -54,9 +57,11 @@ def get_tree(filename: Path, name: str) -> TTree:
     Args:
         filename: Filename of the file containing the tree.
         name: Name of the tree in the file.
+
     Returns:
         The extract tree.
     """
+    # TODO: Cache?
     # Can't use with here because it doesn't fully load the tree here. It just makes it available to be loaded later.
     # If we want to close the file, we need to fully convert to a pandas df immediately. I think even converting to
     # arrays wouldn't be sufficient.
@@ -64,3 +69,44 @@ def get_tree(filename: Path, name: str) -> TTree:
     f = uproot.open(filename)
     return f[name]
 
+def _concatenate_jagged_array(arrays: Sequence[ak.JaggedArray]) -> ak.JaggedArray:
+    """ Concatenate jagged arrays (perhaps from different files).
+
+    Code is from [here](https://github.com/scikit-hep/awkward-array/issues/21#issuecomment-433621906).
+
+    Args:
+        arrays: Jagged arrays to be combined.
+
+    Returns:
+        Concatenate jagged array.
+    """
+    contents = np.concatenate([j.flatten() for j in arrays])
+    counts = np.concatenate([j.counts for j in arrays])
+    return ak.JaggedArray.fromcounts(counts, contents)
+
+def awkward_to_hdf5(trees: Sequence[TTree], array_names: Sequence[str], path: Path, filename: str = "data.h5") -> bool:
+    """ Store awkward arrays in HDF5.
+
+    These arrays can come from a list of trees. If so, they will be concatenated together.
+
+    Args:
+        trees: Trees or dicts of arrays containing the data of interest.
+        array_names: Names of the array keys to be stored.
+        path: Path to the HDF5 file.
+        filename: HDF5 filename.
+
+    Returns:
+        True if the data was written successfully.
+    """
+    path = path / filename
+    with h5py.file(path, "w") as f:
+        storage = ak.hdf5(f)
+        # Store one array at a time in an attempt to keep memory usage reasonable.
+        for name in array_names:
+            values = []
+            for tree in trees:
+                values.append(tree.array([name], namedecode="utf-8"))
+            full_array = _concatenate_jagged_array(values)
+            storage[name] = full_array
+
+    return True
