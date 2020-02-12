@@ -60,17 +60,10 @@ def calculate_soft_drop(z: T_Input, z_hard_cutoff: float) -> Tuple[np.ndarray, n
 
     return z_g, n_sd, z_indices
 
-#@attr.s
-#class SubstructureResult:
-#    delta_R: T_Array = attr.ib()
-#    z: T_Array = attr.ib()
-#    kt: T_Array = attr.ib()
-#    splitting_number: T_Array = attr.ib()
-
-T_GroomingResult = TypeVar("T_GroomingResult", bound="GroomingResult")
+T_SubstructureResult = TypeVar("T_SubstructureResult", bound="SubstructureResult")
 
 @attr.s
-class GroomingResult:
+class SubstructureResult:
     name: str = attr.ib()
     values: T_Array = attr.ib()
     indices: T_Array = attr.ib()
@@ -80,7 +73,7 @@ class GroomingResult:
     splitting_number: T_Array = attr.ib()
 
     @classmethod
-    def from_full_dataset(cls: Type[T_GroomingResult], name: str, values: T_Array, indices: T_Array, delta_R: T_Array, z: T_Array, kt: T_Array, splitting_number: Optional[T_Array] = None) -> T_GroomingResult:
+    def from_full_dataset(cls: Type[T_SubstructureResult], name: str, values: T_Array, indices: T_Array, delta_R: T_Array, z: T_Array, kt: T_Array, splitting_number: Optional[T_Array] = None) -> T_SubstructureResult:
         if splitting_number is None:
             # +1 because splittings counts from 1, but indexing starts from 0.
             splitting_number = indices + 1
@@ -97,16 +90,16 @@ T_SoftDropGroomingResult = TypeVar("T_SoftDropGroomingResult", bound="SoftDropGr
 class SoftDropGroomingResult:
     hard_cutoff: float = attr.ib()
     n_sd: T_Array = attr.ib()
-    grooming_result: GroomingResult = attr.ib()
+    grooming_result: SubstructureResult = attr.ib()
 
     @classmethod
     def from_full_dataset(cls: Type[T_SoftDropGroomingResult], name: str, values: T_Array, indices: T_Array, delta_R: T_Array, z: T_Array, kt: T_Array, hard_cutoff: float, n_sd: T_Array, splitting_number: Optional[T_Array] = None) -> T_SoftDropGroomingResult:
         return cls(
             hard_cutoff = hard_cutoff, n_sd = n_sd,
-            grooming_result = GroomingResult.from_full_dataset(name = name, values = values, indices = indices, delta_R = delta_R, z=z, kt = kt, splitting_number = splitting_number),
+            grooming_result = SubstructureResult.from_full_dataset(name = name, values = values, indices = indices, delta_R = delta_R, z=z, kt = kt, splitting_number = splitting_number),
         )
 
-def calculate_substructure_variables(arrays: Dict[str, T_Array], R: float, prefix: str = "") -> Tuple[GroomingResult, GroomingResult, GroomingResult, SoftDropGroomingResult, GroomingResult, GroomingResult]:
+def calculate_substructure_variables(arrays: Dict[str, T_Array], R: float, prefix: str = "") -> Tuple[SubstructureResult, SubstructureResult, SubstructureResult, SoftDropGroomingResult, SubstructureResult, SubstructureResult]:
     """ Calculate jet substructure variables.
 
     Note:
@@ -144,7 +137,7 @@ def calculate_substructure_variables(arrays: Dict[str, T_Array], R: float, prefi
                                                                z=arrays[z_name],
                                                                parent_pt = arrays[parent_pt_name],
                                                                R=R)
-    dynamical_z = GroomingResult.from_full_dataset(name = "dynamical_z", values = dynamical_z_values, indices = dynamical_z_indices,
+    dynamical_z = SubstructureResult.from_full_dataset(name = "dynamical_z", values = dynamical_z_values, indices = dynamical_z_indices,
                                                    delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
     # kt drop
     dynamical_kt_values, dynamical_kt_indices = calculate_kt_drop(delta_R=arrays[delta_R_name],
@@ -153,14 +146,14 @@ def calculate_substructure_variables(arrays: Dict[str, T_Array], R: float, prefi
                                                                   R=R)
     # NOTE: Dynamical kt gives us the hardest kt, but to put into, for example, the Lund Plane, we need
     #       to use the standard kt value.
-    dynamical_kt = GroomingResult.from_full_dataset(name = "dynamical_kt", values = dynamical_kt_values, indices = dynamical_kt_indices,
+    dynamical_kt = SubstructureResult.from_full_dataset(name = "dynamical_kt", values = dynamical_kt_values, indices = dynamical_kt_indices,
                                                     delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
     # Time Drop
     dynamical_time_values, dynamical_time_indices = calculate_time_drop(delta_R=arrays[delta_R_name],
                                                                         z=arrays[z_name],
                                                                         parent_pt = arrays[parent_pt_name],
                                                                         R=R)
-    dynamical_time = GroomingResult.from_full_dataset(name = "dynamical_time", values = dynamical_time_values, indices = dynamical_time_indices,
+    dynamical_time = SubstructureResult.from_full_dataset(name = "dynamical_time", values = dynamical_time_values, indices = dynamical_time_indices,
                                                       delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
 
     #z_hard_cutoff = 0.2
@@ -181,10 +174,10 @@ def calculate_substructure_variables(arrays: Dict[str, T_Array], R: float, prefi
 
     ## Leading kt
     leading_kt_values, leading_kt_indices = calculate_kt_leading(arrays[kt_name])
-    leading_kt = GroomingResult.from_full_dataset(name = "leading_kt", values = leading_kt_values, indices = leading_kt_indices,
-                                                  delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
+    leading_kt = SubstructureResult.from_full_dataset(name = "leading_kt", values = leading_kt_values, indices = leading_kt_indices,
+                                                      delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
     leading_kt_hard_cutoff_values, leading_kt_hard_cutoff_indices = calculate_kt_leading(arrays[kt_name], z_hard_cutoff_mask = arrays[z_name] > z_hard_cutoff)
-    leading_kt_hard_cutoff = GroomingResult.from_full_dataset(name = "leading_kt_hard_cutoff", values = leading_kt_hard_cutoff_values, indices = leading_kt_hard_cutoff_indices,
+    leading_kt_hard_cutoff = SubstructureResult.from_full_dataset(name = "leading_kt_hard_cutoff", values = leading_kt_hard_cutoff_values, indices = leading_kt_hard_cutoff_indices,
                                                               delta_R = arrays[delta_R_name], z = arrays[z_name], kt = arrays[kt_name])
 
     # NOTE: The number of jets normalization is just len(jet_pt)
