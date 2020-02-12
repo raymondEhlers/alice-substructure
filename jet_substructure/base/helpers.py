@@ -4,15 +4,19 @@ from typing import Any, Dict, Sequence, Union
 
 import attr
 import awkward as ak
+import boost_histogram as bh
 import h5py
 import numpy as np
 import pandas as pd
 import uproot
 
+from pachyderm import histogram
+
 # Typing helpers
 TTree = Any
 UprootArray = Union[np.ndarray, ak.JaggedArray]
 UprootArrays = Dict[str, UprootArray]
+Arrays = Union[UprootArrays, pd.DataFrame]
 
 @attr.s
 class RangeSelector:
@@ -30,7 +34,10 @@ class RangeSelector:
             Mask of the df for the attribute values within the stored range.
         """
         # Range defined by what is shown in the paper.
-        return ((df[attribute_name] >= self.min) & (df[attribute_name] < self.max))
+        return self.mask_array(df[attribute_name])
+
+    def mask_array(self, array: UprootArray) -> UprootArray:
+        return ((array >= self.min) & (array < self.max))
 
 def full_range_extent(selections: Sequence[RangeSelector]) -> RangeSelector:
     """ Extract the min and max range value over all of the selections.
@@ -131,3 +138,43 @@ def hdf5_to_awkward(array_names: Sequence[str], path: Path, filename: str = "dat
             data[array_name] = storage[array_name]
 
     return data
+
+@attr.s
+class BinnedData2D:
+    x_bin_edges: np.ndarray = attr.ib()
+    y_bin_edges: np.ndarray = attr.ib()
+    values: np.ndarray = attr.ib()
+    errors_squared: np.ndarray = attr.ib()
+
+
+def histogram_from_array(df: Union[pd.DataFrame, UprootArrays], observable_name: str, axis: bh.axis.Regular) -> histogram.Histogram1D:
+    bh_hist = bh.Histogram(axis, storage=bh.storage.Weight())
+    bh_hist.fill(df[observable_name].to_numpy())
+    h = histogram.Histogram1D(
+        bin_edges = bh_hist.axes[0].edges,
+        y = bh_hist.view().value,
+        errors_squared = np.copy(bh_hist.view().variance),
+    )
+    # Scale by bin width
+    h /= h.bin_widths
+    return h
+
+def response_from_array(df: Union[pd.DataFrame, UprootArrays], hybrid_observable_name: str, particle_observable_name: str, axes: Sequence[bh.axis.Regular]) -> BinnedData2D:
+    bh_hist = bh.Histogram(*axes, storage=bh.storage.Weight())
+    bh_hist.fill(df[hybrid_observable_name].to_numpy(), df[particle_observable_name].to_numpy())
+
+    # TODO: Scaling!
+    # Scale by bin width
+    #h /= h.bin_widths
+    # Scale by njets.
+    # TODO: Careful - this may not be the correct n_jets
+    #h /= len(df_in)
+    x, y = bh_hist.axes.edges
+    view = bh_hist.view()
+    return BinnedData2D(
+        x_bin_edges = x,
+        y_bin_edges = y,
+        values = view.counts,
+        errors_squared = view.variance,
+    )
+
