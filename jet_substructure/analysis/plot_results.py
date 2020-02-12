@@ -51,6 +51,9 @@ def _retrieve_delta_R(result: substructure.SubstructureResult) -> substructure.T
 def _retrieve_theta(result: substructure.SubstructureResult, jet_R: float) -> substructure.T_Array:
     return result.delta_R / jet_R
 
+def _splitting_number(result: substructure.SubstructureResult) -> substructure.T_Array:
+    return result.splitting_number
+
 def _plot_distribution(results: Sequence[substructure.SubstructureResult], retrieve_values_func: Callable[[substructure.SubstructureResult], substructure.T_Array], jet_pt: substructure.T_Array, axis: bh.axis.Regular, jet_pt_bins: Sequence[helpers.RangeSelector], label: PlotLabel, path: Path) -> None:
     # Validation
     path.mkdir(parents=True, exist_ok=True)
@@ -98,7 +101,7 @@ def _plot_distribution(results: Sequence[substructure.SubstructureResult], retri
                 multialignment="right")
 
         # Presentation
-        ax.legend(frameon=False, loc="lower right")
+        ax.legend(frameon=False, loc="center right")
         ax.set_yscale("log")
         ax.set_xlabel(label.x_label)
         ax.set_ylabel(label.y_label)
@@ -161,3 +164,17 @@ def theta(results: Sequence[substructure.SubstructureResult], jet_R: float, jet_
                            y_label = r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\theta$",
                        ),
                        path = path)
+
+def splitting_number(results: Sequence[substructure.SubstructureResult], jet_R: float, jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
+    logger.debug("Plotting splitting number")
+    _plot_distribution(results = results,
+                       retrieve_values_func=partial(_retrieve_theta, jet_R=jet_R),
+                       axis=bh.axis.Regular(10, 0, 10),
+                       jet_pt = jet_pt, jet_pt_bins = jet_pt_bins,
+                       label = PlotLabel(
+                           name = "splitting_number",
+                           x_label = r"$n$",
+                           y_label = r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$",
+                       ),
+                       path = path)
+
