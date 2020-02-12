@@ -80,36 +80,48 @@ T_SubstructureResult = TypeVar("T_SubstructureResult", bound="SubstructureResult
 @attr.s
 class SubstructureResult:
     name: str = attr.ib()
+    title: str = attr.ib()
     values: T_Array = attr.ib()
     indices: T_Array = attr.ib()
     delta_R: T_Array = attr.ib()
     z: T_Array = attr.ib()
     kt: T_Array = attr.ib()
-    splitting_number: T_Array = attr.ib()
+
+    def __getitem__(self, val: str) -> T_Array:
+        return getattr(self, val)
+
+    @property
+    def splitting_number(self) -> T_Array:
+        try:
+            return self._splitting_number
+        except AttributeError:
+            # +1 because splittings counts from 1, but indexing starts from 0.
+            self._splitting_number: T_Array = self.indices + 1
+        return self._splitting_number
+
+    @splitting_number.setter
+    def splitting_number(self, value: T_Array) -> None:
+        self._splitting_number = value
 
     @classmethod
     def from_full_dataset(
         cls: Type[T_SubstructureResult],
         name: str,
+        title: str,
         values: T_Array,
         indices: T_Array,
         delta_R: T_Array,
         z: T_Array,
         kt: T_Array,
-        splitting_number: Optional[T_Array] = None,
     ) -> T_SubstructureResult:
-        if splitting_number is None:
-            # +1 because splittings counts from 1, but indexing starts from 0.
-            splitting_number = indices + 1
         return cls(
             name=name,
+            title=title,
             values=values,
             indices=indices,
             delta_R=delta_R[indices].flatten(),
             z=z[indices].flatten(),
             kt=kt[indices].flatten(),
-            # +1 because splittings counts from 1, but indexing starts from 0.
-            splitting_number=splitting_number,
         )
 
 
@@ -117,15 +129,15 @@ T_SoftDropGroomingResult = TypeVar("T_SoftDropGroomingResult", bound="SoftDropGr
 
 
 @attr.s
-class SoftDropGroomingResult:
+class SoftDropGroomingResult(SubstructureResult):
     hard_cutoff: float = attr.ib()
     n_sd: T_Array = attr.ib()
-    grooming_result: SubstructureResult = attr.ib()
 
     @classmethod
-    def from_full_dataset(
+    def from_full_dataset(  # type: ignore
         cls: Type[T_SoftDropGroomingResult],
         name: str,
+        title: str,
         values: T_Array,
         indices: T_Array,
         delta_R: T_Array,
@@ -133,20 +145,17 @@ class SoftDropGroomingResult:
         kt: T_Array,
         hard_cutoff: float,
         n_sd: T_Array,
-        splitting_number: Optional[T_Array] = None,
     ) -> T_SoftDropGroomingResult:
         return cls(
+            name=name,
+            title=title,
+            values=values,
+            indices=indices,
+            delta_R=delta_R[indices].flatten(),
+            z=z[indices].flatten(),
+            kt=kt[indices].flatten(),
             hard_cutoff=hard_cutoff,
             n_sd=n_sd,
-            grooming_result=SubstructureResult.from_full_dataset(
-                name=name,
-                values=values,
-                indices=indices,
-                delta_R=delta_R,
-                z=z,
-                kt=kt,
-                splitting_number=splitting_number,
-            ),
         )
 
 
@@ -198,6 +207,7 @@ def calculate_substructure_variables(
     )
     dynamical_z = SubstructureResult.from_full_dataset(
         name="dynamical_z",
+        title="zDrop",
         values=dynamical_z_values,
         indices=dynamical_z_indices,
         delta_R=arrays[delta_R_name],
@@ -212,6 +222,7 @@ def calculate_substructure_variables(
     #       to use the standard kt value.
     dynamical_kt = SubstructureResult.from_full_dataset(
         name="dynamical_kt",
+        title="ktDrop",
         values=dynamical_kt_values,
         indices=dynamical_kt_indices,
         delta_R=arrays[delta_R_name],
@@ -224,6 +235,7 @@ def calculate_substructure_variables(
     )
     dynamical_time = SubstructureResult.from_full_dataset(
         name="dynamical_time",
+        title="TimeDrop",
         values=dynamical_time_values,
         indices=dynamical_time_indices,
         delta_R=arrays[delta_R_name],
@@ -236,6 +248,7 @@ def calculate_substructure_variables(
     z_g, n_sd, z_indices = calculate_soft_drop(z=arrays[z_name], z_hard_cutoff=z_hard_cutoff)
     soft_drop = SoftDropGroomingResult.from_full_dataset(
         name="SD",
+        title="SoftDrop",
         values=z_g,
         indices=z_indices,
         delta_R=arrays[delta_R_name],
@@ -249,6 +262,7 @@ def calculate_substructure_variables(
     leading_kt_values, leading_kt_indices = calculate_kt_leading(arrays[kt_name])
     leading_kt = SubstructureResult.from_full_dataset(
         name="leading_kt",
+        title=r"Leading $k_{\text{T}}$",
         values=leading_kt_values,
         indices=leading_kt_indices,
         delta_R=arrays[delta_R_name],
@@ -260,6 +274,7 @@ def calculate_substructure_variables(
     )
     leading_kt_hard_cutoff = SubstructureResult.from_full_dataset(
         name="leading_kt_hard_cutoff",
+        title=r"SD Leading $k_{\text{T}}$",
         values=leading_kt_hard_cutoff_values,
         indices=leading_kt_hard_cutoff_indices,
         delta_R=arrays[delta_R_name],
