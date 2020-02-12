@@ -277,7 +277,7 @@ def _normalize_key(key: str) -> str:
     key = key.replace(".f", separator)
     index = key.find(separator) + len(separator)
     # +1 to skip over the latter that's being modified.
-    return key[:index] + key[index].lower() + key[index + 1 :]
+    return key[:index] + key[index].lower() + key[index + 1:]
 
 
 def normalize_array_names(arrays: Mapping[str, T_Array]) -> Dict[str, T_Array]:

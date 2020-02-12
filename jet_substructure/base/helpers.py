@@ -110,3 +110,24 @@ def awkward_to_hdf5(trees: Sequence[TTree], array_names: Sequence[str], path: Pa
             storage[name] = full_array
 
     return True
+
+def hdf5_to_awkward(array_names: Sequence[str], path: Path, filename: str = "data.h5") -> UprootArrays:
+    """ Retrieve arrays from an HDF5 array.
+
+    Args:
+        array_names: Names of the array keys to be stored.
+        path: Path to the HDF5 file.
+        filename: HDF5 filename.
+
+    Returns:
+        Awkward arrays constructed from stored data.
+    """
+    data: UprootArrays = {}
+
+    path = path / filename
+    with h5py.file(path, "r") as f:
+        storage = ak.hdf5(f)
+        for array_name in array_names:
+            data[array_name] = storage[array_name]
+
+    return data
