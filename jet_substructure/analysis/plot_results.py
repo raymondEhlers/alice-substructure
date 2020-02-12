@@ -5,9 +5,12 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+import logging
+from functools import partial
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence
 
+import attr
 import boost_histogram as bh
 import matplotlib
 import matplotlib.pyplot as plt
@@ -19,6 +22,8 @@ from pachyderm import histogram
 from jet_substructure.base import helpers
 from jet_substructure.analysis import substructure
 
+logger = logging.getLogger(__name__)
+
 pachyderm.plot.configure()
 # Enable ticks on all sides
 # Unfortunately, some of this is overriding the pachyderm plotting style.
@@ -28,7 +33,25 @@ matplotlib.rcParams["xtick.minor.top"] = True
 matplotlib.rcParams["ytick.right"] = True
 matplotlib.rcParams["ytick.minor.right"] = True
 
-def kt(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
+@attr.s
+class PlotLabel:
+    name: str = attr.ib()
+    x_label: str = attr.ib()
+    y_label: str = attr.ib()
+
+def _retrieve_kt(result: substructure.SubstructureResult) -> substructure.T_Array:
+    return result.kt
+
+def _retrieve_z(result: substructure.SubstructureResult) -> substructure.T_Array:
+    return result.z
+
+def _retrieve_delta_R(result: substructure.SubstructureResult) -> substructure.T_Array:
+    return result.delta_R
+
+def _retrieve_theta(result: substructure.SubstructureResult, jet_R: float) -> substructure.T_Array:
+    return result.delta_R / jet_R
+
+def _plot_distribution(results: Sequence[substructure.SubstructureResult], retrieve_values_func: Callable[[substructure.SubstructureResult], substructure.T_Array], jet_pt: substructure.T_Array, axis: bh.axis.Regular, jet_pt_bins: Sequence[helpers.RangeSelector], label: PlotLabel, path: Path) -> None:
     # Validation
     path.mkdir(parents=True, exist_ok=True)
 
@@ -39,14 +62,19 @@ def kt(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.
         jet_pt_mask = jet_pt_bin.mask_array(jet_pt)
         # Number of jets includes untagged.
         n_jets = len(jet_pt[jet_pt_mask])
+        if n_jets == 0:
+            logger.warning(f"No jets within {jet_pt_bin.min}-{jet_pt_bin.max}. Skipping bin!")
+            continue
+
         for result in results:
-            print(f"Processing {jet_pt_bin}, {result.title}")
+            logger.debug(f"Processing {jet_pt_bin}, {result.title}")
             # To get the jet pt mask to match the result, we need to apply the indices.
             # However, we can't apply them directly because the indices are jagged. By taking
             # those which have a count, we'll match the structure.
             jet_pt_substructure_result_mask = jet_pt_mask[result.indices.counts > 0]
-            bh_hist = bh.Histogram(bh.axis.Regular(90, 0, 45), storage=bh.storage.Weight())
-            bh_hist.fill(result.kt[jet_pt_substructure_result_mask])
+            bh_hist = bh.Histogram(axis, storage=bh.storage.Weight())
+            #print(f"Values: {retrieve_values_func(result)[jet_pt_substructure_result_mask]}")
+            bh_hist.fill(retrieve_values_func(result)[jet_pt_substructure_result_mask])
             h = histogram.Histogram1D(
                 bin_edges = bh_hist.axes[0].edges,
                 y = bh_hist.view().value,
@@ -60,6 +88,7 @@ def kt(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.
             ax.errorbar(h.x, h.y, yerr=h.errors, xerr=h.bin_widths / 2,
                         marker=".", linestyle="", label=result.title)
 
+        # TODO: Use label!
         # Labeling
         text = fr"${jet_pt_bin.min} < p_{{\text{{T}}}}^{{\text{{jet}}}} < {jet_pt_bin.max}$"
         ax.text(0.95, 0.95, text,
@@ -71,13 +100,64 @@ def kt(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.
         # Presentation
         ax.legend(frameon=False, loc="lower right")
         ax.set_yscale("log")
-        ax.set_xlabel(r"$k_{\text{T}}\:(\text{GeV}/c)$")
-        ax.set_ylabel(r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$")
+        ax.set_xlabel(label.x_label)
+        ax.set_ylabel(label.y_label)
         fig.tight_layout()
 
         # Store and reset
-        fig.savefig(path / f"kt_jetPt_{jet_pt_bin.min}_{jet_pt_bin.max}.pdf")
+        fig.savefig(path / f"{label.name}_jetPt_{jet_pt_bin.min}_{jet_pt_bin.max}.pdf")
         ax.clear()
 
     plt.close()
 
+def kt(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
+    logger.debug("Plotting kt")
+    _plot_distribution(results = results,
+                       retrieve_values_func=_retrieve_kt,
+                       axis=bh.axis.Regular(90, 0, 45),
+                       jet_pt = jet_pt, jet_pt_bins = jet_pt_bins,
+                       label = PlotLabel(
+                           name = "kt",
+                           x_label = r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                           y_label = r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                       ),
+                       path = path)
+
+def z(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
+    logger.debug("Plotting z")
+    _plot_distribution(results = results,
+                       retrieve_values_func=_retrieve_z,
+                       axis=bh.axis.Regular(50, 0, 1),
+                       jet_pt = jet_pt, jet_pt_bins = jet_pt_bins,
+                       label = PlotLabel(
+                           name = "z",
+                           x_label = r"$z$",
+                           y_label = r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$",
+                       ),
+                       path = path)
+
+def delta_R(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
+    logger.debug("Plotting delta R")
+    _plot_distribution(results=results,
+                       retrieve_values_func=_retrieve_delta_R,
+                       axis=bh.axis.Regular(20, 0, 0.4),
+                       jet_pt = jet_pt, jet_pt_bins = jet_pt_bins,
+                       label = PlotLabel(
+                           name = "delta_R",
+                           x_label = r"$R$",
+                           y_label = r"$1/N_{\text{jets}}\:\text{d}N/\text{d}R$",
+                       ),
+                       path = path)
+
+def theta(results: Sequence[substructure.SubstructureResult], jet_R: float, jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
+    logger.debug("Plotting theta")
+    _plot_distribution(results = results,
+                       retrieve_values_func=partial(_retrieve_theta, jet_R=jet_R),
+                       axis=bh.axis.Regular(50, 0, 1),
+                       jet_pt = jet_pt, jet_pt_bins = jet_pt_bins,
+                       label = PlotLabel(
+                           name = "theta",
+                           x_label = r"$\theta$",
+                           y_label = r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\theta$",
+                       ),
+                       path = path)
