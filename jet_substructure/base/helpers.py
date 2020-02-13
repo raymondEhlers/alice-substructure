@@ -139,12 +139,88 @@ def hdf5_to_awkward(array_names: Sequence[str], path: Path, filename: str = "dat
 
     return data
 
+def _bin_widths(bin_edges: np.ndarray) -> np.ndarray:
+    """ Bin widths calculated from the bin edges.
+
+    Args:
+        bin_edges: Bin edges.
+    Returns:
+        Array of the bin widths.
+    """
+    return bin_edges[1:] - bin_edges[:-1]
+
+def _bin_centers(bin_edges: np.ndarray, bin_widths: np.ndarray) -> np.ndarray:
+    """ Bin centers.
+
+    Args:
+        bin_edges: Bin edges.
+        bin_widths: Bin widths.
+    Returns:
+        Array of the bin centers.
+    """
+    half_bin_widths = bin_widths / 2
+    return bin_edges[:-1] + half_bin_widths
+
 @attr.s
 class BinnedData2D:
     x_bin_edges: np.ndarray = attr.ib()
     y_bin_edges: np.ndarray = attr.ib()
     values: np.ndarray = attr.ib()
     errors_squared: np.ndarray = attr.ib()
+
+    @property
+    def x_bin_widths(self) -> np.ndarray:
+        """ Bin widths calculated from the bin edges.
+
+        Returns:
+            Array of the bin widths.
+        """
+        return _bin_widths(self.x_bin_edges)
+
+    @property
+    def y_bin_widths(self) -> np.ndarray:
+        """ Bin widths calculated from the bin edges.
+
+        Returns:
+            Array of the bin widths.
+        """
+        return _bin_widths(self.y_bin_edges)
+
+    @property
+    def x(self) -> np.ndarray:
+        """ The x bin centers (``x``).
+
+        This property caches the x value so we don't have to calculate it every time.
+
+        Args:
+            None
+        Returns:
+            Array of center of bins.
+        """
+        try:
+            return self._x
+        except AttributeError:
+            self._x: np.ndarray = _bin_centers(bin_edges = self.x_bin_edges, bin_widths=self.x_bin_widths)
+
+        return self._x
+
+    @property
+    def y(self) -> np.ndarray:
+        """ The y bin centers (``y``).
+
+        This property caches the x value so we don't have to calculate it every time.
+
+        Args:
+            None
+        Returns:
+            Array of center of bins.
+        """
+        try:
+            return self._y
+        except AttributeError:
+            self._y: np.ndarray = _bin_centers(bin_edges = self.y_bin_edges, bin_widths=self.y_bin_widths)
+
+        return self._y
 
 
 def histogram_from_array(df: Union[pd.DataFrame, UprootArrays], observable_name: str, axis: bh.axis.Regular) -> histogram.Histogram1D:
