@@ -48,9 +48,7 @@ calculate_kt_drop = functools.partial(_calculate_dynamical_grooming, grooming_fu
 calculate_time_drop = functools.partial(_calculate_dynamical_grooming, grooming_func=_time_drop)
 
 
-def calculate_kt_leading(kt: T_Input, z_hard_cutoff_mask: Optional[T_Input] = None) -> Tuple[np.ndarray, np.ndarray]:
-    if z_hard_cutoff_mask is not None:
-        kt = kt[z_hard_cutoff_mask]
+def calculate_kt_leading(kt: T_Input) -> Tuple[np.ndarray, np.ndarray]:
     arg_max = kt.argmax()
     return kt[arg_max], arg_max
 
@@ -270,7 +268,7 @@ def calculate_substructure_variables(
         kt=arrays[kt_name],
     )
     leading_kt_hard_cutoff_values, leading_kt_hard_cutoff_indices = calculate_kt_leading(
-        arrays[kt_name], z_hard_cutoff_mask=arrays[z_name] > z_hard_cutoff
+        arrays[kt_name][arrays[z_name] > z_hard_cutoff]
     )
     leading_kt_hard_cutoff = SubstructureResult.from_full_dataset(
         name="leading_kt_hard_cutoff",
