@@ -91,7 +91,6 @@ def _plot_distribution(results: Sequence[substructure.SubstructureResult], retri
             ax.errorbar(h.x, h.y, yerr=h.errors, xerr=h.bin_widths / 2,
                         marker=".", linestyle="", label=result.title)
 
-        # TODO: Use label!
         # Labeling
         text = fr"${jet_pt_bin.min} < p_{{\text{{T}}}}^{{\text{{jet}}}} < {jet_pt_bin.max}$"
         ax.text(0.95, 0.95, text,
@@ -111,13 +110,13 @@ def _plot_distribution(results: Sequence[substructure.SubstructureResult], retri
         fig.savefig(path / f"{label.name}_jetPt_{jet_pt_bin.min}_{jet_pt_bin.max}.pdf")
         ax.clear()
 
-    plt.close()
+    plt.close(fig)
 
 def kt(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
-    logger.debug("Plotting kt")
+    logger.info("Plotting kt")
     _plot_distribution(results = results,
                        retrieve_values_func=_retrieve_kt,
-                       axis=bh.axis.Regular(90, 0, 45),
+                       axis=bh.axis.Regular(50, 0, 25),
                        jet_pt = jet_pt, jet_pt_bins = jet_pt_bins,
                        label = PlotLabel(
                            name = "kt",
@@ -127,10 +126,10 @@ def kt(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.
                        path = path)
 
 def z(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
-    logger.debug("Plotting z")
+    logger.info("Plotting z")
     _plot_distribution(results = results,
                        retrieve_values_func=_retrieve_z,
-                       axis=bh.axis.Regular(50, 0, 1),
+                       axis=bh.axis.Regular(20, 0, 0.5),
                        jet_pt = jet_pt, jet_pt_bins = jet_pt_bins,
                        label = PlotLabel(
                            name = "z",
@@ -140,7 +139,7 @@ def z(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.T
                        path = path)
 
 def delta_R(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
-    logger.debug("Plotting delta R")
+    logger.info("Plotting delta R")
     _plot_distribution(results=results,
                        retrieve_values_func=_retrieve_delta_R,
                        axis=bh.axis.Regular(20, 0, 0.4),
@@ -153,7 +152,7 @@ def delta_R(results: Sequence[substructure.SubstructureResult], jet_pt: substruc
                        path = path)
 
 def theta(results: Sequence[substructure.SubstructureResult], jet_R: float, jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
-    logger.debug("Plotting theta")
+    logger.info("Plotting theta")
     _plot_distribution(results = results,
                        retrieve_values_func=partial(_retrieve_theta, jet_R=jet_R),
                        axis=bh.axis.Regular(50, 0, 1),
@@ -166,7 +165,7 @@ def theta(results: Sequence[substructure.SubstructureResult], jet_R: float, jet_
                        path = path)
 
 def splitting_number(results: Sequence[substructure.SubstructureResult], jet_R: float, jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
-    logger.debug("Plotting splitting number")
+    logger.info("Plotting splitting number")
     _plot_distribution(results = results,
                        retrieve_values_func=partial(_retrieve_theta, jet_R=jet_R),
                        axis=bh.axis.Regular(10, 0, 10),
