@@ -1,6 +1,6 @@
 
 from pathlib import Path
-from typing import Any, Dict, Sequence, Union
+from typing import Any, Dict, Mapping, Sequence, TypeVar, Union
 
 import attr
 import awkward as ak
@@ -138,6 +138,20 @@ def hdf5_to_awkward(array_names: Sequence[str], path: Path, filename: str = "dat
             data[array_name] = storage[array_name]
 
     return data
+
+def _normalize_key(key: str) -> str:
+    separator = "_"
+    key = key.replace(".f", separator)
+    index = key.find(separator) + len(separator)
+    # +1 to skip over the latter that's being modified.
+    return key[:index] + key[index].lower() + key[index + 1:]
+
+
+_T = TypeVar("_T")
+
+def normalize_array_names(arrays: Mapping[str, _T]) -> Dict[str, _T]:
+    return {_normalize_key(k): v for k, v in arrays.items()}
+
 
 def _bin_widths(bin_edges: np.ndarray) -> np.ndarray:
     """ Bin widths calculated from the bin edges.

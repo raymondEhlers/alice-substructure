@@ -6,7 +6,7 @@
 """
 
 import functools
-from typing import Callable, Dict, Mapping, Optional, Tuple, Type, TypeVar, Union
+from typing import Callable, Dict, Tuple, Type, TypeVar, Union
 
 import attr
 import awkward as ak
@@ -94,7 +94,12 @@ class SubstructureResult:
             return self._splitting_number
         except AttributeError:
             # +1 because splittings counts from 1, but indexing starts from 0.
-            self._splitting_number: T_Array = self.indices + 1
+            splitting_number = self.indices + 1
+            # If there were no splittings, we want to set that to 0.
+            splitting_number = splitting_number.pad(1).fillna(0)
+            # Must flatten because the indices are still jagged.
+            self._splitting_number: T_Array = splitting_number.flatten()
+
         return self._splitting_number
 
     @splitting_number.setter
@@ -246,7 +251,7 @@ def calculate_substructure_variables(
     z_g, n_sd, z_indices = calculate_soft_drop(z=arrays[z_name], z_hard_cutoff=z_hard_cutoff)
     soft_drop = SoftDropGroomingResult.from_full_dataset(
         name="SD",
-        title="SoftDrop",
+        title=f"SoftDrop $z > {z_hard_cutoff}$",
         values=z_g,
         indices=z_indices,
         delta_R=arrays[delta_R_name],
@@ -272,7 +277,7 @@ def calculate_substructure_variables(
     )
     leading_kt_hard_cutoff = SubstructureResult.from_full_dataset(
         name="leading_kt_hard_cutoff",
-        title=r"SD Leading $k_{\text{T}}$",
+        title=fr"SD $z > {z_hard_cutoff}$ Leading $k_{{\text{{T}}}}$",
         values=leading_kt_hard_cutoff_values,
         indices=leading_kt_hard_cutoff_indices,
         delta_R=arrays[delta_R_name],
@@ -283,18 +288,6 @@ def calculate_substructure_variables(
     # NOTE: The number of jets normalization is just len(jet_pt)
 
     return dynamical_z, dynamical_kt, dynamical_time, soft_drop, leading_kt, leading_kt_hard_cutoff
-
-
-def _normalize_key(key: str) -> str:
-    separator = "_"
-    key = key.replace(".f", separator)
-    index = key.find(separator) + len(separator)
-    # +1 to skip over the latter that's being modified.
-    return key[:index] + key[index].lower() + key[index + 1:]
-
-
-def normalize_array_names(arrays: Mapping[str, T_Array]) -> Dict[str, T_Array]:
-    return {_normalize_key(k): v for k, v in arrays.items()}
 
 
 def run() -> None:
