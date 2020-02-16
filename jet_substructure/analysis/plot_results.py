@@ -18,6 +18,7 @@ import numpy as np
 
 import pachyderm.plot
 from pachyderm import histogram
+from pachyderm import binned_data
 
 from jet_substructure.base import helpers
 from jet_substructure.analysis import substructure
@@ -51,7 +52,7 @@ def _retrieve_delta_R(result: substructure.SubstructureResult) -> substructure.T
 def _retrieve_theta(result: substructure.SubstructureResult, jet_R: float) -> substructure.T_Array:
     return result.delta_R / jet_R
 
-def _splitting_number(result: substructure.SubstructureResult) -> substructure.T_Array:
+def _retrieve_splitting_number(result: substructure.SubstructureResult) -> substructure.T_Array:
     return result.splitting_number
 
 def _plot_distribution(results: Sequence[substructure.SubstructureResult], retrieve_values_func: Callable[[substructure.SubstructureResult], substructure.T_Array], jet_pt: substructure.T_Array, axis: bh.axis.Regular, jet_pt_bins: Sequence[helpers.RangeSelector], label: PlotLabel, path: Path) -> None:
@@ -74,8 +75,14 @@ def _plot_distribution(results: Sequence[substructure.SubstructureResult], retri
             # To get the jet pt mask to match the result, we need to apply the indices.
             # However, we can't apply them directly because the indices are jagged. By taking
             # those which have a count, we'll match the structure.
-            jet_pt_substructure_result_mask = jet_pt_mask[result.indices.counts > 0]
+            #jet_pt_substructure_result_mask = jet_pt_mask[result.indices.counts > 0]
+            # TEMP - Should use the above.
+            # This works for the splitting but nothing else because for the splittings we fill in 0,
+            # but for the others, those are just empty entries.
+            jet_pt_substructure_result_mask = jet_pt_mask
+            # ENDTEMP
             bh_hist = bh.Histogram(axis, storage=bh.storage.Weight())
+            #print(f"{retrieve_values_func(result)}")
             #print(f"Values: {retrieve_values_func(result)[jet_pt_substructure_result_mask]}")
             bh_hist.fill(retrieve_values_func(result)[jet_pt_substructure_result_mask])
             h = histogram.Histogram1D(
@@ -164,10 +171,12 @@ def theta(results: Sequence[substructure.SubstructureResult], jet_R: float, jet_
                        ),
                        path = path)
 
-def splitting_number(results: Sequence[substructure.SubstructureResult], jet_R: float, jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
+def splitting_number(results: Sequence[substructure.SubstructureResult], jet_pt: substructure.T_Array, jet_pt_bins: Sequence[helpers.RangeSelector], path: Path) -> None:
+    # TODO: Plot on log scale.
+    # TODO: Need to convert empty indices to 0s.
     logger.info("Plotting splitting number")
     _plot_distribution(results = results,
-                       retrieve_values_func=partial(_retrieve_theta, jet_R=jet_R),
+                       retrieve_values_func=_retrieve_splitting_number,
                        axis=bh.axis.Regular(10, 0, 10),
                        jet_pt = jet_pt, jet_pt_bins = jet_pt_bins,
                        label = PlotLabel(
@@ -204,23 +213,26 @@ def _plot_lund_plane_hist(results: Sequence[substructure.SubstructureResult],
 
             bh_hist = bh.Histogram(*axes, storage=bh.storage.Weight())
             bh_hist.fill(*retrieve_values_func(result, jet_pt_substructure_result_mask))
-
-            # TODO: Scaling!
-            # Scale by bin width
-            #h /= h.bin_widths
-            # TODO: Scale by njets.
-            #h /= n_jets
             x, y = bh_hist.axes.edges
             view = bh_hist.view()
-            h = helpers.BinnedData2D(
-                x_bin_edges = x, y_bin_edges = y,
+            h = binned_data.BinnedData(
+                axes = [x, y],
                 values = view.value,
-                errors_squared = view.variance,
+                variances = view.variance,
             )
+            # Scale by bin width
+            x_bin_widths, y_bin_widths = np.meshgrid(*h.axes.bin_widths)
+            bin_widths = x_bin_widths * y_bin_widths
+            #print(f"x_bin_widths: {x_bin_widths.size}")
+            #print(f"y_bin_widths: {y_bin_widths.size}")
+            #print(f"bin_widths size: {bin_widths.size}")
+            h /= bin_widths
+            # Scale by njets.
+            h /= n_jets
 
             # Make the plot
-            mesh = ax.pcolormesh(h.x_bin_edges.T, h.y_bin_edges.T, h.values.T,
-                                 norm=matplotlib.colors.LogNorm(vmin=1, vmax=h.values.max()))
+            mesh = ax.pcolormesh(h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T,
+                                 norm=matplotlib.colors.LogNorm(vmin=h.values[h.values > 0].min(), vmax=h.values.max()))
             fig.colorbar(mesh)
 
             # Labeling
@@ -266,7 +278,7 @@ def _plot_lund_plane_scatter(results: Sequence[substructure.SubstructureResult],
             x, y = retrieve_values_func(result, jet_pt_substructure_result_mask)
 
             # Make the plot
-            mesh = ax.scatter(x, y, alpha = 0.2)
+            ax.scatter(x, y, alpha = 0.1)
 
             # Labeling
             text = fr"${jet_pt_bin.min} < p_{{\text{{T}}}}^{{\text{{jet, part}}}} < {jet_pt_bin.max}$"
