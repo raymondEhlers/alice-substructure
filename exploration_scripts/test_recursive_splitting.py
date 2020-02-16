@@ -40,14 +40,15 @@ def convert_flat_to_tree(parent_label: int, relationships: Sequence[Tuple[int, i
     Returns:
         Tree representing these relationships.
     """
-    return { v: convert_flat_to_tree(v, relationships) for v in [index for index, parent in relationships if parent == parent_label]}
+    return { p: convert_flat_to_tree(p, relationships) for p in [index for index, parent in relationships if parent == parent_label]}
 
 def run() -> None:
     f = uproot.open("../temp/AnalysisResults.root")
     t = f["AliAnalysisTaskJetDynamicalGrooming_RawTree_Data_ConstSub_Incl"]
     arrays = t.arrays(namedecode="utf-8")
 
-    splitting_tree = convert_flat_to_tree(-1, list(enumerate(arrays["data.fSplitParentLabel"][0])))
+    #splitting_tree = convert_flat_to_tree(0, list(enumerate(arrays["data.fSubjets.fSplittingNodeIndex"][0])))
+    splitting_tree = convert_flat_to_tree(-1, list(enumerate(arrays["data.fJetSplittings.fParentIndex"][0])))
     pretty_print_tree(splitting_tree)
 
     IPython.embed()
