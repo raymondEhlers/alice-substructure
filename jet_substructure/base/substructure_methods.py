@@ -173,6 +173,9 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):
     @ak.util.wrapjaggedmethod(JaggedSubjetArrayMethods)
     def from_jagged(cls, part_of_iterative_splitting: Result[bool], parent_splitting_index: Result[int],
                  constituents_indices: Result[int], constituents_jagged_indices: Result[int]) -> "SubjetArray":
+        # NOTE: This doesn't work because the JaggedArrays are different sizes.
+        #       Need to find a new solution! Probably just construct the constituent indices array before passing it in.
+        #       See: https://github.com/scikit-hep/uproot/issues/452
         return cls(part_of_iterative_splitting, parent_splitting_index, constituents_indices, constituents_jagged_indices)
 
 class JetSplitting:
