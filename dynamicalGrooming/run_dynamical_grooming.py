@@ -326,7 +326,7 @@ def run_dynamical_grooming(task_name: str,
             "", "", "", 0.4, "",
             "tracks", "", "", "", "", "TPC", "V0M", physics_selection,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kData,
-            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kConstSub,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kNoSub,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kInclusive,
             0, 0, 0.6,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kSecondOrder,
@@ -352,6 +352,7 @@ def run_dynamical_grooming(task_name: str,
     dynamical_grooming.SetJetPtThreshold(20)
     dynamical_grooming.SetNeedEmcalGeom(False)
     #dynamical_grooming.SetZvertexDiffValue(0.1)
+    dynamical_grooming.SetStoreRecursiveJetSplittings(True)
 
     #dynamical_grooming.SetDoTwoTrack(kTRUE)
     # The hard cutoff isn't meaningful when storing all splittings.
