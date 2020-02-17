@@ -20,6 +20,11 @@ Result = Union[UprootArray, T]
 #class UprootArray(Generic[T]): ...
 #Result = Union[UprootArray[T], T]
 
+class ArrayMethods(ak.Methods):
+    # Seems to be required for creating JaggedArray elements within an Array.
+    # Otherwise, it will create one object per event, with that object storing arrays of members.
+    awkward = ak
+
 class JetConstituent:
     def __init__(self, pt: Result[float], eta: Result[float], phi: Result[float], global_index: Result[int]) -> None:
         self._pt = pt
@@ -43,10 +48,7 @@ class JetConstituent:
     def index(self) -> Result[int]:
         return self._global_index
 
-class JetConstituentArrayMethods(ak.Methods):
-    # Seems to be required for creating JaggedArray elements within an Array.
-    # Otherwise, it will create one object per event, with that object storing arrays of members.
-    awkward = ak
+class JetConstituentArrayMethods(ArrayMethods):
     def _init_object_array(self, table: ak.Table) -> None:
         self.awkward.ObjectArray.__init__(
             self, table, lambda row: JetConstituent(row["pt"], row["eta"], row["phi"], row["global_index"])
@@ -103,11 +105,11 @@ class Subjet:
     def constituents(self, jet_constituents: Result[Sequence[JetConstituent]]) -> Result[Sequence[JetConstituent]]:
         return jet_constituents[self._constituents_indices]
         #return ak.JaggedArray.fromoffsets(self._constituents_indices.offsets, jet_constituents[s.flatten()])
-        return ak.JaggedArray.fromoffsets(
-            self._constituents_indices.offsets, ak.JaggedArray.fromoffsets(
-                self._constituents_indices.offsets, jet_constituents.flatten()[self._constituents_indices.flatten(axis=1)]
-            )
-        )
+        #return ak.JaggedArray.fromoffsets(
+        #    self._constituents_indices.offsets, ak.JaggedArray.fromoffsets(
+        #        self._constituents_indices.offsets, jet_constituents.flatten()[self._constituents_indices.flatten(axis=1)]
+        #    )
+        #)
 
     #constituents[subjets._constituents_indices.flatten(axis=1)]
 
@@ -119,17 +121,7 @@ class Subjet:
     #        )
     #    )
 
-# TODO: Add jagged constructors for the others!
-
-class SubjetArray(ak.ObjectArray):
-    def __init__(self, part_of_iterative_splitting: Result[bool], parent_splitting_index: Result[int],
-                 constituents_indices: Result[int], constituents_jagged_indices: Result[int]) -> None:
-        self._init_object_array(ak.Table())
-        self["part_of_iterative_splitting"] = part_of_iterative_splitting
-        self["parent_splitting_index"] = parent_splitting_index
-        self["constituents_indices"] = constituents_indices
-        self["constituents_jagged_indices"] = constituents_jagged_indices
-
+class SubjetArrayMethods(ArrayMethods):
     def _init_object_array(self, table: ak.Table) -> None:
         self.awkward.ObjectArray.__init__(
             self, table, lambda row: Subjet(row["part_of_iterative_splitting"], row["parent_splitting_index"], row["constituents_indices"], row["constituents_jagged_indices"])
@@ -137,8 +129,12 @@ class SubjetArray(ak.ObjectArray):
 
     @property
     def _constituents_indices(self) -> Result[ak.JaggedArray]:
-        # NOTE: I can't figure out how to construct a nested JaggedArray, so I have to construct it event by event.
-        #       This is super inefficient. I will try to revise it when I get a better answer.
+        """ Construct constituent indices from stored JaggedArrays.
+
+        Note:
+            I can't figure out how to construct a nested JaggedArray, so I have to construct it event by event.
+            This is super inefficient. I will try to revise it when I get a better answer.
+        """
         return ak.fromiter(
             (ak.JaggedArray.fromoffsets(jagged_indices, constituents_indices)
              for jagged_indices, constituents_indices in
@@ -160,6 +156,24 @@ class SubjetArray(ak.ObjectArray):
                 jet_constituents[self._constituents_indices.flatten(axis=1)].flatten()
             )
         )
+
+# Adds in JaggedArray methods for constructing objects with jagged structure.
+JaggedSubjetArrayMethods = SubjetArrayMethods.mixin(SubjetArrayMethods, ak.JaggedArray)
+
+class SubjetArray(SubjetArrayMethods, ak.ObjectArray):
+    def __init__(self, part_of_iterative_splitting: Result[bool], parent_splitting_index: Result[int],
+                 constituents_indices: Result[int], constituents_jagged_indices: Result[int]) -> None:
+        self._init_object_array(ak.Table())
+        self["part_of_iterative_splitting"] = part_of_iterative_splitting
+        self["parent_splitting_index"] = parent_splitting_index
+        self["constituents_indices"] = constituents_indices
+        self["constituents_jagged_indices"] = constituents_jagged_indices
+
+    @classmethod
+    @ak.util.wrapjaggedmethod(JaggedSubjetArrayMethods)
+    def from_jagged(cls, part_of_iterative_splitting: Result[bool], parent_splitting_index: Result[int],
+                 constituents_indices: Result[int], constituents_jagged_indices: Result[int]) -> "SubjetArray":
+        return cls(part_of_iterative_splitting, parent_splitting_index, constituents_indices, constituents_jagged_indices)
 
 class JetSplitting:
     def __init__(self, kt: Result[float], delta_R: Result[float], z: Result[float], parent_index: Result[int]) -> None:
@@ -186,14 +200,7 @@ class JetSplitting:
         iterative_splittings = subjets.parent_splitting[subjets.part_of_iterative_splitting]
         return self[iterative_splittings]
 
-class JetSplittingArray(ak.ObjectArray):
-    def __init__(self, kt: Result[float], delta_R: Result[float], z: Result[float], parent_index: Result[int]) -> None:
-        self._init_object_array(ak.Table())
-        self["kt"] = kt
-        self["delta_R"] = delta_R
-        self["z"] = z
-        self["parent_index"] = parent_index
-
+class JetSplittingArrayMethods(ArrayMethods):
     def _init_object_array(self, table: ak.Table) -> None:
         self.awkward.ObjectArray.__init__(
             self, table, lambda row: JetConstituent(row["kt"], row["delta_R"], row["z"], row["parent_index"])
@@ -213,6 +220,23 @@ class JetSplittingArray(ak.ObjectArray):
 
     def iterative_splitting(self, subjets: Result[Sequence[Subjet]]) -> Result[bool]:
         return self.iterative_splitting(subjets)
+
+# Adds in JaggedArray methods for constructing objects with jagged structure.
+JaggedJetSplittingArrayMethods = JetSplittingArrayMethods.mixin(JetSplittingArrayMethods, ak.JaggedArray)
+
+class JetSplittingArray(JetSplittingArrayMethods, ak.ObjectArray):
+    def __init__(self, kt: Result[float], delta_R: Result[float], z: Result[float], parent_index: Result[int]) -> None:
+        self._init_object_array(ak.Table())
+        self["kt"] = kt
+        self["delta_R"] = delta_R
+        self["z"] = z
+        self["parent_index"] = parent_index
+
+    @classmethod
+    @ak.util.wrapjaggedmethod(JaggedJetSplittingArrayMethods)
+    def from_jagged(cls, kt: Result[float], delta_R: Result[float], z: Result[float],
+                    parent_index: Result[int]) -> "JetSplittingArray":
+        return cls(kt, delta_R, z, parent_index)
 
 class SubstructureJet(ak.Methods):
     def __init__(self, jet_pt: Result[float], constituents: Result[Sequence[JetConstituent]],
