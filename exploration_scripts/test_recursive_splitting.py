@@ -10,6 +10,8 @@ import pprint
 import IPython
 import uproot
 
+from jet_substructure.base import substructure_methods
+
 def pretty_print_tree(d: Dict[int, Any], indent: int = 0) -> None:
     """ Convenience function for pretty printing the splitting tree.
 
@@ -51,7 +53,32 @@ def run() -> None:
     splitting_tree = convert_flat_to_tree(-1, list(enumerate(arrays["data.fJetSplittings.fParentIndex"][0])))
     pretty_print_tree(splitting_tree)
 
-    IPython.embed()
+    constituents = substructure_methods.JetConstituentArray.from_jagged(
+        arrays["data.fJetConstituents.fPt"],
+        arrays["data.fJetConstituents.fEta"],
+        arrays["data.fJetConstituents.fPhi"],
+        arrays["data.fJetConstituents.fGlobalIndex"]
+    )
+    #constituents = substructure_methods.JetConstituentArray.from_jagged(
+    #    pt=arrays["data.fJetConstituents.fPt"],
+    #    eta=arrays["data.fJetConstituents.fEta"],
+    #    phi=arrays["data.fJetConstituents.fPhi"],
+    #    global_index=arrays["data.fJetConstituents.fGlobalIndex"]
+    #)
+    splittings = substructure_methods.JetSplittingArray.from_jagged(
+        arrays["data.fJetSplittings.fKt"],
+        arrays["data.fJetSplittings.fDeltaR"],
+        arrays["data.fJetSplittings.fZ"],
+        arrays["data.fJetSplittings.fParentIndex"]
+    )
+    subjets = substructure_methods.SubjetArray.from_jagged(
+        arrays["data.fSubjets.fPartOfIterativeSplitting"],
+        arrays["data.fSubjets.fSplittingNodeIndex"],
+        arrays["data.fSubjets.fConstituentIndices"],
+        arrays["data.fSubjets.fConstituentJaggedIndices"],
+    )
+
+    IPython.start_ipython(user_ns=locals())
 
 if __name__ == "__main__":
     run()
