@@ -87,6 +87,7 @@ def _concatenate_jagged_array(arrays: Sequence[ak.JaggedArray]) -> ak.JaggedArra
     Returns:
         Concatenate jagged array.
     """
+    # TODO: Perhaps can be replaced with ak.concatenate(arrays)
     contents = np.concatenate([j.flatten() for j in arrays])
     counts = np.concatenate([j.counts for j in arrays])
     return ak.JaggedArray.fromcounts(counts, contents)
