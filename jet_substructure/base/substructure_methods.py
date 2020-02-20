@@ -91,10 +91,10 @@ class JetConstituentArray(JetConstituentArrayMethods, ak.ObjectArray):
 
 class Subjet:
     def __init__(self, part_of_iterative_splitting: Result[bool], parent_splitting_index: Result[int],
-                 constituents_indices: Result[int], constituents_jagged_indices: Result[int]) -> None:
+                 constituents_indices: Result[int]) -> None:
         self._part_of_iterative_splitting = part_of_iterative_splitting
         self._parent_splitting_index = parent_splitting_index
-        self._constituents_indices = ak.JaggedArray.fromoffsets(constituents_jagged_indices, constituents_indices)
+        self._constituents_indices = constituents_indices
 
     def part_of_iterative_splitting(self) -> Result[bool]:
         return self._part_of_iterative_splitting
@@ -121,10 +121,17 @@ class Subjet:
     #        )
     #    )
 
+def _convert_jagged_constituents_indicies(constituents_indices: ak.JaggedArray, jagged_indices: ak.JaggedArray) -> ak.JaggedArray:
+    return ak.fromiter(
+        (ak.JaggedArray.fromoffsets(jagged, indices)
+         for jagged, indices in
+         zip(jagged_indices, constituents_indices))
+    )
+
 class SubjetArrayMethods(ArrayMethods):
     def _init_object_array(self, table: ak.Table) -> None:
         self.awkward.ObjectArray.__init__(
-            self, table, lambda row: Subjet(row["part_of_iterative_splitting"], row["parent_splitting_index"], row["constituents_indices"], row["constituents_jagged_indices"])
+            self, table, lambda row: Subjet(row["part_of_iterative_splitting"], row["parent_splitting_index"], row["constituents_indices"])
         )
 
     @property
@@ -135,11 +142,8 @@ class SubjetArrayMethods(ArrayMethods):
             I can't figure out how to construct a nested JaggedArray, so I have to construct it event by event.
             This is super inefficient. I will try to revise it when I get a better answer.
         """
-        return ak.fromiter(
-            (ak.JaggedArray.fromoffsets(jagged_indices, constituents_indices)
-             for jagged_indices, constituents_indices in
-             zip(self["constituents_jagged_indices"], self["constituents_indices"]))
-        )
+        return self["constituents_indices"]
+        #return _convert_jagged_constituents_indicies(self["constituents_indices"], self["constituents_jagged_indices"])
 
     def part_of_iterative_splitting(self) -> Result[bool]:
         return self["part_of_iterative_splitting"]
@@ -162,21 +166,20 @@ JaggedSubjetArrayMethods = SubjetArrayMethods.mixin(SubjetArrayMethods, ak.Jagge
 
 class SubjetArray(SubjetArrayMethods, ak.ObjectArray):
     def __init__(self, part_of_iterative_splitting: Result[bool], parent_splitting_index: Result[int],
-                 constituents_indices: Result[int], constituents_jagged_indices: Result[int]) -> None:
+                 constituents_indices: Result[int]) -> None:
         self._init_object_array(ak.Table())
         self["part_of_iterative_splitting"] = part_of_iterative_splitting
         self["parent_splitting_index"] = parent_splitting_index
         self["constituents_indices"] = constituents_indices
-        self["constituents_jagged_indices"] = constituents_jagged_indices
 
     @classmethod
     @ak.util.wrapjaggedmethod(JaggedSubjetArrayMethods)
     def from_jagged(cls, part_of_iterative_splitting: Result[bool], parent_splitting_index: Result[int],
-                 constituents_indices: Result[int], constituents_jagged_indices: Result[int]) -> "SubjetArray":
+                 constituents_indices: Result[int]) -> "SubjetArray":
         # NOTE: This doesn't work because the JaggedArrays are different sizes.
         #       Need to find a new solution! Probably just construct the constituent indices array before passing it in.
         #       See: https://github.com/scikit-hep/uproot/issues/452
-        return cls(part_of_iterative_splitting, parent_splitting_index, constituents_indices, constituents_jagged_indices)
+        return cls(part_of_iterative_splitting, parent_splitting_index, constituents_indices)
 
 class JetSplitting:
     def __init__(self, kt: Result[float], delta_R: Result[float], z: Result[float], parent_index: Result[int]) -> None:

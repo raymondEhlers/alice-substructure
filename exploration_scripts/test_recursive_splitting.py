@@ -71,11 +71,18 @@ def run() -> None:
         arrays["data.fJetSplittings.fZ"],
         arrays["data.fJetSplittings.fParentIndex"]
     )
+
+    # When we want to pass the constituents_indices
+    constituents_indices = substructure_methods._convert_jagged_constituents_indicies(
+        arrays["data.fSubjets.fConstituentIndices"],
+        arrays["data.fSubjets.fConstituentJaggedIndices"],
+    )
+    # When we don't want to pass the values.
+    #constituents_indices = arrays["data.fSubjets.fPartOfIterativeSplitting"].zeros_like()
     subjets = substructure_methods.SubjetArray.from_jagged(
         arrays["data.fSubjets.fPartOfIterativeSplitting"],
         arrays["data.fSubjets.fSplittingNodeIndex"],
-        arrays["data.fSubjets.fConstituentIndices"],
-        arrays["data.fSubjets.fConstituentJaggedIndices"],
+        constituents_indices,
     )
 
     IPython.start_ipython(user_ns=locals())
