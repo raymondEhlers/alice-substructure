@@ -6,6 +6,7 @@
 
 from typing import Any, Dict, Sequence, Tuple
 
+import awkward as ak
 import pprint
 import IPython
 import uproot
@@ -79,10 +80,13 @@ def run() -> None:
     print("Done with splittings")
 
     # When we want to pass the constituents_indices
-    constituents_indices = substructure_methods._convert_jagged_constituents_indicies(
-        arrays["data.fSubjets.fConstituentIndices"],
-        arrays["data.fSubjets.fConstituentJaggedIndices"],
-    )
+    if "data.fSubjets.fConstituentJaggedIndices" in arrays:
+        constituents_indices = substructure_methods._convert_jagged_constituents_indicies(
+            arrays["data.fSubjets.fConstituentIndices"],
+            arrays["data.fSubjets.fConstituentJaggedIndices"],
+        )
+    else:
+        constituents_indices = ak.fromiter(arrays["data.fSubjets.fConstituentIndices"])
     # When we don't want to pass the values.
     #constituents_indices = arrays["data.fSubjets.fPartOfIterativeSplitting"].zeros_like()
     subjets = substructure_methods.SubjetArray.from_jagged(
