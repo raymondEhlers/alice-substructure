@@ -281,3 +281,42 @@ class SubstructureJet(ak.Methods):
         ...
 
 
+class SubstructureJetArrayMethods(ArrayMethods):
+    def _init_object_array(self, table: ak.Table) -> None:
+        self.awkward.ObjectArray.__init__(
+            self, table, lambda row: SubstructureJet(row["jet_pt"], row["constituents"], row["subjets"], row["splittings"])
+        )
+
+    @property
+    def jet_pt(self) -> Result[float]:
+        return self["jet_pt"]
+
+    @property
+    def constituents(self) -> Result[JetConstituentArray]:
+        return self["constituents"]
+
+    @property
+    def subjets(self) -> Result[SubjetArray]:
+        return self["subjets"]
+
+    @property
+    def splittings(self) -> Result[JetSplittingArray]:
+        return self["splittings"]
+
+# Adds in JaggedArray methods for constructing objects with jagged structure.
+JaggedSubstructureJetArrayMethods = SubstructureJetArrayMethods.mixin(SubstructureJetArrayMethods, ak.JaggedArray)
+
+class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):
+    def __init__(self, jet_pt: Result[float], jet_constituents: Result[JetConstituentArray], subjets: Result[SubjetArray], jet_splittings: Result[JetSplittingArray]) -> None:
+        self._init_object_array(ak.Table())
+        self["jet_pt"] = jet_pt
+        self["constituents"] = jet_constituents
+        self["subjets"] = subjets
+        self["jet_splittings"] = jet_splittings
+
+    @classmethod
+    @ak.util.wrapjaggedmethod(JaggedSubstructureJetArrayMethods)
+    def from_jagged(cls, jet_pt: Result[float], jet_constituents: Result[JetConstituentArray], subjets: Result[SubjetArray],
+                    jet_splittings: Result[JetSplittingArray]) -> "SubstructureJetArray":
+        return cls(jet_pt, jet_constituents, subjets, jet_splittings)
+

@@ -46,8 +46,12 @@ def convert_flat_to_tree(parent_label: int, relationships: Sequence[Tuple[int, i
 
 def run() -> None:
     f = uproot.open("../temp/AnalysisResults.root")
-    t = f["AliAnalysisTaskJetDynamicalGrooming_RawTree_Data_ConstSub_Incl"]
+    t = f["AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"]
+    #f = uproot.open("../trains/embedPythia/5491/AnalysisResults.LHC18q.root")
+    #t = f["AliAnalysisTaskJetDynamicalGrooming_RawTree_EventSub_Incl"]
+    print("Loading data")
     arrays = t.arrays(namedecode="utf-8")
+    print("Finished loading arrays")
 
     #splitting_tree = convert_flat_to_tree(0, list(enumerate(arrays["data.fSubjets.fSplittingNodeIndex"][0])))
     splitting_tree = convert_flat_to_tree(-1, list(enumerate(arrays["data.fJetSplittings.fParentIndex"][0])))
@@ -59,6 +63,7 @@ def run() -> None:
         arrays["data.fJetConstituents.fPhi"],
         arrays["data.fJetConstituents.fGlobalIndex"]
     )
+    print("Done with constituents")
     #constituents = substructure_methods.JetConstituentArray.from_jagged(
     #    pt=arrays["data.fJetConstituents.fPt"],
     #    eta=arrays["data.fJetConstituents.fEta"],
@@ -71,6 +76,7 @@ def run() -> None:
         arrays["data.fJetSplittings.fZ"],
         arrays["data.fJetSplittings.fParentIndex"]
     )
+    print("Done with splittings")
 
     # When we want to pass the constituents_indices
     constituents_indices = substructure_methods._convert_jagged_constituents_indicies(
@@ -84,6 +90,14 @@ def run() -> None:
         arrays["data.fSubjets.fSplittingNodeIndex"],
         constituents_indices,
     )
+
+    # Construct substructure jets using the above
+    #jets = substructure_methods.SubstructureJetArray.from_jagged(
+    #    arrays["data.fJetPt"],
+    #    constituents,
+    #    subjets,
+    #    splittings,
+    #)
 
     IPython.start_ipython(user_ns=locals())
 
