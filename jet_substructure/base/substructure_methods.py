@@ -312,7 +312,7 @@ class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):
         self["jet_pt"] = jet_pt
         self["constituents"] = jet_constituents
         self["subjets"] = subjets
-        self["jet_splittings"] = jet_splittings
+        self["splittings"] = jet_splittings
 
     @classmethod
     @ak.util.wrapjaggedmethod(JaggedSubstructureJetArrayMethods)
