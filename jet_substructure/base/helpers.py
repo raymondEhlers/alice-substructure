@@ -1,6 +1,8 @@
 
+import logging
 from pathlib import Path
-from typing import Any, Dict, Mapping, Sequence, TypeVar, Union
+from types import TracebackType
+from typing import Any, ContextManager, Dict, List, Mapping, Optional, Sequence, Type, TypeVar, Union
 
 import attr
 import awkward as ak
@@ -11,6 +13,9 @@ import pandas as pd
 import uproot
 
 from pachyderm import histogram
+
+
+logger = logging.getLogger(__name__)
 
 # Typing helpers
 TTree = Any
@@ -92,13 +97,14 @@ def _concatenate_jagged_array(arrays: Sequence[ak.JaggedArray]) -> ak.JaggedArra
     counts = np.concatenate([j.counts for j in arrays])
     return ak.JaggedArray.fromcounts(counts, contents)
 
-def awkward_to_hdf5(trees: Sequence[TTree], array_names: Sequence[str], path: Path, filename: str = "data.h5") -> bool:
+def awkward_to_hdf5(trees: Sequence[TTree], dataset_name: str, array_names: Sequence[str], hdf5_file: h5py.File) -> bool:
     """ Store awkward arrays in HDF5.
 
     These arrays can come from a list of trees. If so, they will be concatenated together.
 
     Args:
         trees: Trees or dicts of arrays containing the data of interest.
+        dataset_name: Name of the dataset (under which it is stored)
         array_names: Names of the array keys to be stored.
         path: Path to the HDF5 file.
         filename: HDF5 filename.
@@ -106,20 +112,22 @@ def awkward_to_hdf5(trees: Sequence[TTree], array_names: Sequence[str], path: Pa
     Returns:
         True if the data was written successfully.
     """
-    path = path / filename
-    with h5py.file(path, "w") as f:
-        storage = ak.hdf5(f)
-        # Store one array at a time in an attempt to keep memory usage reasonable.
-        for name in array_names:
-            values = []
-            for tree in trees:
-                values.append(tree.array([name], namedecode="utf-8"))
-            full_array = _concatenate_jagged_array(values)
-            storage[name] = full_array
+    dataset = hdf5_file.require_group(dataset_name)
+    storage = ak.hdf5(dataset)
+    # Store one array at a time in an attempt to keep memory usage reasonable.
+    for name in array_names:
+        logger.debug(f"Extracting {name}")
+        values = []
+        for tree in trees:
+            values.append(tree.array(name))
+        #full_array = _concatenate_jagged_array(values)
+        # TODO: If this works, remove the dedicated function above.
+        full_array = ak.concatenate(values)
+        storage[name] = full_array
 
     return True
 
-def hdf5_to_awkward(array_names: Sequence[str], path: Path, filename: str = "data.h5") -> UprootArrays:
+def hdf5_to_awkward(hdf5_file: h5py.File, dataset_name: str, array_names: Sequence[str]) -> UprootArrays:
     """ Retrieve arrays from an HDF5 array.
 
     Args:
@@ -132,11 +140,10 @@ def hdf5_to_awkward(array_names: Sequence[str], path: Path, filename: str = "dat
     """
     data: UprootArrays = {}
 
-    path = path / filename
-    with h5py.file(path, "r") as f:
-        storage = ak.hdf5(f)
-        for array_name in array_names:
-            data[array_name] = storage[array_name]
+    dataset = hdf5_file[dataset_name]
+    storage = ak.hdf5(dataset)
+    for array_name in array_names:
+        data[array_name] = storage[array_name]
 
     return data
 
@@ -268,4 +275,70 @@ def response_from_array(df: Union[pd.DataFrame, UprootArrays], hybrid_observable
         values = view.counts,
         errors_squared = view.variance,
     )
+
+def _get_branches_from_tree(filename: Path, tree_name: str) -> List[str]:
+    keys: List[str] = []
+    with uproot.open(filename) as f:
+        keys = f[tree_name].allkeys()
+    return keys
+
+
+class UprootFiles(ContextManager[Sequence[uproot.rootio.ROOTDirectory]]):
+    def __init__(self, filenames: Sequence[str]):
+        self._filenames = filenames
+        self._open_files: List[uproot.rootio.ROOTDirectory] = []
+
+    def __enter__(self) -> Sequence[uproot.rootio.ROOTDirectory]:
+        for filename in self._filenames:
+            self._open_files.append(uproot.open(filename))
+        return self._open_files
+
+    def __exit__(self, execption_type: Optional[Type[BaseException]],
+                 exception_value: Optional[BaseException], traceback: Optional[TracebackType]) -> None:
+        for f in self._open_files:
+            f.close()
+
+        # To ensure that any other exceptions that were raised are re-raised, we don't return any value.
+
+def root_tree_to_hdf5(dataset_name: str, filenames: Sequence[str], tree_name: str, array_names: Sequence[str], hdf5_file: h5py.File) -> None:
+    trees = []
+    with UprootFiles(filenames) as files:
+        for f in files:
+            trees.append(f[tree_name])
+
+        # Convert trees to hdf5
+        awkward_to_hdf5(trees = trees, dataset_name=dataset_name, array_names=array_names, hdf5_file=hdf5_file)
+
+def load_data(collision_system: str, dataset_config: Dict[str, Any],
+              available_datasets_config: Dict[str, Any], force_reload_dataset: bool = False,
+              hdf5_filename: Path = Path("trains/HDF5/data.h5")) -> UprootArrays:
+    # Setup
+    dataset_name = dataset_config["name"]
+    array_names = dataset_config.get("branches", None)
+    selected_dataset_config = available_datasets_config[dataset_name]
+    filenames = selected_dataset_config["files"]
+    tree_name = selected_dataset_config["tree_name"]
+
+    with h5py.File(hdf5_filename, "a") as f:
+        if dataset_name not in f or force_reload_dataset:
+            # Convert tree to hdf5 via uproot and awkward-array
+            logger.info(f"Converting dataset {dataset_name} from ROOT to HDF5.")
+            root_tree_to_hdf5(dataset_name=dataset_name, filenames=filenames, tree_name=tree_name, array_names=array_names, hdf5_file=f)
+        else:
+            # Ensure that all requested branches are in the data.
+            missing_arrays = []
+            for array_name in array_names:
+                if array_name not in f[dataset_name]:
+                    missing_arrays.append(array_name)
+
+            # If they're not available, load them into the store.
+            if missing_arrays:
+                logger.info(f"Missing columns: {missing_arrays}. Will convert from ROOT to HDF5.")
+                root_tree_to_hdf5(dataset_name=dataset_name, filenames=filenames, tree_name=tree_name, array_names=missing_arrays, hdf5_file=f)
+
+        # Finally, all the data is available and we can actually load it.
+        logger.info(f"Loading dataset \"{dataset_name}\" from HDF5.")
+        data = hdf5_to_awkward(hdf5_file=f, dataset_name=dataset_name, array_names=array_names)
+
+    return data
 
