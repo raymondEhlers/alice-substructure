@@ -1,14 +1,18 @@
-#1/usr/bin/env python3
+# 1/usr/bin/env python3
 
 """ Tests for Jet Substructure interpretation for uproot.
 
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
-from typing import Dict, Generic, Sequence, TypeVar, Union
+from __future__ import annotations
 
+from typing import Callable, Dict, Optional, Sequence, Type, TypeVar, Union, cast
+
+import attr
 import awkward as ak
 import numpy as np
+
 
 # Typing helpers
 T = TypeVar("T")
@@ -17,66 +21,98 @@ UprootArrays = Dict[str, UprootArray]
 Result = Union[UprootArray, T]
 # More ideally, I would like:
 # It's supposed to carry the semantics of Union[np.ndarray, ak.JaggedArray]
-#class UprootArray(Generic[T]): ...
-#Result = Union[UprootArray[T], T]
+# class UprootArray(Generic[T]): ...
+# Result = Union[UprootArray[T], T]
 
-class ArrayMethods(ak.Methods):
+
+class ArrayMethods(ak.Methods):  # type: ignore
     # Seems to be required for creating JaggedArray elements within an Array.
     # Otherwise, it will create one object per event, with that object storing arrays of members.
     awkward = ak
 
+    def _trymemo(self, name: str, function: Callable[..., T]) -> Callable[..., T]:
+        memoname = "_memo_" + name
+        wrap, (array,) = ak.util.unwrap_jagged(type(self), self.JaggedArray, (self,))
+        if not hasattr(array, memoname):
+            setattr(array, memoname, function(array))
+        return cast(Callable[..., T], wrap(getattr(array, memoname)))
+
+
+@attr.s
 class JetConstituent:
-    def __init__(self, pt: Result[float], eta: Result[float], phi: Result[float], global_index: Result[int]) -> None:
-        self._pt = pt
-        self._eta = eta
-        self._phi = phi
-        self._global_index = global_index
+    """ Jet constituent.
+
+    Args:
+        pt: Jet constituent pt.
+        eta: Jet constituent eta.
+        phi: Jet constituent phi.
+        global_index: Global index assigned to the track during analysis. The index is unique
+            for each event.
+    """
+
+    pt: float = attr.ib()
+    eta: float = attr.ib()
+    phi: float = attr.ib()
+    _global_index: int = attr.ib()
 
     @property
-    def pt(self) -> Result[float]:
-        return self._pt
-
-    @property
-    def eta(self) -> Result[float]:
-        return self._eta
-
-    @property
-    def phi(self) -> Result[float]:
-        return self._phi
-
-    @property
-    def index(self) -> Result[int]:
+    def index(self) -> int:
         return self._global_index
 
+
 class JetConstituentArrayMethods(ArrayMethods):
+    """ Methods for operating on jet constituents arrays.
+
+    These methods operate on externally stored arrays.
+    """
+
     def _init_object_array(self, table: ak.Table) -> None:
+        """ Create jet constituent views in a table.
+
+        Args:
+            table: Table where the constituents will be created.
+        """
         self.awkward.ObjectArray.__init__(
             self, table, lambda row: JetConstituent(row["pt"], row["eta"], row["phi"], row["global_index"])
         )
 
     @property
     def pt(self) -> Result[float]:
+        """ Constituents pt. """
         return self["pt"]
 
     @property
     def eta(self) -> Result[float]:
+        """ Constituents eta. """
         return self["eta"]
 
     @property
     def phi(self) -> Result[float]:
+        """ Constituents phi. """
         return self["phi"]
 
     @property
-    def global_index(self) -> Result[int]:
+    def index(self) -> Result[int]:
+        """ Constituents global index. """
         return self["global_index"]
+
 
 # Adds in JaggedArray methods for constructing objects with jagged structure.
 JaggedJetConstituentArrayMethods = JetConstituentArrayMethods.mixin(JetConstituentArrayMethods, ak.JaggedArray)
 
-class JetConstituentArray(JetConstituentArrayMethods, ak.ObjectArray):
+
+class JetConstituentArray(JetConstituentArrayMethods, ak.ObjectArray):  # type:ignore
     """ Array of jet constituents.
 
+    This effectively constructs a virtual object that can operate transparently on arrays.
+
+    Args:
+        pt: Array of constituent pt.
+        eta: Array of constituent eta.
+        phi: Array of constituent phi.
+        global_index: Array of constituent global indices.
     """
+
     def __init__(self, pt: Result[float], eta: Result[float], phi: Result[float], global_index: Result[int]) -> None:
         self._init_object_array(ak.Table())
         self["pt"] = pt
@@ -85,35 +121,72 @@ class JetConstituentArray(JetConstituentArrayMethods, ak.ObjectArray):
         self["global_index"] = global_index
 
     @classmethod
-    @ak.util.wrapjaggedmethod(JaggedJetConstituentArrayMethods)
-    def from_jagged(cls, pt: Result[float], eta: Result[float], phi: Result[float], global_index: Result[int]) -> "JetConstituentArray":
-        return cls(pt, eta, phi, global_index)
+    @ak.util.wrapjaggedmethod(JaggedJetConstituentArrayMethods)  # type: ignore
+    def from_jagged(
+        cls: Type[T], pt: Result[Result[float]], eta: Result[float], phi: Result[float], global_index: Result[int]
+    ) -> T:
+        """ Creates a view of constituents with jagged structure.
 
+        On it's own, this object can operate on arrays. However, by constructing with this method, it gives a step
+        further in, constructing virtual objects in the jagged structure.
+
+        Args:
+            pt: Jagged constituent pt.
+            eta: Jagged constituent eta.
+            phi: Jagged constituent phi.
+            global_index: Jagged constituent global index.
+        """
+        return cls(pt, eta, phi, global_index)  # type: ignore
+
+
+@attr.s
 class Subjet:
-    def __init__(self, part_of_iterative_splitting: Result[bool], parent_splitting_index: Result[int],
-                 constituents_indices: Result[int]) -> None:
-        self._part_of_iterative_splitting = part_of_iterative_splitting
-        self._parent_splitting_index = parent_splitting_index
-        self._constituents_indices = constituents_indices
+    """ Subjet found within a jet.
 
-    def part_of_iterative_splitting(self) -> Result[bool]:
-        return self._part_of_iterative_splitting
+    Args:
+        part_of_iterative_splitting: True if the subjet is part of the iterative splitting.
+        parent_splitting_index: Index of the splitting which lead to this subjet.
+        constituents_indices: Indices of the constituents that are contained within this subjet.
+            This is indexed by the number of constituents in a jet (i.e. it is not the global index!).
+    """
 
-    def parent_splitting(self, splittings: Result[Sequence["JetSplitting"]]) -> Result["JetSplitting"]:
+    part_of_iterative_splitting: bool = attr.ib()
+    _parent_splitting_index: int = attr.ib()
+    _constituents_indices: Result[int] = attr.ib()
+
+    @property
+    def parent_splitting_index(self) -> int:
+        return self._parent_splitting_index
+
+    def parent_splitting(self, splittings: Result[Sequence[JetSplitting]]) -> Result[JetSplitting]:
+        """ Retrieve the parent splitting of this subjet.
+
+        Args:
+            splittings: All of the splittings from the overall jet.
+        Returns:
+            Splitting which led to this subjet.
+        """
         return splittings[self._parent_splitting_index]
 
     def constituents(self, jet_constituents: Result[Sequence[JetConstituent]]) -> Result[Sequence[JetConstituent]]:
+        """ Retrieve the constituents of this subjet.
+
+        Args:
+            jet_constituents: Constituents of the overall jet.
+        Returns:
+            Constituents of this subjet.
+        """
         return jet_constituents[self._constituents_indices]
-        #return ak.JaggedArray.fromoffsets(self._constituents_indices.offsets, jet_constituents[s.flatten()])
-        #return ak.JaggedArray.fromoffsets(
+        # return ak.JaggedArray.fromoffsets(self._constituents_indices.offsets, jet_constituents[s.flatten()])
+        # return ak.JaggedArray.fromoffsets(
         #    self._constituents_indices.offsets, ak.JaggedArray.fromoffsets(
         #        self._constituents_indices.offsets, jet_constituents.flatten()[self._constituents_indices.flatten(axis=1)]
         #    )
-        #)
+        # )
 
-    #constituents[subjets._constituents_indices.flatten(axis=1)]
+    # constituents[subjets._constituents_indices.flatten(axis=1)]
 
-    #def test():
+    # def test():
     #    ak.JaggedArray.fromoffsets(
     #        subjets._constituents_indices.offsets, ak.JaggedArray.fromoffsets(
     #            subjets._constituents_indices.flatten().offsets,
@@ -121,93 +194,241 @@ class Subjet:
     #        )
     #    )
 
-def _convert_jagged_constituents_indicies(constituents_indices: ak.JaggedArray, jagged_indices: ak.JaggedArray) -> ak.JaggedArray:
+
+def _convert_jagged_constituents_indicies(
+    constituents_indices: ak.JaggedArray, jagged_indices: ak.JaggedArray
+) -> ak.JaggedArray:
     return ak.fromiter(
-        (ak.JaggedArray.fromoffsets(jagged, indices)
-         for jagged, indices in
-         zip(jagged_indices, constituents_indices))
+        (ak.JaggedArray.fromoffsets(jagged, indices) for jagged, indices in zip(jagged_indices, constituents_indices))
     )
 
+
 class SubjetArrayMethods(ArrayMethods):
+    """ Methods for operating on subjet arrays.
+
+    These methods operate on externally stored arrays.
+    """
+
     def _init_object_array(self, table: ak.Table) -> None:
+        """ Create jet constituent views in a table.
+
+        Args:
+            table: Table where the constituents will be created.
+        """
         self.awkward.ObjectArray.__init__(
-            self, table, lambda row: Subjet(row["part_of_iterative_splitting"], row["parent_splitting_index"], row["constituents_indices"])
+            self,
+            table,
+            lambda row: Subjet(
+                row["part_of_iterative_splitting"], row["parent_splitting_index"], row["constituents_indices"]
+            ),
         )
 
     @property
-    def _constituents_indices(self) -> Result[ak.JaggedArray]:
+    def _constituents_indices(self) -> Result[int]:
         """ Construct constituent indices from stored JaggedArrays.
 
+        We create this property just to make it slightly easier to access. Normally,
+        one would just want the constituents directly, so we make it private.
+
         Note:
-            I can't figure out how to construct a nested JaggedArray, so I have to construct it event by event.
-            This is super inefficient. I will try to revise it when I get a better answer.
+            It's currently not possible to directly create doubly Jagged arrays. We unfortunately have to accept
+            a loop in python to create it.
         """
         return self["constituents_indices"]
-        #return _convert_jagged_constituents_indicies(self["constituents_indices"], self["constituents_jagged_indices"])
 
+    @property
     def part_of_iterative_splitting(self) -> Result[bool]:
+        """ Whether subjets are part of the iterative splitting. """
         return self["part_of_iterative_splitting"]
 
-    def parent_splitting(self, splittings: Result[Sequence["JetSplitting"]]) -> Result["JetSplitting"]:
+    @property
+    def parent_splitting_index(self) -> Result[int]:
+        """ Index of the parent splittings. """
+        return self["parent_splitting_index"]
+
+    @property
+    def iterative_splitting_index(self) -> Result[int]:
+        """ Indices of splittings which were part of the iterative splitting chain. """
+        return self.parent_splitting_index[self.part_of_iterative_splitting]
+
+    def parent_splitting(self, splittings: Result[Sequence[JetSplitting]]) -> Result[JetSplitting]:
+        """ Retrieve the parent splittings for the subjets.
+
+        Args:
+            splittings: Splittings corresponding to the subjets.
+        Returns:
+            Parent splittings for the subjets.
+        """
         return splittings[self["parent_splitting_index"]]
 
     def constituents(self, jet_constituents: Result[Sequence[JetConstituent]]) -> Result[Sequence[JetConstituent]]:
-        #return jet_constituents[self._constituents_indices]
-        # This isn't super efficient, but I can't seem to broadcast it directly.
-        return ak.JaggedArray.fromoffsets(
-            self._constituents_indices.offsets, ak.JaggedArray.fromoffsets(
-                self._constituents_indices.flatten().offsets,
-                jet_constituents[self._constituents_indices.flatten(axis=1)].flatten()
-            )
+        """ Constituents of the subjets.
+
+        Args:
+            jet_constituents: Constituents of the overall jets which contain the subjets.
+        Returns:
+            Jet constituents of the subjets.
+        """
+        return self._try_memo(
+            "constituents",
+            lambda self: ak.JaggedArray.fromoffsets(
+                self._constituents_indices.offsets,
+                ak.JaggedArray.fromoffsets(
+                    self._constituents_indices.flatten().offsets,
+                    jet_constituents[self._constituents_indices.flatten(axis=1)].flatten(),
+                ),
+            ),
         )
+        # return jet_constituents[self._constituents_indices]
+        # This doesn't seem super efficient, but I can't seem to broadcast it directly.
+        # return ak.JaggedArray.fromoffsets(
+        #    self._constituents_indices.offsets, ak.JaggedArray.fromoffsets(
+        #        self._constituents_indices.flatten().offsets,
+        #        jet_constituents[self._constituents_indices.flatten(axis=1)].flatten()
+        #    )
+        # )
+
 
 # Adds in JaggedArray methods for constructing objects with jagged structure.
 JaggedSubjetArrayMethods = SubjetArrayMethods.mixin(SubjetArrayMethods, ak.JaggedArray)
 
-class SubjetArray(SubjetArrayMethods, ak.ObjectArray):
-    def __init__(self, part_of_iterative_splitting: Result[bool], parent_splitting_index: Result[int],
-                 constituents_indices: Result[int]) -> None:
+_T_SubjetArray = TypeVar("_T_SubjetArray", bound="SubjetArray")
+
+
+class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
+    """ Array of subjets.
+
+    This effectively constructs a virtual object that can operate transparently on arrays.
+
+    Args:
+        part_of_iterative_splitting: True if the given subjet is part of the iterative splitting.
+        parent_splitting_index: Index of the parent splitting of the subjets.
+        constituents_indices: Indices of the constituents of the subjets.
+    """
+
+    def __init__(
+        self,
+        part_of_iterative_splitting: Result[bool],
+        parent_splitting_index: Result[int],
+        constituents_indices: Result[Result[int]],
+    ) -> None:
         self._init_object_array(ak.Table())
         self["part_of_iterative_splitting"] = part_of_iterative_splitting
         self["parent_splitting_index"] = parent_splitting_index
         self["constituents_indices"] = constituents_indices
 
     @classmethod
-    @ak.util.wrapjaggedmethod(JaggedSubjetArrayMethods)
-    def from_jagged(cls, part_of_iterative_splitting: Result[bool], parent_splitting_index: Result[int],
-                 constituents_indices: Result[int]) -> "SubjetArray":
-        # NOTE: This doesn't work because the JaggedArrays are different sizes.
-        #       Need to find a new solution! Probably just construct the constituent indices array before passing it in.
-        #       See: https://github.com/scikit-hep/uproot/issues/452
+    def from_jagged(
+        cls: Type[_T_SubjetArray],
+        part_of_iterative_splitting: Result[bool],
+        parent_splitting_index: Result[int],
+        constituents_indices: Result[int],
+        constituents_jagged_indices: Optional[Result[int]] = None,
+    ) -> _T_SubjetArray:
+        """ Creates a view of subjets with jagged structure.
+
+        On it's own, this object can operate on arrays. However, by constructing with this method, it gives a step
+        further in, constructing virtual objects in the jagged structure.
+
+        Note:
+            We need this additional wrapper because we can't construct doubly jagged arrays directly, and the jaggedness
+            needs to be the same for all parts for of the array. We work around this by constructing the doubly jagged
+            array before constructing the `ObjectArray`. See: https://github.com/scikit-hep/uproot/issues/452.
+
+        Args:
+            part_of_iterative_splitting: Jagged iterative splitting label.
+            parent_splitting_index: Jagged parent splitting index.
+            constituents_indices: Jagged constituents indices of the subjet.
+        """
+        if constituents_jagged_indices:
+            constituents_indices = _convert_jagged_constituents_indicies(
+                constituents_indices, constituents_jagged_indices
+            )
+        else:
+            constituents_indices = ak.fromiter(constituents_indices)
+
+        return cast(
+            _T_SubjetArray,
+            cls._from_jagged_impl(part_of_iterative_splitting, parent_splitting_index, constituents_indices),
+        )
+
+    @classmethod
+    @ak.util.wrapjaggedmethod(JaggedSubjetArrayMethods)  # type: ignore
+    def _from_jagged_impl(
+        cls: Type[_T_SubjetArray],
+        part_of_iterative_splitting: Result[bool],
+        parent_splitting_index: Result[int],
+        constituents_indices: Result[int],
+    ) -> _T_SubjetArray:
+        """ Creates a view of subjets with jagged structure.
+
+        On it's own, this object can operate on arrays. However, by constructing with this method, it gives a step
+        further in, constructing virtual objects in the jagged structure.
+
+        This is a bit of a pain to call directly, so it's hidden behind the wrapper defined above.
+
+        Args:
+            part_of_iterative_splitting: Jagged iterative splitting label.
+            parent_splitting_index: Jagged parent splitting index.
+            constituents_indices: Jagged constituents indices of the subjet.
+        """
         return cls(part_of_iterative_splitting, parent_splitting_index, constituents_indices)
 
+
+@attr.s
 class JetSplitting:
-    def __init__(self, kt: Result[float], delta_R: Result[float], z: Result[float], parent_index: Result[int]) -> None:
-        self._kt = kt
-        self._delta_R = delta_R
-        self._z = z
-        self._parent_index = parent_index
+    """ Properties of a jet splitting.
 
-    @property
-    def kt(self) -> Result[float]:
-        return self._kt
+    Args:
+        kt: Kt of the subjets.
+        delta_R: Delta R between the subjets.
+        z: Z of the softer subjet.
+        parent_index: Index of the parent subjet.
+    """
 
-    @property
-    def delta_R(self) -> Result[float]:
-        return self._delta_R
+    kt: float = attr.ib()
+    delta_R: float = attr.ib()
+    z: float = attr.ib()
+    _parent_index: int = attr.ib()
 
-    @property
-    def z(self) -> Result[float]:
-        return self._z
+    def iterative_splitting(self, subjets: SubjetArray) -> bool:
+        """ Determine whether the splitting is iterative.
 
-    def iterative_splitting(self, subjets: Result[Sequence[Subjet]]) -> Result[bool]:
+        Args:
+            subjets: Subjets of the overall jet which containing the iterative splitting information.
+        Returns:
+            True if the splitting is part of the iterative splitting chain.
+        """
         # Determine the parent index of the splittings which are iterative.
         # This indexes the splittings, so we then apply it to the object.
-        iterative_splittings = subjets.parent_splitting[subjets.part_of_iterative_splitting]
-        return self[iterative_splittings]
+        iterative_splittings = subjets.parent_splitting_index[subjets.part_of_iterative_splitting]
+        return self._parent_index in iterative_splittings
+
+    @property
+    def dynamical_z(self) -> float:
+        ...
+
+    @property
+    def dynamical_kt(self) -> float:
+        ...
+
+    @property
+    def dynamical_time(self) -> float:
+        ...
+
 
 class JetSplittingArrayMethods(ArrayMethods):
+    """ Methods for operating on jet splittings arrays.
+
+    These methods operate on externally stored arrays.
+    """
+
     def _init_object_array(self, table: ak.Table) -> None:
+        """ Create jet splitting views in a table.
+
+        Args:
+            table: Table where the constituents will be created.
+        """
         self.awkward.ObjectArray.__init__(
             self, table, lambda row: JetConstituent(row["kt"], row["delta_R"], row["z"], row["parent_index"])
         )
@@ -224,13 +445,28 @@ class JetSplittingArrayMethods(ArrayMethods):
     def z(self) -> Result[float]:
         return self["z"]
 
-    def iterative_splitting(self, subjets: Result[Sequence[Subjet]]) -> Result[bool]:
-        return self.iterative_splitting(subjets)
+    def iterative_splitting(self, subjets: Result[SubjetArray]) -> Result[bool]:
+        # iterative_splittings = subjets.parent_splitting_index[subjets.part_of_iterative_splitting]
+        iterative_splittings = subjets.iterative_splitting_index
+        return self["parent_index"] in iterative_splittings
+
 
 # Adds in JaggedArray methods for constructing objects with jagged structure.
 JaggedJetSplittingArrayMethods = JetSplittingArrayMethods.mixin(JetSplittingArrayMethods, ak.JaggedArray)
 
-class JetSplittingArray(JetSplittingArrayMethods, ak.ObjectArray):
+
+class JetSplittingArray(JetSplittingArrayMethods, ak.ObjectArray):  # type: ignore
+    """ Array of jet splittings.
+
+    This effectively constructs a virtual object that can operate transparently on arrays.
+
+    Args:
+        kt: Kt of the jet splittings.
+        delta_R: Delta R of the subjets.
+        z: Momentum fraction of the softer subjet.
+        parent_index: Index of the parent splitting.
+    """
+
     def __init__(self, kt: Result[float], delta_R: Result[float], z: Result[float], parent_index: Result[int]) -> None:
         self._init_object_array(ak.Table())
         self["kt"] = kt
@@ -239,31 +475,34 @@ class JetSplittingArray(JetSplittingArrayMethods, ak.ObjectArray):
         self["parent_index"] = parent_index
 
     @classmethod
-    @ak.util.wrapjaggedmethod(JaggedJetSplittingArrayMethods)
-    def from_jagged(cls, kt: Result[float], delta_R: Result[float], z: Result[float],
-                    parent_index: Result[int]) -> "JetSplittingArray":
-        return cls(kt, delta_R, z, parent_index)
+    @ak.util.wrapjaggedmethod(JaggedJetSplittingArrayMethods)  # type: ignore
+    def from_jagged(
+        cls: Type[T], kt: Result[float], delta_R: Result[float], z: Result[float], parent_index: Result[int]
+    ) -> T:
+        """ Creates a view of constituents with jagged structure.
 
-class SubstructureJet(ak.Methods):
-    def __init__(self, jet_pt: Result[float], constituents: Result[Sequence[JetConstituent]],
-                 subjets: Result[Sequence[Subjet]], splittings: Result[Sequence[JetSplitting]]) -> None:
-        self._jet_pt = jet_pt
+        On it's own, this object can operate on arrays. However, by constructing with this method, it gives a step
+        further in, constructing virtual objects in the jagged structure.
 
-        self._constituents: Sequence[JetConstituent] = constituents
-        self._subjets: Sequence[Subjet] = subjets
-        self._splittings: Sequence[JetSplitting] = splittings
+        Args:
+            kt: Jagged kt.
+            delta_R: Jagged delta R.
+            z: Jagged z.
+            parent_index: Jagged parent splitting index.
+        """
+        return cls(kt, delta_R, z, parent_index)  # type: ignore
 
-    @property
-    def jet_pt(self) -> Result[float]:
-        return self._jet_pt
+
+@attr.s
+class SubstructureJet:
+    jet_pt: float = attr.ib()
+    constituents: JetConstituentArray = attr.ib()
+    subjets: SubjetArray = attr.ib()
+    splittings: JetSplittingArray = attr.ib()
 
     @property
     def leading_track_pt(self) -> Result[float]:
-        return self._constituents.max_pt()
-
-    @property
-    def constituents(self) -> Result[Sequence[JetConstituent]]:
-        return self._constituents
+        return self.constituents.max_pt()
 
     def leading_kt(self) -> Result[float]:
         ...
@@ -284,7 +523,9 @@ class SubstructureJet(ak.Methods):
 class SubstructureJetArrayMethods(ArrayMethods):
     def _init_object_array(self, table: ak.Table) -> None:
         self.awkward.ObjectArray.__init__(
-            self, table, lambda row: SubstructureJet(row["jet_pt"], row["constituents"], row["subjets"], row["splittings"])
+            self,
+            table,
+            lambda row: SubstructureJet(row["jet_pt"], row["constituents"], row["subjets"], row["splittings"]),
         )
 
     @property
@@ -303,20 +544,30 @@ class SubstructureJetArrayMethods(ArrayMethods):
     def splittings(self) -> Result[JetSplittingArray]:
         return self["splittings"]
 
+
 # Adds in JaggedArray methods for constructing objects with jagged structure.
 JaggedSubstructureJetArrayMethods = SubstructureJetArrayMethods.mixin(SubstructureJetArrayMethods, ak.JaggedArray)
 
-class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):
-    def __init__(self, jet_pt: Result[float], jet_constituents: Result[JetConstituentArray], subjets: Result[SubjetArray], jet_splittings: Result[JetSplittingArray]) -> None:
+
+class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):  # type: ignore
+    """
+
+    Note:
+        This can't support a `from_jagged(...)` method because the contained arrays have different
+        jaggedness. The overlay expanding into the jagged dimension only works if they have the same
+        jaggedness.
+
+    """
+
+    def __init__(
+        self,
+        jet_pt: Result[float],
+        jet_constituents: Result[JetConstituentArray],
+        subjets: Result[SubjetArray],
+        jet_splittings: Result[JetSplittingArray],
+    ) -> None:
         self._init_object_array(ak.Table())
         self["jet_pt"] = jet_pt
         self["constituents"] = jet_constituents
         self["subjets"] = subjets
         self["splittings"] = jet_splittings
-
-    @classmethod
-    @ak.util.wrapjaggedmethod(JaggedSubstructureJetArrayMethods)
-    def from_jagged(cls, jet_pt: Result[float], jet_constituents: Result[JetConstituentArray], subjets: Result[SubjetArray],
-                    jet_splittings: Result[JetSplittingArray]) -> "SubstructureJetArray":
-        return cls(jet_pt, jet_constituents, subjets, jet_splittings)
-
