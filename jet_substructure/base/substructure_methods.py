@@ -7,22 +7,48 @@
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Optional, Sequence, Type, TypeVar, Union, cast
+import functools
+import logging
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
 
 import attr
 import awkward as ak
 import numpy as np
 
 
+logger = logging.getLogger(__name__)
+
 # Typing helpers
 T = TypeVar("T")
 UprootArray = Union[np.ndarray, ak.JaggedArray]
-UprootArrays = Dict[str, UprootArray]
 Result = Union[UprootArray, T]
 # More ideally, I would like:
 # It's supposed to carry the semantics of Union[np.ndarray, ak.JaggedArray]
 # class UprootArray(Generic[T]): ...
 # Result = Union[UprootArray[T], T]
+
+
+def _dynamical_hardness_measure(
+    delta_R: Result[float], z: Result[float], parent_pt: Result[float], R: float, a: float
+) -> Result[float]:
+    return z * (1 - z) * parent_pt * (delta_R / R) ** a
+
+
+dynamical_z = functools.partial(_dynamical_hardness_measure, a=0.1)
+dynamical_kt = functools.partial(_dynamical_hardness_measure, a=1.0)
+dynamical_time = functools.partial(_dynamical_hardness_measure, a=2.0)
+
+
+def find_leading(values: Result[float]) -> Tuple[Result[float], Result[float]]:
+    """ Calculate hardest value.
+
+    Used for dynamical grooming, hardest kt, etc.
+
+    Returns:
+        Leading value, index of value.
+    """
+    arg_max = values.argmax()
+    return values[arg_max], arg_max
 
 
 class ArrayMethods(ak.Methods):  # type: ignore
@@ -119,6 +145,10 @@ class JetConstituentArray(JetConstituentArrayMethods, ak.ObjectArray):  # type:i
         self["eta"] = eta
         self["phi"] = phi
         self["global_index"] = global_index
+
+    @property
+    def max_pt(self) -> Result[float]:
+        return self["pt"].max()
 
     @classmethod
     @ak.util.wrapjaggedmethod(JaggedJetConstituentArrayMethods)  # type: ignore
@@ -391,7 +421,7 @@ class JetSplitting:
     z: float = attr.ib()
     _parent_index: int = attr.ib()
 
-    def iterative_splitting(self, subjets: SubjetArray) -> bool:
+    def part_of_iterative_splitting(self, subjets: SubjetArray) -> bool:
         """ Determine whether the splitting is iterative.
 
         Args:
@@ -405,16 +435,19 @@ class JetSplitting:
         return self._parent_index in iterative_splittings
 
     @property
-    def dynamical_z(self) -> float:
-        ...
+    def parent_pt(self) -> Result[float]:
+        """ pt of the parent subjet. """
+        # parent_pt = subleading / z = kt / sin(delta_R) / z
+        return self.kt / np.sin(self.delta_R) / self.z
 
-    @property
-    def dynamical_kt(self) -> float:
-        ...
+    def dynamical_z(self, R: float) -> float:
+        return dynamical_z(self.delta_R, self.z, self.parent_pt, R)
 
-    @property
-    def dynamical_time(self) -> float:
-        ...
+    def dynamical_kt(self, R: float) -> float:
+        return dynamical_kt(self.delta_R, self.z, self.parent_pt, R)
+
+    def dynamical_time(self, R: float) -> float:
+        return dynamical_time(self.delta_R, self.z, self.parent_pt, R)
 
 
 class JetSplittingArrayMethods(ArrayMethods):
@@ -445,10 +478,73 @@ class JetSplittingArrayMethods(ArrayMethods):
     def z(self) -> Result[float]:
         return self["z"]
 
-    def iterative_splitting(self, subjets: Result[SubjetArray]) -> Result[bool]:
+    def part_of_iterative_splitting(self, subjets: Result[SubjetArray]) -> Result[bool]:
         # iterative_splittings = subjets.parent_splitting_index[subjets.part_of_iterative_splitting]
         iterative_splittings = subjets.iterative_splitting_index
         return self["parent_index"] in iterative_splittings
+
+    def iterative_splittings(self, subjets: Result[SubjetArray]) -> Result[SubjetArray]:
+        """ Retrieve iterative splittings. """
+        return self[subjets.iterative_splitting_index]
+
+    def dynamical_z(self, R: float) -> Tuple[Result[float], Result[float]]:
+        """ Dynamical z of the jet splittings.
+
+        Args:
+            R: Jet resolution parameter.
+        Returns:
+            Leading dynamical z values, leading dynamical z indices.
+        """
+        return find_leading(dynamical_z(self.delta_R, self.z, self.parent_pt, R))
+
+    def dynamical_kt(self, R: float) -> Tuple[Result[float], Result[float]]:
+        """ Dynamical kt of the jet splittings.
+
+        Args:
+            R: Jet resolution parameter.
+        Returns:
+            Leading dynamical kt values, leading dynamical kt indices.
+        """
+        return find_leading(dynamical_kt(self.delta_R, self.z, self.parent_pt, R))
+
+    def dynamical_time(self, R: float) -> Tuple[Result[float], Result[float]]:
+        """ Dynamical time of the jet splittings.
+
+        Args:
+            R: Jet resolution parameter.
+        Returns:
+            Leading dynamical time values, leading dynamical time indices.
+        """
+        return find_leading(dynamical_time(self.delta_R, self.z, self.parent_pt, R))
+
+    def leading_kt(self, z_cutoff: Optional[float] = None) -> Tuple[Result[float], Result[float]]:
+        """ Leading kt of the jet splittings.
+
+        Args:
+            z_cutoff: Z cutoff to be applied before calculating the leading kt.
+        Returns:
+            Leading kt values, leading kt indices.
+        """
+        mask = slice(None)
+        if z_cutoff is not None:
+            mask = self.z > z_cutoff
+        return find_leading(self.kt[mask])
+
+    def soft_drop(self, z_cutoff: float) -> Tuple[Result[float], Result[int], Result[float]]:
+        """ Calculate soft drop of the splittings.
+
+        Args:
+            z_cutoff: Minimum z for Soft Drop.
+        Returns:
+            First z passing cutoff (z_g), number of splittings passing SD (n_sd), index of z passing cutoff.
+        """
+        z_cutoff_mask = self.z > z_cutoff
+        # We use :1 because this maintains the jagged structure. That way, we can apply it to initial arrays.
+        z_index = self.z.localindex[z_cutoff_mask][:, :1]
+        z_g = self.z[z_index].flatten()
+        n_sd = self.z[z_cutoff_mask].count_nonzero()
+
+        return z_g, n_sd, z_index
 
 
 # Adds in JaggedArray methods for constructing objects with jagged structure.
@@ -493,34 +589,64 @@ class JetSplittingArray(JetSplittingArrayMethods, ak.ObjectArray):  # type: igno
         return cls(kt, delta_R, z, parent_index)  # type: ignore
 
 
+class SubstructureJetCommonMethods:
+    """ Common methods for jet substructure methods.
+
+    Note:
+        These only work if properties have the same names in both the single and array classes.
+    """
+
+    if TYPE_CHECKING:
+        constituents: Union[Result[JetConstituentArray], JetConstituentArray]
+        splittings: Union[Result[JetSplittingArray], JetSplittingArray]
+
+    @property
+    def leading_track_pt(self) -> float:
+        """ Leading track pt. """
+        return self.constituents.max_pt
+
+    def dynamical_z(self, R: float) -> Tuple[float, float]:
+        return self.splittings.dynamical_z(R=R)
+
+    def dynamical_kt(self, R: float) -> Tuple[float, float]:
+        return self.splittings.dynamical_kt(R=R)
+
+    def dynamical_time(self, R: float) -> Tuple[float, float]:
+        return self.splittings.dynamical_time(R=R)
+
+    def leading_kt(self, z_cutoff: Optional[float] = None) -> Tuple[float, float]:
+        """ Leading kt. """
+        return self.splittings.leading_kt(z_cutoff=z_cutoff)
+
+    def soft_drop_kt(self, z_cutoff: float) -> Tuple[float, int, float]:
+        """ Calculate soft drop of the splittings.
+
+        Args:
+            z_cutoff: Minimum z for Soft Drop.
+        Returns:
+            First z passing cutoff (z_g), number of splittings passing SD (n_sd), index of z passing cutoff.
+        """
+        return self.splittings.soft_drop(z_cutoff=z_cutoff)
+
+
 @attr.s
-class SubstructureJet:
+class SubstructureJet(SubstructureJetCommonMethods):
+    """ Substructure of a jet.
+
+    Args:
+        jet_pt: Jet pt.
+        constituents: Jet constituents.
+        subjets: Subjets.
+        splittings: Jet splittings.
+    """
+
     jet_pt: float = attr.ib()
     constituents: JetConstituentArray = attr.ib()
     subjets: SubjetArray = attr.ib()
     splittings: JetSplittingArray = attr.ib()
 
-    @property
-    def leading_track_pt(self) -> Result[float]:
-        return self.constituents.max_pt()
 
-    def leading_kt(self) -> Result[float]:
-        ...
-
-    def soft_drop_kt(self, z_hard_cutoff: float) -> Result[float]:
-        ...
-
-    def dynamical_z(self) -> Result[float]:
-        ...
-
-    def dynamical_kt(self) -> Result[float]:
-        ...
-
-    def dynamical_time(self) -> Result[float]:
-        ...
-
-
-class SubstructureJetArrayMethods(ArrayMethods):
+class SubstructureJetArrayMethods(SubstructureJetCommonMethods, ArrayMethods):
     def _init_object_array(self, table: ak.Table) -> None:
         self.awkward.ObjectArray.__init__(
             self,
@@ -550,13 +676,12 @@ JaggedSubstructureJetArrayMethods = SubstructureJetArrayMethods.mixin(Substructu
 
 
 class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):  # type: ignore
-    """
+    """ Array of substructure jets.
 
     Note:
         This can't support a `from_jagged(...)` method because the contained arrays have different
         jaggedness. The overlay expanding into the jagged dimension only works if they have the same
-        jaggedness.
-
+        jaggedness. However, we can still create one object per element in the array (ie. for each jet).
     """
 
     def __init__(
@@ -571,3 +696,41 @@ class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):  # type
         self["constituents"] = jet_constituents
         self["subjets"] = subjets
         self["splittings"] = jet_splittings
+
+    @classmethod
+    def from_tree(cls: Type[T], tree: ak.JaggedArray, prefix: str) -> T:
+        """ Construct from a tree.
+
+        Args:
+            tree: Tree containing the splittings.
+            prefix: Prefix under which the branches are stored.
+        Returns:
+            Substructure jet array wrapping all of the arrays.
+        """
+        logger.debug("Creating substructure jet arrays.")
+        constituents = JetConstituentArray.from_jagged(
+            tree[f"{prefix}.fJetConstituents.fPt"],
+            tree[f"{prefix}.fJetConstituents.fEta"],
+            tree[f"{prefix}.fJetConstituents.fPhi"],
+            tree[f"{prefix}.fJetConstituents.fGlobalIndex"],
+        )
+        logger.debug("Done with constructing constituents")
+        splittings = JetSplittingArray.from_jagged(
+            tree[f"{prefix}.fJetSplittings.fKt"],
+            tree[f"{prefix}.fJetSplittings.fDeltaR"],
+            tree[f"{prefix}.fJetSplittings.fZ"],
+            tree[f"{prefix}.fJetSplittings.fParentIndex"],
+        )
+        logger.debug("Done with constructing splittings")
+        subjets = SubjetArray.from_jagged(
+            tree[f"{prefix}.fSubjets.fPartOfIterativeSplitting"],
+            tree[f"{prefix}.fSubjets.fSplittingNodeIndex"],
+            tree[f"{prefix}.fSubjets.fConstituentIndices"],
+            tree.get(f"{prefix}.fSubjets.fConstituentJaggedIndices", None),
+        )
+        logger.debug("Done with constructing subjets.")
+
+        # Construct substructure jets using the above
+        return cls(  # type: ignore
+            tree[f"{prefix}.fJetPt"], constituents, subjets, splittings,
+        )
