@@ -24,7 +24,15 @@ UprootArray = Union[np.ndarray, ak.JaggedArray]
 Result = Union[UprootArray, T]
 # More ideally, I would like:
 # It's supposed to carry the semantics of Union[np.ndarray, ak.JaggedArray]
-# class UprootArray(Generic[T]): ...
+# class NDArray(Generic[T]):
+#    def argmax(self) -> T: ...
+# class UprootArrayTyped(Generic[T]):
+#    def argmax(self) -> NDArray[int]: ...
+#    @overload
+#    def __getitem__(self, key: NDArray[bool]) -> Union[UprootArrayTyped[T], NDArray[T]]: ...
+#    @overload
+#    def __getitem__(self, key: NDArray[int]) -> NDArray[T]: ...
+
 # Result = Union[UprootArray[T], T]
 
 
@@ -39,7 +47,7 @@ dynamical_kt = functools.partial(_dynamical_hardness_measure, a=1.0)
 dynamical_time = functools.partial(_dynamical_hardness_measure, a=2.0)
 
 
-def find_leading(values: Result[float]) -> Tuple[Result[float], Result[float]]:
+def find_leading(values: UprootArray) -> Tuple[np.ndarray, np.ndarray]:
     """ Calculate hardest value.
 
     Used for dynamical grooming, hardest kt, etc.
@@ -56,7 +64,7 @@ class ArrayMethods(ak.Methods):  # type: ignore
     # Otherwise, it will create one object per event, with that object storing arrays of members.
     awkward = ak
 
-    def _trymemo(self, name: str, function: Callable[..., T]) -> Callable[..., T]:
+    def _try_memo(self, name: str, function: Callable[..., T]) -> Callable[..., T]:
         memoname = "_memo_" + name
         wrap, (array,) = ak.util.unwrap_jagged(type(self), self.JaggedArray, (self,))
         if not hasattr(array, memoname):
@@ -146,9 +154,25 @@ class JetConstituentArray(JetConstituentArrayMethods, ak.ObjectArray):  # type:i
         self["phi"] = phi
         self["global_index"] = global_index
 
+    def __awkward_serialize__(self, serializer: ak.persist.Serializer) -> ak.persist.Serializer:
+        """ Serialize to file. """
+        self._valid()
+        pt, eta, phi, global_index = self.pt, self.eta, self.phi, self.global_index
+        return serializer.encode_call(
+            ["jet_substructure.base.substructure_methods", "JetConstituentArray", "from_jagged"],
+            serializer(pt, "JetConstituentArray.pt"),
+            serializer(eta, "JetConstituentArray.eta"),
+            serializer(phi, "JetConstituentArray.phi"),
+            serializer(global_index, "JetConstituentArray.global_index"),
+        )
+
     @property
     def max_pt(self) -> Result[float]:
         return self["pt"].max()
+
+    @classmethod
+    def from_jagged_table(cls: Type[T], table: ak.Table) -> T:
+        return cls.from_jagged(table.pt, table.eta, table.phi, table.global_index)  # type: ignore
 
     @classmethod
     @ak.util.wrapjaggedmethod(JaggedJetConstituentArrayMethods)  # type: ignore
@@ -253,6 +277,21 @@ class SubjetArrayMethods(ArrayMethods):
             ),
         )
 
+    def __awkward_serialize__(self, serializer: ak.persist.Serializer) -> ak.persist.Serializer:
+        """ Serialize to file. """
+        self._valid()
+        part_of_iterative_splitting, parent_splitting_index, constituents_indices = (
+            self.part_of_iterative_splitting,
+            self.parent_splitting_index,
+            self.constituents_indices,
+        )
+        return serializer.encode_call(
+            ["jet_substructure.base.substructure_methods", "SubjetArrayMethods", "from_jagged"],
+            serializer(part_of_iterative_splitting, "SubjetArrayMethods.part_of_iterative_splitting"),
+            serializer(parent_splitting_index, "SubjetArrayMethods.parent_splitting_index"),
+            serializer(constituents_indices, "SubjetArrayMethods.constituents_indices"),
+        )
+
     @property
     def _constituents_indices(self) -> Result[int]:
         """ Construct constituent indices from stored JaggedArrays.
@@ -299,13 +338,14 @@ class SubjetArrayMethods(ArrayMethods):
         Returns:
             Jet constituents of the subjets.
         """
+        # TODO: Need to rewarp as constituents.
         return self._try_memo(
             "constituents",
             lambda self: ak.JaggedArray.fromoffsets(
                 self._constituents_indices.offsets,
                 ak.JaggedArray.fromoffsets(
                     self._constituents_indices.flatten().offsets,
-                    jet_constituents[self._constituents_indices.flatten(axis=1)].flatten(),
+                    jet_constituents[self._constituents_indices.flatten(axis=1)].flatten().content,
                 ),
             ),
         )
@@ -375,6 +415,7 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
                 constituents_indices, constituents_jagged_indices
             )
         else:
+            logger.info(f"Constituent indices type: {type(constituents_indices)}")
             constituents_indices = ak.fromiter(constituents_indices)
 
         return cast(
@@ -463,7 +504,19 @@ class JetSplittingArrayMethods(ArrayMethods):
             table: Table where the constituents will be created.
         """
         self.awkward.ObjectArray.__init__(
-            self, table, lambda row: JetConstituent(row["kt"], row["delta_R"], row["z"], row["parent_index"])
+            self, table, lambda row: JetSplitting(row["kt"], row["delta_R"], row["z"], row["parent_index"])
+        )
+
+    def __awkward_serialize__(self, serializer: ak.persist.Serializer) -> ak.persist.Serializer:
+        """ Serialize to file. """
+        self._valid()
+        kt, delta_R, z, parent_index = self.kt, self.delta_R, self.z, self.parent_index
+        return serializer.encode_call(
+            ["jet_substructure.base.substructure_methods", "JetSplittingArrayMethods", "from_jagged"],
+            serializer(kt, "JetSplittingArrayMethods.kt"),
+            serializer(delta_R, "JetSplittingArrayMethods.delta_R"),
+            serializer(z, "JetSplittingArrayMethods.z"),
+            serializer(parent_index, "JetSplittingArrayMethods.parent_index"),
         )
 
     @property
@@ -477,6 +530,12 @@ class JetSplittingArrayMethods(ArrayMethods):
     @property
     def z(self) -> Result[float]:
         return self["z"]
+
+    @property
+    def parent_pt(self) -> Result[float]:
+        """ pt of the parent subjet. """
+        # parent_pt = subleading / z = kt / sin(delta_R) / z
+        return self.kt / np.sin(self.delta_R) / self.z
 
     def part_of_iterative_splitting(self, subjets: Result[SubjetArray]) -> Result[bool]:
         # iterative_splittings = subjets.parent_splitting_index[subjets.part_of_iterative_splitting]
@@ -652,6 +711,18 @@ class SubstructureJetArrayMethods(SubstructureJetCommonMethods, ArrayMethods):
             self,
             table,
             lambda row: SubstructureJet(row["jet_pt"], row["constituents"], row["subjets"], row["splittings"]),
+        )
+
+    def __awkward_serialize__(self, serializer: ak.persist.Serializer) -> ak.persist.Serializer:
+        """ Serialize to file. """
+        self._valid()
+        jet_pt, constituents, subjets, splittings = self.jet_pt, self.constituents, self.subjets, self.splittings
+        return serializer.encode_call(
+            ["jet_substructure.base.substructure_methods", "SubstructureJetArrayMethods", "from_jagged"],
+            serializer(jet_pt, "SubstructureJetArrayMethods.jet_pt"),
+            serializer(constituents, "SubstructureJetArrayMethods.constituents"),
+            serializer(subjets, "SubstructureJetArrayMethods.subjets"),
+            serializer(splittings, "SubstructureJetArrayMethods.splittings"),
         )
 
     @property
