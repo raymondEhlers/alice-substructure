@@ -1,21 +1,23 @@
+""" Manager access to datasets and trees.
+
+.. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
+"""
+
 import logging
 from collections import ChainMap
-from functools import reduce
+from functools import partial, reduce
 from pathlib import Path
-from typing import Any, Dict, FrozenSet, Iterable, Iterator, List, MutableMapping, Optional, Sequence, Union
+from typing import Any, FrozenSet, Iterable, Iterator, List, Mapping, MutableMapping, Optional, Sequence, Union
 
 import attr
 import awkward as ak
 import h5py
-import numpy as np
 import uproot
+
+from jet_substructure.base.helpers import UprootArray, UprootArrays
 
 
 logger = logging.getLogger(__name__)
-
-# TODO: Consolidate.
-UprootArray = Union[np.ndarray, ak.JaggedArray]
-UprootArrays = Dict[str, UprootArray]
 
 
 def _ensure_paths(paths: Sequence[Union[str, Path]]) -> List[Path]:
@@ -141,10 +143,19 @@ class Tree(MutableMapping[str, UprootArrays]):
 class UprootTreeIterator:
     _filenames: Sequence[Path] = attr.ib(converter=_ensure_paths)
     _tree_name: str = attr.ib()
+    _cache: MutableMapping[str, UprootArray] = attr.ib(factory=partial(uproot.ThreadSafeArrayCache, "1 GB"))
+    _key_cache: MutableMapping[str, UprootArray] = attr.ib(factory=partial(uproot.ThreadSafeArrayCache, "100 MB"))
 
     def __iter__(self) -> Iterator[UprootTreeWrapper]:
-        # TODO: Add additional arguments!
-        for tree in uproot.iterate(path=self._filenames, treepath=self._tree_name, namedecode="utf-8"):
+        # NOTE: If the file sizes get too big, can set entrysteps to something like `entrysteps=100000`, which
+        #       is large, but less than the size of the file. We want to keep it as large as possible.
+        for tree in uproot.iterate(
+            path=self._filenames,
+            treepath=self._tree_name,
+            namedecode="utf-8",
+            cache=self._cache,
+            keycache=self._key_cache,
+        ):
             yield UprootTreeWrapper(tree)
 
 
@@ -171,7 +182,7 @@ class IterateTrees:
     branches: FrozenSet[str] = attr.ib(converter=set)
     _current_tree: Optional[Tree] = attr.ib(default=None)
 
-    def data_for_analysis(self) -> Iterator[Dict[str, UprootArrays]]:
+    def data_for_analysis(self) -> Iterator[Mapping[str, UprootArrays]]:
         for uproot_tree, hdf5_tree in zip(
             UprootTreeIterator(filenames=self._filenames, tree_name=self.tree_name),
             HDF5TreeIterator(filenames=self._filenames, tree_name=self.tree_name),
