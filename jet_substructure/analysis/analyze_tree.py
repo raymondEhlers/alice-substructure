@@ -95,28 +95,34 @@ def run(
             for jet_pt_bin in jet_pt_bins:
                 jet_pt_mask = jet_pt_bin.mask_array(jets.jet_pt)
                 restricted_jets = jets[jet_pt_mask]
+                if iterative_splittings:
+                    # Only keep iterative splittings.
+                    splittings = restricted_jets.splittings.iterative_splittings(restricted_jets.subjets)
+                else:
+                    splittings = restricted_jets.splittings
 
-                # TODO: Need deltaR, etc for _each_ selection!!
+                # import IPython; IPython.embed()
+
                 # Fill the hists as appropriate
-                values, indices = restricted_jets.dynamical_z(R=R)
+                values, indices = splittings.dynamical_z(R=R)
                 hists[Identifier(iterative_splittings, jet_pt_bin)].dynamical_z.fill(
-                    values=values, indices=indices, jets=restricted_jets, jet_R=R
+                    values=values, indices=indices, splittings=splittings, jet_R=R
                 )
-                values, indices = restricted_jets.dynamical_kt(R=R)
+                values, indices = splittings.dynamical_kt(R=R)
                 hists[Identifier(iterative_splittings, jet_pt_bin)].dynamical_kt.fill(
-                    values=values, indices=indices, jets=restricted_jets, jet_R=R
+                    values=values, indices=indices, splittings=splittings, jet_R=R
                 )
-                values, indices = restricted_jets.dynamical_time(R=R)
+                values, indices = splittings.dynamical_time(R=R)
                 hists[Identifier(iterative_splittings, jet_pt_bin)].dynamical_time.fill(
-                    values=values, indices=indices, jets=restricted_jets, jet_R=R
+                    values=values, indices=indices, splittings=splittings, jet_R=R
                 )
-                values, indices = restricted_jets.leading_kt()
+                values, indices = splittings.leading_kt()
                 hists[Identifier(iterative_splittings, jet_pt_bin)].leading_kt.fill(
-                    values=values, indices=indices, jets=restricted_jets, jet_R=R
+                    values=values, indices=indices, splittings=splittings, jet_R=R
                 )
-                values, indices = restricted_jets.leading_kt(z_cutoff=z_cutoff)
+                values, indices = splittings.leading_kt(z_cutoff=z_cutoff)
                 hists[Identifier(iterative_splittings, jet_pt_bin)].leading_kt_hard_cutoff.fill(
-                    values=values, indices=indices, jets=restricted_jets, jet_R=R
+                    values=values, indices=indices, splittings=splittings, jet_R=R
                 )
 
     return hists, output
@@ -144,7 +150,7 @@ if __name__ == "__main__":
     logging.getLogger("parso").setLevel(logging.INFO)
 
     # Setup and run
-    collision_system = "pythia"
+    collision_system = "pp"
     jet_pt_bins = [
         helpers.RangeSelector(min=60, max=80),
         helpers.RangeSelector(min=80, max=100),

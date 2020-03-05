@@ -93,16 +93,10 @@ class SubstructureHists:
         self,
         values: UprootArray,
         indices: UprootArray,
-        jets: "substructure_methods.SubstructureJetArray",
+        splittings: "substructure_methods.JetSplittingArray",
         jet_R: float,
         splitting_number: Optional[UprootArray] = None,
     ) -> None:
-        # For convenience
-        if self.iterative_splittings:
-            splittings = jets.splittings.iterative_splittings(jets.subjets)[indices]
-        else:
-            splittings = jets.splittings[indices]
-
         # Give a useful error message
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
             raise ValueError("Not all hists are boost histograms! Cannot fill!")
