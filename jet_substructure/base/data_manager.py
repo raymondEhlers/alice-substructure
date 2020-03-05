@@ -69,7 +69,7 @@ class TreeWrapper(MutableMapping[str, UprootArray]):
             # Retrieve all of the branches.
             return self._retrieve_branches(branches_to_return)
 
-        return self._tree[key]
+        return {key: self._tree[key]}
 
     def __setitem__(self, key: str, item: Any) -> None:
         if not isinstance(key, str):

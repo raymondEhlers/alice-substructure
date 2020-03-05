@@ -15,12 +15,13 @@ import attr
 import awkward as ak
 import numpy as np
 
+from jet_substructure.base.helpers import UprootArray
+
 
 logger = logging.getLogger(__name__)
 
 # Typing helpers
 T = TypeVar("T")
-UprootArray = Union[np.ndarray, ak.JaggedArray]
 Result = Union[UprootArray, T]
 # More ideally, I would like:
 # It's supposed to carry the semantics of Union[np.ndarray, ak.JaggedArray]
@@ -47,7 +48,7 @@ dynamical_kt = functools.partial(_dynamical_hardness_measure, a=1.0)
 dynamical_time = functools.partial(_dynamical_hardness_measure, a=2.0)
 
 
-def find_leading(values: UprootArray) -> Tuple[np.ndarray, np.ndarray]:
+def find_leading(values: UprootArray) -> Tuple[np.ndarray, ak.JaggedArray]:
     """ Calculate hardest value.
 
     Used for dynamical grooming, hardest kt, etc.
@@ -56,7 +57,7 @@ def find_leading(values: UprootArray) -> Tuple[np.ndarray, np.ndarray]:
         Leading value, index of value.
     """
     arg_max = values.argmax()
-    return values[arg_max], arg_max
+    return values[arg_max].flatten(), arg_max
 
 
 class ArrayMethods(ak.Methods):  # type: ignore
@@ -546,6 +547,8 @@ class JetSplittingArrayMethods(ArrayMethods):
         """ Retrieve iterative splittings. """
         return self[subjets.iterative_splitting_index]
 
+    # TODO: Add splitting number (ie how many splittings to this splitting).
+
     def dynamical_z(self, R: float) -> Tuple[Result[float], Result[float]]:
         """ Dynamical z of the jet splittings.
 
@@ -667,7 +670,7 @@ class SubstructureJetCommonMethods:
     def dynamical_z(self, R: float) -> Tuple[float, float]:
         return self.splittings.dynamical_z(R=R)
 
-    def dynamical_kt(self, R: float) -> Tuple[float, float]:
+    def dynamical_kt(self, R: float) -> Tuple[Result[float], Result[int]]:
         return self.splittings.dynamical_kt(R=R)
 
     def dynamical_time(self, R: float) -> Tuple[float, float]:
@@ -677,7 +680,7 @@ class SubstructureJetCommonMethods:
         """ Leading kt. """
         return self.splittings.leading_kt(z_cutoff=z_cutoff)
 
-    def soft_drop_kt(self, z_cutoff: float) -> Tuple[float, int, float]:
+    def soft_drop(self, z_cutoff: float) -> Tuple[float, int, float]:
         """ Calculate soft drop of the splittings.
 
         Args:

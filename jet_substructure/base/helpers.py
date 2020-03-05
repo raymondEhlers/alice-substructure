@@ -19,9 +19,19 @@ logger = logging.getLogger(__name__)
 UprootArray = Union[np.ndarray, ak.JaggedArray]
 UprootArrays = Mapping[str, UprootArray]
 # Arrays = Union[UprootArrays, pd.DataFrame]
+# More ideally, I would like:
+# It's supposed to carry the semantics of Union[np.ndarray, ak.JaggedArray]
+# class NDArray(Generic[T]):
+#    def argmax(self) -> T: ...
+# class UprootArrayTyped(Generic[T]):
+#    def argmax(self) -> NDArray[int]: ...
+#    @overload
+#    def __getitem__(self, key: NDArray[bool]) -> Union[UprootArrayTyped[T], NDArray[T]]: ...
+#    @overload
+#    def __getitem__(self, key: NDArray[int]) -> NDArray[T]: ...
 
 
-@attr.s
+@attr.s(frozen=True)
 class RangeSelector:
     min: float = attr.ib()
     max: float = attr.ib()
