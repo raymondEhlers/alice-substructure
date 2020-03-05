@@ -416,7 +416,7 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
                 constituents_indices, constituents_jagged_indices
             )
         else:
-            logger.info(f"Constituent indices type: {type(constituents_indices)}")
+            logger.debug(f"Constituent indices type: {type(constituents_indices)}")
             constituents_indices = ak.fromiter(constituents_indices)
 
         return cast(
