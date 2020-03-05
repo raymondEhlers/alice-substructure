@@ -23,9 +23,15 @@ class Identifier:
     iterative_splittings: bool = attr.ib()
     jet_pt_bin: helpers.RangeSelector = attr.ib()
 
+    @property
+    def iterative_splittings_label(self) -> str:
+        return "iterative" if self.iterative_splittings else "recursive"
+
     def __str__(self) -> str:
-        iterative_label = "iterative" if self.iterative_splittings else "recursive"
-        return f"jetPt_{self.jet_pt_bin.min}_{self.jet_pt_bin.max}_{iterative_label}_splittings"
+        return f"jetPt_{self.jet_pt_bin.min}_{self.jet_pt_bin.max}_{self.iterative_splittings_label}_splittings"
+
+    def display_str(self) -> str:
+        return f"{self.iterative_splittings_label.capitalize()} splittings\n${self.jet_pt_bin.display_str()}$"
 
 
 @attr.s

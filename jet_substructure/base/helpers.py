@@ -68,3 +68,9 @@ class RangeSelector:
             Minimum and maximum values.
         """
         return cls(min=min(selections, key=lambda v: v.min).min, max=max(selections, key=lambda v: v.max).max,)
+
+    def __str__(self) -> str:
+        return f"jetPt_{self.min}_{self.max}"
+
+    def display_str(self) -> str:
+        return fr"{self.min} < p_{{\text{{T}}}}^{{\text{{jet}}}} < {self.max}"
