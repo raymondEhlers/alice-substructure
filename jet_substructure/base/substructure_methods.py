@@ -411,7 +411,7 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
             parent_splitting_index: Jagged parent splitting index.
             constituents_indices: Jagged constituents indices of the subjet.
         """
-        if constituents_jagged_indices:
+        if constituents_jagged_indices is not None:
             constituents_indices = _convert_jagged_constituents_indicies(
                 constituents_indices, constituents_jagged_indices
             )
