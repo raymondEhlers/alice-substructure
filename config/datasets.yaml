@@ -1,0 +1,98 @@
+---
+datasets:
+    PbPb:
+        dataset:
+            name: "LHC18qr"
+            branches:
+                - "data.fJetPt"
+                - "data.fKt"
+                - "data.fDeltaR"
+                - "data.fZ"
+    embedPythia:
+        dataset:
+            name: "LHC18b8_embedded_into_LHC18qr"
+    pp:
+        dataset:
+            name: "LHC17pq"
+            branches:
+                - "data.fJetPt"
+                - "data.fJetConstituents.fPt"
+                - "data.fJetConstituents.fEta"
+                - "data.fJetConstituents.fPhi"
+                - "data.fJetConstituents.fGlobalIndex"
+                - "data.fJetSplittings.fKt"
+                - "data.fJetSplittings.fDeltaR"
+                - "data.fJetSplittings.fZ"
+                - "data.fJetSplittings.fParentIndex"
+                - "data.fSubjets.fPartOfIterativeSplitting"
+                - "data.fSubjets.fSplittingNodeIndex"
+                - "data.fSubjets.fConstituentIndices"
+                - "data.fSubjets.fConstituentJaggedIndices"
+    pythia:
+        dataset:
+            name: "LHC18b8"
+            branches:
+                - "data.fJetPt"
+                - "data.fJetConstituents.fPt"
+                - "data.fJetConstituents.fEta"
+                - "data.fJetConstituents.fPhi"
+                - "data.fJetConstituents.fGlobalIndex"
+                - "data.fJetSplittings.fKt"
+                - "data.fJetSplittings.fDeltaR"
+                - "data.fJetSplittings.fZ"
+                - "data.fJetSplittings.fParentIndex"
+                - "data.fSubjets.fPartOfIterativeSplitting"
+                - "data.fSubjets.fSplittingNodeIndex"
+                - "data.fSubjets.fConstituentIndices"
+
+available_datasets:
+    LHC18qr:
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
+        jet_R: 0.4
+        files:
+            - "trains/PbPb/5537/AnalysisResults.18q.1.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.2.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.3.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.1.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.2.root"
+    LHC18b8_embedded_into_LHC18qr:
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        jet_R: 0.4
+        files:
+            - "trains/embedPythia/5517/AnalysisResults.root"
+            - "trains/embedPythia/5518/AnalysisResults.root"
+            - "trains/embedPythia/5519/AnalysisResults.root"
+            - "trains/embedPythia/5520/AnalysisResults.root"
+            - "trains/embedPythia/5521/AnalysisResults.root"
+            - "trains/embedPythia/5522/AnalysisResults.root"
+            - "trains/embedPythia/5523/AnalysisResults.root"
+            - "trains/embedPythia/5524/AnalysisResults.root"
+            - "trains/embedPythia/5525/AnalysisResults.root"
+            - "trains/embedPythia/5526/AnalysisResults.root"
+            - "trains/embedPythia/5527/AnalysisResults.root"
+            - "trains/embedPythia/5528/AnalysisResults.root"
+            - "trains/embedPythia/5529/AnalysisResults.root"
+            - "trains/embedPythia/5530/AnalysisResults.root"
+            - "trains/embedPythia/5531/AnalysisResults.root"
+            - "trains/embedPythia/5532/AnalysisResults.root"
+            - "trains/embedPythia/5533/AnalysisResults.root"
+            - "trains/embedPythia/5534/AnalysisResults.root"
+            - "trains/embedPythia/5535/AnalysisResults.root"
+            - "trains/embedPythia/5536/AnalysisResults.root"
+    LHC17pq:
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_RawTree_Data_NoSub_Incl"
+        jet_R: 0.4
+        files:
+            - "trains/pp/1788/AnalysisResults.FAST.root"
+            - "trains/pp/1788/AnalysisResults.woSDD.root"
+            - "trains/pp/1789/AnalysisResults.FAST.root"
+            - "trains/pp/1789/AnalysisResults.woSDD.root"
+    LHC18b8:
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
+        jet_R: 0.4
+        files:
+            - "trains/pythia/2110/AnalysisResults.FAST.1.root"
+            - "trains/pythia/2110/AnalysisResults.FAST.2.root"
