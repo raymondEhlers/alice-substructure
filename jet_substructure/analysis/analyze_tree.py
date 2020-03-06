@@ -13,10 +13,10 @@ from typing import Dict, Sequence, Tuple
 
 import attr
 import coloredlogs
-from pachyderm import yaml
+from pachyderm import binned_data, yaml
 
-from jet_substructure.base import data_manager, helpers, substructure_methods
-from jet_substructure.base.analysis_objects import Hists, Identifier
+from jet_substructure.analysis import plot_results
+from jet_substructure.base import analysis_objects, data_manager, helpers, substructure_methods
 from jet_substructure.base.helpers import UprootArray
 
 
@@ -52,13 +52,17 @@ class SubstructureResult:
         self._splitting_number = value
 
 
+def setup_yaml() -> yaml.ruamel.yaml.Yaml:
+    return yaml.yaml(modules_to_register=[binned_data, analysis_objects])
+
+
 def run(
     collision_system: str, jet_pt_bins: Sequence[helpers.RangeSelector], dataset_config_filename: Path, output: Path
-) -> Tuple[Dict[Identifier, Hists], Path]:
+) -> Tuple[Dict[analysis_objects.Identifier, analysis_objects.Hists], Path]:
     # Setup
     z_cutoff = 0.2
     # Configuration
-    y = yaml.yaml()
+    y = setup_yaml()
     with open(dataset_config_filename, "r") as f:
         config = y.load(f)
     dataset_config = config["datasets"][collision_system]["dataset"]
@@ -77,10 +81,12 @@ def run(
     )
 
     # Define hists
-    hists: Dict[Identifier, Hists] = {}
+    hists: Dict[analysis_objects.Identifier, analysis_objects.Hists] = {}
     for iterative_splittings in [False, True]:
         for jet_pt_bin in jet_pt_bins:
-            hists[Identifier(iterative_splittings, jet_pt_bin)] = Hists.create_boost_histograms(
+            hists[
+                analysis_objects.Identifier(iterative_splittings, jet_pt_bin)
+            ] = analysis_objects.Hists.create_boost_histograms(
                 iterative_splittings=iterative_splittings, z_cutoff=z_cutoff
             )
 
@@ -105,23 +111,23 @@ def run(
 
                 # Fill the hists as appropriate
                 values, indices = splittings.dynamical_z(R=R)
-                hists[Identifier(iterative_splittings, jet_pt_bin)].dynamical_z.fill(
+                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_z.fill(
                     values=values, indices=indices, splittings=splittings, jet_R=R
                 )
                 values, indices = splittings.dynamical_kt(R=R)
-                hists[Identifier(iterative_splittings, jet_pt_bin)].dynamical_kt.fill(
+                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_kt.fill(
                     values=values, indices=indices, splittings=splittings, jet_R=R
                 )
                 values, indices = splittings.dynamical_time(R=R)
-                hists[Identifier(iterative_splittings, jet_pt_bin)].dynamical_time.fill(
+                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_time.fill(
                     values=values, indices=indices, splittings=splittings, jet_R=R
                 )
                 values, indices = splittings.leading_kt()
-                hists[Identifier(iterative_splittings, jet_pt_bin)].leading_kt.fill(
+                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].leading_kt.fill(
                     values=values, indices=indices, splittings=splittings, jet_R=R
                 )
                 values, indices = splittings.leading_kt(z_cutoff=z_cutoff)
-                hists[Identifier(iterative_splittings, jet_pt_bin)].leading_kt_hard_cutoff.fill(
+                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].leading_kt_hard_cutoff.fill(
                     values=values, indices=indices, splittings=splittings, jet_R=R
                 )
 
@@ -132,7 +138,7 @@ def run(
     # dynamical_z, dynamical_kt, dynamical_time, soft_drop, leading_kt, leading_kt_hard_cutoff = res
 
     # import IPython; IPython.embed()
-    # TODO: Now: Plot the histograms (in a new function...)
+    # TODO: Store the hists!
 
     # plot_results.kt(results = res, jet_pt=arrays["data_jetPt"], jet_pt_bins = jet_pt_bins, path = output)
     # plot_results.z(results = res, jet_pt=arrays["data_jetPt"], jet_pt_bins = jet_pt_bins, path = output)
@@ -158,9 +164,11 @@ if __name__ == "__main__":
         # Most likely where we will actually measure.
         helpers.RangeSelector(min=80, max=120),
     ]
-    run(
+    hists, output = run(
         collision_system=collision_system,
         jet_pt_bins=jet_pt_bins,
         dataset_config_filename=Path("config") / "datasets.yaml",
         output=Path("output"),
     )
+
+    plot_results.lund_plane(all_hists=hists, path=output)
