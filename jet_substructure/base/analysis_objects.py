@@ -81,6 +81,25 @@ class SubstructureHists:
             }.items()
         )
 
+    def __truediv__(self, other: "SubstructureHists") -> "SubstructureHists":
+        data = []
+        for (k, v), (k_other, v_other) in zip(self, other):
+            # Sanity check
+            if k != k_other:
+                raise ValueError(f"Somehow keys mismatch. self key: {k}, other key: {k_other}")
+            # First, normalize the hists by the number of jets.
+            temp_v = v / self.n_jets
+            temp_v_other = v_other / other.n_jets
+            data.append(temp_v / temp_v_other)
+
+        return type(self)(
+            f"{self.name}_{other.name}",
+            f"{self.title}_{other.title}",
+            self.iterative_splittings and other.iterative_splittings,
+            1,
+            *data,
+        )
+
     def convert_boost_histograms_to_binned_data(self) -> None:
         # Sanity check
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
@@ -97,9 +116,15 @@ class SubstructureHists:
         jet_R: float,
         splitting_number: Optional[UprootArray] = None,
     ) -> None:
+        # Validation
         # Give a useful error message
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
             raise ValueError("Not all hists are boost histograms! Cannot fill!")
+
+        # Setup
+        # Apply the indices mask to select the splittings of interest
+        splittings = splittings[indices]
+
         # And then help out mypy...
         assert (
             isinstance(self.values, bh.Histogram)
