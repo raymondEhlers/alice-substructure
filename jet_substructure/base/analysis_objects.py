@@ -46,6 +46,7 @@ class SubstructureHists:
     delta_R: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     theta: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     splitting_number: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    splitting_number_perturbative: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     lund_plane: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
 
     @classmethod
@@ -69,6 +70,7 @@ class SubstructureHists:
             delta_R=bh.Histogram(delta_R_axis, storage=bh.storage.Weight()),
             theta=bh.Histogram(theta_axis, storage=bh.storage.Weight()),
             splitting_number=bh.Histogram(splitting_number_axis, storage=bh.storage.Weight()),
+            splitting_number_perturbative=bh.Histogram(splitting_number_axis, storage=bh.storage.Weight()),
             lund_plane=bh.Histogram(*lund_plane_axes, storage=bh.storage.Weight()),
         )
 
@@ -133,6 +135,7 @@ class SubstructureHists:
             and isinstance(self.delta_R, bh.Histogram)
             and isinstance(self.theta, bh.Histogram)
             and isinstance(self.splitting_number, bh.Histogram)
+            and isinstance(self.splitting_number_perturbative, bh.Histogram)
             and isinstance(self.lund_plane, bh.Histogram)
         )
         # Need to store the number of jets along the histograms.
@@ -146,10 +149,16 @@ class SubstructureHists:
             # +1 because splittings counts from 1, but indexing starts from 0.
             splitting_number = indices + 1
             # If there were no splittings, we want to set that to 0.
-            splitting_number = splitting_number.pad(1).fillna(0).flatten()
+            splitting_number = splitting_number.pad(1).fillna(0)
             # Must flatten because the indices are still jagged.
             splitting_number = splitting_number.flatten()
         self.splitting_number.fill(splitting_number)
+        # Select only splittings with kt > 5.
+        # +1 because splittings counts from 1, but indexing starts from 0.
+        # NOTE: We aren't counting 0 here if it fails, so we aren't preserving counts!
+        #       In this simpler case, we can just select directly on the indices.
+        splitting_number_perturbative = (indices + 1)[splittings.kt > 5].flatten()
+        self.splitting_number_perturbative.fill(splitting_number_perturbative)
         self.lund_plane.fill(np.log(1.0 / splittings.delta_R.flatten()), np.log(splittings.kt.flatten()))
 
 

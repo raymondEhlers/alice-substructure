@@ -325,8 +325,14 @@ def lund_plane(all_hists: Dict[analysis_objects.Identifier, analysis_objects.His
         legend_location="center right",
         log_y=False,
     )
-
-    # TODO: For splitting_number, need to convert empty indices to 0s (??)
+    # NOTE: Assumes fixed value of kt > 5!!
+    splitting_number_perturbative_label = PlotConfig(
+        name="splitting_number_kt_greater_than_5",
+        x_label=r"$n$",
+        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$ ($k_{\text{T}} > 5$)",
+        legend_location="center right",
+        log_y=False,
+    )
 
     distributions: List[Tuple[str, PlotConfig]] = [
         ("kt", kt_label),
@@ -334,6 +340,7 @@ def lund_plane(all_hists: Dict[analysis_objects.Identifier, analysis_objects.His
         ("delta_R", delta_R_label),
         ("theta", theta_label),
         ("splitting_number", splitting_number_label),
+        ("splitting_number_perturbative", splitting_number_perturbative_label),
     ]
     for identifier, masked_hists in all_hists.items():
         for attribute_name, plot_config in distributions:
