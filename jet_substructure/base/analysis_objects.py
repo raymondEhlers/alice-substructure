@@ -3,6 +3,7 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+import copy
 from typing import TYPE_CHECKING, Iterator, Optional, Tuple, Type, Union
 
 import attr
@@ -78,10 +79,40 @@ class SubstructureHists:
         return iter(
             {
                 k: v
-                for k, v in attr.asdict(self).items()
+                for k, v in attr.asdict(self, recurse=False).items()
                 if k not in ["name", "title", "iterative_splittings", "n_jets"]
             }.items()
         )
+
+    def __add__(self, other: "SubstructureHists") -> "SubstructureHists":
+        """ Handles a = b + c """
+        new = copy.deepcopy(self)
+        new += other
+        return new
+
+    def __iadd__(self, other: "SubstructureHists") -> "SubstructureHists":
+        """ Handles a += b """
+        # Validation
+        if self.iterative_splittings != other.iterative_splittings:
+            raise TypeError(
+                f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
+            )
+
+        self.name = f"{self.name}_{other.name}" if self.name != other.name else self.name
+        self.title = f"{self.title}_{other.title}" if self.title != other.title else self.title
+        # Don't need to update iterative_splittings since they must be the same!
+        self.n_jets += other.n_jets
+        for (k, v), (k_other, v_other) in zip(self, other):
+            v += v_other
+
+        return self
+
+    def __radd__(self, other: "SubstructureHists") -> "SubstructureHists":
+        """ For use with sum(...). """
+        if other == 0:
+            return self
+        else:
+            return self + other
 
     def __truediv__(self, other: "SubstructureHists") -> "SubstructureHists":
         data = []
@@ -174,6 +205,34 @@ class Hists:
         # We don't want to recurse because we have to handle the dict conversion more careful
         # for the SubstructureHists
         return iter(attr.asdict(self, recurse=False).items())
+
+    def __add__(self, other: "Hists") -> "Hists":
+        """ Handles a = b + c. """
+        new = copy.deepcopy(self)
+        new += other
+        return new
+
+    def __iadd__(self, other: "Hists") -> "Hists":
+        """ Handles a += b. """
+        # Add the stored values together.
+        for (k, v), (k_other, v_other) in zip(self, other):
+            # Validation
+            if k != k_other:
+                raise ValueError(f"Somehow keys mismatch. self key: {k}, other key: {k_other}")
+
+            # Assumes that they are passed by reference.
+            v += v_other
+
+        return self
+
+    def __radd__(self, other: "Hists") -> "Hists":
+        """ For use with sum(...). """
+        if other == 0:
+            return self
+        else:
+            # Help out mypy
+            assert not isinstance(other, int)
+            return self + other
 
     @classmethod
     def create_boost_histograms(cls: Type["Hists"], iterative_splittings: bool, z_cutoff: float) -> "Hists":
