@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple, cast
 
 import attr
 import coloredlogs
 import enlighten
+import IPython
 from pachyderm import binned_data, yaml
 
 from jet_substructure.analysis import plot_results
@@ -57,6 +58,75 @@ def setup_yaml() -> yaml.ruamel.yaml.Yaml:
     return yaml.yaml(modules_to_register=[binned_data, analysis_objects, helpers])
 
 
+def analyze_single_tree(
+    tree: data_manager.Tree,
+    z_cutoff: float,
+    R: float,
+    jet_pt_bins: Sequence[helpers.RangeSelector],
+    progress_manager: enlighten.Manager,
+    y: yaml.ruamel.yaml.Yaml,
+    output: Path,
+) -> Dict[analysis_objects.Identifier, analysis_objects.Hists]:
+    logger.debug("Actually about to access/use data.")
+    # Add a convenient wrapper.
+    jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix="data")
+
+    # Setup outputs
+    hists: Dict[analysis_objects.Identifier, analysis_objects.Hists] = {}
+    for iterative_splittings in [False, True]:
+        for jet_pt_bin in jet_pt_bins:
+            hists[
+                analysis_objects.Identifier(iterative_splittings, jet_pt_bin)
+            ] = analysis_objects.Hists.create_boost_histograms(
+                iterative_splittings=iterative_splittings, z_cutoff=z_cutoff
+            )
+
+    # Loop over iterations (jet pt ranges, iterative splitting)
+    with progress_manager.counter(total=len(jet_pt_bins) * 2, desc="Analyzing", unit="variation") as variations:
+        for iterative_splittings in [False, True]:
+            for jet_pt_bin in jet_pt_bins:
+                jet_pt_mask = jet_pt_bin.mask_array(jets.jet_pt)
+                restricted_jets = jets[jet_pt_mask]
+                if iterative_splittings:
+                    # Only keep iterative splittings.
+                    splittings = restricted_jets.splittings.iterative_splittings(restricted_jets.subjets)
+                else:
+                    splittings = restricted_jets.splittings
+
+                # Fill the hists as appropriate
+                values, indices = splittings.dynamical_z(R=R)
+                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_z.fill(
+                    values=values, indices=indices, splittings=splittings, jet_R=R
+                )
+                values, indices = splittings.dynamical_kt(R=R)
+                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_kt.fill(
+                    values=values, indices=indices, splittings=splittings, jet_R=R
+                )
+                values, indices = splittings.dynamical_time(R=R)
+                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_time.fill(
+                    values=values, indices=indices, splittings=splittings, jet_R=R
+                )
+                values, indices = splittings.leading_kt()
+                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].leading_kt.fill(
+                    values=values, indices=indices, splittings=splittings, jet_R=R
+                )
+                values, indices = splittings.leading_kt(z_cutoff=z_cutoff)
+                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].leading_kt_hard_cutoff.fill(
+                    values=values, indices=indices, splittings=splittings, jet_R=R
+                )
+                # Update progress
+                variations.update()
+
+    # Convert to BinnedData and store the hists
+    for h in hists.values():
+        for _, technique_hists in h:
+            technique_hists.convert_boost_histograms_to_binned_data()
+    with open(output / tree.filename.with_suffix(".yaml").name, "w") as f:
+        y.dump(hists, f)
+
+    return hists
+
+
 def run(
     collision_system: str, jet_pt_bins: Sequence[helpers.RangeSelector], dataset_config_filename: Path, output: Path
 ) -> Tuple[Dict[analysis_objects.Identifier, analysis_objects.Hists], Path]:
@@ -80,80 +150,47 @@ def run(
         tree_name=selected_dataset_config["tree_name"],
         branches=dataset_config["branches"],
     )
-
-    # Define hists
-    hists: Dict[analysis_objects.Identifier, analysis_objects.Hists] = {}
-    for iterative_splittings in [False, True]:
-        for jet_pt_bin in jet_pt_bins:
-            hists[
-                analysis_objects.Identifier(iterative_splittings, jet_pt_bin)
-            ] = analysis_objects.Hists.create_boost_histograms(
-                iterative_splittings=iterative_splittings, z_cutoff=z_cutoff
-            )
-
     logger.info("Setup complete. Beginning processing of trees.")
 
     # Iterate over trees.
     progress_manager = enlighten.get_manager()
+    results: List[Dict[analysis_objects.Identifier, analysis_objects.Hists]] = []
     with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
         for tree in tree_counter(dm):
             logger.info(f"Processing tree from file {tree.filename}")
-            # Add a convenient wrapper.
-            jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix="data")
+            tree_hists = analyze_single_tree(
+                tree,
+                z_cutoff=z_cutoff,
+                R=R,
+                jet_pt_bins=jet_pt_bins,
+                progress_manager=progress_manager,
+                y=y,
+                output=output,
+            )
+            # hists[tree.filename] = tree_hists
+            results.append(tree_hists)
 
-            # Loop over iterations (jet pt ranges, iterative splitting)
-            with progress_manager.counter(total=len(jet_pt_bins) * 2, desc="Analyzing", unit="variation") as variations:
-                for iterative_splittings in [False, True]:
-                    for jet_pt_bin in jet_pt_bins:
-                        jet_pt_mask = jet_pt_bin.mask_array(jets.jet_pt)
-                        restricted_jets = jets[jet_pt_mask]
-                        if iterative_splittings:
-                            # Only keep iterative splittings.
-                            splittings = restricted_jets.splittings.iterative_splittings(restricted_jets.subjets)
-                        else:
-                            splittings = restricted_jets.splittings
+    # Merge the hists
+    full_hists: Dict[analysis_objects.Identifier, analysis_objects.Hists] = {}
+    for k in results[0]:
+        full_hists[k] = cast(analysis_objects.Hists, sum([hists[k] for hists in results]))
+    # for h in hists[1:]:
+    #    for (full_technique, full_technique_hists), (technique, technique_hists) in zip(full_hists.items(), h.items()):
+    #        if full_technique != technique:
+    #            raise RuntimeError(f"Technique mismatched! Full hists: {full_technique}, single hist: {technique}")
+    #        full_hists[full_technique] += technique_hists
 
-                        # Fill the hists as appropriate
-                        values, indices = splittings.dynamical_z(R=R)
-                        hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_z.fill(
-                            values=values, indices=indices, splittings=splittings, jet_R=R
-                        )
-                        values, indices = splittings.dynamical_kt(R=R)
-                        hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_kt.fill(
-                            values=values, indices=indices, splittings=splittings, jet_R=R
-                        )
-                        values, indices = splittings.dynamical_time(R=R)
-                        hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_time.fill(
-                            values=values, indices=indices, splittings=splittings, jet_R=R
-                        )
-                        values, indices = splittings.leading_kt()
-                        hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].leading_kt.fill(
-                            values=values, indices=indices, splittings=splittings, jet_R=R
-                        )
-                        values, indices = splittings.leading_kt(z_cutoff=z_cutoff)
-                        hists[
-                            analysis_objects.Identifier(iterative_splittings, jet_pt_bin)
-                        ].leading_kt_hard_cutoff.fill(values=values, indices=indices, splittings=splittings, jet_R=R)
-                        # Update progress
-                        variations.update()
-
-            # Convert to BinnedData and store the hists
-            for h in hists.values():
-                for _, technique_hists in h:
-                    technique_hists.convert_boost_histograms_to_binned_data()
-            with open(output / tree.filename.with_suffix(".yaml").name, "w") as f:
-                y.dump(hists, f)
+    # Write out the merged hists
+    with open(output / "hists.yaml", "w") as f:
+        y.dump(full_hists, f)
 
     progress_manager.stop()
 
-    return hists, output
+    return full_hists, output
 
     # Calculate the substructure variables
     # res = substructure.calculate_substructure_variables(arrays, R = 0.4, prefix = "data")
     # dynamical_z, dynamical_kt, dynamical_time, soft_drop, leading_kt, leading_kt_hard_cutoff = res
-
-    # import IPython; IPython.embed()
-    # TODO: Store the hists!
 
     # plot_results.kt(results = res, jet_pt=arrays["data_jetPt"], jet_pt_bins = jet_pt_bins, path = output)
     # plot_results.z(results = res, jet_pt=arrays["data_jetPt"], jet_pt_bins = jet_pt_bins, path = output)
@@ -187,3 +224,5 @@ if __name__ == "__main__":
     )
 
     plot_results.lund_plane(all_hists=hists, path=output)
+
+    IPython.start_ipython(user_ns=locals())
