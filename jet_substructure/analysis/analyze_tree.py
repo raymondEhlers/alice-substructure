@@ -13,6 +13,7 @@ from typing import Dict, Sequence, Tuple
 
 import attr
 import coloredlogs
+import enlighten
 from pachyderm import binned_data, yaml
 
 from jet_substructure.analysis import plot_results
@@ -53,7 +54,7 @@ class SubstructureResult:
 
 
 def setup_yaml() -> yaml.ruamel.yaml.Yaml:
-    return yaml.yaml(modules_to_register=[binned_data, analysis_objects])
+    return yaml.yaml(modules_to_register=[binned_data, analysis_objects, helpers])
 
 
 def run(
@@ -90,46 +91,60 @@ def run(
                 iterative_splittings=iterative_splittings, z_cutoff=z_cutoff
             )
 
+    logger.info("Setup complete. Beginning processing of trees.")
+
     # Iterate over trees.
-    for i, tree in enumerate(dm.data_for_analysis(), start=1):
-        logger.info(f"Processing tree {i}")
-        # Add a convenient wrapper.
-        jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix="data")
+    progress_manager = enlighten.get_manager()
+    with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
+        for tree in tree_counter(dm):
+            logger.info(f"Processing tree from file {tree.filename}")
+            # Add a convenient wrapper.
+            jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix="data")
 
-        # Loop over jet pt ranges
-        for iterative_splittings in [False, True]:
-            for jet_pt_bin in jet_pt_bins:
-                jet_pt_mask = jet_pt_bin.mask_array(jets.jet_pt)
-                restricted_jets = jets[jet_pt_mask]
-                if iterative_splittings:
-                    # Only keep iterative splittings.
-                    splittings = restricted_jets.splittings.iterative_splittings(restricted_jets.subjets)
-                else:
-                    splittings = restricted_jets.splittings
+            # Loop over iterations (jet pt ranges, iterative splitting)
+            with progress_manager.counter(total=len(jet_pt_bins) * 2, desc="Analyzing", unit="variation") as variations:
+                for iterative_splittings in [False, True]:
+                    for jet_pt_bin in jet_pt_bins:
+                        jet_pt_mask = jet_pt_bin.mask_array(jets.jet_pt)
+                        restricted_jets = jets[jet_pt_mask]
+                        if iterative_splittings:
+                            # Only keep iterative splittings.
+                            splittings = restricted_jets.splittings.iterative_splittings(restricted_jets.subjets)
+                        else:
+                            splittings = restricted_jets.splittings
 
-                # import IPython; IPython.embed()
+                        # Fill the hists as appropriate
+                        values, indices = splittings.dynamical_z(R=R)
+                        hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_z.fill(
+                            values=values, indices=indices, splittings=splittings, jet_R=R
+                        )
+                        values, indices = splittings.dynamical_kt(R=R)
+                        hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_kt.fill(
+                            values=values, indices=indices, splittings=splittings, jet_R=R
+                        )
+                        values, indices = splittings.dynamical_time(R=R)
+                        hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_time.fill(
+                            values=values, indices=indices, splittings=splittings, jet_R=R
+                        )
+                        values, indices = splittings.leading_kt()
+                        hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].leading_kt.fill(
+                            values=values, indices=indices, splittings=splittings, jet_R=R
+                        )
+                        values, indices = splittings.leading_kt(z_cutoff=z_cutoff)
+                        hists[
+                            analysis_objects.Identifier(iterative_splittings, jet_pt_bin)
+                        ].leading_kt_hard_cutoff.fill(values=values, indices=indices, splittings=splittings, jet_R=R)
+                        # Update progress
+                        variations.update()
 
-                # Fill the hists as appropriate
-                values, indices = splittings.dynamical_z(R=R)
-                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_z.fill(
-                    values=values, indices=indices, splittings=splittings, jet_R=R
-                )
-                values, indices = splittings.dynamical_kt(R=R)
-                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_kt.fill(
-                    values=values, indices=indices, splittings=splittings, jet_R=R
-                )
-                values, indices = splittings.dynamical_time(R=R)
-                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_time.fill(
-                    values=values, indices=indices, splittings=splittings, jet_R=R
-                )
-                values, indices = splittings.leading_kt()
-                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].leading_kt.fill(
-                    values=values, indices=indices, splittings=splittings, jet_R=R
-                )
-                values, indices = splittings.leading_kt(z_cutoff=z_cutoff)
-                hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].leading_kt_hard_cutoff.fill(
-                    values=values, indices=indices, splittings=splittings, jet_R=R
-                )
+            # Convert to BinnedData and store the hists
+            for h in hists.values():
+                for _, technique_hists in h:
+                    technique_hists.convert_boost_histograms_to_binned_data()
+            with open(output / tree.filename.with_suffix(".yaml").name, "w") as f:
+                y.dump(hists, f)
+
+    progress_manager.stop()
 
     return hists, output
 
@@ -156,7 +171,7 @@ if __name__ == "__main__":
     logging.getLogger("parso").setLevel(logging.INFO)
 
     # Setup and run
-    collision_system = "pp"
+    collision_system = "pythia"
     jet_pt_bins = [
         helpers.RangeSelector(min=60, max=80),
         helpers.RangeSelector(min=80, max=100),
