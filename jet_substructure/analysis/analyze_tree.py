@@ -138,6 +138,7 @@ def analyze_single_tree(
     for h in hists.values():
         h.convert_boost_histograms_to_binned_data()
     with open(yaml_filename, "w") as f:
+        logger.info("Writing hists of the tree {tree.filename} to {yaml_filename}")
         y.dump(hists, f)
 
     return hists
