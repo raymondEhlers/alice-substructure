@@ -92,7 +92,15 @@ def analyze_single_tree(
     # Add a convenient wrapper.
     logger.debug(f"Accessing data from the tree {tree.filename}.")
     try:
-        jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix="data")
+        prefix = "data"
+        jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
+        # Save the calculated constituent indices. Only do it if they're not stored
+        # because HDF5 doesn't like us overwriting it.
+        if f"{prefix}.calculated_constituents_indices" not in tree:
+            tree[f"{prefix}.calculated_constituents_indices"] = jets.subjets.constituents_indices
+
+        # TODO: Write the calculated constituents so we can avoid recalcuating them in the future.
+        # tree[f"{prefix}.subjet_constituents"] = jets.subjets.constituents(jets.constituents)
     except zlib.error as e:
         logger.warning(f"Issue reading the data: {e}. Skipping")
         # Return the empty hists

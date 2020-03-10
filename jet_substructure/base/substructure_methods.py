@@ -395,6 +395,7 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
         parent_splitting_index: Result[int],
         constituents_indices: Result[int],
         constituents_jagged_indices: Optional[Result[int]] = None,
+        calculated_constituents_indices: Optional[Result[int]] = None,
     ) -> _T_SubjetArray:
         """ Creates a view of subjets with jagged structure.
 
@@ -411,7 +412,21 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
             parent_splitting_index: Jagged parent splitting index.
             constituents_indices: Jagged constituents indices of the subjet.
         """
-        if constituents_jagged_indices is not None:
+        # Validation
+        if calculated_constituents_indices is None and constituents_indices is None:
+            raise ValueError("Must pass constituents indices or pre-calculated constituents indices.")
+        logger.debug("Determining constituents indices")
+
+        # We have three modes for creating the indices:
+        # 1) If the constituent indices are already converted into a doubly jagged array, just use them.
+        # 2) Construct the constituent indices using separately stored jagged indices.
+        # 3) Construct the doubly jagged indices stored in the tree via fromiter(...)
+        if calculated_constituents_indices is not None:
+            # Great, we already have them calculated! We don't care about anything else.
+            logger.debug("Loading pre-calculated constituents indices")
+            constituents_indices = calculated_constituents_indices
+        elif constituents_jagged_indices is not None:
+            # Calculate the indices
             constituents_indices = _convert_jagged_constituents_indicies(
                 constituents_indices, constituents_jagged_indices
             )
@@ -801,6 +816,7 @@ class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):  # type
             tree[f"{prefix}.fSubjets.fSplittingNodeIndex"],
             tree[f"{prefix}.fSubjets.fConstituentIndices"],
             tree.get(f"{prefix}.fSubjets.fConstituentJaggedIndices", None),
+            tree.get(f"{prefix}.calculated_constituents_indices", None),
         )
         logger.debug("Done with constructing subjets.")
 
