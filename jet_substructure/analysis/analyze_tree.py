@@ -138,7 +138,7 @@ def analyze_single_tree(
     for h in hists.values():
         h.convert_boost_histograms_to_binned_data()
     with open(yaml_filename, "w") as f:
-        logger.info("Writing hists of the tree {tree.filename} to {yaml_filename}")
+        logger.info(f"Writing hists of the tree {tree.filename} to {yaml_filename}")
         y.dump(hists, f)
 
     return hists
@@ -172,7 +172,7 @@ def run(
     # Iterate over trees.
     progress_manager = enlighten.get_manager()
     results: List[Dict[analysis_objects.Identifier, analysis_objects.Hists]] = []
-    with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
+    with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree", leave=False) as tree_counter:
         for tree in tree_counter(dm):
             logger.info(f"Processing tree from file {tree.filename}")
             tree_hists = analyze_single_tree(
