@@ -27,8 +27,7 @@ def _convert_wildcards(paths: Sequence[Path]) -> List[Path]:
         p = str(path)
         if "*" in str(p):
             # Glob all associated filenames.
-            loc = p.find("*")
-            return_paths.extend(Path(p[:loc]).glob(p[loc:]))
+            return_paths.extend(list(Path(path.parent).glob(path.name)))
         else:
             return_paths.append(path)
 
