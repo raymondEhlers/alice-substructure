@@ -8,7 +8,7 @@ import typing
 from collections import ChainMap
 from functools import partial, reduce
 from pathlib import Path
-from typing import FrozenSet, Iterable, Iterator, List, MutableMapping, Optional, Sequence, Union
+from typing import FrozenSet, Iterable, Iterator, List, Mapping, MutableMapping, Optional, Sequence, Type, Union, cast
 
 import attr
 import awkward as ak
@@ -45,18 +45,21 @@ def _ensure_and_expand_hdf5_paths(paths: Sequence[Union[str, Path]]) -> List[Pat
     return _convert_wildcards([Path(p).with_suffix(".h5") for p in paths])
 
 
-@attr.s
-class TreeWrapper(MutableMapping[str, UprootArray]):
+def _ensure_hdf5_path(path: Union[str, Path]) -> Path:
+    return Path(path).with_suffix(".h5")
+
+
+class TreeMixin:
     """ Wrapper around an open tree.
 
     It keeps track of the tree itself, as well as tree metadata such as the available branches
     or the filename where it is stored.
     """
 
-    _tree: MutableMapping[str, UprootArray] = attr.ib()
-    _filename: Path = attr.ib(converter=Path)
-    _tree_name: str = attr.ib()
-    _branches: FrozenSet[str] = attr.ib(converter=frozenset, default=frozenset())
+    _tree: Mapping[str, UprootArray]
+    _filename: Path
+    _tree_name: str
+    _branches: FrozenSet[str]
 
     @property
     def filename(self) -> Path:
@@ -68,6 +71,9 @@ class TreeWrapper(MutableMapping[str, UprootArray]):
         """ Name of the current tree. """
         return self._tree_name
 
+    def _retrieve_branch_names(self) -> FrozenSet[str]:
+        return frozenset(self._tree.keys())
+
     @property
     def branches(self) -> FrozenSet[str]:
         """ Branches stored in the tree.
@@ -78,17 +84,20 @@ class TreeWrapper(MutableMapping[str, UprootArray]):
         if len(self._branches) != 0:
             return self._branches
         else:
-            self._branches = frozenset(self._tree.keys())
+            self._branches = self._retrieve_branch_names()
         return self._branches
 
     def __len__(self) -> int:
-        return len(self._tree)
+        return len(self.branches)
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self._tree)
+        return iter(self.branches)
 
     def _retrieve_branches(self, key: Iterable[str]) -> UprootArrays:
         return {k: self._tree[k] for k in key}
+
+    def _retrieve_branch(self, key: str) -> UprootArray:
+        return self._tree[key]
 
     @typing.overload
     def __getitem__(self, key: str) -> UprootArray:
@@ -112,7 +121,72 @@ class TreeWrapper(MutableMapping[str, UprootArray]):
             # Retrieve all of the branches.
             return self._retrieve_branches(branches_to_return)
 
-        return self._tree[key]
+        return self._retrieve_branch(key)
+
+
+@attr.s
+class UprootTreeWrapper(TreeMixin, Mapping[str, UprootArray]):
+    """
+
+    Note:
+        If iterating over many files, it's best to create the caches externally. Otherwise, we keep creating
+        new caches.
+    """
+
+    _filename: Path = attr.ib(converter=Path)
+    _file: uproot.rootio.ROOTDirectory = attr.ib()
+    _tree_name: str = attr.ib()
+    # _tree: Mapping[str, UprootArray] = attr.ib()
+    _tree: uproot.tree.TTreeMethods = attr.ib()
+    _branches: FrozenSet[str] = attr.ib(converter=frozenset, default=frozenset())
+    _cache: MutableMapping[str, UprootArray] = attr.ib(factory=partial(uproot.ThreadSafeArrayCache, "1 GB"))
+    _key_cache: MutableMapping[str, UprootArray] = attr.ib(factory=partial(uproot.ThreadSafeArrayCache, "100 MB"))
+
+    def _retrieve_branch_names(self) -> FrozenSet[str]:
+        return frozenset([name.decode("utf-8") for name in self._tree.allkeys()])
+
+    def _retrieve_branches(self, key: Iterable[str]) -> UprootArrays:
+        return cast(
+            UprootArrays, self._tree.arrays(key, cache=self._cache, keycache=self._key_cache, namedecode="utf-8")
+        )
+
+    def _retrieve_branch(self, key: str) -> UprootArray:
+        return self._tree.array(key, cache=self._cache, keycache=self._key_cache)
+
+    @classmethod
+    def from_filename(
+        cls: Type["UprootTreeWrapper"], filename: Path, tree_name: str, **kwargs: MutableMapping[str, UprootArray]
+    ) -> "UprootTreeWrapper":
+        """ Open a tree stored in a given file and wrap around the tree for a uniform API.
+
+        Note:
+            If iterating over many files, it's best to create the caches externally. Otherwise, we keep creating
+            new caches.
+
+        Args:
+            filename: Filename which contains the tree.
+            tree_name: Name of the tree inside of the file.
+            cache: Uproot cache for tree array data.
+            key_cache: Uproot cache for tree keys.
+
+        Returns:
+            Wrapped around the tree stored in HDF5, ready to provide data.
+        """
+        # Will be closed when this tree wrapper goes out of scope.
+        f = uproot.open(filename)
+
+        return cls(file=f, tree=f[tree_name], filename=filename, tree_name=tree_name, branches=frozenset(), **kwargs,)
+
+
+@attr.s
+class HDF5TreeWrapper(TreeMixin, MutableMapping[str, UprootArray]):
+    _filename: Path = attr.ib(converter=_ensure_hdf5_path)
+    _file: h5py.File = attr.ib()
+    _tree_name: str = attr.ib()
+    # Technically, it would be more correct to be typed as ak.hdf5. However, that would be less informative
+    # because it will be treated as Any. So instead we tell a white lie and type it with it's behavior.
+    _tree: MutableMapping[str, UprootArray] = attr.ib()
+    _branches: FrozenSet[str] = attr.ib(converter=frozenset, default=frozenset())
 
     def __setitem__(self, key: str, item: UprootArray) -> None:
         self._tree.__setitem__(key, item)
@@ -120,17 +194,30 @@ class TreeWrapper(MutableMapping[str, UprootArray]):
     def __delitem__(self, key: str) -> None:
         self._tree.__delitem__(key)
 
+    @classmethod
+    def from_filename(
+        cls: Type["HDF5TreeWrapper"], filename: Union[Path, str], tree_name: str, file_mode: str = "a"
+    ) -> "HDF5TreeWrapper":
+        """ Open a tree stored in a given file and wrap around the tree for a uniform API.
 
-@attr.s
-class UprootTreeWrapper(TreeWrapper):
-    def __setitem__(self, key: Union[str, Iterable[str]], item: UprootArray) -> None:
-        raise TypeError(f"Cannot write key {key} to the uproot TTree. Instead, write to the HDF5 tree.")
+        Args:
+            filename: Filename which contains the tree.
+            tree_name: Name of the tree inside of the file.
+            file_mode: Mode under which the file should be opened. Default to "a"
+                so that we can read and write (and the file will be created if it
+                doesn't exist).
 
+        Returns:
+            Wrapped around the tree stored in HDF5, ready to provide data.
+        """
+        # Validation
+        filename = _ensure_hdf5_path(filename)
+        file_mode = "a" if not filename.exists() else file_mode
 
-@attr.s
-class HDF5TreeWrapper(TreeWrapper):
-    # NOTE: Not adding new fields - just updating the types.
-    _tree: ak.hdf5
+        # Will be closed when this tree wrapper goes out of scope.
+        f = h5py.File(filename, file_mode)
+
+        return cls(filename=filename, file=f, tree_name=tree_name, tree=ak.hdf5(f.require_group(tree_name)),)
 
 
 @attr.s
@@ -143,17 +230,23 @@ class UprootTreeIterator:
     def __iter__(self) -> Iterator[UprootTreeWrapper]:
         # NOTE: If the file sizes get too big, can set entrysteps to something like `entrysteps=100000`, which
         #       is large, but less than the size of the file. We want to keep it as large as possible.
-        for filename, tree in zip(
-            self._filenames,
-            uproot.iterate(
-                path=self._filenames,
-                treepath=self._tree_name,
-                namedecode="utf-8",
-                cache=self._cache,
-                keycache=self._key_cache,
-            ),
+        for f, filename, tree in uproot.iterate(
+            path=self._filenames,
+            treepath=self._tree_name,
+            namedecode="utf-8",
+            cache=self._cache,
+            keycache=self._key_cache,
+            reportpath=True,
+            reportfile=True,
         ):
-            yield UprootTreeWrapper(tree=tree, filename=filename, tree_name=self._tree_name)
+            yield UprootTreeWrapper(
+                filename=filename,
+                file=f,
+                tree_name=self._tree_name,
+                tree=tree,
+                cache=self._cache,
+                key_cache=self._key_cache,
+            )
 
 
 @attr.s
@@ -168,7 +261,7 @@ class HDF5TreeIterator:
             file_mode = "a" if not filename.exists() else self._file_mode
             with h5py.File(filename, file_mode) as f:
                 storage = ak.hdf5(f.require_group(self._tree_name))
-                yield HDF5TreeWrapper(tree=storage, filename=filename, tree_name=self._tree_name)
+                yield HDF5TreeWrapper(filename=filename, file=f, tree_name=self._tree_name, tree=storage)
 
 
 @attr.s
@@ -193,7 +286,7 @@ class Tree(MutableMapping[str, UprootArrays]):
         return self._uproot_tree.tree_name
 
     @property
-    def _trees(self) -> List[TreeWrapper]:
+    def _trees(self) -> List[TreeMixin]:
         return [self._uproot_tree, self._hdf5_tree]
 
     @property
@@ -255,13 +348,33 @@ class IterateTrees:
     def __contains__(self, key: str) -> bool:
         return Path(key) in self._filenames
 
-    # def data_for_analysis(self) -> Iterator[Mapping[str, UprootArrays]]:
     def __iter__(self) -> Iterator[Tree]:
+        """ Iterate over lazy trees.
+
+        """
+        # Allocate cache here so we only create it once.
+        uproot_cache = uproot.ThreadSafeArrayCache("1 GB")
+        uproot_key_cache = uproot.ThreadSafeArrayCache("100 MB")
+
+        for filename in self._filenames:
+            self._current_tree = Tree(
+                UprootTreeWrapper.from_filename(
+                    filename=filename, tree_name=self.tree_name, cache=uproot_cache, key_cache=uproot_key_cache
+                ),
+                HDF5TreeWrapper.from_filename(filename=filename, tree_name=self.tree_name, file_mode="a"),
+            )
+
+            yield self._current_tree
+
+    def active_iteration(self) -> Iterator[Tree]:
+        """ Iterate over actively loaded trees.
+
+        It is recommended to use lazy iteration via `__iter__`!
+        """
         for uproot_tree, hdf5_tree in zip(
             UprootTreeIterator(filenames=self._filenames, tree_name=self.tree_name),
             HDF5TreeIterator(filenames=self._filenames, tree_name=self.tree_name),
         ):
             self._current_tree = Tree(uproot_tree, hdf5_tree)
 
-            # yield _current_tree[self.branches]
             yield self._current_tree
