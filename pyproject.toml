@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Jet substructure analysis code"
 authors = ["Raymond Ehlers <raymond.ehlers@cern.ch>"]
 license = "BSD-3-Clause"
+include = [
+    "jet_substructure/py.typed",
+]
 
 [tool.poetry.dependencies]
 python = "^3.6.1"
