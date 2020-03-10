@@ -141,8 +141,7 @@ def _plot_distribution(
             continue
 
         h: Union[bh.Histogram, binned_data.BinnedData] = getattr(technique_hists, attribute_name)
-        if isinstance(h, bh.Histogram):
-            h = binned_data.BinnedData.from_boost_histogram(h)
+        h = binned_data.BinnedData.from_existing_data(h)
 
         # TODO: Should the hists be normalized earlier??
         # Scale by bin widths and number of jets
@@ -163,8 +162,7 @@ def _plot_distribution(
             ratio_denominator = getattr(ratio_denominator_hists, technique)
 
             h_denominator: Union[bh.Histogram, binned_data.BinnedData] = getattr(ratio_denominator, attribute_name)
-            if isinstance(h_denominator, bh.Histogram):
-                h_denominator = binned_data.BinnedData.from_boost_histogram(h_denominator)
+            h_denominator = binned_data.BinnedData.from_existing_data(h_denominator)
 
             h_denominator /= ratio_denominator.n_jets
             h_denominator /= h_denominator.axis.bin_widths
@@ -237,7 +235,7 @@ def _plot_lund_plane(
 
     h: Union[bh.Histogram, binned_data.BinnedData] = hists.lund_plane
     if isinstance(h, bh.Histogram):
-        h = binned_data.BinnedData.from_boost_histogram(h)
+        h = binned_data.BinnedData.from_existing_data(h)
 
     # TODO: Should the hists be normalized earlier??
     # Scale by bin width
@@ -359,7 +357,9 @@ def lund_plane(all_hists: Dict[analysis_objects.Identifier, analysis_objects.His
                     identifier=identifier,
                     plot_config=plot_config,
                     path=path,
-                    ratio_denominator_hists=all_hists[analysis_objects.Identifier(True, identifier.jet_pt_bin)],
+                    ratio_denominator_hists=all_hists[
+                        analysis_objects.Identifier(iterative_splittings=True, jet_pt_bin=identifier.jet_pt_bin)
+                    ],
                 )
 
         for technique, hists in masked_hists:

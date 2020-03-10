@@ -4,6 +4,7 @@
 """
 
 import copy
+import logging
 from typing import TYPE_CHECKING, Iterator, Optional, Tuple, Type, Union
 
 import attr
@@ -17,6 +18,8 @@ from jet_substructure.base.helpers import UprootArray
 
 if TYPE_CHECKING:
     from jet_substructure.base import substructure_methods
+
+logger = logging.getLogger(__name__)
 
 
 @attr.s(frozen=True)
@@ -139,7 +142,7 @@ class SubstructureHists:
             raise ValueError("Not all hists are boost histograms! Cannot convert to binned data!")
 
         for k, v in self:
-            setattr(self, k, binned_data.BinnedData.from_boost_histogram(v))
+            setattr(self, k, binned_data.BinnedData.from_existing_data(v))
 
     def fill(
         self,
