@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import zlib
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple, cast
 
@@ -89,7 +90,12 @@ def analyze_single_tree(
 
     # Add a convenient wrapper.
     logger.debug(f"Accessing data from the tree {tree.filename}.")
-    jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix="data")
+    try:
+        jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix="data")
+    except zlib.error as e:
+        logger.warning(f"Issue reading the data: {e}. Skipping")
+        # Return the empty hists
+        return hists
 
     # Loop over iterations (jet pt ranges, iterative splitting)
     with progress_manager.counter(total=len(jet_pt_bins) * 2, desc="Analyzing", unit="variation") as variations:
@@ -129,8 +135,7 @@ def analyze_single_tree(
 
     # Convert to BinnedData and store the hists
     for h in hists.values():
-        for _, technique_hists in h:
-            technique_hists.convert_boost_histograms_to_binned_data()
+        h.convert_boost_histograms_to_binned_data()
     with open(yaml_filename, "w") as f:
         y.dump(hists, f)
 

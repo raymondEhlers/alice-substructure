@@ -237,6 +237,10 @@ class Hists:
             assert not isinstance(other, int)
             return self + other
 
+    def convert_boost_histograms_to_binned_data(self) -> None:
+        for _, v in self:
+            v.convert_boost_histograms_to_binned_data()
+
     @classmethod
     def create_boost_histograms(cls: Type["Hists"], iterative_splittings: bool, z_cutoff: float) -> "Hists":
         kt_axis = bh.axis.Regular(50, 0, 25)
