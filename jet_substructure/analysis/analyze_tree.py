@@ -72,7 +72,8 @@ def analyze_single_tree(
     # Setup
     hists: Dict[analysis_objects.Identifier, analysis_objects.Hists] = {}
     # If the hists already exist, skip processing the tree and just return the hists instead (which is way faster!)
-    yaml_filename = output / tree.filename.with_suffix(".yaml").name
+    train_number = tree.filename.parent.name
+    yaml_filename = output / f"{train_number}_{tree.filename.with_suffix('.yaml').name}"
     if yaml_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
         with open(yaml_filename, "r") as f:
