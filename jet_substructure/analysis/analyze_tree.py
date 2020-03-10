@@ -66,13 +66,19 @@ def analyze_single_tree(
     progress_manager: enlighten.Manager,
     y: yaml.ruamel.yaml.Yaml,
     output: Path,
+    force_reprocessing: bool = False,
 ) -> Dict[analysis_objects.Identifier, analysis_objects.Hists]:
-    logger.debug("Actually about to access/use data.")
-    # Add a convenient wrapper.
-    jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix="data")
-
-    # Setup outputs
+    # Setup
     hists: Dict[analysis_objects.Identifier, analysis_objects.Hists] = {}
+    # If the hists already exist, skip processing the tree and just return the hists instead (which is way faster!)
+    yaml_filename = output / tree.filename.with_suffix(".yaml").name
+    if yaml_filename.exists() and not force_reprocessing:
+        logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
+        with open(yaml_filename, "r") as f:
+            hists = y.load(f)
+            return hists
+
+    # Since we're actually processing, we setup the output hists
     for iterative_splittings in [False, True]:
         for jet_pt_bin in jet_pt_bins:
             hists[
@@ -80,6 +86,10 @@ def analyze_single_tree(
             ] = analysis_objects.Hists.create_boost_histograms(
                 iterative_splittings=iterative_splittings, z_cutoff=z_cutoff
             )
+
+    # Add a convenient wrapper.
+    logger.debug(f"Accessing data from the tree {tree.filename}.")
+    jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix="data")
 
     # Loop over iterations (jet pt ranges, iterative splitting)
     with progress_manager.counter(total=len(jet_pt_bins) * 2, desc="Analyzing", unit="variation") as variations:
@@ -121,7 +131,7 @@ def analyze_single_tree(
     for h in hists.values():
         for _, technique_hists in h:
             technique_hists.convert_boost_histograms_to_binned_data()
-    with open(output / tree.filename.with_suffix(".yaml").name, "w") as f:
+    with open(yaml_filename, "w") as f:
         y.dump(hists, f)
 
     return hists
@@ -172,13 +182,8 @@ def run(
 
     # Merge the hists
     full_hists: Dict[analysis_objects.Identifier, analysis_objects.Hists] = {}
-    for k in results[0]:
+    for k in results[0].keys():
         full_hists[k] = cast(analysis_objects.Hists, sum([hists[k] for hists in results]))
-    # for h in hists[1:]:
-    #    for (full_technique, full_technique_hists), (technique, technique_hists) in zip(full_hists.items(), h.items()):
-    #        if full_technique != technique:
-    #            raise RuntimeError(f"Technique mismatched! Full hists: {full_technique}, single hist: {technique}")
-    #        full_hists[full_technique] += technique_hists
 
     # Write out the merged hists
     with open(output / "hists.yaml", "w") as f:
@@ -188,15 +193,15 @@ def run(
 
     return full_hists, output
 
-    # Calculate the substructure variables
-    # res = substructure.calculate_substructure_variables(arrays, R = 0.4, prefix = "data")
-    # dynamical_z, dynamical_kt, dynamical_time, soft_drop, leading_kt, leading_kt_hard_cutoff = res
 
-    # plot_results.kt(results = res, jet_pt=arrays["data_jetPt"], jet_pt_bins = jet_pt_bins, path = output)
-    # plot_results.z(results = res, jet_pt=arrays["data_jetPt"], jet_pt_bins = jet_pt_bins, path = output)
-    # plot_results.delta_R(results = res, jet_pt=arrays["data_jetPt"], jet_pt_bins = jet_pt_bins, path = output)
-    # plot_results.theta(results = res, jet_R=0.4, jet_pt=arrays["data_jetPt"], jet_pt_bins = jet_pt_bins, path = output)
-    # plot_results.splitting_number(results = res, jet_pt=arrays["data_jetPt"], jet_pt_bins = jet_pt_bins, path = output)
+# def compare_PbPb_to_embedded(pbpb_hists_path: Path, embedded_hists_path: Path) -> None:
+#    # Setup
+#    y = setup_yaml()
+#    with open(pbpb_hists_path, "r") as f:
+#        pbpb_hists = y.load(f)
+#    with open(embedded_hists_path, "r") as f:
+#        embedded_hists = y.load(f)
+#    ...
 
 
 if __name__ == "__main__":
