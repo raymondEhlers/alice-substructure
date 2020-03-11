@@ -602,10 +602,15 @@ class JetSplittingArrayMethods(ArrayMethods):
         Returns:
             Leading kt values, leading kt indices.
         """
-        mask = slice(None)
+        # Need to use the local index because we are going to mask z values. If we index from the masked
+        # z values, it it is applied to the unmasked array later, it will give nonsense. So we mask the local index,
+        # find the leading, and then apply that index back to the local index, which then gives us the leading index
+        # in the unmasked array.
+        local_index_mask = self.z.localindex
         if z_cutoff is not None:
-            mask = self.z > z_cutoff
-        return find_leading(self.kt[mask])
+            local_index_mask = self.z.localindex[self.z > z_cutoff]
+        values, indices = find_leading(self.kt[local_index_mask])
+        return values, local_index_mask[indices]
 
     def soft_drop(self, z_cutoff: float) -> Tuple[Result[float], Result[int], Result[float]]:
         """ Calculate soft drop of the splittings.
