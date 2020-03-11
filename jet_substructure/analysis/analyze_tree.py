@@ -59,6 +59,22 @@ def setup_yaml() -> yaml.ruamel.yaml.Yaml:
     return yaml.yaml(modules_to_register=[binned_data, analysis_objects, helpers])
 
 
+def _convert_and_write_hists(
+    hists: Dict[analysis_objects.Identifier, analysis_objects.Hists],
+    tree_filename: Path,
+    yaml_filename: Path,
+    y: yaml.ruamel.yaml.Yaml,
+) -> Dict[analysis_objects.Identifier, analysis_objects.Hists]:
+    # Convert to BinnedData and store the hists
+    for h in hists.values():
+        h.convert_boost_histograms_to_binned_data()
+    with open(yaml_filename, "w") as f:
+        logger.info(f"Writing hists of the tree {tree_filename} to {yaml_filename}")
+        y.dump(hists, f)
+
+    return hists
+
+
 def analyze_single_tree(
     tree: data_manager.Tree,
     z_cutoff: float,
@@ -103,8 +119,8 @@ def analyze_single_tree(
         # tree[f"{prefix}.subjet_constituents"] = jets.subjets.constituents(jets.constituents)
     except zlib.error as e:
         logger.warning(f"Issue reading the data: {e}. Skipping")
-        # Return the empty hists
-        return hists
+        # Convert, write, and return the empty hists. We can't process this data :-(
+        return _convert_and_write_hists(hists=hists, tree_filename=tree.filename, yaml_filename=yaml_filename, y=y)
 
     # Loop over iterations (jet pt ranges, iterative splitting)
     with progress_manager.counter(total=len(jet_pt_bins) * 2, desc="Analyzing", unit="variation") as variations:
@@ -146,14 +162,7 @@ def analyze_single_tree(
                 # Update progress
                 variations.update()
 
-    # Convert to BinnedData and store the hists
-    for h in hists.values():
-        h.convert_boost_histograms_to_binned_data()
-    with open(yaml_filename, "w") as f:
-        logger.info(f"Writing hists of the tree {tree.filename} to {yaml_filename}")
-        y.dump(hists, f)
-
-    return hists
+    return _convert_and_write_hists(hists=hists, tree_filename=tree.filename, yaml_filename=yaml_filename, y=y)
 
 
 def run(
