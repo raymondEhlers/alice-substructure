@@ -112,6 +112,10 @@ def analyze_single_tree(
             for jet_pt_bin in jet_pt_bins:
                 jet_pt_mask = jet_pt_bin.mask_array(jets.jet_pt)
                 restricted_jets = jets[jet_pt_mask]
+                # Need to determine all jets which are accepted in the jet pt range.
+                # Otherwise, those which may fail (such as with a z_cutoff) may not get
+                # the proper normalization.
+                n_jets = len(restricted_jets)
                 if iterative_splittings:
                     # Only keep iterative splittings.
                     splittings = restricted_jets.splittings.iterative_splittings(restricted_jets.subjets)
@@ -121,23 +125,23 @@ def analyze_single_tree(
                 # Fill the hists as appropriate
                 values, indices = splittings.dynamical_z(R=R)
                 hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_z.fill(
-                    values=values, indices=indices, splittings=splittings, jet_R=R
+                    values=values, indices=indices, splittings=splittings, jet_R=R, n_jets=n_jets,
                 )
                 values, indices = splittings.dynamical_kt(R=R)
                 hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_kt.fill(
-                    values=values, indices=indices, splittings=splittings, jet_R=R
+                    values=values, indices=indices, splittings=splittings, jet_R=R, n_jets=n_jets,
                 )
                 values, indices = splittings.dynamical_time(R=R)
                 hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].dynamical_time.fill(
-                    values=values, indices=indices, splittings=splittings, jet_R=R
+                    values=values, indices=indices, splittings=splittings, jet_R=R, n_jets=n_jets,
                 )
                 values, indices = splittings.leading_kt()
                 hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].leading_kt.fill(
-                    values=values, indices=indices, splittings=splittings, jet_R=R
+                    values=values, indices=indices, splittings=splittings, jet_R=R, n_jets=n_jets,
                 )
                 values, indices = splittings.leading_kt(z_cutoff=z_cutoff)
                 hists[analysis_objects.Identifier(iterative_splittings, jet_pt_bin)].leading_kt_hard_cutoff.fill(
-                    values=values, indices=indices, splittings=splittings, jet_R=R
+                    values=values, indices=indices, splittings=splittings, jet_R=R, n_jets=n_jets,
                 )
                 # Update progress
                 variations.update()
@@ -191,6 +195,7 @@ def run(
                 progress_manager=progress_manager,
                 y=y,
                 output=output,
+                force_reprocessing=True,
             )
             # hists[tree.filename] = tree_hists
             results.append(tree_hists)

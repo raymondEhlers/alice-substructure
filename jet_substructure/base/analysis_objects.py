@@ -149,6 +149,7 @@ class SubstructureHists:
         values: UprootArray,
         indices: UprootArray,
         splittings: "substructure_methods.JetSplittingArray",
+        n_jets: int,
         jet_R: float,
         splitting_number: Optional[UprootArray] = None,
     ) -> None:
@@ -173,7 +174,7 @@ class SubstructureHists:
             and isinstance(self.lund_plane, bh.Histogram)
         )
         # Need to store the number of jets along the histograms.
-        self.n_jets += len(values)
+        self.n_jets += n_jets
         self.values.fill(values)
         self.kt.fill(splittings.kt.flatten())
         self.z.fill(splittings.z.flatten())
