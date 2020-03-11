@@ -107,18 +107,28 @@ def analyze_single_tree(
 
     # Add a convenient wrapper.
     logger.debug(f"Accessing data from the tree {tree.filename}.")
+    successfully_accessed_data = False
     try:
-        prefix = "data"
-        jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
-        # Save the calculated constituent indices. Only do it if they're not stored
-        # because HDF5 doesn't like us overwriting it.
-        if f"{prefix}.calculated_constituents_indices" not in tree:
-            tree[f"{prefix}.calculated_constituents_indices"] = jets.subjets.constituents_indices
+        # If there are 0 entries, then just return - it won't work...
+        if len(tree) > 0:
+            prefix = "data"
+            jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
+            # Save the calculated constituent indices. Only do it if they're not stored
+            # because HDF5 doesn't like us overwriting it.
+            if f"{prefix}.calculated_constituents_indices" not in tree:
+                tree[f"{prefix}.calculated_constituents_indices"] = jets.subjets.constituents_indices
 
-        # TODO: Write the calculated constituents so we can avoid recalcuating them in the future.
-        # tree[f"{prefix}.subjet_constituents"] = jets.subjets.constituents(jets.constituents)
+            # TODO: Write the calculated constituents so we can avoid recalculating them in the future.
+            # tree[f"{prefix}.subjet_constituents"] = jets.subjets.constituents(jets.constituents)
+
+            successfully_accessed_data = True
+        else:
+            logger.warning(f"No jets are in file {tree.filename}. Skipping")
     except zlib.error as e:
         logger.warning(f"Issue reading the data: {e}. Skipping")
+
+    # Catch all failed cases.
+    if not successfully_accessed_data:
         # Convert, write, and return the empty hists. We can't process this data :-(
         return _convert_and_write_hists(hists=hists, tree_filename=tree.filename, yaml_filename=yaml_filename, y=y)
 
@@ -204,7 +214,7 @@ def run(
                 progress_manager=progress_manager,
                 y=y,
                 output=output,
-                force_reprocessing=True,
+                force_reprocessing=False,
             )
             # hists[tree.filename] = tree_hists
             results.append(tree_hists)

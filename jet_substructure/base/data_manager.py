@@ -87,7 +87,7 @@ class TreeMixin:
         return self._branches
 
     def __len__(self) -> int:
-        return len(self.branches)
+        return len(self._tree)
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.branches)
@@ -297,7 +297,7 @@ class Tree(MutableMapping[str, UprootArrays]):
         return self._branches
 
     def __len__(self) -> int:
-        return len(self.branches)
+        return len(self._uproot_tree)
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.branches)
