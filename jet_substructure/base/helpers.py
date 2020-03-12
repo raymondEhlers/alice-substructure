@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Mapping, Sequence, Type, Union
+from typing import Any, Dict, Mapping, Sequence, Tuple, Type, Union
 
 import attr
 import awkward as ak
@@ -29,6 +29,43 @@ UprootArrays = Mapping[str, UprootArray]
 #    def __getitem__(self, key: NDArray[bool]) -> Union[UprootArrayTyped[T], NDArray[T]]: ...
 #    @overload
 #    def __getitem__(self, key: NDArray[int]) -> NDArray[T]: ...
+
+
+def pretty_print_tree(d: Mapping[int, Any], indent: int = 0) -> None:
+    """ Convenience function for pretty printing the splitting tree.
+
+    From: https://stackoverflow.com/a/3229493.
+
+    Args:
+        d: Dictionary containing the splittings.
+        indent: How far to indent (effectively how far we are into the recursion).
+
+    Returns:
+        None.
+    """
+    for key, value in d.items():
+        print("\t" * indent + str(key))
+        if isinstance(value, Mapping):
+            pretty_print_tree(value, indent + 1)
+        else:
+            print("\t" * (indent + 1) + str(value))
+
+
+def convert_flat_to_tree(parent_label: int, relationships: Sequence[Tuple[int, int]]) -> Dict[int, Any]:
+    """ Convert the flat array to the tree.
+
+    Slightly modified from: https://stackoverflow.com/a/43728268
+
+    Args:
+        parent_label: Label of the root parent (usually -1).
+        relationships: Relationships from child to parent. Of the form (child index, parent index).
+    Returns:
+        Tree representing these relationships.
+    """
+    return {
+        p: convert_flat_to_tree(p, relationships)
+        for p in [index for index, parent in relationships if parent == parent_label]
+    }
 
 
 @attr.s(frozen=True)
