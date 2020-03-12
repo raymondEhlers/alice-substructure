@@ -121,11 +121,11 @@ def _plot_distribution_old(
 
 def _plot_distribution(
     attribute_name: str,
-    hists: analysis_objects.Hists,
+    hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
     identifier: analysis_objects.Identifier,
     plot_config: PlotConfig,
     path: Path,
-    ratio_denominator_hists: Optional[analysis_objects.Hists] = None,
+    ratio_denominator_hists: Optional[analysis_objects.Hists[analysis_objects.SubstructureHists]] = None,
 ) -> None:
     # Setup
     if ratio_denominator_hists:
@@ -290,7 +290,9 @@ def _plot_lund_plane(
     plt.close(fig)
 
 
-def lund_plane(all_hists: Dict[analysis_objects.Identifier, analysis_objects.Hists], path: Path) -> None:
+def lund_plane(
+    all_hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]], path: Path
+) -> None:
     # Validation
     path.mkdir(parents=True, exist_ok=True)
 
