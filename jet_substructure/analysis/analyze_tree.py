@@ -396,6 +396,70 @@ def run(
     return full_hists, output
 
 
+def run_embedding(
+    collision_system: str, jet_pt_bins: Sequence[helpers.RangeSelector], dataset_config_filename: Path, output: Path
+) -> Tuple[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]], Path]:
+    # Setup
+    z_cutoff = 0.2
+    # Configuration
+    y = setup_yaml()
+    with open(dataset_config_filename, "r") as f:
+        config = y.load(f)
+    dataset_config = config["datasets"][collision_system]["dataset"]
+    dataset_name = dataset_config["name"]
+    # finalize setup
+    output = output / collision_system / dataset_name
+    output.mkdir(parents=True, exist_ok=True)
+
+    # Retrieve and setup data
+    selected_dataset_config = config["available_datasets"][dataset_name]
+    R = selected_dataset_config["jet_R"]
+    dm = data_manager.IterateTrees(
+        filenames=selected_dataset_config["files"],
+        tree_name=selected_dataset_config["tree_name"],
+        branches=dataset_config["branches"],
+    )
+    logger.info("Setup complete. Beginning processing of trees.")
+
+    # Iterate over trees.
+    progress_manager = enlighten.get_manager()
+    results: List[
+        Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]]
+    ] = []
+    with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
+        for tree in tree_counter(dm):
+            logger.info(f"Processing tree from file {tree.filename}")
+            tree_hists = analyze_single_tree_embedding(
+                tree,
+                z_cutoff=z_cutoff,
+                R=R,
+                jet_pt_bins=jet_pt_bins,
+                progress_manager=progress_manager,
+                y=y,
+                output=output,
+                force_reprocessing=True,
+            )
+            # hists[tree.filename] = tree_hists
+            results.append(tree_hists)
+
+    # Merge the hists
+    full_hists: Dict[
+        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]
+    ] = {}
+    for k in results[0].keys():
+        full_hists[k] = cast(
+            analysis_objects.Hists[analysis_objects.SubstructureResponseHists], sum([hists[k] for hists in results])
+        )
+
+    # Write out the merged hists
+    with open(output / "response_hists.yaml", "w") as f:
+        y.dump(full_hists, f)
+
+    progress_manager.stop()
+
+    return full_hists, output
+
+
 # def compare_PbPb_to_embedded(pbpb_hists_path: Path, embedded_hists_path: Path) -> None:
 #    # Setup
 #    y = setup_yaml()
