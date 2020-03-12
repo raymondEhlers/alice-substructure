@@ -1,3 +1,4 @@
 *.exe
 
 fastjet-3.3.3/
+build/
