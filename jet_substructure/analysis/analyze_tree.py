@@ -119,10 +119,10 @@ def analyze_single_tree(
             if name not in tree:
                 tree[name] = jets.subjets.constituents_indices
 
-            # calculated constituents.
-            name = f"{prefix}.calculated_subjet_constituents"
-            if name not in tree:
-                tree[name] = jets.subjets.constituents(jets.constituents)
+            # TODO: calculated constituents.
+            # name = f"{prefix}.calculated_subjet_constituents"
+            # if name not in tree:
+            #    tree[name] = jets.subjets.constituents(jets.constituents)
 
             successfully_accessed_data = True
         else:
@@ -143,6 +143,16 @@ def analyze_single_tree(
             restricted_jets, splittings = _select_and_retrieve_splittings(jets, identifier)
 
             # Fill the hists as appropriate
+            # Inclusive
+            inputs = analysis_objects.FillHistogramInput(
+                restricted_jets,
+                splittings,
+                # Fake the calculations, taking all values, and not masking
+                # anything out.
+                splittings.kt.ones_like().flatten(),
+                splittings.localindex,
+            )
+            hists[identifier].inclusive.fill(inputs, jet_R=R)
             # Dynamical z
             inputs = analysis_objects.FillHistogramInput(restricted_jets, splittings, *splittings.dynamical_z(R=R))
             hists[identifier].dynamical_z.fill(inputs, jet_R=R)
@@ -174,6 +184,12 @@ def _select_and_retrieve_splittings(
         splittings = restricted_jets.splittings.iterative_splittings(restricted_jets.subjets)
     else:
         splittings = restricted_jets.splittings
+
+        # TODO: Test this more extensively.
+        # comparison = restricted_jets.splittings.iterative_splittings(restricted_jets.subjets)
+        # if (comparison != splittings).any().any():
+        #    logger.warning("An actual disagreement in pythia!!")
+        #    IPython.embed()
 
     return restricted_jets, splittings
 
@@ -259,6 +275,7 @@ def analyze_single_tree_embedding(
             weight = 1.0
 
             # Fill the hists as appropriate
+            # TODO: Inclusive
             # Dynamical z
             hybrid_inputs = analysis_objects.FillHistogramInput(
                 restricted_hybrid_jets,

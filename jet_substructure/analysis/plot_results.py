@@ -136,8 +136,12 @@ def _plot_distribution(
     logger.info(f"Plotting {attribute_name}, {identifier}{', ratio' if ratio_denominator_hists else ''}")
 
     for technique, technique_hists in hists:
+        # It will fail for 0 jets, so skip it
         if technique_hists.n_jets == 0:
             logger.warning(f"No jets within {identifier}_{technique}. Skipping bin!")
+            continue
+        # We don't want to include inclusive in the comparison at the moment.
+        if technique == "inclusive":
             continue
 
         h: Union[bh.Histogram, binned_data.BinnedData] = getattr(technique_hists, attribute_name)

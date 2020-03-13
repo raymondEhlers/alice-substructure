@@ -40,8 +40,8 @@ class Identifier:
 
 @attr.s
 class FillHistogramInput:
-    jets: substructure_methods.SubstructureJetArray = attr.ib()
-    _splittings: substructure_methods.JetSplittingArray = attr.ib()
+    jets: "substructure_methods.SubstructureJetArray" = attr.ib()
+    _splittings: "substructure_methods.JetSplittingArray" = attr.ib()
     values: UprootArray = attr.ib()
     indices: UprootArray = attr.ib()
 
@@ -50,7 +50,7 @@ class FillHistogramInput:
         try:
             return self._restricted_splittings
         except AttributeError:
-            self._restricted_splittings: substructure_methods.JetSplittingArray = self._splittings[self.indices]
+            self._restricted_splittings: "substructure_methods.JetSplittingArray" = self._splittings[self.indices]
         return self._restricted_splittings
 
     @property
@@ -386,6 +386,7 @@ T_SubstructureHists = TypeVar("T_SubstructureHists", SubstructureHists, Substruc
 
 @attr.s
 class Hists(Generic[T_SubstructureHists]):
+    inclusive: T_SubstructureHists = attr.ib()
     dynamical_z: T_SubstructureHists = attr.ib()
     dynamical_kt: T_SubstructureHists = attr.ib()
     dynamical_time: T_SubstructureHists = attr.ib()
@@ -432,6 +433,13 @@ class Hists(Generic[T_SubstructureHists]):
 
 def create_substructure_hists(iterative_splittings: bool, z_cutoff: float) -> Hists[SubstructureHists]:
     kt_axis = bh.axis.Regular(50, 0, 25)
+    inclusive = SubstructureHists.create_boost_histograms(
+        name="inclusive",
+        title="Inclusive",
+        iterative_splittings=iterative_splittings,
+        # This isn't really going to be meaningful for the inclusive case...
+        values_axis=bh.axis.Regular(10, 0, 100),
+    )
     dynamical_z = SubstructureHists.create_boost_histograms(
         name="dynamical_z",
         title="zDrop",
@@ -462,6 +470,7 @@ def create_substructure_hists(iterative_splittings: bool, z_cutoff: float) -> Hi
 
     # TODO: SD
     return Hists(
+        inclusive=inclusive,
         dynamical_z=dynamical_z,
         dynamical_kt=dynamical_kt,
         dynamical_time=dynamical_time,
@@ -471,6 +480,9 @@ def create_substructure_hists(iterative_splittings: bool, z_cutoff: float) -> Hi
 
 
 def create_substructure_response_hists(iterative_splittings: bool, z_cutoff: float) -> Hists[SubstructureResponseHists]:
+    inclusive = SubstructureResponseHists.create_boost_histograms(
+        name="inclusive_response", title="Inclusive", iterative_splittings=iterative_splittings,
+    )
     dynamical_z = SubstructureResponseHists.create_boost_histograms(
         name="dynamical_z_response", title="zDrop", iterative_splittings=iterative_splittings,
     )
@@ -491,6 +503,7 @@ def create_substructure_response_hists(iterative_splittings: bool, z_cutoff: flo
 
     # TODO: SD
     return Hists(
+        inclusive=inclusive,
         dynamical_z=dynamical_z,
         dynamical_kt=dynamical_kt,
         dynamical_time=dynamical_time,
