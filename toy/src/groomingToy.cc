@@ -83,6 +83,7 @@ bool EtaCut(fastjet::PseudoJet fjJet, double etaMin, double etaMax)
   }
 }
 
+/*
 void ExtractWMass(vector<fastjet::PseudoJet> jet, Int_t type, double etmin, double etmax)
 {
   double zg = 0.;
@@ -184,7 +185,7 @@ void ExtractWMassDijet(vector<fastjet::PseudoJet> jet, Int_t type, double etmin,
   }
 
   return;
-}
+}*/
 
 //_________________________________________________________________________
 Double_t RelativePhi(Double_t mphi, Double_t vphi)
@@ -284,8 +285,8 @@ int main(int argc, char* argv[])
   //___________________________________________________
   //                      FASTJET  SETTINGS
 
-  double etamin_Sig = -trackEtaCut + jetParameterR; // signal jet eta range
-  double etamax_Sig = -etamin_Sig;
+  //double etamin_Sig = -trackEtaCut + jetParameterR; // signal jet eta range
+  //double etamax_Sig = -etamin_Sig;
   fastjet::Strategy strategy = fastjet::Best;
   fastjet::RecombinationScheme recombScheme = fastjet::E_scheme;
   fastjet::JetDefinition* jetDefAKT_Sig = NULL;
@@ -302,7 +303,7 @@ int main(int argc, char* argv[])
 
   //_________Thermal Particl_densityes Distribuitions (toy model)
 
-  TH1D* hT_phi = new TH1D("hT_phi", "", 700, -3.5, 3.5);
+  //TH1D* hT_phi = new TH1D("hT_phi", "", 700, -3.5, 3.5);
 
   TF1* f_pT = new TF1("f_pT", "x*exp(-x/0.3)", 0.0, 400.0);
   f_pT->SetNpx(40000);
@@ -342,11 +343,11 @@ int main(int argc, char* argv[])
   fHInfo = new THnSparseF("fHInfo", "fHInfo[jetpt,tform,erad]", dimSpec, nBinsSpec, lowBinSpec, hiBinSpec);
 
   // Define output objects.
-  TTree tree("tree", "tree");
-  tree.Branch("data.", &dataJetSplittings, bufferSize, splitLevel);
   int splitLevel = 4;
   int bufferSize = 32000;
   SubstructureTree::JetSubstructureSplittings dataJetSplittings;
+  TTree tree("tree", "tree");
+  tree.Branch("data.", &dataJetSplittings, bufferSize, splitLevel);
 
   //___________________________________________________
   // Begin event loop. Generate event. Skip if error. List first one.
@@ -398,8 +399,8 @@ int main(int argc, char* argv[])
     vector<fastjet::PseudoJet> inclusiveJets_Sig;
     fastjet::ClusterSequenceArea clustSeq_Sig(fjInputs, *jetDefAKT_Sig, *areaDef);
     inclusiveJets_Sig = clustSeq_Sig.inclusive_jets(30.);
-    ExtractWMass(inclusiveJets_Sig, 0, etamin_Sig, etamax_Sig);
-    ExtractWMassDijet(inclusiveJets_Sig, 0, etamin_Sig, etamax_Sig);
+    //ExtractWMass(inclusiveJets_Sig, 0, etamin_Sig, etamax_Sig);
+    //ExtractWMassDijet(inclusiveJets_Sig, 0, etamin_Sig, etamax_Sig);
 
     //_________________HI jets_______________________________________________________
     std::vector<fastjet::PseudoJet> NewJets;             // Declaration of vector for Reconstructed Jets
@@ -429,10 +430,9 @@ int main(int argc, char* argv[])
     }
 
     // Extract the splittings.
-    ...
 
-    ExtractWMass(NewJets, 1, etamin_Sig, etamax_Sig);
-    ExtractWMassDijet(NewJets, 1, etamin_Sig, etamax_Sig);
+    //ExtractWMass(NewJets, 1, etamin_Sig, etamax_Sig);
+    //ExtractWMassDijet(NewJets, 1, etamin_Sig, etamax_Sig);
 
     tree.Fill();
 
