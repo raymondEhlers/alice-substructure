@@ -8,7 +8,6 @@
  * These classes are copied directly over from AliPhysics on 12 March 2020.
  */
 
-/*
 /// \cond CLASSIMP
 ClassImp(SubstructureTree::Subjets);
 /// \endcond
@@ -24,7 +23,6 @@ ClassImp(SubstructureTree::JetConstituents);
 /// \cond CLASSIMP
 ClassImp(SubstructureTree::JetSubstructureSplittings);
 /// \endcond
-*/
 
 namespace SubstructureTree {
 

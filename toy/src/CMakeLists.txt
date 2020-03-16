@@ -31,6 +31,11 @@ add_library(output SHARED output.cc G__output.cxx)
 target_link_libraries(output ${ROOT_LIBRARIES} FastJet::FastJet)
 
 add_executable(${MODULE} ${SRCS})
-target_link_libraries(${MODULE} ${ROOT_LIBRARIES} FastJet::FastJet ${PYTHIA8_LIBRARIES})
+target_link_libraries(${MODULE} output ${ROOT_LIBRARIES} FastJet::FastJet ${PYTHIA8_LIBRARIES})
 
 install(TARGETS ${MODULE} DESTINATION bin)
+install(TARGETS output DESTINATION lib)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/liboutput_rdict.pcm
+    ${CMAKE_CURRENT_BINARY_DIR}/liboutput.rootmap
+    DESTINATION lib)

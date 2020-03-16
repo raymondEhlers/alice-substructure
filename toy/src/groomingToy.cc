@@ -210,6 +210,76 @@ Double_t RelativePhi(Double_t mphi, Double_t vphi)
   return dphi; // dphi in [-Pi, Pi]
 }
 
+std::map<int, int> PerformGeometricalMatching(std::vector<fastjet::PseudoJet> & outerJets, std::vector<fastjet::PseudoJet> & innerJets)
+{
+  std::map<int, int> indexMap;
+  for (std::size_t outerIndex = 0; outerIndex < outerJets.size(); outerIndex++) {
+    fastjet::PseudoJet & outerJet = outerJets[outerIndex];
+    // Basic acceptance cuts
+    if (outerJet.pt() < 0.1) {
+      continue;
+    }
+    double distance = 1000;
+    for (std::size_t innerIndex = 0; innerIndex < innerJets.size(); innerIndex++)
+    {
+      fastjet::PseudoJet & innerJet = innerJets[innerIndex];
+      if (innerJet.pt() < 0.1) {
+        continue;
+      }
+      double deltaR = outerJet.delta_R(innerJet);
+      if (deltaR < distance) {
+        distance = deltaR;
+        indexMap[outerIndex] = innerIndex;
+      }
+    }
+  }
+  if (innerJets.size() == 0) {
+    std::cout << "indexMap size: " << indexMap.size() << "\n";
+  }
+
+  return indexMap;
+}
+
+std::tuple<std::map<int, int>, std::map<int, int>> MatchJets(std::vector<fastjet::PseudoJet> & hybridJets, std::vector<fastjet::PseudoJet> & trueJets)
+{
+  std::map<int, int> trueToHybridIndex = PerformGeometricalMatching(trueJets, hybridJets);
+  std::map<int, int> hybridToTrueIndex = PerformGeometricalMatching(hybridJets, trueJets);
+
+  std::cout << "trueToHybridIndex.size(): " << trueToHybridIndex.size() << "\n";
+
+  // Determine matches where one points at the other and vice versa.
+  std::map<int, int> trueToHybridIndexVerified;
+  std::map<int, int> hybridToTrueIndexVerified;
+  for (const auto & hybridIndex : hybridToTrueIndex) {
+    if (trueToHybridIndex[hybridIndex.second] == hybridIndex.first) {
+      // We have a true match!
+      hybridToTrueIndexVerified[hybridIndex.first] = hybridIndex.second;
+      trueToHybridIndexVerified[hybridIndex.second] = hybridIndex.first;
+    }
+    else {
+      // Sentinel index to signify no matching
+      hybridToTrueIndexVerified[hybridIndex.first] = -1;
+      trueToHybridIndexVerified[hybridIndex.second] = -1;
+    }
+  }
+
+  std::cout << "trueToHybridIndexVerified.size(): " << trueToHybridIndexVerified.size() << "\n";
+  std::cout << "hybridToTrueIndexVerified.size(): " << hybridToTrueIndexVerified.size() << "\n";
+
+  return std::make_tuple(trueToHybridIndexVerified, hybridToTrueIndexVerified);
+}
+
+double SharedMomentumFraction(fastjet::PseudoJet & baseJet, fastjet::PseudoJet & otherJet)
+{
+  double sharedMomentumFraction = 0;
+  // TEMP
+  sharedMomentumFraction = 1;
+
+  // TODO: Check order of arguments and implement!
+
+  return sharedMomentumFraction;
+}
+
 void ExtractJetSplittings(SubstructureTree::JetSubstructureSplittings & jetSplittings, fastjet::PseudoJet & inputJet, int splittingNodeIndex, bool followingIterativeSplitting, const bool storeRecursiveSplittings = true)
 {
   fastjet::PseudoJet j1;
@@ -252,8 +322,27 @@ void ExtractJetSplittings(SubstructureTree::JetSubstructureSplittings & jetSplit
   }
 }
 
-void Reclustering(SubstructureTree::JetSubstructureSplittings & jetSplittings, std::vector<fastjet::PseudoJet> & inputVectors, const bool storeRecursiveSplittings = true, const bool isData = false)
+void Reclustering(SubstructureTree::JetSubstructureSplittings & jetSplittings, fastjet::PseudoJet & jet,const bool storeRecursiveSplittings = true, const bool isData = false)
 {
+  // Grab the jet constituents from the jet.
+  // They will be storedwith the splitting, and also used for the declustering.
+  std::vector<fastjet::PseudoJet> inputVectors;
+  fastjet::PseudoJet pseudoTrack;
+  unsigned int constituentIndex = 0;
+  for (const auto & part : jet.constituents()) {
+    //if (isData == true && fDoTwoTrack == kTRUE && CheckClosePartner(jet, part))
+    //    continue;
+    pseudoTrack.reset(part.px(), part.py(), part.pz(), part.e());
+    pseudoTrack.set_user_index(constituentIndex);
+    inputVectors.push_back(pseudoTrack);
+
+    // Also store the jet constituents in the output
+    jetSplittings.AddJetConstituent(part);
+
+    // Keep track of the number of constituents.
+    constituentIndex++;
+  }
+
   try {
     fastjet::JetAlgorithm jetalgo(fastjet::cambridge_algorithm);
     fastjet::JetDefinition jetDef(jetalgo, 1., fastjet::RecombinationScheme::E_scheme, fastjet::BestFJ30);
@@ -268,9 +357,9 @@ void Reclustering(SubstructureTree::JetSubstructureSplittings & jetSplittings, s
     else {
       cs = new fastjet::ClusterSequence(inputVectors, jetDef);
     }
-    std::cout << "About to get jets\n";
+    //std::cout << "About to get jets\n";
     std::vector<fastjet::PseudoJet> outputJets = cs->inclusive_jets(0);
-    std::cout << "Output jets size = " << outputJets.size() << "\n";
+    //std::cout << "Output jets size = " << outputJets.size() << "\n";
 
     if (outputJets.size() == 0) {
       std::cout << "Not output jets in reclustering! Returning.\n";
@@ -278,31 +367,11 @@ void Reclustering(SubstructureTree::JetSubstructureSplittings & jetSplittings, s
     }
 
     fastjet::PseudoJet jj;
-    //fastjet::PseudoJet j1;
-    //fastjet::PseudoJet j2;
     jj = outputJets[0];
 
     // Store the jet splittings.
     int splittingNodeIndex = -1;
     ExtractJetSplittings(jetSplittings, jj, splittingNodeIndex, true, storeRecursiveSplittings);
-    /*while (jj.has_parents(j1, j2)) {
-      splittingLabel++;
-      // j1 should always be the harder of the two subjets.
-      if (j1.perp() < j2.perp()) {
-        swap(j1, j2);
-      }
-
-      double z = j2.perp() / (j2.perp() + j1.perp());
-      double delta_R = j1.delta_R(j2);
-      double xkt = j2.perp() * sin(delta_R);
-      std::vector<unsigned int> constituentIndices;
-      for (auto constituent: j1.constituents()) {
-        constituentIndices.emplace_back(constituent.user_index());
-      }
-      jetSplittings.AddSplitting(xkt, delta_R, z, constituentIndices);
-
-      jj = j1;
-    }*/
 
     // Cleanup the allocated cluster sequence.
     delete cs;
@@ -315,18 +384,18 @@ void Reclustering(SubstructureTree::JetSubstructureSplittings & jetSplittings, s
 
 int main(int argc, char* argv[])
 {
-  Int_t cislo = -1;  // unique number for each file
+  Int_t randomSeed = -1;  // unique number for each file
   Int_t tune = -1;   // pythia tune
   Int_t charged = 0; // full or track-based jets
-  Int_t unev = 1;    // underlying event (ISR+MPI)
+  Int_t underlingEvent = 1;    // underlying event (ISR+MPI)
 
   if (argc != 6) {
-    cout << "Usage:" << endl << "./pygen <PythiaTune> <Number> <nEvts> <unev> <jetR>" << endl;
+    cout << "Usage:" << endl << "./pygen <PythiaTune> <Number> <nEvts> <underlingEvent> <jetR>" << endl;
     return 0;
   }
   tune = atoi(argv[1]);
-  cislo = atoi(argv[2]);
-  unev = atoi(argv[4]);
+  randomSeed = atoi(argv[2]);
+  underlingEvent = atoi(argv[4]);
 
   Int_t nEvent = atoi(argv[3]); //(Int_t) 1e3 + 1.0;
   TString name;
@@ -351,7 +420,7 @@ int main(int argc, char* argv[])
    Form("Tune:pp = %d", tune)); // tune 1-13    5=default TUNE4C,  6=Tune 4Cx, 7=ATLAS MB Tune A2-CTEQ6L1
 
   pythia.readString("Random:setSeed = on");
-  pythia.readString(Form("Random:seed = %d", cislo));
+  pythia.readString(Form("Random:seed = %d", randomSeed));
   // pythia
   pythia.readString("WeakDoubleBoson:ffbar2WW=on");
   // pythia.readString("24:mMin = 100");
@@ -367,7 +436,7 @@ int main(int argc, char* argv[])
     pythia.readString(name.Data());
   }
 
-  if (unev == 0) {
+  if (underlingEvent == 0) {
     pythia.readString("PartonLevel:MPI = off");
     pythia.readString("PartonLevel:ISR = off");
   }
@@ -399,8 +468,8 @@ int main(int argc, char* argv[])
   fastjet::AreaDefinition* areaDef = new fastjet::AreaDefinition(areaType, ghostareaspec);
 
   // Fastjet inputs
-  std::vector<fastjet::PseudoJet> fjInputs;
-  std::vector<fastjet::PseudoJet> fjInputs2;
+  std::vector<fastjet::PseudoJet> inputsTrue;
+  std::vector<fastjet::PseudoJet> inputsHybrid;
 
   //_________Thermal Particl_densityes Distribuitions (toy model)
 
@@ -446,20 +515,31 @@ int main(int argc, char* argv[])
   // Define output objects.
   int splitLevel = 4;
   int bufferSize = 32000;
-  SubstructureTree::JetSubstructureSplittings dataJetSplittings;
+  SubstructureTree::JetSubstructureSplittings hybridJetSplittings;
+  SubstructureTree::JetSubstructureSplittings trueJetSplittings;
   TTree tree("tree", "tree");
-  tree.Branch("data.", &dataJetSplittings, bufferSize, splitLevel);
+  // data will contain the hybrid jets
+  tree.Branch("data.", &hybridJetSplittings, bufferSize, splitLevel);
+  // matched will contain the true jets
+  tree.Branch("matched.", &trueJetSplittings, bufferSize, splitLevel);
 
   //___________________________________________________
   // Begin event loop. Generate event. Skip if error. List first one.
   for (int iEvent = 0; iEvent < nEvent; iEvent++) {
-    if (!pythia.next())
+    // TEMP
+    std::cout << "Event " << iEvent << "\n";
+    // ENDTEMP
+    if (iEvent % 100 == 0) {
+      std::cout << "Event " << iEvent << "\n";
+    }
+    if (!pythia.next()) {
       continue;
+    }
 
-    fjInputs.clear();
-    fjInputs2.clear();
-    fjInputs.resize(0);
-    fjInputs2.resize(0);
+    inputsTrue.clear();
+    inputsHybrid.clear();
+    inputsTrue.resize(0);
+    inputsHybrid.resize(0);
     Double_t index = 0;
     Double_t fourvec[4];
     for (Int_t i = 0; i < pythia.event.size(); ++i) {
@@ -478,8 +558,8 @@ int main(int argc, char* argv[])
         fourvec[3] = pythia.event[i].pAbs();
         fastjet::PseudoJet particle(fourvec);
         particle.set_user_index(index);
-        fjInputs.push_back(particle);
-        fjInputs2.push_back(particle);
+        inputsTrue.push_back(particle);
+        inputsHybrid.push_back(particle);
       }
     }
     // Thermal Particles loop
@@ -495,28 +575,26 @@ int main(int argc, char* argv[])
       fourvec[3] = Calculate_E(pT, eta, phi);
       fastjet::PseudoJet ThermalParticle(fourvec);
       ThermalParticle.set_user_index(1);
-      fjInputs2.push_back(ThermalParticle);
+      inputsHybrid.push_back(ThermalParticle);
     }
 
     //________________signal jets____________________________________________________
-    vector<fastjet::PseudoJet> inclusiveJets_Sig;
-    fastjet::ClusterSequenceArea clustSeq_Sig(fjInputs, *jetDefAKT_Sig, *areaDef);
-    inclusiveJets_Sig = clustSeq_Sig.inclusive_jets(30.);
-    //ExtractWMass(inclusiveJets_Sig, 0, etamin_Sig, etamax_Sig);
-    //ExtractWMassDijet(inclusiveJets_Sig, 0, etamin_Sig, etamax_Sig);
+    fastjet::ClusterSequenceArea clustSeq_Sig(inputsTrue, *jetDefAKT_Sig, *areaDef);
+    std::vector<fastjet::PseudoJet> trueJets = clustSeq_Sig.inclusive_jets(30.);
+    //ExtractWMass(trueJets, 0, etamin_Sig, etamax_Sig);
+    //ExtractWMassDijet(trueJets, 0, etamin_Sig, etamax_Sig);
 
     //_________________HI jets_______________________________________________________
-    std::vector<fastjet::PseudoJet> NewJets;             // Declaration of vector for Reconstructed Jets
     fastjet::GhostedAreaSpec New_ghost_spec(1, 1, 0.05); // Ghosts to calculate the Jet Area
     fastjet::AreaDefinition New_fAreaDef(fastjet::active_area_explicit_ghosts, New_ghost_spec); // Area Definition
-    fastjet::ClusterSequenceArea New_clustSeq_Sig(fjInputs2, *jetDefAKT_Sig, New_fAreaDef);     // Cluster Sequence
-    NewJets = New_clustSeq_Sig.inclusive_jets(1.); // Vector with the Reconstructed Jets
+    fastjet::ClusterSequenceArea New_clustSeq_Sig(inputsHybrid, *jetDefAKT_Sig, New_fAreaDef);     // Cluster Sequence
+    std::vector<fastjet::PseudoJet> hybridJets = New_clustSeq_Sig.inclusive_jets(1.); // Vector with the Reconstructed Jets
 
     fastjet::JetMedianBackgroundEstimator bge;
     fastjet::Selector BGSelector = fastjet::SelectorAbsEtaMax(1.0);
     fastjet::JetDefinition jetDefBG(fastjet::kt_algorithm, jetParameterR, recombScheme, strategy);
     fastjet::AreaDefinition fAreaDefBG(fastjet::active_area_explicit_ghosts, New_ghost_spec);
-    fastjet::ClusterSequenceArea clustSeqBG(fjInputs2, jetDefBG, fAreaDefBG);
+    fastjet::ClusterSequenceArea clustSeqBG(inputsHybrid, jetDefBG, fAreaDefBG);
     std::vector<fastjet::PseudoJet> BGJets = clustSeqBG.inclusive_jets();
     bge.set_selector(BGSelector);
     bge.set_jets(BGJets);
@@ -526,32 +604,93 @@ int main(int argc, char* argv[])
     subtractor.set_max_standardDeltaR(jetParameterR);
     // subtractor.set_alpha(0.5);
 
-    for (int j = 0; j < NewJets.size(); j++) {
-      const fastjet::PseudoJet& jet = NewJets[j];
+    for (int j = 0; j < hybridJets.size(); j++) {
+      const fastjet::PseudoJet& jet = hybridJets[j];
       fastjet::PseudoJet subtracted_Jet = subtractor(jet);
-      NewJets[j] = subtracted_Jet;
+      hybridJets[j] = subtracted_Jet;
     }
 
-    // Extract the splittings.
-    std::cout << "About to recluster event " << iEvent << "\n";
-    Reclustering(dataJetSplittings, inclusiveJets_Sig, true, false);
+    // Match jets
+    // Need to do rudimentary matching
+    std::map<int, int> trueToHybridIndex;
+    std::map<int, int> hybridToTrueIndex;
+    std::tie(trueToHybridIndex, hybridToTrueIndex) = MatchJets(hybridJets, trueJets);
 
-    //ExtractWMass(NewJets, 1, etamin_Sig, etamax_Sig);
-    //ExtractWMassDijet(NewJets, 1, etamin_Sig, etamax_Sig);
+    // Extract the splittings for each set of matched jets.
+    //std::cout << "About to recluster event " << iEvent << "\n";
+    bool storeRecursiveSplittings = true;
+    bool applyTwoParticleAcceptanceCut = false;
+    for (std::size_t hybridIndex = 0; hybridIndex < hybridJets.size(); hybridIndex++) {
+      if (hybridToTrueIndex.count(hybridIndex) == 0) {
+        // This jet doesn't have a match. Skip it.
+        std::cout << "No match for this hybrid jet. Skipping\n";
+        continue;
+      }
+      // Hybrid jet
+      fastjet::PseudoJet & hybridJet = hybridJets[hybridIndex];
+      if (hybridJet.pt() < 0.1) {
+        std::cout << "Hybrid jet pt too low.\n";
+        continue;
+      }
+      hybridJetSplittings.SetJetPt(hybridJet.pt());
+      Reclustering(hybridJetSplittings, hybridJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
+      // True jet
+      std::cout << "hybridToTrueIndex.size(): " << hybridToTrueIndex.size() << "\n";
+      int trueJetIndex = hybridToTrueIndex[hybridIndex];
+      if (trueJetIndex == -1) {
+        // No match - continue.
+        continue;
+      }
+      fastjet::PseudoJet & trueJet = trueJets[trueJetIndex];
+      std::cout << "hybridJet pt: " << hybridJet.pt() << "\n";
+      std::cout << "trueJet address: " << &trueJet << "\n";
+      std::cout << "trueJetIndex: " << trueJetIndex << "\n";
+      std::cout << "trueJets.size(): " << trueJets.size() << "\n";
+      std::cout << "hybridToTrueIndex.size(): " << hybridToTrueIndex.size() << "\n";
+      std::cout << "trueToHybridIndex.size(): " << trueToHybridIndex.size() << "\n";
+      // Minimum jet pt check
+      if (trueJet.pt() < 0.1) {
+        std::cout << "True jet pt too low.\n";
+        continue;
+      }
+      // Check distance is reasonable.
+      if (hybridJet.delta_R(trueJet) > jetParameterR) {
+        // Too far away!
+        std::cout << "Too far away! Delta_R = " << hybridJet.delta_R(trueJet) << "\n";
+        continue;
+      }
+      // Check shared momentum fraction
+      if (SharedMomentumFraction(hybridJet, trueJet) < 0.5)
+      {
+        // Insufficiently similar jets.
+        std::cout << "Insufficient shared momentum fraction: " << SharedMomentumFraction(hybridJet, trueJet) << "\n";
+        continue;
+      }
 
-    tree.Fill();
+      trueJetSplittings.SetJetPt(trueJet.pt());
+      Reclustering(trueJetSplittings, trueJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
+      // Fill the matched jets.
+      tree.Fill();
+    }
+
+    //ExtractWMass(hybridJets, 1, etamin_Sig, etamax_Sig);
+    //ExtractWMassDijet(hybridJets, 1, etamin_Sig, etamax_Sig);
 
   } // end of event
+
+  std::cout << "Number of entries: " << tree.GetEntries() << "\n";
+  tree.Show(1);
 
   //____________________________________________________
   //          SAVE OUTPUT
 
-  TString tag = Form("PP_2W_ANTIKT%02d", TMath::Nint(jetParameterR * 10));
+  TString tag = TString::Format("Pythia+thermal_substructure_toy_antikt_%02d", TMath::Nint(jetParameterR * 10));
 
   TFile* outFile =
-   new TFile(Form("%s_tune%d_c%d_charged%d_unev%d.root", tag.Data(), tune, cislo, charged, unev), "RECREATE");
+   new TFile(TString::Format("%s_tune_%d_seed_%d_%s%s.root", tag.Data(), tune, randomSeed, charged ? "charged" : "full", underlingEvent ? "_underlyingEvent" : ""), "RECREATE");
 
   outFile->cd();
+  tree.Write();
   // fTreeObservables->Write();
   histoWMass->Write();
   histoWMassNsub->Write();

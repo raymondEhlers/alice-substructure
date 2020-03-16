@@ -48,7 +48,7 @@ class Subjets {
   Subjets& operator=(Subjets other);
   friend void ::swap(Subjets & first, Subjets & second);
   // Avoid implementing move since c++11 is not allowed in the header
-  ~Subjets() = default;
+  virtual ~Subjets() = default;
 
   /// Reset the properties for the next filling of the tree.
   bool Clear();
@@ -72,7 +72,7 @@ class Subjets {
   std::vector<std::vector<unsigned short>> fConstituentIndices;        ///<  Constituent jet indices (ie. index by the stored jet constituents, not the global index).
 
   /// \cond CLASSIMP
-  ClassDefNV(Subjets, 2) // Subjets from splittings.
+  ClassDef(Subjets, 2) // Subjets from splittings.
   /// \endcond
 };
 
@@ -84,7 +84,7 @@ class JetSplittings {
   JetSplittings& operator=(JetSplittings other);
   friend void ::swap(JetSplittings & first, JetSplittings & second);
   // Avoid implementing move since c++11 is not allowed in the header
-  ~JetSplittings() = default;
+  virtual ~JetSplittings() = default;
 
   /// Reset the properties for the next filling of the tree.
   bool Clear();
@@ -109,7 +109,7 @@ class JetSplittings {
   std::vector<short> fParentIndex;    ///<  Index of the parent splitting.
 
   /// \cond CLASSIMP
-  ClassDefNV(JetSplittings, 1) // Jet splittings.
+  ClassDef(JetSplittings, 1) // Jet splittings.
   /// \endcond
 };
 
@@ -123,7 +123,7 @@ class JetConstituents
   JetConstituents& operator=(JetConstituents other);
   friend void ::swap(JetConstituents & first, JetConstituents & second);
   // Avoid implementing move since c++11 is not allowed in the header
-  ~JetConstituents() = default;
+  virtual ~JetConstituents() = default;
 
   /// Reset the properties for the next filling of the tree.
   bool Clear();
@@ -147,7 +147,7 @@ class JetConstituents
   std::vector<unsigned int> fGlobalIndex; ///<  Jet constituent global index
 
   /// \cond CLASSIMP
-  ClassDefNV(JetConstituents, 1) // Jet constituents.
+  ClassDef(JetConstituents, 1) // Jet constituents.
   /// \endcond
 };
 
@@ -169,7 +169,7 @@ class JetSubstructureSplittings {
   JetSubstructureSplittings& operator=(JetSubstructureSplittings other);
   friend void ::swap(JetSubstructureSplittings & first, JetSubstructureSplittings & second);
   // Avoid implementing move since c++11 is not allowed in the header
-  ~JetSubstructureSplittings() = default;
+  virtual ~JetSubstructureSplittings() = default;
 
   /// Reset the properties for the next filling of the tree.
   bool Clear();
@@ -203,7 +203,7 @@ class JetSubstructureSplittings {
   Subjets fSubjets;                     ///<  Subjets within the jet.
 
   /// \cond CLASSIMP
-  ClassDefNV(JetSubstructureSplittings, 2) // Jet splitting properties.
+  ClassDef(JetSubstructureSplittings, 2) // Jet splitting properties.
   /// \endcond
 };
 

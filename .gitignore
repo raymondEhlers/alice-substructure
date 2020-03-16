@@ -20,3 +20,8 @@ ipynb_checkpoints/
 # Packaging
 dist/
 jet_substructure.egg-info/
+
+# Compiled
+bin/
+build/
+lib/
