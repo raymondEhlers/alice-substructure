@@ -210,6 +210,107 @@ Double_t RelativePhi(Double_t mphi, Double_t vphi)
   return dphi; // dphi in [-Pi, Pi]
 }
 
+void ExtractJetSplittings(SubstructureTree::JetSubstructureSplittings & jetSplittings, fastjet::PseudoJet & inputJet, int splittingNodeIndex, bool followingIterativeSplitting, const bool storeRecursiveSplittings = true)
+{
+  fastjet::PseudoJet j1;
+  fastjet::PseudoJet j2;
+  if (inputJet.has_parents(j1, j2) == false) {
+    // No parents, so we're done - just return.
+    return;
+  }
+
+  // j1 should always be the harder of the two subjets.
+  if (j1.perp() < j2.perp()) {
+    swap(j1, j2);
+  }
+
+  // We have a splitting. Record the properties.
+  double z = j2.perp() / (j2.perp() + j1.perp());
+  double delta_R = j1.delta_R(j2);
+  double xkt = j2.perp() * sin(delta_R);
+  // Add the splitting node.
+  jetSplittings.AddSplitting(xkt, delta_R, z, splittingNodeIndex);
+  // Increment after storing splitting because the parent is the new one.
+  //splittingNodeIndex++;
+  // -1 because we want to index the parent splitting that was just stored.
+  splittingNodeIndex = jetSplittings.GetNumberOfSplittings() - 1;
+  // Store the subjets
+  std::vector<unsigned short> j1ConstituentIndices, j2ConstituentIndices;
+  for (auto constituent: j1.constituents()) {
+    j1ConstituentIndices.emplace_back(constituent.user_index());
+  }
+  for (auto constituent: j2.constituents()) {
+    j2ConstituentIndices.emplace_back(constituent.user_index());
+  }
+  jetSplittings.AddSubjet(splittingNodeIndex, followingIterativeSplitting, j1ConstituentIndices);
+  jetSplittings.AddSubjet(splittingNodeIndex, false, j2ConstituentIndices);
+
+  // Recurse as necessary to get the rest of the splittings.
+  ExtractJetSplittings(jetSplittings, j1, splittingNodeIndex, followingIterativeSplitting);
+  if (storeRecursiveSplittings == true) {
+    ExtractJetSplittings(jetSplittings, j2, splittingNodeIndex, false);
+  }
+}
+
+void Reclustering(SubstructureTree::JetSubstructureSplittings & jetSplittings, std::vector<fastjet::PseudoJet> & inputVectors, const bool storeRecursiveSplittings = true, const bool isData = false)
+{
+  try {
+    fastjet::JetAlgorithm jetalgo(fastjet::cambridge_algorithm);
+    fastjet::JetDefinition jetDef(jetalgo, 1., fastjet::RecombinationScheme::E_scheme, fastjet::BestFJ30);
+    // For area calculation (when desired)
+    fastjet::GhostedAreaSpec ghost_spec(1, 1, 0.05);
+    fastjet::AreaDefinition areaDef(fastjet::passive_area, ghost_spec);
+    // We use a pointer for the CS because it has to stay in scope while we explore the splitting history.
+    fastjet::ClusterSequence * cs = nullptr;
+    if (isData) {
+      cs = new fastjet::ClusterSequenceArea(inputVectors, jetDef, areaDef);
+    }
+    else {
+      cs = new fastjet::ClusterSequence(inputVectors, jetDef);
+    }
+    std::cout << "About to get jets\n";
+    std::vector<fastjet::PseudoJet> outputJets = cs->inclusive_jets(0);
+    std::cout << "Output jets size = " << outputJets.size() << "\n";
+
+    if (outputJets.size() == 0) {
+      std::cout << "Not output jets in reclustering! Returning.\n";
+      return;
+    }
+
+    fastjet::PseudoJet jj;
+    //fastjet::PseudoJet j1;
+    //fastjet::PseudoJet j2;
+    jj = outputJets[0];
+
+    // Store the jet splittings.
+    int splittingNodeIndex = -1;
+    ExtractJetSplittings(jetSplittings, jj, splittingNodeIndex, true, storeRecursiveSplittings);
+    /*while (jj.has_parents(j1, j2)) {
+      splittingLabel++;
+      // j1 should always be the harder of the two subjets.
+      if (j1.perp() < j2.perp()) {
+        swap(j1, j2);
+      }
+
+      double z = j2.perp() / (j2.perp() + j1.perp());
+      double delta_R = j1.delta_R(j2);
+      double xkt = j2.perp() * sin(delta_R);
+      std::vector<unsigned int> constituentIndices;
+      for (auto constituent: j1.constituents()) {
+        constituentIndices.emplace_back(constituent.user_index());
+      }
+      jetSplittings.AddSplitting(xkt, delta_R, z, constituentIndices);
+
+      jj = j1;
+    }*/
+
+    // Cleanup the allocated cluster sequence.
+    delete cs;
+  } catch (const fastjet::Error&) {
+    std::cerr << " [w] FJ Exception caught.\n";
+  }
+}
+
 //___________________________________________________________________
 
 int main(int argc, char* argv[])
@@ -355,6 +456,8 @@ int main(int argc, char* argv[])
     if (!pythia.next())
       continue;
 
+    fjInputs.clear();
+    fjInputs2.clear();
     fjInputs.resize(0);
     fjInputs2.resize(0);
     Double_t index = 0;
@@ -430,6 +533,8 @@ int main(int argc, char* argv[])
     }
 
     // Extract the splittings.
+    std::cout << "About to recluster event " << iEvent << "\n";
+    Reclustering(dataJetSplittings, inclusiveJets_Sig, true, false);
 
     //ExtractWMass(NewJets, 1, etamin_Sig, etamax_Sig);
     //ExtractWMassDijet(NewJets, 1, etamin_Sig, etamax_Sig);
