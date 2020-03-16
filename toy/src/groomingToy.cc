@@ -404,8 +404,8 @@ int main(int argc, char* argv[])
   double jetParameterR = (double)atof(argv[5]); // jet R
   double trackLowPtCut = 0.;                    // GeV
   double trackEtaCut = 1;
-  Float_t ptHatMin = 200;
-  Float_t ptHatMax = 13000;
+  Float_t ptHatMin = 20;
+  Float_t ptHatMax = 200;
 
   //__________________________________________________________________________
   //                        PYTHIA SETTINGS
