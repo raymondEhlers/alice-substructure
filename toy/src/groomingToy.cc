@@ -1,10 +1,5 @@
-// main01.cc is a part of the PYTHIA event generator.
+// Adapted from main01.cc from PYTHIA and from code from Leticia.
 // Copyright (C) 2014 Torbjorn Sjostrand.
-// PYTHIA is licenced under the GNU GPL version 2, see COPYING for details.
-// Please respect the MCnet Guidelines, see GUIDELINES for details.
-
-// This is a simple test program. It fits on one slide in a talk.
-// It studies the charged multiplicity distribution at the LHC.
 
 #include <math.h>
 #include <stdlib.h>
@@ -23,7 +18,6 @@
 #include <vector>
 
 #include "Pythia8/Pythia.h"
-#include "TClonesArray.h"
 #include "TF1.h"
 #include "TFile.h"
 #include "TH1D.h"
@@ -269,15 +263,20 @@ std::tuple<std::map<int, int>, std::map<int, int>> MatchJets(std::vector<fastjet
   return std::make_tuple(trueToHybridIndexVerified, hybridToTrueIndexVerified);
 }
 
-double SharedMomentumFraction(fastjet::PseudoJet & baseJet, fastjet::PseudoJet & otherJet)
+double SharedMomentumFraction(fastjet::PseudoJet & hybridJet, fastjet::PseudoJet & trueJet)
 {
-  double sharedMomentumFraction = 0;
-  // TEMP
-  sharedMomentumFraction = 1;
-
-  // TODO: Check order of arguments and implement!
-
-  return sharedMomentumFraction;
+  double constituentsPt = 0;
+  for (const auto & trueConstituent : trueJet.constituents())
+  {
+    for (const auto & hybridConstituent : hybridJet.constituents())
+    {
+      // Perform matching based solely on constituent global index.
+      if (trueConstituent.user_index() == hybridConstituent.user_index()) {
+        constituentsPt += trueConstituent.pt();
+      }
+    }
+  }
+  return constituentsPt / trueJet.pt();
 }
 
 void ExtractJetSplittings(SubstructureTree::JetSubstructureSplittings & jetSplittings, fastjet::PseudoJet & inputJet, int splittingNodeIndex, bool followingIterativeSplitting, const bool storeRecursiveSplittings = true)
@@ -421,10 +420,12 @@ int main(int argc, char* argv[])
 
   pythia.readString("Random:setSeed = on");
   pythia.readString(Form("Random:seed = %d", randomSeed));
+  // Turn on QCD.
+  pythia.readString("HardQCD:all = on");
   // pythia
-  pythia.readString("WeakDoubleBoson:ffbar2WW=on");
+  //pythia.readString("WeakDoubleBoson:ffbar2WW=on");
   // pythia.readString("24:mMin = 100");
-  pythia.readString("24:onIfAny = 1 2 3 4 5");
+  //pythia.readString("24:onIfAny = 1 2 3 4 5");
   //# Force production to higher pT
   pythia.readString("PhaseSpace:pTHatMin = 40");
   if (ptHatMin < 0 || ptHatMax < 0) {
@@ -441,14 +442,14 @@ int main(int argc, char* argv[])
     pythia.readString("PartonLevel:ISR = off");
   }
 
-  pythia.readString("310:mayDecay  = off"); // K0s
-  pythia.readString("3122:mayDecay = off"); // labda0
-  pythia.readString("3112:mayDecay = off"); // sigma-
-  pythia.readString("3212:mayDecay = off"); // sigma0
-  pythia.readString("3222:mayDecay = off"); // sigma+
-  pythia.readString("3312:mayDecay = off"); // xi-
-  pythia.readString("3322:mayDecay = off"); // xi+
-  pythia.readString("3334:mayDecay = off"); // omega-
+  //pythia.readString("310:mayDecay  = off"); // K0s
+  //pythia.readString("3122:mayDecay = off"); // labda0
+  //pythia.readString("3112:mayDecay = off"); // sigma-
+  //pythia.readString("3212:mayDecay = off"); // sigma0
+  //pythia.readString("3222:mayDecay = off"); // sigma+
+  //pythia.readString("3312:mayDecay = off"); // xi-
+  //pythia.readString("3322:mayDecay = off"); // xi+
+  //pythia.readString("3334:mayDecay = off"); // omega-
 
   pythia.init();
 
@@ -540,7 +541,7 @@ int main(int argc, char* argv[])
     inputsHybrid.clear();
     inputsTrue.resize(0);
     inputsHybrid.resize(0);
-    Double_t index = 0;
+    Double_t globalIndex = 0;
     Double_t fourvec[4];
     for (Int_t i = 0; i < pythia.event.size(); ++i) {
       if (pythia.event[i].isFinal()) {
@@ -551,17 +552,19 @@ int main(int argc, char* argv[])
           continue; // pt cut
         if (TMath::Abs(pythia.event[i].eta()) > trackEtaCut)
           continue; // eta cut
-        index = 0;
         fourvec[0] = pythia.event[i].px();
         fourvec[1] = pythia.event[i].py();
         fourvec[2] = pythia.event[i].pz();
         fourvec[3] = pythia.event[i].pAbs();
         fastjet::PseudoJet particle(fourvec);
-        particle.set_user_index(index);
+        particle.set_user_index(globalIndex);
         inputsTrue.push_back(particle);
         inputsHybrid.push_back(particle);
+        ++globalIndex;
       }
     }
+    // Add an offset for thermal particles.
+    globalIndex = 100000;
     // Thermal Particles loop
     for (int j = 0; j < nThermalParticles; j++) {
       double pT = f_pT->GetRandom();
@@ -574,8 +577,9 @@ int main(int argc, char* argv[])
       fourvec[2] = Calculate_pZ(pT, eta, phi);
       fourvec[3] = Calculate_E(pT, eta, phi);
       fastjet::PseudoJet ThermalParticle(fourvec);
-      ThermalParticle.set_user_index(1);
+      ThermalParticle.set_user_index(globalIndex);
       inputsHybrid.push_back(ThermalParticle);
+      ++globalIndex;
     }
 
     //________________signal jets____________________________________________________
@@ -684,7 +688,7 @@ int main(int argc, char* argv[])
   //____________________________________________________
   //          SAVE OUTPUT
 
-  TString tag = TString::Format("Pythia+thermal_substructure_toy_antikt_%02d", TMath::Nint(jetParameterR * 10));
+  TString tag = TString::Format("pythia+thermal_substructure_toy_antikt_%02d", TMath::Nint(jetParameterR * 10));
 
   TFile* outFile =
    new TFile(TString::Format("%s_tune_%d_seed_%d_%s%s.root", tag.Data(), tune, randomSeed, charged ? "charged" : "full", underlingEvent ? "_underlyingEvent" : ""), "RECREATE");
