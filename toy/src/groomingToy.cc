@@ -68,7 +68,7 @@ double Calculate_E(double pT, double eta, double phi)
 THnSparse* fHLundIterative;
 THnSparse* fHInfo;
 
-bool EtaCut(fastjet::PseudoJet fjJet, double etaMin, double etaMax)
+bool JetInsideEtaLimits(fastjet::PseudoJet fjJet, double etaMin, double etaMax)
 {
   if (fjJet.eta() > etaMax || fjJet.eta() < etaMin) {
     return false;
@@ -77,109 +77,17 @@ bool EtaCut(fastjet::PseudoJet fjJet, double etaMin, double etaMax)
   }
 }
 
-/*
-void ExtractWMass(vector<fastjet::PseudoJet> jet, Int_t type, double etmin, double etmax)
+bool AcceptJet(fastjet::PseudoJet & jet, double etaMin, double etaMax)
 {
-  double zg = 0.;
-  double njetiness_kt = 0.;
-  double sdmass = 0;
-  double angle = 0;
-  double sdmass2 = 0;
-
-  fastjet::JetDefinition jet_def(fastjet::antikt_algorithm, 1, static_cast<fastjet::RecombinationScheme>(0),
-                  fastjet::Best);
-  for (unsigned int ijet = 0; ijet < jet.size(); ijet++) {
-    fastjet::PseudoJet fjJet;
-    vector<fastjet::PseudoJet> constit = sorted_by_pt(jet[ijet].constituents());
-    if (constit.size() == 0)
-      continue;
-
-    fastjet::ClusterSequence cs_gen(constit, jet_def);
-    std::vector<fastjet::PseudoJet> output_jets = sorted_by_pt(cs_gen.inclusive_jets(0));
-    fjJet = output_jets[0];
-
-    if (!EtaCut(fjJet, etmin, etmax))
-      continue;
-    if (fjJet.pt() < 0.150)
-      continue;
-    // fastjet::contrib::Recluster recluster(fastjet::cambridge_aachen_algorithm, 1, true);
-    fastjet::contrib::SoftDrop softdrop(0., 0.4);
-    // softdrop.set_reclustering(true,&recluster);
-    softdrop.set_verbose_structure(kTRUE);
-    fastjet::PseudoJet finaljet = softdrop(fjJet);
-    zg = finaljet.structure_of<fastjet::contrib::SoftDrop>().symmetry();
-    fastjet::contrib::NsubjettinessRatio nSub21_beta2(2, 1, fastjet::contrib::KT_Axes(),
-                             fastjet::contrib::NormalizedMeasure(1., 0.4));
-    njetiness_kt = nSub21_beta2(finaljet);
-    sdmass = finaljet.m();
-    sdmass2 = fjJet.m();
-    angle = finaljet.structure_of<fastjet::contrib::SoftDrop>().delta_R();
-    double var = TMath::Log(sdmass * sdmass / (fjJet.pt() * fjJet.pt()));
-
-    double lundEntries[7] = { finaljet.perp(), (1 - zg) * finaljet.perp(), angle, njetiness_kt, sdmass, var, (double) type };
-    fHInfo->Fill(lundEntries);
+  if (JetInsideEtaLimits(jet, etaMin, etaMax) == false) {
+    return false;
+  }
+  if (jet.pt() < 0.15) {
+    return false;
   }
 
-  return;
+  return true;
 }
-
-void ExtractWMassDijet(vector<fastjet::PseudoJet> jet, Int_t type, double etmin, double etmax)
-{
-  double zg = 0.;
-  double njetiness_kt = 0.;
-  double sdmass = 0;
-  double angle = 0;
-  double sdmass2 = 0;
-
-  fastjet::JetDefinition jet_def(fastjet::antikt_algorithm, 1, static_cast<fastjet::RecombinationScheme>(0),
-                  fastjet::Best);
-
-  for (unsigned int ijet = 0; ijet < jet.size(); ijet++) {
-    fastjet::PseudoJet fjJet;
-    fastjet::PseudoJet fjJet2;
-    vector<fastjet::PseudoJet> constit = sorted_by_pt(jet[ijet].constituents());
-    if (constit.size() == 0)
-      continue;
-    for (unsigned int ijet2 = 0; ijet2 < jet.size(); ijet2++) {
-      if (ijet == ijet2)
-        continue;
-      vector<fastjet::PseudoJet> constit2 = sorted_by_pt(jet[ijet2].constituents());
-      if (constit2.size() == 0)
-        continue;
-
-      fastjet::ClusterSequence cs_gen(constit, jet_def);
-      std::vector<fastjet::PseudoJet> output_jets = sorted_by_pt(cs_gen.inclusive_jets(0));
-      fjJet = output_jets[0];
-
-      fastjet::ClusterSequence cs_gen2(constit2, jet_def);
-      std::vector<fastjet::PseudoJet> output_jets2 = sorted_by_pt(cs_gen2.inclusive_jets(0));
-      fjJet2 = output_jets2[0];
-
-      if (!EtaCut(fjJet, etmin, etmax))
-        continue;
-      if (fjJet.pt() < 0.150)
-        continue;
-
-      if (!EtaCut(fjJet2, etmin, etmax))
-        continue;
-      if (fjJet2.pt() < 0.150)
-        continue;
-
-      fastjet::contrib::SoftDrop softdrop(0., 0.1);
-
-      softdrop.set_verbose_structure(kTRUE);
-      fastjet::PseudoJet finaljet1 = softdrop(fjJet);
-      fastjet::PseudoJet finaljet2 = softdrop(fjJet2);
-
-      if (TMath::Abs(finaljet1.delta_R(finaljet2)) > TMath::Pi())
-        continue;
-
-      double invmass=2*finaljet1.perp()*finaljet2.perp()*(cosh(finaljet1.eta()-finaljet2.eta())-cos(finaljet1.phi()-finaljet2.phi()));
-    }
-  }
-
-  return;
-}*/
 
 //_________________________________________________________________________
 Double_t RelativePhi(Double_t mphi, Double_t vphi)
@@ -227,9 +135,9 @@ std::map<int, int> PerformGeometricalMatching(std::vector<fastjet::PseudoJet> & 
       }
     }
   }
-  if (innerJets.size() == 0) {
+  /*if (innerJets.size() == 0) {
     std::cout << "indexMap size: " << indexMap.size() << "\n";
-  }
+  }*/
 
   return indexMap;
 }
@@ -239,7 +147,7 @@ std::tuple<std::map<int, int>, std::map<int, int>> MatchJets(std::vector<fastjet
   std::map<int, int> trueToHybridIndex = PerformGeometricalMatching(trueJets, hybridJets);
   std::map<int, int> hybridToTrueIndex = PerformGeometricalMatching(hybridJets, trueJets);
 
-  std::cout << "trueToHybridIndex.size(): " << trueToHybridIndex.size() << "\n";
+  //std::cout << "trueToHybridIndex.size(): " << trueToHybridIndex.size() << "\n";
 
   // Determine matches where one points at the other and vice versa.
   std::map<int, int> trueToHybridIndexVerified;
@@ -257,8 +165,8 @@ std::tuple<std::map<int, int>, std::map<int, int>> MatchJets(std::vector<fastjet
     }
   }
 
-  std::cout << "trueToHybridIndexVerified.size(): " << trueToHybridIndexVerified.size() << "\n";
-  std::cout << "hybridToTrueIndexVerified.size(): " << hybridToTrueIndexVerified.size() << "\n";
+  //std::cout << "trueToHybridIndexVerified.size(): " << trueToHybridIndexVerified.size() << "\n";
+  //std::cout << "hybridToTrueIndexVerified.size(): " << hybridToTrueIndexVerified.size() << "\n";
 
   return std::make_tuple(trueToHybridIndexVerified, hybridToTrueIndexVerified);
 }
@@ -456,8 +364,8 @@ int main(int argc, char* argv[])
   //___________________________________________________
   //                      FASTJET  SETTINGS
 
-  //double etamin_Sig = -trackEtaCut + jetParameterR; // signal jet eta range
-  //double etamax_Sig = -etamin_Sig;
+  double jetEtaMin = -trackEtaCut + jetParameterR; // signal jet eta range
+  double jetEtaMax = -jetEtaMin;
   fastjet::Strategy strategy = fastjet::Best;
   fastjet::RecombinationScheme recombScheme = fastjet::E_scheme;
   fastjet::JetDefinition* jetDefAKT_Sig = NULL;
@@ -527,9 +435,6 @@ int main(int argc, char* argv[])
   //___________________________________________________
   // Begin event loop. Generate event. Skip if error. List first one.
   for (int iEvent = 0; iEvent < nEvent; iEvent++) {
-    // TEMP
-    std::cout << "Event " << iEvent << "\n";
-    // ENDTEMP
     if (iEvent % 100 == 0) {
       std::cout << "Event " << iEvent << "\n";
     }
@@ -541,8 +446,7 @@ int main(int argc, char* argv[])
     inputsHybrid.clear();
     inputsTrue.resize(0);
     inputsHybrid.resize(0);
-    Double_t globalIndex = 0;
-    Double_t fourvec[4];
+    unsigned int globalIndex = 0;
     for (Int_t i = 0; i < pythia.event.size(); ++i) {
       if (pythia.event[i].isFinal()) {
         if (charged == 1)
@@ -552,11 +456,12 @@ int main(int argc, char* argv[])
           continue; // pt cut
         if (TMath::Abs(pythia.event[i].eta()) > trackEtaCut)
           continue; // eta cut
-        fourvec[0] = pythia.event[i].px();
-        fourvec[1] = pythia.event[i].py();
-        fourvec[2] = pythia.event[i].pz();
-        fourvec[3] = pythia.event[i].pAbs();
-        fastjet::PseudoJet particle(fourvec);
+        fastjet::PseudoJet particle(
+          pythia.event[i].px(),
+          pythia.event[i].py(),
+          pythia.event[i].pz(),
+          pythia.event[i].pAbs()
+        );
         particle.set_user_index(globalIndex);
         inputsTrue.push_back(particle);
         inputsHybrid.push_back(particle);
@@ -572,11 +477,12 @@ int main(int argc, char* argv[])
       double phi = f_phi->GetRandom();
       if (pT < trackLowPtCut)
         continue; // pt cut
-      fourvec[0] = Calculate_pX(pT, eta, phi);
-      fourvec[1] = Calculate_pY(pT, eta, phi);
-      fourvec[2] = Calculate_pZ(pT, eta, phi);
-      fourvec[3] = Calculate_E(pT, eta, phi);
-      fastjet::PseudoJet ThermalParticle(fourvec);
+      fastjet::PseudoJet ThermalParticle(
+        Calculate_pX(pT, eta, phi),
+        Calculate_pY(pT, eta, phi),
+        Calculate_pZ(pT, eta, phi),
+        Calculate_E(pT, eta, phi)
+      );
       ThermalParticle.set_user_index(globalIndex);
       inputsHybrid.push_back(ThermalParticle);
       ++globalIndex;
@@ -627,34 +533,26 @@ int main(int argc, char* argv[])
     for (std::size_t hybridIndex = 0; hybridIndex < hybridJets.size(); hybridIndex++) {
       if (hybridToTrueIndex.count(hybridIndex) == 0) {
         // This jet doesn't have a match. Skip it.
-        std::cout << "No match for this hybrid jet. Skipping\n";
+        //std::cout << "No match for this hybrid jet. Skipping\n";
         continue;
       }
       // Hybrid jet
       fastjet::PseudoJet & hybridJet = hybridJets[hybridIndex];
-      if (hybridJet.pt() < 0.1) {
-        std::cout << "Hybrid jet pt too low.\n";
+      if (AcceptJet(hybridJet, jetEtaMin, jetEtaMax) == false) {
+        //std::cout << "Hybrid jet rejected.\n";
         continue;
       }
       hybridJetSplittings.SetJetPt(hybridJet.pt());
       Reclustering(hybridJetSplittings, hybridJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
       // True jet
-      std::cout << "hybridToTrueIndex.size(): " << hybridToTrueIndex.size() << "\n";
       int trueJetIndex = hybridToTrueIndex[hybridIndex];
       if (trueJetIndex == -1) {
         // No match - continue.
         continue;
       }
       fastjet::PseudoJet & trueJet = trueJets[trueJetIndex];
-      std::cout << "hybridJet pt: " << hybridJet.pt() << "\n";
-      std::cout << "trueJet address: " << &trueJet << "\n";
-      std::cout << "trueJetIndex: " << trueJetIndex << "\n";
-      std::cout << "trueJets.size(): " << trueJets.size() << "\n";
-      std::cout << "hybridToTrueIndex.size(): " << hybridToTrueIndex.size() << "\n";
-      std::cout << "trueToHybridIndex.size(): " << trueToHybridIndex.size() << "\n";
-      // Minimum jet pt check
-      if (trueJet.pt() < 0.1) {
-        std::cout << "True jet pt too low.\n";
+      if (AcceptJet(trueJet, jetEtaMin, jetEtaMax) == false) {
+        //std::cout << "True jet rejected.\n";
         continue;
       }
       // Check distance is reasonable.
@@ -682,8 +580,7 @@ int main(int argc, char* argv[])
 
   } // end of event
 
-  std::cout << "Number of entries: " << tree.GetEntries() << "\n";
-  tree.Show(1);
+  std::cout << "Number of matched jets: " << tree.GetEntries() << "\n";
 
   //____________________________________________________
   //          SAVE OUTPUT
