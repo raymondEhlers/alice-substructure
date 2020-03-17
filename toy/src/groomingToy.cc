@@ -394,31 +394,36 @@ int main(int argc, char* argv[])
 
   // Particle distributions
   // All particles
-  TH1D hPtAllParticles("hPtAllParticles", "", 40000, 0.0, 400);
-  TH1D hEtaAllParticles("hEtaAllParticles", "", 200, -1.0, 1.0);
-  TH1D hPhiAllParticles("hPhiAllParticles", "", 700, -3.5, 3.5);
+  TH1D hPtAllParticles("hPtAllParticles", ";p_{T}", 4000, 0.0, 400);
+  TH1D hEtaAllParticles("hEtaAllParticles", ";#eta", 200, -1.0, 1.0);
+  TH1D hPhiAllParticles("hPhiAllParticles", ";#phi", 700, -3.5, 3.5);
   hists.emplace_back(&hPtAllParticles);
   hists.emplace_back(&hEtaAllParticles);
   hists.emplace_back(&hPhiAllParticles);
   // Pythia
-  TH1D hPtPythia("hPtPythia", "", 40000, 0.0, 400);
-  TH1D hEtaPythia("hEtaPythia", "", 200, -1.0, 1.0);
-  TH1D hPhiPythia("hPhiPythia", "", 700, -3.5, 3.5);
+  TH1D hPtPythia("hPtPythia", ";p_{T}", 4000, 0.0, 400);
+  TH1D hEtaPythia("hEtaPythia", ";#eta", 200, -1.0, 1.0);
+  TH1D hPhiPythia("hPhiPythia", ";#varphi", 700, -3.5, 3.5);
   hists.emplace_back(&hPtPythia);
   hists.emplace_back(&hEtaPythia);
   hists.emplace_back(&hPhiPythia);
   // Thermal
-  TH1D hPtThermal("hPtThermal", "", 40000, 0.0, 400);
-  TH1D hEtaThermal("hEtaThermal", "", 200, -1.0, 1.0);
-  TH1D hPhiThermal("hPhiThermal", "", 700, -3.5, 3.5);
+  TH1D hPtThermal("hPtThermal", ";p_{T}", 4000, 0.0, 400);
+  TH1D hEtaThermal("hEtaThermal", ";#eta", 200, -1.0, 1.0);
+  TH1D hPhiThermal("hPhiThermal", ";#varphi", 700, -3.5, 3.5);
   hists.emplace_back(&hPtThermal);
   hists.emplace_back(&hEtaThermal);
   hists.emplace_back(&hPhiThermal);
 
+  // Pythia information
   TProfile hXsection("fHistXsection", "fHistXsection;;xsection", 1, 0, 1);
   hists.emplace_back(&hXsection);
   TH1D hTrials("fHistTrials", "fHistTrials;;trials", 1, 0, 1);
   hists.emplace_back(&hTrials);
+
+  // Jet matching information
+  TH1D hMatchingDistance("hMatchingDistance", ";#Delta R", 100, 0, 1);
+  hists.emplace_back(&hMatchingDistance);
 
   // Enable Sumw2
   for (auto & h: hists) {
@@ -472,10 +477,10 @@ int main(int argc, char* argv[])
         // Store particle properties
         hPtAllParticles.Fill(particle.pt());
         hEtaAllParticles.Fill(particle.eta());
-        hPhiAllParticles.Fill(particle.phi());
+        hPhiAllParticles.Fill(particle.phi_std());
         hPtPythia.Fill(particle.pt());
         hEtaPythia.Fill(particle.eta());
-        hPhiPythia.Fill(particle.phi());
+        hPhiPythia.Fill(particle.phi_std());
         ++globalIndex;
       }
     }
@@ -499,10 +504,10 @@ int main(int argc, char* argv[])
       // Store particle properties
       hPtAllParticles.Fill(thermalParticle.pt());
       hEtaAllParticles.Fill(thermalParticle.eta());
-      hPhiAllParticles.Fill(thermalParticle.phi());
+      hPhiAllParticles.Fill(thermalParticle.phi_std());
       hPtThermal.Fill(thermalParticle.pt());
       hEtaThermal.Fill(thermalParticle.eta());
-      hPhiThermal.Fill(thermalParticle.phi());
+      hPhiThermal.Fill(thermalParticle.phi_std());
       ++globalIndex;
     }
 
@@ -576,10 +581,12 @@ int main(int argc, char* argv[])
         //std::cout << "True jet rejected.\n";
         continue;
       }
+      double matchingDistance = hybridJet.delta_R(trueJet);
+      hMatchingDistance.Fill(matchingDistance);
       // Check distance is reasonable.
-      if (hybridJet.delta_R(trueJet) > jetParameterR) {
+      if (matchingDistance > jetParameterR) {
         // Too far away!
-        std::cout << "Too far away! Delta_R = " << hybridJet.delta_R(trueJet) << "\n";
+        std::cout << "Too far away! Delta_R = " << matchingDistance << "\n";
         continue;
       }
       // Check shared momentum fraction
