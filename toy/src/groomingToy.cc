@@ -47,10 +47,9 @@
 
 #include "output.h"
 
-using namespace Pythia8;
-
 #define nThermalParticles 4000
 
+using namespace Pythia8;
 
 double Calculate_pX(double pT, double eta, double phi) { return (pT * TMath::Cos(phi)); }
 
@@ -64,9 +63,6 @@ double Calculate_E(double pT, double eta, double phi)
 
   return (TMath::Sqrt(pT * pT + pZ * pZ));
 }
-
-THnSparse* fHLundIterative;
-THnSparse* fHInfo;
 
 bool JetInsideEtaLimits(fastjet::PseudoJet fjJet, double etaMin, double etaMax)
 {
@@ -306,14 +302,15 @@ int main(int argc, char* argv[])
 
   Int_t nEvent = atoi(argv[3]); //(Int_t) 1e3 + 1.0;
   TString name;
+
   //__________________________________________________________________________
   //                        ANALYSIS SETTINGS
 
   double jetParameterR = (double)atof(argv[5]); // jet R
-  double trackLowPtCut = 0.;                    // GeV
+  double trackLowPtCut = 1.150;                 // GeV
   double trackEtaCut = 1;
   Float_t ptHatMin = 20;
-  Float_t ptHatMax = 200;
+  Float_t ptHatMax = 300;
 
   //__________________________________________________________________________
   //                        PYTHIA SETTINGS
@@ -328,14 +325,11 @@ int main(int argc, char* argv[])
 
   pythia.readString("Random:setSeed = on");
   pythia.readString(Form("Random:seed = %d", randomSeed));
+
   // Turn on QCD.
   pythia.readString("HardQCD:all = on");
-  // pythia
-  //pythia.readString("WeakDoubleBoson:ffbar2WW=on");
-  // pythia.readString("24:mMin = 100");
-  //pythia.readString("24:onIfAny = 1 2 3 4 5");
-  //# Force production to higher pT
-  pythia.readString("PhaseSpace:pTHatMin = 40");
+
+  // Force production to higher pT
   if (ptHatMin < 0 || ptHatMax < 0) {
     pythia.readString("PhaseSpace:pTHatMin = 0."); // <<<<<<<<<<<<<<<<<<<<<<<
   } else {
@@ -350,14 +344,14 @@ int main(int argc, char* argv[])
     pythia.readString("PartonLevel:ISR = off");
   }
 
-  //pythia.readString("310:mayDecay  = off"); // K0s
-  //pythia.readString("3122:mayDecay = off"); // labda0
-  //pythia.readString("3112:mayDecay = off"); // sigma-
-  //pythia.readString("3212:mayDecay = off"); // sigma0
-  //pythia.readString("3222:mayDecay = off"); // sigma+
-  //pythia.readString("3312:mayDecay = off"); // xi-
-  //pythia.readString("3322:mayDecay = off"); // xi+
-  //pythia.readString("3334:mayDecay = off"); // omega-
+  pythia.readString("310:mayDecay  = off"); // K0s
+  pythia.readString("3122:mayDecay = off"); // labda0
+  pythia.readString("3112:mayDecay = off"); // sigma-
+  pythia.readString("3212:mayDecay = off"); // sigma0
+  pythia.readString("3222:mayDecay = off"); // sigma+
+  pythia.readString("3312:mayDecay = off"); // xi-
+  pythia.readString("3322:mayDecay = off"); // xi+
+  pythia.readString("3334:mayDecay = off"); // omega-
 
   pythia.init();
 
@@ -366,10 +360,11 @@ int main(int argc, char* argv[])
 
   double jetEtaMin = -trackEtaCut + jetParameterR; // signal jet eta range
   double jetEtaMax = -jetEtaMin;
+
   fastjet::Strategy strategy = fastjet::Best;
   fastjet::RecombinationScheme recombScheme = fastjet::E_scheme;
-  fastjet::JetDefinition* jetDefAKT_Sig = NULL;
-  jetDefAKT_Sig = new fastjet::JetDefinition(fastjet::antikt_algorithm, jetParameterR, recombScheme, strategy);
+
+  fastjet::JetDefinition* jetDefAKT_Sig = new fastjet::JetDefinition(fastjet::antikt_algorithm, jetParameterR, recombScheme, strategy);
 
   fastjet::GhostedAreaSpec ghostareaspec(trackEtaCut, 1, 0.05); // ghost
   // max rap, repeat, ghostarea default 0.01
@@ -382,8 +377,6 @@ int main(int argc, char* argv[])
 
   //_________Thermal Particl_densityes Distribuitions (toy model)
 
-  //TH1D* hT_phi = new TH1D("hT_phi", "", 700, -3.5, 3.5);
-
   TF1* f_pT = new TF1("f_pT", "x*exp(-x/0.3)", 0.0, 400.0);
   f_pT->SetNpx(40000);
 
@@ -395,33 +388,44 @@ int main(int argc, char* argv[])
 
   //___________________________________________________________
 
-  TH1D* histoWMass = new TH1D("histoWMass", "histoWMass", 100, 0.0, 200.0);
-  histoWMass->Sumw2();
+  // Hists
+  // Store all hists here for convenience later.
+  std::vector<TH1*> hists;
 
-  TH1D* histoWMassNsub = new TH1D("histoWMassNsub", "histoWMassNsub", 100, 0.0, 200.0);
-  histoWMassNsub->Sumw2();
+  // Particle distributions
+  // All particles
+  TH1D hPtAllParticles("hPtAllParticles", "", 40000, 0.0, 400);
+  TH1D hEtaAllParticles("hEtaAllParticles", "", 200, -1.0, 1.0);
+  TH1D hPhiAllParticles("hPhiAllParticles", "", 700, -3.5, 3.5);
+  hists.emplace_back(&hPtAllParticles);
+  hists.emplace_back(&hEtaAllParticles);
+  hists.emplace_back(&hPhiAllParticles);
+  // Pythia
+  TH1D hPtPythia("hPtPythia", "", 40000, 0.0, 400);
+  TH1D hEtaPythia("hEtaPythia", "", 200, -1.0, 1.0);
+  TH1D hPhiPythia("hPhiPythia", "", 700, -3.5, 3.5);
+  hists.emplace_back(&hPtPythia);
+  hists.emplace_back(&hEtaPythia);
+  hists.emplace_back(&hPhiPythia);
+  // Thermal
+  TH1D hPtThermal("hPtThermal", "", 40000, 0.0, 400);
+  TH1D hEtaThermal("hEtaThermal", "", 200, -1.0, 1.0);
+  TH1D hPhiThermal("hPhiThermal", "", 700, -3.5, 3.5);
+  hists.emplace_back(&hPtThermal);
+  hists.emplace_back(&hEtaThermal);
+  hists.emplace_back(&hPhiThermal);
 
-  TH1D* histoAngle = new TH1D("histoAngle", "histoAngle", 100, 0.0, 6.4);
-  histoAngle->Sumw2();
+  TProfile hXsection("fHistXsection", "fHistXsection;;xsection", 1, 0, 1);
+  hists.emplace_back(&hXsection);
+  TH1D hTrials("fHistTrials", "fHistTrials;;trials", 1, 0, 1);
+  hists.emplace_back(&hTrials);
 
-  TH2D* histoTest = new TH2D("histoTest", "histoTest", 100, -20, 0, 100, 0, 1);
-  histoTest->Sumw2();
+  // Enable Sumw2
+  for (auto & h: hists) {
+    h->Sumw2();
+  }
 
-  TProfile* fHistXsection = new TProfile("fHistXsection", "fHistXsection", 1, 0, 1);
-  fHistXsection->GetYaxis()->SetTitle("xsection");
-
-  TH1F* fHistTrials = new TH1F("fHistTrials", "fHistTrials", 1, 0, 1);
-  fHistTrials->GetYaxis()->SetTitle("trials");
-
-  // THnSparse *fHInfo;
-  // ptlead,ptsublead,angle,tau2/tau1,mass,log(mass^2/pt^2)
-  const Int_t dimSpec = 7;
-  const Int_t nBinsSpec[7] = { 200, 200, 100, 20, 200, 20, 2 };
-  const Double_t lowBinSpec[7] = { 0, 0, 0, 0, 0, -20, 0 };
-  const Double_t hiBinSpec[7] = { 1000, 1000, 6.4, 1.2, 200, 0, 2 };
-  fHInfo = new THnSparseF("fHInfo", "fHInfo[jetpt,tform,erad]", dimSpec, nBinsSpec, lowBinSpec, hiBinSpec);
-
-  // Define output objects.
+  // Define output trees.
   int splitLevel = 4;
   int bufferSize = 32000;
   SubstructureTree::JetSubstructureSplittings hybridJetSplittings;
@@ -465,6 +469,13 @@ int main(int argc, char* argv[])
         particle.set_user_index(globalIndex);
         inputsTrue.push_back(particle);
         inputsHybrid.push_back(particle);
+        // Store particle properties
+        hPtAllParticles.Fill(particle.pt());
+        hEtaAllParticles.Fill(particle.eta());
+        hPhiAllParticles.Fill(particle.phi());
+        hPtPythia.Fill(particle.pt());
+        hEtaPythia.Fill(particle.eta());
+        hPhiPythia.Fill(particle.phi());
         ++globalIndex;
       }
     }
@@ -477,22 +488,32 @@ int main(int argc, char* argv[])
       double phi = f_phi->GetRandom();
       if (pT < trackLowPtCut)
         continue; // pt cut
-      fastjet::PseudoJet ThermalParticle(
+      fastjet::PseudoJet thermalParticle(
         Calculate_pX(pT, eta, phi),
         Calculate_pY(pT, eta, phi),
         Calculate_pZ(pT, eta, phi),
         Calculate_E(pT, eta, phi)
       );
-      ThermalParticle.set_user_index(globalIndex);
-      inputsHybrid.push_back(ThermalParticle);
+      thermalParticle.set_user_index(globalIndex);
+      inputsHybrid.push_back(thermalParticle);
+      // Store particle properties
+      hPtAllParticles.Fill(thermalParticle.pt());
+      hEtaAllParticles.Fill(thermalParticle.eta());
+      hPhiAllParticles.Fill(thermalParticle.phi());
+      hPtThermal.Fill(thermalParticle.pt());
+      hEtaThermal.Fill(thermalParticle.eta());
+      hPhiThermal.Fill(thermalParticle.phi());
       ++globalIndex;
     }
 
     //________________signal jets____________________________________________________
     fastjet::ClusterSequenceArea clustSeq_Sig(inputsTrue, *jetDefAKT_Sig, *areaDef);
     std::vector<fastjet::PseudoJet> trueJets = clustSeq_Sig.inclusive_jets(30.);
-    //ExtractWMass(trueJets, 0, etamin_Sig, etamax_Sig);
-    //ExtractWMassDijet(trueJets, 0, etamin_Sig, etamax_Sig);
+
+    if (trueJets.size() == 0) {
+      // No true jets, so nothing else to be done.
+      continue;
+    }
 
     //_________________HI jets_______________________________________________________
     fastjet::GhostedAreaSpec New_ghost_spec(1, 1, 0.05); // Ghosts to calculate the Jet Area
@@ -575,9 +596,6 @@ int main(int argc, char* argv[])
       tree.Fill();
     }
 
-    //ExtractWMass(hybridJets, 1, etamin_Sig, etamax_Sig);
-    //ExtractWMassDijet(hybridJets, 1, etamin_Sig, etamax_Sig);
-
   } // end of event
 
   std::cout << "Number of matched jets: " << tree.GetEntries() << "\n";
@@ -591,13 +609,12 @@ int main(int argc, char* argv[])
    new TFile(TString::Format("%s_tune_%d_seed_%d_%s%s.root", tag.Data(), tune, randomSeed, charged ? "charged" : "full", underlingEvent ? "_underlyingEvent" : ""), "RECREATE");
 
   outFile->cd();
+  // Write out hists
+  for (auto & h: hists) {
+    h->Write();
+  }
+  // And tree
   tree.Write();
-  // fTreeObservables->Write();
-  histoWMass->Write();
-  histoWMassNsub->Write();
-  histoTest->Write();
-  histoAngle->Write();
-  fHInfo->Write();
   outFile->Close();
 
   pythia.stat();
