@@ -540,7 +540,7 @@ int main(int argc, char* argv[])
     subtractor.set_max_standardDeltaR(jetParameterR);
     // subtractor.set_alpha(0.5);
 
-    for (int j = 0; j < hybridJets.size(); j++) {
+    for (std::size_t j = 0; j < hybridJets.size(); j++) {
       const fastjet::PseudoJet& jet = hybridJets[j];
       fastjet::PseudoJet subtracted_Jet = subtractor(jet);
       hybridJets[j] = subtracted_Jet;
