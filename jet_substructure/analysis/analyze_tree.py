@@ -114,15 +114,10 @@ def analyze_single_tree(
             # Save calculate columns so we don't need to re-calculate them every time.
             # NOTE: We always check if they already exist because HDF5 doesn't like us
             #       overwriting columns.
-            # Calculated constituent indices.
-            name = f"{prefix}.calculated_constituents_indices"
+            # Calculated subjet constituents.
+            name = f"{prefix}.fSubjets.constituents"
             if name not in tree:
-                tree[name] = jets.subjets.constituents_indices
-
-            # TODO: calculated constituents.
-            # name = f"{prefix}.calculated_subjet_constituents"
-            # if name not in tree:
-            #    tree[name] = jets.subjets.constituents(jets.constituents)
+                tree[name] = jets.subjets.constituents
 
             successfully_accessed_data = True
         else:

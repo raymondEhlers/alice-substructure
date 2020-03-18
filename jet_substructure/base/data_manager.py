@@ -32,7 +32,7 @@ def _convert_wildcards(paths: Sequence[Path]) -> List[Path]:
             return_paths.append(path)
 
     # Sort in the expected order.
-    return_paths = sorted(return_paths, key=lambda p: int("".join(filter(str.isdigit, str(p)))))
+    # return_paths = sorted(return_paths, key=lambda p: int("".join(filter(str.isdigit, str(p)))))
     return return_paths
 
 
@@ -216,7 +216,17 @@ class HDF5TreeWrapper(TreeMixin, MutableMapping[str, UprootArray]):
         # Will be closed when this tree wrapper goes out of scope.
         f = h5py.File(filename, file_mode)
 
-        return cls(filename=filename, file=f, tree_name=tree_name, tree=ak.hdf5(f.require_group(tree_name)),)
+        whitelist = ak.persist.whitelist + [
+            ["jet_substructure.base.substructure_methods", "JetConstituentArray", "from_jagged"],
+            ["jet_substructure.base.substructure_methods", "SubjetArray", "from_jagged"],
+            ["jet_substructure.base.substructure_methods", "JetSplittingArray", "from_jagged"],
+        ]
+        return cls(
+            filename=filename,
+            file=f,
+            tree_name=tree_name,
+            tree=ak.hdf5(f.require_group(tree_name), whitelist=whitelist),
+        )
 
 
 @attr.s

@@ -207,7 +207,17 @@ class Subjet:
 
     part_of_iterative_splitting: bool = attr.ib()
     _parent_splitting_index: int = attr.ib()
-    _constituents_indices: Result[int] = attr.ib()
+    _constituents: JetConstituentArray = attr.ib()
+
+    @classmethod
+    def from_constituents_indices(
+        cls: Type["Subjet"],
+        part_of_iterative_splitting: bool,
+        parent_splitting_index: int,
+        constituent_indices: Result[int],
+        jet_constituents: JetConstituentArray,
+    ) -> "Subjet":
+        return cls(part_of_iterative_splitting, parent_splitting_index, jet_constituents[constituent_indices],)
 
     @property
     def parent_splitting_index(self) -> int:
@@ -223,34 +233,8 @@ class Subjet:
         """
         return splittings[self._parent_splitting_index]
 
-    def constituents(self, jet_constituents: Result[Sequence[JetConstituent]]) -> Result[Sequence[JetConstituent]]:
-        """ Retrieve the constituents of this subjet.
 
-        Args:
-            jet_constituents: Constituents of the overall jet.
-        Returns:
-            Constituents of this subjet.
-        """
-        return jet_constituents[self._constituents_indices]
-        # return ak.JaggedArray.fromoffsets(self._constituents_indices.offsets, jet_constituents[s.flatten()])
-        # return ak.JaggedArray.fromoffsets(
-        #    self._constituents_indices.offsets, ak.JaggedArray.fromoffsets(
-        #        self._constituents_indices.offsets, jet_constituents.flatten()[self._constituents_indices.flatten(axis=1)]
-        #    )
-        # )
-
-    # constituents[subjets._constituents_indices.flatten(axis=1)]
-
-    # def test():
-    #    ak.JaggedArray.fromoffsets(
-    #        subjets._constituents_indices.offsets, ak.JaggedArray.fromoffsets(
-    #            subjets._constituents_indices.flatten().offsets,
-    #            constituents[subjets._constituents_indices.flatten(axis=1)].flatten()
-    #        )
-    #    )
-
-
-def _convert_jagged_constituents_indicies(
+def _convert_jagged_constituents_indices(
     constituents_indices: ak.JaggedArray, jagged_indices: ak.JaggedArray
 ) -> ak.JaggedArray:
     return ak.fromiter(
@@ -268,29 +252,27 @@ class SubjetArrayMethods(ArrayMethods):
         """ Create jet constituent views in a table.
 
         Args:
-            table: Table where the constituents will be created.
+            table: Table where the subjets will be created.
         """
         self.awkward.ObjectArray.__init__(
             self,
             table,
-            lambda row: Subjet(
-                row["part_of_iterative_splitting"], row["parent_splitting_index"], row["constituents_indices"]
-            ),
+            lambda row: Subjet(row["part_of_iterative_splitting"], row["parent_splitting_index"], row["constituents"]),
         )
 
     def __awkward_serialize__(self, serializer: ak.persist.Serializer) -> ak.persist.Serializer:
         """ Serialize to file. """
         self._valid()
-        part_of_iterative_splitting, parent_splitting_index, constituents_indices = (
+        part_of_iterative_splitting, parent_splitting_index, constituents = (
             self.part_of_iterative_splitting,
             self.parent_splitting_index,
-            self.constituents_indices,
+            self.constituents,
         )
         return serializer.encode_call(
             ["jet_substructure.base.substructure_methods", "SubjetArrayMethods", "from_jagged"],
             serializer(part_of_iterative_splitting, "SubjetArrayMethods.part_of_iterative_splitting"),
             serializer(parent_splitting_index, "SubjetArrayMethods.parent_splitting_index"),
-            serializer(constituents_indices, "SubjetArrayMethods.constituents_indices"),
+            serializer(constituents, "SubjetArrayMethods.constituents"),
         )
 
     @property
@@ -331,33 +313,37 @@ class SubjetArrayMethods(ArrayMethods):
         """
         return splittings[self["parent_splitting_index"]]
 
-    def constituents(self, jet_constituents: Result[Sequence[JetConstituent]]) -> Result[Sequence[JetConstituent]]:
-        """ Constituents of the subjets.
+    # def constituents(self, jet_constituents: Result[Sequence[JetConstituent]]) -> Result[Sequence[JetConstituent]]:
+    #    """ Constituents of the subjets.
 
-        Args:
-            jet_constituents: Constituents of the overall jets which contain the subjets.
-        Returns:
-            Jet constituents of the subjets.
-        """
-        # TODO: Need to rewarp as constituents.
-        return self._try_memo(
-            "constituents",
-            lambda self: ak.JaggedArray.fromoffsets(
-                self._constituents_indices.offsets,
-                ak.JaggedArray.fromoffsets(
-                    self._constituents_indices.flatten().offsets,
-                    jet_constituents[self._constituents_indices.flatten(axis=1)].flatten().content,
-                ),
-            ),
-        )
-        # return jet_constituents[self._constituents_indices]
-        # This doesn't seem super efficient, but I can't seem to broadcast it directly.
-        # return ak.JaggedArray.fromoffsets(
-        #    self._constituents_indices.offsets, ak.JaggedArray.fromoffsets(
-        #        self._constituents_indices.flatten().offsets,
-        #        jet_constituents[self._constituents_indices.flatten(axis=1)].flatten()
-        #    )
-        # )
+    #    Args:
+    #        jet_constituents: Constituents of the overall jets which contain the subjets.
+    #    Returns:
+    #        Jet constituents of the subjets.
+    #    """
+    #    #return self._try_memo(
+    #    #    "constituents",
+    #    #    lambda self: ak.JaggedArray.fromoffsets(
+    #    #            self._constituents_indices.offsets,
+    #    #            jet_constituents[self._constituents_indices.flatten()],
+    #    #    ),
+    #    #)
+    #    # TODO: Need to rewarp as constituents.
+    #    #result = ak.JaggedArray.fromoffsets(
+    #    #    self._constituents_indices.offsets,
+    #    #    ak.JaggedArray.fromoffsets(
+    #    #        self._constituents_indices.flatten().offsets,
+    #    #        jet_constituents[self._constituents_indices.flatten(axis=1)].flatten().content,
+    #    #    ),
+    #    #)
+    #    # return jet_constituents[self._constituents_indices]
+    #    # This doesn't seem super efficient, but I can't seem to broadcast it directly.
+    #    return ak.JaggedArray.fromoffsets(
+    #        self._constituents_indices.offsets, ak.JaggedArray.fromoffsets(
+    #            self._constituents_indices.flatten().offsets,
+    #            jet_constituents[self._constituents_indices.flatten(axis=1)].flatten()
+    #        )
+    #    )
 
 
 # Adds in JaggedArray methods for constructing objects with jagged structure.
@@ -381,12 +367,12 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
         self,
         part_of_iterative_splitting: Result[bool],
         parent_splitting_index: Result[int],
-        constituents_indices: Result[Result[int]],
+        constituents: Result[JetConstituentArray],
     ) -> None:
         self._init_object_array(ak.Table())
         self["part_of_iterative_splitting"] = part_of_iterative_splitting
         self["parent_splitting_index"] = parent_splitting_index
-        self["constituents_indices"] = constituents_indices
+        self["constituents"] = constituents
 
     @classmethod
     def from_jagged(
@@ -394,8 +380,9 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
         part_of_iterative_splitting: Result[bool],
         parent_splitting_index: Result[int],
         constituents_indices: Result[int],
+        subjet_constituents: Result[JetConstituentArray] = None,
+        jet_constituents: Result[JetConstituentArray] = None,
         constituents_jagged_indices: Optional[Result[int]] = None,
-        calculated_constituents_indices: Optional[Result[int]] = None,
     ) -> _T_SubjetArray:
         """ Creates a view of subjets with jagged structure.
 
@@ -413,30 +400,43 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
             constituents_indices: Jagged constituents indices of the subjet.
         """
         # Validation
-        if calculated_constituents_indices is None and constituents_indices is None:
-            raise ValueError("Must pass constituents indices or pre-calculated constituents indices.")
-        logger.debug("Determining constituents indices")
+        if subjet_constituents is None and constituents_indices is None:
+            raise ValueError("Must pass subjet constituents or constituents indices.")
+        logger.debug("Determining subjet constituents.")
 
         # We have three modes for creating the indices:
-        # 1) If the constituent indices are already converted into a doubly jagged array, just use them.
+        # 1) The subjet constituents have already been determined in the past. Just use them.
         # 2) Construct the constituent indices using separately stored jagged indices.
         # 3) Construct the doubly jagged indices stored in the tree via fromiter(...)
-        if calculated_constituents_indices is not None:
-            # Great, we already have them calculated! We don't care about anything else.
-            logger.debug("Loading pre-calculated constituents indices")
-            constituents_indices = calculated_constituents_indices
-        elif constituents_jagged_indices is not None:
-            # Calculate the indices
-            constituents_indices = _convert_jagged_constituents_indicies(
-                constituents_indices, constituents_jagged_indices
-            )
+        # In the case of 2 or 3, the subjets constituents are determine from the jet constituents.
+        if subjet_constituents is not None:
+            logger.debug("Using pre-calculated constituents.")
+            pass
         else:
-            logger.debug(f"Constituent indices type: {type(constituents_indices)}")
-            constituents_indices = ak.fromiter(constituents_indices)
+            if constituents_jagged_indices is not None:
+                # Calculate the indices.
+                logger.debug("Constructing constituents indices from manually stored jagged indices.")
+                constituents_indices = _convert_jagged_constituents_indices(
+                    constituents_indices, constituents_jagged_indices
+                )
+            else:
+                # Construct the indices.
+                logger.debug(f"Constructing constituents indices from doubly jagged indices.")
+                constituents_indices = ak.fromiter(constituents_indices)
+
+            # This doesn't seem super efficient, but I can't seem to broadcast it directly.
+            logger.debug("Calculating subjets constituents from consituents indices.")
+            subjet_constituents = ak.JaggedArray.fromoffsets(
+                constituents_indices.offsets,
+                ak.JaggedArray.fromoffsets(
+                    constituents_indices.flatten().offsets,
+                    jet_constituents[constituents_indices.flatten(axis=1)].flatten(),
+                ),
+            )
 
         return cast(
             _T_SubjetArray,
-            cls._from_jagged_impl(part_of_iterative_splitting, parent_splitting_index, constituents_indices),
+            cls._from_jagged_impl(part_of_iterative_splitting, parent_splitting_index, subjet_constituents),
         )
 
     @classmethod
@@ -445,7 +445,7 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
         cls: Type[_T_SubjetArray],
         part_of_iterative_splitting: Result[bool],
         parent_splitting_index: Result[int],
-        constituents_indices: Result[int],
+        constituents: Result[JetConstituentArray],
     ) -> _T_SubjetArray:
         """ Creates a view of subjets with jagged structure.
 
@@ -457,9 +457,9 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
         Args:
             part_of_iterative_splitting: Jagged iterative splitting label.
             parent_splitting_index: Jagged parent splitting index.
-            constituents_indices: Jagged constituents indices of the subjet.
+            constituents: Constituents of the subjet.
         """
-        return cls(part_of_iterative_splitting, parent_splitting_index, constituents_indices)
+        return cls(part_of_iterative_splitting, parent_splitting_index, constituents)
 
 
 @attr.s
@@ -820,9 +820,11 @@ class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):  # type
             tree[f"{prefix}.fSubjets.fPartOfIterativeSplitting"],
             tree[f"{prefix}.fSubjets.fSplittingNodeIndex"],
             tree[f"{prefix}.fSubjets.fConstituentIndices"],
+            tree.get(f"{prefix}.fSubjets.constituents", None),
+            constituents,
             tree.get(f"{prefix}.fSubjets.fConstituentJaggedIndices", None),
-            tree.get(f"{prefix}.calculated_constituents_indices", None),
         )
+
         logger.debug("Done with constructing subjets.")
 
         # Construct substructure jets using the above
