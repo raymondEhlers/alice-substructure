@@ -133,6 +133,7 @@ class JetConstituents
   #if !(defined(__CINT__) || defined(__MAKECINT__))
   std::tuple<float, float, float, int> GetJetConstituent(int i) const;
   #endif
+  unsigned int GetNumberOfJetConstituents() const { return fPt.size(); }
 
   // Printing
   std::string toString() const;
@@ -187,6 +188,7 @@ class JetSubstructureSplittings {
   std::tuple<float, float, float, short> GetSplitting(int i) const;
   std::tuple<unsigned short, bool, const std::vector<unsigned short>> GetSubjet(int i) const;
   #endif
+  unsigned int GetNumberOfJetConstituents() const { return fJetConstituents.GetNumberOfJetConstituents(); }
   unsigned int GetNumberOfSplittings() { return fJetSplittings.GetNumberOfSplittings(); }
 
   // Printing

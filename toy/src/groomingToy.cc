@@ -210,9 +210,17 @@ void ExtractJetSplittings(SubstructureTree::JetSubstructureSplittings & jetSplit
   // Store the subjets
   std::vector<unsigned short> j1ConstituentIndices, j2ConstituentIndices;
   for (auto constituent: j1.constituents()) {
+    // Skip ghosts
+    if (constituent.user_index() == -1) {
+      continue;
+    }
     j1ConstituentIndices.emplace_back(constituent.user_index());
   }
   for (auto constituent: j2.constituents()) {
+    // Skip ghosts
+    if (constituent.user_index() == -1) {
+      continue;
+    }
     j2ConstituentIndices.emplace_back(constituent.user_index());
   }
   jetSplittings.AddSubjet(splittingNodeIndex, followingIterativeSplitting, j1ConstituentIndices);
@@ -235,6 +243,13 @@ void Reclustering(SubstructureTree::JetSubstructureSplittings & jetSplittings, f
   for (const auto & part : jet.constituents()) {
     //if (isData == true && fDoTwoTrack == kTRUE && CheckClosePartner(jet, part))
     //    continue;
+    // Exclude ghosts
+    if (part.user_index() == -1) {
+      continue;
+    }
+    //if (part.pt() < 0.15) {
+    //    std::cout << "Soft particle! pt: " << part.pt() << "\n";
+    //}
     pseudoTrack.reset(part.px(), part.py(), part.pz(), part.e());
     pseudoTrack.set_user_index(constituentIndex);
     inputVectors.push_back(pseudoTrack);
@@ -557,6 +572,10 @@ int main(int argc, char* argv[])
     bool storeRecursiveSplittings = true;
     bool applyTwoParticleAcceptanceCut = false;
     for (std::size_t hybridIndex = 0; hybridIndex < hybridJets.size(); hybridIndex++) {
+      // Setup. Ensure that the tree outputs are clear for each set of jets to fill it.
+      hybridJetSplittings.Clear();
+      trueJetSplittings.Clear();
+
       if (hybridToTrueIndex.count(hybridIndex) == 0) {
         // This jet doesn't have a match. Skip it.
         //std::cout << "No match for this hybrid jet. Skipping\n";
@@ -599,6 +618,13 @@ int main(int argc, char* argv[])
 
       trueJetSplittings.SetJetPt(trueJet.pt());
       Reclustering(trueJetSplittings, trueJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
+
+      // Check number of stored jet constituents
+      /*std::cout << "Number of hybrid jet constituents: " << hybridJet.constituents().size() << "\n";
+      std::cout << "hybrid constituents: " << hybridJetSplittings.GetNumberOfJetConstituents() << "\n";
+      std::cout << "Number of true jet constituents: " << trueJet.constituents().size() << "\n";
+      std::cout << "true constituents: " << trueJetSplittings.GetNumberOfJetConstituents() << "\n";
+      std::cout << "fill tree\n";*/
       // Fill the matched jets.
       tree.Fill();
     }
