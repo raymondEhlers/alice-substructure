@@ -216,7 +216,7 @@ class SubstructureHists(SubstructureHistsBase):
         self.kt.fill(inputs.splittings.kt.flatten())
         self.z.fill(inputs.splittings.z.flatten())
         self.delta_R.fill(inputs.splittings.delta_R.flatten())
-        self.theta.fill(inputs.splittings.delta_R.flatten() / jet_R)
+        self.theta.fill(inputs.splittings.theta(jet_R).flatten())
         if splitting_number is None:
             splitting_number = _calculate_splitting_number(inputs.indices)
         self.splitting_number.fill(splitting_number)
@@ -367,9 +367,9 @@ class SubstructureResponseHists(SubstructureHistsBase):
         )
         self.response_theta.fill(
             hybrid_inputs.jets.jet_pt,
-            hybrid_inputs.splittings.theta.flatten() / jet_R,
+            hybrid_inputs.splittings.theta(jet_R).flatten(),
             true_inputs.jets.jet_pt,
-            true_inputs.splittings.theta.flatten() / jet_R,
+            true_inputs.splittings.theta(jet_R).flatten(),
             weight=weight,
         )
         self.response_splitting_number.fill(

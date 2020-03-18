@@ -94,6 +94,9 @@ class JetConstituent:
     def index(self) -> int:
         return self._global_index
 
+    def delta_R(self, other: "JetConstituent") -> float:
+        return np.sqrt((self.phi - other.phi) ** 2 + (self.eta - other.eta) ** 2)
+
 
 class JetConstituentArrayMethods(ArrayMethods):
     """ Methods for operating on jet constituents arrays.
@@ -131,6 +134,13 @@ class JetConstituentArrayMethods(ArrayMethods):
         """ Constituents global index. """
         return self["global_index"]
 
+    @property
+    def max_pt(self) -> Result[float]:
+        return self["pt"].max()
+
+    def delta_R(self, other: "JetConstituentArray") -> Result[float]:
+        return np.sqrt((self["phi"] - other["phi"]) ** 2 + (self["eta"] - other["eta"]) ** 2)
+
 
 # Adds in JaggedArray methods for constructing objects with jagged structure.
 JaggedJetConstituentArrayMethods = JetConstituentArrayMethods.mixin(JetConstituentArrayMethods, ak.JaggedArray)
@@ -166,10 +176,6 @@ class JetConstituentArray(JetConstituentArrayMethods, ak.ObjectArray):  # type:i
             serializer(phi, "JetConstituentArray.phi"),
             serializer(global_index, "JetConstituentArray.global_index"),
         )
-
-    @property
-    def max_pt(self) -> Result[float]:
-        return self["pt"].max()
 
     @classmethod
     def from_jagged_table(cls: Type[T], table: ak.Table) -> T:
@@ -233,6 +239,11 @@ class Subjet:
         """
         return splittings[self._parent_splitting_index]
 
+    @property
+    def constituents(self) -> JetConstituentArray:
+        """ Subjet constituents. """
+        return self._constituents
+
 
 def _convert_jagged_constituents_indices(
     constituents_indices: ak.JaggedArray, jagged_indices: ak.JaggedArray
@@ -274,19 +285,6 @@ class SubjetArrayMethods(ArrayMethods):
             serializer(parent_splitting_index, "SubjetArrayMethods.parent_splitting_index"),
             serializer(constituents, "SubjetArrayMethods.constituents"),
         )
-
-    @property
-    def _constituents_indices(self) -> Result[int]:
-        """ Construct constituent indices from stored JaggedArrays.
-
-        We create this property just to make it slightly easier to access. Normally,
-        one would just want the constituents directly, so we make it private.
-
-        Note:
-            It's currently not possible to directly create doubly Jagged arrays. We unfortunately have to accept
-            a loop in python to create it.
-        """
-        return self["constituents_indices"]
 
     @property
     def part_of_iterative_splitting(self) -> Result[bool]:
@@ -497,6 +495,9 @@ class JetSplitting:
         # parent_pt = subleading / z = kt / sin(delta_R) / z
         return self.kt / np.sin(self.delta_R) / self.z
 
+    def theta(self, jet_R: float) -> float:
+        return self.delta_R / jet_R
+
     def dynamical_z(self, R: float) -> float:
         return dynamical_z(self.delta_R, self.z, self.parent_pt, R)
 
@@ -546,6 +547,9 @@ class JetSplittingArrayMethods(ArrayMethods):
     @property
     def z(self) -> Result[float]:
         return self["z"]
+
+    def theta(self, jet_R: float) -> Result[float]:
+        return self.delta_R / jet_R
 
     @property
     def parent_pt(self) -> Result[float]:
