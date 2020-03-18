@@ -17,7 +17,6 @@ import awkward as ak
 import coloredlogs
 import enlighten
 import IPython
-import numpy as np
 from pachyderm import binned_data, yaml
 
 from jet_substructure.analysis import plot_results
@@ -226,30 +225,25 @@ def determine_matched_jets(
     """
     # Setup
     delta = 0.001
-    try:
-        selected_indices_mask = (
-            matched_inputs.jets.subjets.parent_splitting_index.ones_like() * matched_inputs.indices.flatten()
-        )
-        matched_subjets_unsorted = matched_inputs.jets.subjets[
-            selected_indices_mask == matched_inputs.jets.subjets.parent_splitting_index
-        ]
-        selected_indices_mask = (
-            hybrid_inputs.jets.subjets.parent_splitting_index.ones_like() * hybrid_inputs.indices.flatten()
-        )
-        hybrid_subjets_unsorted = hybrid_inputs.jets.subjets[
-            selected_indices_mask == hybrid_inputs.jets.subjets.parent_splitting_index
-        ]
-    except Exception as e:
-        print(e)
-        IPython.embed()
-        exit(0)
+    selected_indices_mask = (
+        matched_inputs.jets.subjets.parent_splitting_index.ones_like() * matched_inputs.indices.flatten()
+    )
+    matched_subjets_unsorted = matched_inputs.jets.subjets[
+        selected_indices_mask == matched_inputs.jets.subjets.parent_splitting_index
+    ]
+    selected_indices_mask = (
+        hybrid_inputs.jets.subjets.parent_splitting_index.ones_like() * hybrid_inputs.indices.flatten()
+    )
+    hybrid_subjets_unsorted = hybrid_inputs.jets.subjets[
+        selected_indices_mask == hybrid_inputs.jets.subjets.parent_splitting_index
+    ]
     # hybrid_inputs.subjets.parent_splitting_index.ones_like() * hybrid_inputs.indices.flatten()
     # Sort the subjets such that 0 is always the leading subjet.
     # matched_subjets_pt_comparison = 1 - (matched_subjets_unsorted[:, 0].constituents.pt.sum() > matched_subjets_unsorted[:, 1].constituents.pt.sum() * 1)
     # matched_subjets_leading = matched_subjets_unsorted[matched_subjets_pt_comparison]
     # matched_subjets_subleading = matched_subjets_unsorted[1 - matched_subjets_pt_comparison]
     matched_subjets_leading, matched_subjets_subleading = _get_leading_and_subleading_subjets(matched_subjets_unsorted)
-    hybrid_subjets_leading, hybrid_subjets_subleading = _get_leading_and_subleading_subjets(matched_subjets_unsorted)
+    hybrid_subjets_leading, hybrid_subjets_subleading = _get_leading_and_subleading_subjets(hybrid_subjets_unsorted)
 
     # This works...
     # In [119]: matched_subjets[:, 0].constituents.argcross(hybrid_subjets[:, 0].constituents)
@@ -532,7 +526,7 @@ def run(
     with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
         for tree in tree_counter(dm):
             logger.info(f"Processing tree from file {tree.filename}")
-            tree_hists = analyze_single_tree_embedding(
+            tree_hists = analyze_single_tree(
                 tree,
                 z_cutoff=z_cutoff,
                 R=R,
@@ -654,7 +648,7 @@ if __name__ == "__main__":
         # Most likely where we will actually measure.
         helpers.RangeSelector(min=80, max=120),
     ]
-    hists, output = run(
+    hists, output = run_embedding(
         collision_system=collision_system,
         jet_pt_bins=jet_pt_bins,
         dataset_config_filename=Path("config") / "datasets.yaml",
