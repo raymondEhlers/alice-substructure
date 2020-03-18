@@ -137,7 +137,7 @@ def analyze_single_tree(
     ) as variations_counter:
         for identifier, h in variations_counter(hists.items()):
             restricted_jets, splittings = _select_and_retrieve_splittings(
-                jets, jet_pt_mask=identifier.jet_pt_bin.mask_array(jets.jet_pt), identifier=identifier
+                jets, jet_pt_mask=identifier.jet_pt_bin.mask_array(jets.jet_pt), iterative_splittings=identifier.iterative_splittings
             )
 
             # Fill the hists as appropriate
@@ -177,11 +177,11 @@ def analyze_single_tree(
 
 
 def _select_and_retrieve_splittings(
-    jets: substructure_methods.SubstructureJetArray, jet_pt_mask: UprootArray, identifier: analysis_objects.Identifier
+    jets: substructure_methods.SubstructureJetArray, jet_pt_mask: UprootArray, iterative_splittings: bool
 ) -> Tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray]:
     # Ensure that there are sufficient counts
     restricted_jets = jets[jet_pt_mask]
-    if identifier.iterative_splittings:
+    if iterative_splittings:
         # Only keep iterative splittings.
         splittings = restricted_jets.splittings.iterative_splittings(restricted_jets.subjets)
     else:
@@ -195,6 +195,11 @@ def _select_and_retrieve_splittings(
 
     return restricted_jets, splittings
 
+@attr.s
+class MatchingResult:
+    properly: UprootArray = attr.ib()
+    mistag: UprootArray = attr.ib()
+    failed: UprootArray = attr.ib()
 
 def _get_leading_and_subleading_subjets(
     subjets_unsorted: substructure_methods.SubjetArray,
@@ -210,8 +215,26 @@ def _get_leading_and_subleading_subjets(
     return subjets_leading, subjets_subleading
 
 
-def determine_matching_types():
-    ...
+def determine_matching_types(matched_subjets: substructure_methods.SubjetArray, hybrid_subjets: substructure_methods.SubjetArray,
+                             matched_inputs: analysis_objects.FillHistogramInput) -> UprootArray:
+    constituent_pairs = matched_subjets.constituents.argcross(hybrid_subjets.constituents)
+    matched_leading_indices, hybrid_leading_indices = constituent_pairs.unzip()
+
+    index_matching = (
+        matched_subjets.constituents[matched_leading_indices].global_index
+        == hybrid_subjets.constituents[hybrid_leading_indices].global_index
+    )
+
+    constituent_pts = matched_subjets.constituents[matched_leading_indices][index_matching].pt.sum()
+
+    # Sanity check
+    if (constituent_pts > matched_inputs.jets.jet_pt).any():
+        logger.warning("Constituent pts are greater than the jet pts...")
+        IPython.embed()
+        raise ValueError("Constituent pts are greater than the jet pts...")
+
+    matched = (constituent_pts / matched_inputs.jets.jet_pt) > 0.5
+    return matched
 
 
 def determine_matched_jets(
@@ -251,15 +274,41 @@ def determine_matched_jets(
     # 6)] [(0, 0) (0, 1) (0, 2) ... (16, 9) (16, 10) (16, 11)] ... [(0, 0) (0, 1) (0, 2) ... (8, 13) (8, 14) (8, 15)] [(0, 0) (0, 1)
     # (0, 2) ... (8, 13) (8, 14) (8, 15)] [(0, 0) (0, 1) (0, 2) ... (8, 13) (8, 14) (8, 15)]] at 0x7f035ec61790>
 
-    constituent_pairs = matched_subjets_leading.constituents.argcross(hybrid_subjets_leading.constituents)
-    matched_leading_indices, hybrid_leading_indices = constituent_pairs.unzip()
+    #shared_constituent_pts_matched_leading_hybrid_leading = determine_matching_types(matched_subjets_leading, hybrid_subjets_leading)
+    #shared_constituent_pts_matched_leading_hybrid_subleading = determine_matching_types(matched_subjets_leading, hybrid_subjets_subleading)
+    #shared_constituent_pts_matched_subleading_hybrid_leading = determine_matching_types(matched_subjets_subleading, hybrid_subjets_leading)
+    #shared_constituent_pts_matched_subleading_hybrid_subleading = determine_matching_types(matched_subjets_subleading, hybrid_subjets_subleading)
 
-    index_matching = (
-        matched_subjets_leading.constituents[matched_leading_indices].global_index
-        == hybrid_subjets_leading.constituents[hybrid_leading_indices].global_index
-    )
+    #matched_leading_properly = (shared_constituent_pts_matched_leading_hybrid_leading / matched_inputs.jets.jet_pt) > 0.5
+    #matched_leading_mistag = (shared_constituent_pts_matched_leading_hybrid_subleading / matched_inputs.jets.jet_pt) > 0.5
+    #matched_leading_failed = ~matched_leading_properly & ~matched_leading_mistag
+    #matched_subleading_properly = (shared_constituent_pts_matched_subleading_hybrid_leading / matched_inputs.jets.jet_pt) > 0.5
+    #matched_subleading_mistag = (shared_constituent_pts_matched_subleading_hybrid_subleading / matched_inputs.jets.jet_pt) > 0.5
+    #matched_subleading_failed = ~matched_subleading_properly & ~matched_subleading_mistag
 
-    constituent_pts = matched_subjets_leading.constituents[matched_leading_indices][index_matching].pt.sum()
+    matched_leading_properly = determine_matching_types(matched_subjets_leading, hybrid_subjets_leading, matched_inputs)
+    matched_leading_mistag = determine_matching_types(matched_subjets_leading, hybrid_subjets_subleading, matched_inputs)
+    matched_subleading_properly = determine_matching_types(matched_subjets_subleading, hybrid_subjets_leading, matched_inputs)
+    matched_subleading_mistag = determine_matching_types(matched_subjets_subleading, hybrid_subjets_subleading, matched_inputs)
+    matched_leading_failed = ~matched_leading_properly & ~matched_leading_mistag
+    matched_subleading_failed = ~matched_subleading_properly & ~matched_subleading_mistag
+
+    IPython.embed()
+
+    return (MatchingResult(matched_leading_properly, matched_leading_mistag, matched_leading_failed),
+            MatchingResult(matched_subleading_properly, matched_subleading_mistag, matched_subleading_failed))
+
+    # Moved to function
+    #constituent_pairs = matched_subjets_leading.constituents.argcross(hybrid_subjets_leading.constituents)
+    #matched_leading_indices, hybrid_leading_indices = constituent_pairs.unzip()
+
+    #index_matching = (
+    #    matched_subjets_leading.constituents[matched_leading_indices].global_index
+    #    == hybrid_subjets_leading.constituents[hybrid_leading_indices].global_index
+    #)
+
+    #constituent_pts = matched_subjets_leading.constituents[matched_leading_indices][index_matching].pt.sum()
+    # END moved to function
 
     # IPython.embed()
 
@@ -291,12 +340,7 @@ def determine_matched_jets(
 
     # constituent_pts = matched_subjets.constituents[(delta_phi < delta) & (delta_eta < delta)]
 
-    if (constituent_pts > matched_inputs.jets.jet_pt).any():
-        logger.warning("Constituent pts are greater than the jet pts...")
-        IPython.embed()
-        raise ValueError("Constituent pts are greater than the jet pts...")
-
-    return (constituent_pts / matched_inputs.jets.jet_pt) > 0.5
+    #return (constituent_pts / matched_inputs.jets.jet_pt) > 0.5
 
     # for (int i = 0; i < constDet->size(); i++)
     # {
@@ -396,10 +440,10 @@ def analyze_single_tree_embedding(
             # TODO: Can we do better???
             jet_pt_mask = jet_pt_mask & (hybrid_jets.constituents.counts > 1) & (true_jets.constituents.counts > 1)
             restricted_hybrid_jets, restricted_hybrid_jets_splittings = _select_and_retrieve_splittings(
-                hybrid_jets, jet_pt_mask, identifier
+                hybrid_jets, jet_pt_mask, identifier.iterative_splittings
             )
             restricted_true_jets, restricted_true_jets_splittings = _select_and_retrieve_splittings(
-                true_jets, jet_pt_mask, identifier
+                true_jets, jet_pt_mask, identifier.iterative_splittings
             )
 
             # TODO: What about additional cuts? Pt hard? etc
@@ -433,7 +477,6 @@ def analyze_single_tree_embedding(
                 restricted_true_jets_splittings,
                 *restricted_true_jets_splittings.dynamical_kt(R=R),
             )
-            determine_matched_jets(hybrid_inputs, true_inputs)
             hists[identifier].dynamical_kt.fill(
                 hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
             )
@@ -479,6 +522,30 @@ def analyze_single_tree_embedding(
             hists[identifier].leading_kt.fill(
                 hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
             )
+
+    # Look at matched jets
+    # We want to plot as a function of jet pt, so we don't select on jet pt here.
+    for iterative_splittings in [False, True]:
+        identifier = analysis_objects.Identifier(iterative_splittings=iterative_splittings, jet_pt_bin=helpers.RangeSelector(0, 200))
+        # Not actual jet pt range restrictions.
+        mask = (hybrid_jets.constituents.counts > 1) & (true_jets.constituents.counts > 1)
+        restricted_hybrid_jets, restricted_hybrid_jets_splittings = _select_and_retrieve_splittings(
+            hybrid_jets, mask, identifier.iterative_splittings
+        )
+        restricted_true_jets, restricted_true_jets_splittings = _select_and_retrieve_splittings(
+            true_jets, mask, identifier.iterative_splittings
+        )
+
+        # Dynamical z
+        hybrid_inputs = analysis_objects.FillHistogramInput(
+            restricted_hybrid_jets,
+            restricted_hybrid_jets_splittings,
+            *restricted_hybrid_jets_splittings.dynamical_z(R=R),
+        )
+        true_inputs = analysis_objects.FillHistogramInput(
+            restricted_true_jets, restricted_true_jets_splittings, *restricted_true_jets_splittings.dynamical_z(R=R)
+        )
+        determine_matched_jets(hybrid_inputs, true_inputs)
 
     # Convert to BinnedData and store the hists
     # for h in hists.values():
