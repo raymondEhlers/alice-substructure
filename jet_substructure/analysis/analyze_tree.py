@@ -137,7 +137,9 @@ def analyze_single_tree(
         total=len(hists), desc="Analyzing", unit="variation", leave=False
     ) as variations_counter:
         for identifier, h in variations_counter(hists.items()):
-            restricted_jets, splittings = _select_and_retrieve_splittings(jets, jet_pt_mask=identifier.jet_pt_bin.mask_array(jets.jet_pt), identifier=identifier)
+            restricted_jets, splittings = _select_and_retrieve_splittings(
+                jets, jet_pt_mask=identifier.jet_pt_bin.mask_array(jets.jet_pt), identifier=identifier
+            )
 
             # Fill the hists as appropriate
             # Inclusive
@@ -167,8 +169,8 @@ def analyze_single_tree(
                 restricted_jets, splittings, *splittings.leading_kt(z_cutoff=z_cutoff)
             )
             hists[identifier].leading_kt_hard_cutoff.fill(inputs, jet_R=R)
-            #import numpy as np
-            #if (np.log(1.0 / splittings[indices].delta_R.flatten()) < 2).any() and (np.log(splittings[indices].kt.flatten()) < -1).any():
+            # import numpy as np
+            # if (np.log(1.0 / splittings[indices].delta_R.flatten()) < 2).any() and (np.log(splittings[indices].kt.flatten()) < -1).any():
             #    logger.warning("Maybe the z cut isn't working??")
             #    import IPython; IPython.embed()
 
@@ -178,6 +180,7 @@ def analyze_single_tree(
 def _select_and_retrieve_splittings(
     jets: substructure_methods.SubstructureJetArray, jet_pt_mask: UprootArray, identifier: analysis_objects.Identifier
 ) -> Tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray]:
+    # Ensure that there are sufficient counts
     restricted_jets = jets[jet_pt_mask]
     if identifier.iterative_splittings:
         # Only keep iterative splittings.
@@ -193,17 +196,28 @@ def _select_and_retrieve_splittings(
 
     return restricted_jets, splittings
 
-def _get_leading_and_subleading_subjets(subjets_unsorted: substructure_methods.SubjetArray) -> Tuple[substructure_methods.SubjetArray, substructure_methods.SubjetArray]:
-    subjets_pt_comparison = 1 - (subjets_unsorted[:, 0].constituents.pt.sum() > subjets_unsorted[:, 1].constituents.pt.sum() * 1)
-    leading_indices = ak.JaggedArray.fromoffsets(range(len(subjets_pt_comparison)+1), subjets_pt_comparison)
+
+def _get_leading_and_subleading_subjets(
+    subjets_unsorted: substructure_methods.SubjetArray,
+) -> Tuple[substructure_methods.SubjetArray, substructure_methods.SubjetArray]:
+    subjets_pt_comparison = 1 - (
+        subjets_unsorted[:, 0].constituents.pt.sum() > subjets_unsorted[:, 1].constituents.pt.sum() * 1
+    )
+    leading_indices = ak.JaggedArray.fromoffsets(range(len(subjets_pt_comparison) + 1), subjets_pt_comparison)
     subjets_leading = subjets_unsorted[leading_indices].flatten()
-    subleading_indices = ak.JaggedArray.fromoffsets(range(len(subjets_pt_comparison)+1), 1 - subjets_pt_comparison)
+    subleading_indices = ak.JaggedArray.fromoffsets(range(len(subjets_pt_comparison) + 1), 1 - subjets_pt_comparison)
     subjets_subleading = subjets_unsorted[subleading_indices].flatten()
 
     return subjets_leading, subjets_subleading
 
-def determine_matched_jets(hybrid_inputs: analysis_objects.FillHistogramInput,
-                           matched_inputs: analysis_objects.FillHistogramInput) -> UprootArray:
+
+def determine_matching_types():
+    ...
+
+
+def determine_matched_jets(
+    hybrid_inputs: analysis_objects.FillHistogramInput, matched_inputs: analysis_objects.FillHistogramInput
+) -> UprootArray:
     """
 
     The passed jets need to have the selected indices already applied.
@@ -212,65 +226,76 @@ def determine_matched_jets(hybrid_inputs: analysis_objects.FillHistogramInput,
     """
     # Setup
     delta = 0.001
-    selected_indices_mask = matched_inputs.jets.subjets.parent_splitting_index.ones_like() * matched_inputs.indices.flatten()
-    matched_subjets_unsorted = matched_inputs.jets.subjets[
-        selected_indices_mask == matched_inputs.jets.subjets.parent_splitting_index
-    ]
-    selected_indices_mask = hybrid_inputs.jets.subjets.parent_splitting_index.ones_like() * hybrid_inputs.indices.flatten()
-    hybrid_subjets_unsorted = hybrid_inputs.jets.subjets[
-        selected_indices_mask == hybrid_inputs.jets.subjets.parent_splitting_index
-    ]
-    #hybrid_inputs.subjets.parent_splitting_index.ones_like() * hybrid_inputs.indices.flatten()
+    try:
+        selected_indices_mask = (
+            matched_inputs.jets.subjets.parent_splitting_index.ones_like() * matched_inputs.indices.flatten()
+        )
+        matched_subjets_unsorted = matched_inputs.jets.subjets[
+            selected_indices_mask == matched_inputs.jets.subjets.parent_splitting_index
+        ]
+        selected_indices_mask = (
+            hybrid_inputs.jets.subjets.parent_splitting_index.ones_like() * hybrid_inputs.indices.flatten()
+        )
+        hybrid_subjets_unsorted = hybrid_inputs.jets.subjets[
+            selected_indices_mask == hybrid_inputs.jets.subjets.parent_splitting_index
+        ]
+    except Exception as e:
+        print(e)
+        IPython.embed()
+        exit(0)
+    # hybrid_inputs.subjets.parent_splitting_index.ones_like() * hybrid_inputs.indices.flatten()
     # Sort the subjets such that 0 is always the leading subjet.
-    #matched_subjets_pt_comparison = 1 - (matched_subjets_unsorted[:, 0].constituents.pt.sum() > matched_subjets_unsorted[:, 1].constituents.pt.sum() * 1)
-    #matched_subjets_leading = matched_subjets_unsorted[matched_subjets_pt_comparison]
-    #matched_subjets_subleading = matched_subjets_unsorted[1 - matched_subjets_pt_comparison]
+    # matched_subjets_pt_comparison = 1 - (matched_subjets_unsorted[:, 0].constituents.pt.sum() > matched_subjets_unsorted[:, 1].constituents.pt.sum() * 1)
+    # matched_subjets_leading = matched_subjets_unsorted[matched_subjets_pt_comparison]
+    # matched_subjets_subleading = matched_subjets_unsorted[1 - matched_subjets_pt_comparison]
     matched_subjets_leading, matched_subjets_subleading = _get_leading_and_subleading_subjets(matched_subjets_unsorted)
     hybrid_subjets_leading, hybrid_subjets_subleading = _get_leading_and_subleading_subjets(matched_subjets_unsorted)
 
     # This works...
-    #In [119]: matched_subjets[:, 0].constituents.argcross(hybrid_subjets[:, 0].constituents)
-    #Out[119]: <JaggedArray [[(0, 0) (0, 1) (0, 2) ... (10, 9) (10, 10) (10, 11)] [(0, 0) (0, 1) (0, 2) ... (16, 14) (16, 15) (16, 1
-    #6)] [(0, 0) (0, 1) (0, 2) ... (16, 9) (16, 10) (16, 11)] ... [(0, 0) (0, 1) (0, 2) ... (8, 13) (8, 14) (8, 15)] [(0, 0) (0, 1)
-    #(0, 2) ... (8, 13) (8, 14) (8, 15)] [(0, 0) (0, 1) (0, 2) ... (8, 13) (8, 14) (8, 15)]] at 0x7f035ec61790>
+    # In [119]: matched_subjets[:, 0].constituents.argcross(hybrid_subjets[:, 0].constituents)
+    # Out[119]: <JaggedArray [[(0, 0) (0, 1) (0, 2) ... (10, 9) (10, 10) (10, 11)] [(0, 0) (0, 1) (0, 2) ... (16, 14) (16, 15) (16, 1
+    # 6)] [(0, 0) (0, 1) (0, 2) ... (16, 9) (16, 10) (16, 11)] ... [(0, 0) (0, 1) (0, 2) ... (8, 13) (8, 14) (8, 15)] [(0, 0) (0, 1)
+    # (0, 2) ... (8, 13) (8, 14) (8, 15)] [(0, 0) (0, 1) (0, 2) ... (8, 13) (8, 14) (8, 15)]] at 0x7f035ec61790>
 
     constituent_pairs = matched_subjets_leading.constituents.argcross(hybrid_subjets_leading.constituents)
     matched_leading_indices, hybrid_leading_indices = constituent_pairs.unzip()
 
-    index_matching = matched_subjets_leading.constituents[matched_leading_indices].global_index == hybrid_subjets_leading.constituents[hybrid_leading_indices].global_index
+    index_matching = (
+        matched_subjets_leading.constituents[matched_leading_indices].global_index
+        == hybrid_subjets_leading.constituents[hybrid_leading_indices].global_index
+    )
 
     constituent_pts = matched_subjets_leading.constituents[matched_leading_indices][index_matching].pt.sum()
 
-    IPython.embed()
+    # IPython.embed()
 
     # TODO: Use distance at some point. Can use delta_R that I impelemented.
-    #delta_eta = matched_subjets_leading.constituents[matched_leading_indices].eta - \
+    # delta_eta = matched_subjets_leading.constituents[matched_leading_indices].eta - \
     #    hybrid_subjets_leading.constituents[hybrid_leading_indices].eta
-    #delta_phi = matched_subjets_leading.constituents[matched_leading_indices].phi - \
+    # delta_phi = matched_subjets_leading.constituents[matched_leading_indices].phi - \
     #    hybrid_subjets_leading.constituents[hybrid_leading_indices].phi
 
-    #delta_eta_mask = np.abs(delta_eta) < delta
-    #delta_phi_mask = np.abs(delta_phi) < delta
+    # delta_eta_mask = np.abs(delta_eta) < delta
+    # delta_phi_mask = np.abs(delta_phi) < delta
 
-    #subjet_pairs = matched_subjets.argcross(hybrid_subjets)
-    #matched_subjets_indices, hybrid_subjets_indices = subjet_pairs.unzip()
+    # subjet_pairs = matched_subjets.argcross(hybrid_subjets)
+    # matched_subjets_indices, hybrid_subjets_indices = subjet_pairs.unzip()
 
-    #matched_subjets_leading = matched_subjets[subjet_pairs][:, 0]
-    #matched_subjets_subleading = matched_subjets[subjet_pairs][:, 1]
+    # matched_subjets_leading = matched_subjets[subjet_pairs][:, 0]
+    # matched_subjets_subleading = matched_subjets[subjet_pairs][:, 1]
 
     # Work with matched jets.
     # Match constituents.
     # Take the two hybrid subjets, and the two detlevel subjets. Compare them.
-    #track_pairs = matched_subjets.constituents.argcross(hybrid_subjets.constituents, nested=True)
+    # track_pairs = matched_subjets.constituents.argcross(hybrid_subjets.constituents, nested=True)
     ##delta_phi = matched_subjets.constituents[track_pairs[0, :]].phi() - hybrid_subjets.constituents[track_pairs[1, :]].phi()
     ##delta_eta = matched_subjets.constituents[track_pairs[0, :]].eta() - hybrid_subjets.constituents[track_pairs[1, :]].eta()
     ## use unzip here instead...
-    #matched_subjets_indices, hybrid_subjets_indices = track_pairs.unzip()
-    #delta_phi = matched_subjets.constituents[matched_subjets_indices].phi - hybrid_subjets.constituents[hybrid_subjets_indices].phi
-    #delta_eta = matched_subjets.constituents[matched_subjets_indices].eta - hybrid_subjets.constituents[hybrid_subjets_indices].eta
+    # matched_subjets_indices, hybrid_subjets_indices = track_pairs.unzip()
+    # delta_phi = matched_subjets.constituents[matched_subjets_indices].phi - hybrid_subjets.constituents[hybrid_subjets_indices].phi
+    # delta_eta = matched_subjets.constituents[matched_subjets_indices].eta - hybrid_subjets.constituents[hybrid_subjets_indices].eta
 
-    #IPython.embed()
-    #constituent_pts = matched_subjets.constituents[(delta_phi < delta) & (delta_eta < delta)]
+    # constituent_pts = matched_subjets.constituents[(delta_phi < delta) & (delta_eta < delta)]
 
     if (constituent_pts > matched_inputs.jets.jet_pt).any():
         logger.warning("Constituent pts are greater than the jet pts...")
@@ -279,8 +304,8 @@ def determine_matched_jets(hybrid_inputs: analysis_objects.FillHistogramInput,
 
     return (constituent_pts / matched_inputs.jets.jet_pt) > 0.5
 
-    #for (int i = 0; i < constDet->size(); i++)
-    #{
+    # for (int i = 0; i < constDet->size(); i++)
+    # {
     #    float eta_det = constDet->at(i).eta();
     #    float phi_det = constDet->at(i).phi();
     #    for (int j  = 0; j < constHyb->size(); j++)
@@ -295,11 +320,11 @@ def determine_matched_jets(hybrid_inputs: analysis_objects.FillHistogramInput,
     #        if (dphi > delta) continue;
     #        sumpT+=constDet->at(i).pt();
     #    }
-    #}
+    # }
 
-    #if sumpT / matched_jets.jet_pt() > 0.5:
+    # if sumpT / matched_jets.jet_pt() > 0.5:
     #    return True
-    #return False
+    # return False
 
 
 def analyze_single_tree_embedding(
@@ -342,9 +367,9 @@ def analyze_single_tree_embedding(
             hybrid_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
             prefix = "matched"
             true_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
-            #prefix = "detLevel"
-            #det_level_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
-            #for prefix, jets in [("data", hybrid_jets), ("matched", true_jets), ("detLevel", det_level_jets)]:
+            # prefix = "detLevel"
+            # det_level_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
+            # for prefix, jets in [("data", hybrid_jets), ("matched", true_jets), ("detLevel", det_level_jets)]:
             for prefix, jets in [("data", hybrid_jets), ("matched", true_jets)]:
                 # Save calculate columns so we don't need to re-calculate them every time.
                 # NOTE: We always check if they already exist because HDF5 doesn't like us
@@ -373,6 +398,9 @@ def analyze_single_tree_embedding(
             # We want to restrict a constant hybrid jet pt range for both true and hybrid.
             # This will allow us to compare to measured jet pt ranges.
             jet_pt_mask = identifier.jet_pt_bin.mask_array(hybrid_jets.jet_pt)
+            # Add additional restrictions that we can't handle single constituent jets.
+            # TODO: Can we do better???
+            jet_pt_mask = jet_pt_mask & (hybrid_jets.constituents.counts > 1) & (true_jets.constituents.counts > 1)
             restricted_hybrid_jets, restricted_hybrid_jets_splittings = _select_and_retrieve_splittings(
                 hybrid_jets, jet_pt_mask, identifier
             )
@@ -395,11 +423,11 @@ def analyze_single_tree_embedding(
                 restricted_true_jets, restricted_true_jets_splittings, *restricted_true_jets_splittings.dynamical_z(R=R)
             )
             hists[identifier].dynamical_z.fill(
-                hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=np.ones_like(hybrid_inputs.jets.jet_pt) * weight,
+                hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
             )
-            #hists[identifier].dynamical_z.fill(
+            # hists[identifier].dynamical_z.fill(
             #    hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
-            #)
+            # )
             # Dynamical kt
             hybrid_inputs = analysis_objects.FillHistogramInput(
                 restricted_hybrid_jets,
@@ -411,10 +439,10 @@ def analyze_single_tree_embedding(
                 restricted_true_jets_splittings,
                 *restricted_true_jets_splittings.dynamical_kt(R=R),
             )
-            hists[identifier].dynamical_kt.fill(
-                hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=np.ones_like(hybrid_inputs.jets.jet_pt) * weight,
-            )
             determine_matched_jets(hybrid_inputs, true_inputs)
+            hists[identifier].dynamical_kt.fill(
+                hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
+            )
             # Dynamical time
             hybrid_inputs = analysis_objects.FillHistogramInput(
                 restricted_hybrid_jets,
@@ -452,16 +480,23 @@ def analyze_single_tree_embedding(
                 restricted_true_jets_splittings,
                 *restricted_true_jets_splittings.leading_kt(z_cutoff=z_cutoff),
             )
+            # Ensure that there are sufficient values!
+            # IPython.embed()
             hists[identifier].leading_kt.fill(
                 hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
             )
 
     # Convert to BinnedData and store the hists
-    for h in hists.values():
-        h.convert_boost_histograms_to_binned_data()
-    with open(yaml_filename, "w") as f:
-        logger.info(f"Writing hists of the tree {tree.filename} to {yaml_filename}")
-        y.dump(hists, f)
+    # for h in hists.values():
+    #    h.convert_boost_histograms_to_binned_data()
+    with open(yaml_filename.with_suffix(".pkl"), "wb") as f:
+        import pickle
+
+        pickle.dump(hists, f)
+    # with open(yaml_filename, "w") as f:
+    #    logger.info(f"Writing hists of the tree {tree.filename} to {yaml_filename}")
+    #    IPython.embed()
+    #    y.dump(hists, f)
 
     return hists
 

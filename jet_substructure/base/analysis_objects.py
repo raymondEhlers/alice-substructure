@@ -344,32 +344,35 @@ class SubstructureResponseHists(SubstructureHistsBase):
         self.n_hybrid_jets += hybrid_inputs.n_jets
         self.n_true_jets += true_inputs.n_jets
         # Store the responses
+        # TODO: Can we do better than this pad and fillna hack??
+        #       The length of those values can be shorter than the jet pt length due to
+        #       the z_cutoff. Otherwise, they have no effect.
         self.response_kt.fill(
             hybrid_inputs.jets.jet_pt,
-            hybrid_inputs.splittings.kt.flatten(),
+            hybrid_inputs.splittings.kt.pad(1).fillna(0).flatten(),
             true_inputs.jets.jet_pt,
-            true_inputs.splittings.kt.flatten(),
+            true_inputs.splittings.kt.pad(1).fillna(0).flatten(),
             weight=weight,
         )
         self.response_z.fill(
             hybrid_inputs.jets.jet_pt,
-            hybrid_inputs.splittings.kt.flatten(),
+            hybrid_inputs.splittings.kt.pad(1).fillna(0).flatten(),
             true_inputs.jets.jet_pt,
-            true_inputs.splittings.kt.flatten(),
+            true_inputs.splittings.kt.pad(1).fillna(0).flatten(),
             weight=weight,
         )
         self.response_delta_R.fill(
             hybrid_inputs.jets.jet_pt,
-            hybrid_inputs.splittings.delta_R.flatten(),
+            hybrid_inputs.splittings.delta_R.pad(1).fillna(0).flatten(),
             true_inputs.jets.jet_pt,
-            true_inputs.splittings.delta_R.flatten(),
+            true_inputs.splittings.delta_R.pad(1).fillna(0).flatten(),
             weight=weight,
         )
         self.response_theta.fill(
             hybrid_inputs.jets.jet_pt,
-            hybrid_inputs.splittings.theta(jet_R).flatten(),
+            hybrid_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten(),
             true_inputs.jets.jet_pt,
-            true_inputs.splittings.theta(jet_R).flatten(),
+            true_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten(),
             weight=weight,
         )
         self.response_splitting_number.fill(

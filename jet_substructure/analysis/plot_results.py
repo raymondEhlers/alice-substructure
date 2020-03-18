@@ -174,6 +174,8 @@ def _plot_distribution(
             # Don't apply any further normalization! We want the direct ratio of the values!
             h_ratio = h / h_denominator
 
+            logger.warning(f"Ratio integral: {np.sum(h_ratio.values * h_ratio.axis.bin_widths)}")
+
             # Plot the ratio
             ax_ratio.errorbar(
                 h_ratio.axis.bin_centers,
@@ -231,7 +233,7 @@ def _plot_distribution(
 
 
 def _plot_lund_plane(
-    technique: str, identifier: analysis_objects.Identifier, hists: analysis_objects.SubstructureHists, path: Path
+    technique: str, identifier: analysis_objects.Identifier, hists: analysis_objects.SubstructureHists, path: Path,
 ) -> None:
     # Setup
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -252,12 +254,20 @@ def _plot_lund_plane(
     # Scale by njets.
     h /= hists.n_jets
 
+    # Determine the normalization range
+    z_axis_range = {
+        "vmin": h.values[h.values > 0].min(),
+        "vmax": h.values.max(),
+    }
+    if technique == "inclusive":
+        z_axis_range = {
+            "vmin": 10e-3,
+            "vmax": 5,
+        }
+
     # Make the plot
     mesh = ax.pcolormesh(
-        h.axes[0].bin_edges.T,
-        h.axes[1].bin_edges.T,
-        h.values.T,
-        norm=matplotlib.colors.LogNorm(vmin=h.values[h.values > 0].min(), vmax=h.values.max()),
+        h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
