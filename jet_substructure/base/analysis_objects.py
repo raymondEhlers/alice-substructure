@@ -92,7 +92,8 @@ class SubstructureHistsBase:
     def convert_boost_histograms_to_binned_data(self) -> None:
         # Sanity check
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
-            raise ValueError("Not all hists are boost histograms! Cannot convert to binned data!")
+            types = {k: type(v) for k, v in self}
+            raise ValueError(f"Not all hists are boost histograms! Cannot convert to binned data! Types: {types}")
 
         for k, v in self:
             setattr(self, k, binned_data.BinnedData.from_existing_data(v))
@@ -384,7 +385,109 @@ class SubstructureResponseHists(SubstructureHistsBase):
         )
 
 
-T_SubstructureHists = TypeVar("T_SubstructureHists", SubstructureHists, SubstructureResponseHists)
+@attr.s
+class SubstructureMatchingSubjetHists(SubstructureHistsBase):
+    name: str = attr.ib()
+    title: str = attr.ib()
+    iterative_splittings: bool = attr.ib()
+    # n_jets: int = attr.ib()
+    all: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    both_correct: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    leading_failed_subleading_correct: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    leading_correct_subleading_failed: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    leading_failed_subleading_mistag: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    leading_mistag_subleading_failed: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    reversed: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    both_failed: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+
+    # @property
+    # def attributes_to_skip(self) -> List[str]:
+    #    attrs = super().attributes_to_skip
+    #    attrs.extend(["n_jets"])
+    #    return attrs
+
+    def __add__(self, other: "SubstructureMatchingSubjetHists") -> "SubstructureMatchingSubjetHists":
+        """ Handles a = b + c """
+        new = copy.deepcopy(self)
+        new += other
+        return new
+
+    def __iadd__(self, other: "SubstructureMatchingSubjetHists") -> "SubstructureMatchingSubjetHists":
+        """ Handles a += b """
+        # Validation
+        if self.iterative_splittings != other.iterative_splittings:
+            raise TypeError(
+                f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
+            )
+
+        self.name = f"{self.name}_{other.name}" if self.name != other.name else self.name
+        self.title = f"{self.title}_{other.title}" if self.title != other.title else self.title
+        # Don't need to update iterative_splittings since they must be the same!
+        # self.n_jets += self.n_jets
+        for (k, v), (k_other, v_other) in zip(self, other):
+            v += v_other
+
+        return self
+
+    def __radd__(self, other: "SubstructureMatchingSubjetHists") -> "SubstructureMatchingSubjetHists":
+        """ For use with sum(...). """
+        if other == 0:
+            return self
+        else:
+            return self + other
+
+    @classmethod
+    def create_boost_histograms(
+        cls: Type["SubstructureMatchingSubjetHists"], name: str, title: str, iterative_splittings: bool
+    ) -> "SubstructureMatchingSubjetHists":
+        jet_pt_axis = bh.axis.Regular(150, 0, 150)
+        return cls(
+            name=name,
+            title=title,
+            iterative_splittings=iterative_splittings,
+            all=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
+            both_correct=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
+            leading_failed_subleading_correct=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
+            leading_correct_subleading_failed=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
+            leading_failed_subleading_mistag=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
+            leading_mistag_subleading_failed=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
+            reversed=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
+            both_failed=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
+        )
+
+    def fill(
+        self, matched_inputs: FillHistogramInput, leading: "MatchingResult", subleading: "MatchingResult",
+    ) -> None:
+        # Validation
+        # Give a useful error message
+        if not all(isinstance(hist, bh.Histogram) for _, hist in self):
+            raise ValueError("Not all hists are boost histograms! Cannot fill!")
+
+        # And then help out mypy...
+        assert (
+            isinstance(self.all, bh.Histogram)
+            and isinstance(self.both_correct, bh.Histogram)
+            and isinstance(self.leading_failed_subleading_correct, bh.Histogram)
+            and isinstance(self.leading_correct_subleading_failed, bh.Histogram)
+            and isinstance(self.leading_failed_subleading_mistag, bh.Histogram)
+            and isinstance(self.leading_mistag_subleading_failed, bh.Histogram)
+            and isinstance(self.reversed, bh.Histogram)
+            and isinstance(self.both_failed, bh.Histogram)
+        )
+
+        self.all.fill(matched_inputs.jets.jet_pt)
+        self.both_correct.fill(matched_inputs.jets.jet_pt[leading.properly & subleading.properly])
+        self.leading_failed_subleading_correct.fill(matched_inputs.jets.jet_pt[leading.failed & subleading.properly])
+        self.leading_correct_subleading_failed.fill(matched_inputs.jets.jet_pt[leading.properly & subleading.failed])
+        self.leading_failed_subleading_mistag.fill(matched_inputs.jets.jet_pt[leading.failed & subleading.mistag])
+        self.leading_mistag_subleading_failed.fill(matched_inputs.jets.jet_pt[leading.mistag & subleading.failed])
+        self.reversed.fill(matched_inputs.jets.jet_pt[leading.mistag & subleading.mistag])
+        self.both_failed.fill(matched_inputs.jets.jet_pt[leading.failed & subleading.failed])
+
+
+T_SubstructureHists = TypeVar(
+    "T_SubstructureHists", SubstructureHists, SubstructureResponseHists, SubstructureMatchingSubjetHists
+)
 
 
 @attr.s
@@ -499,6 +602,42 @@ def create_substructure_response_hists(iterative_splittings: bool, z_cutoff: flo
         name="leading_kt_response", title=r"Leading $k_{\text{T}}$", iterative_splittings=iterative_splittings,
     )
     leading_kt_hard_cutoff = SubstructureResponseHists.create_boost_histograms(
+        name="leading_kt_hard_cutoff_response",
+        title=fr"SD $z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
+        iterative_splittings=iterative_splittings,
+    )
+
+    # TODO: SD
+    return Hists(
+        inclusive=inclusive,
+        dynamical_z=dynamical_z,
+        dynamical_kt=dynamical_kt,
+        dynamical_time=dynamical_time,
+        leading_kt=leading_kt,
+        leading_kt_hard_cutoff=leading_kt_hard_cutoff,
+    )
+
+
+def create_matching_hists(iterative_splittings: bool, z_cutoff: float) -> Hists[SubstructureMatchingSubjetHists]:
+    """ Matching subjets hists
+
+    """
+    inclusive = SubstructureMatchingSubjetHists.create_boost_histograms(
+        name="inclusive_response", title="Inclusive", iterative_splittings=iterative_splittings,
+    )
+    dynamical_z = SubstructureMatchingSubjetHists.create_boost_histograms(
+        name="dynamical_z_response", title="zDrop", iterative_splittings=iterative_splittings,
+    )
+    dynamical_kt = SubstructureMatchingSubjetHists.create_boost_histograms(
+        name="dynamical_kt_response", title="ktDrop", iterative_splittings=iterative_splittings
+    )
+    dynamical_time = SubstructureMatchingSubjetHists.create_boost_histograms(
+        name="dynamical_time_response", title="timeDrop", iterative_splittings=iterative_splittings,
+    )
+    leading_kt = SubstructureMatchingSubjetHists.create_boost_histograms(
+        name="leading_kt_response", title=r"Leading $k_{\text{T}}$", iterative_splittings=iterative_splittings,
+    )
+    leading_kt_hard_cutoff = SubstructureMatchingSubjetHists.create_boost_histograms(
         name="leading_kt_hard_cutoff_response",
         title=fr"SD $z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
         iterative_splittings=iterative_splittings,

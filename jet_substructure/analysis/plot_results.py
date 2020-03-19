@@ -385,3 +385,166 @@ def lund_plane(
             # Plot Lund Plane
             _plot_lund_plane(technique=technique, identifier=identifier, hists=hists, path=path)
             # TODO: What about plotting _all_ of the splittings. Would I ever even want to do that??
+
+
+def _plot_matching(
+    technique: str,
+    identifier: analysis_objects.Identifier,
+    hists: analysis_objects.SubstructureMatchingSubjetHists,
+    path: Path,
+) -> None:
+    fig, axes = plt.subplots(3, 3, figsize=(10, 10), sharex=True, sharey=True)
+
+    # NOTE: We convert the hists here to ensure that we're working with copies!
+    normalization = binned_data.BinnedData.from_existing_data(hists.all)
+
+    # Both correctly tagged goes in the upper left
+    both_correct = binned_data.BinnedData.from_existing_data(hists.both_correct)
+    both_correct /= normalization
+    axes[0, 0].errorbar(
+        both_correct.axes[0].bin_centers,
+        both_correct.values,
+        yerr=both_correct.errors,
+        xerr=both_correct.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        # label="",
+    )
+    # Skip this panel
+    axes[0, 1].set_visible(False)
+    # Leading wasn't tagged, but subleading was correctly tagged as subleading.
+    leading_failed_subleading_correct = binned_data.BinnedData.from_existing_data(
+        hists.leading_failed_subleading_correct
+    )
+    leading_failed_subleading_correct /= normalization
+    axes[0, 2].errorbar(
+        leading_failed_subleading_correct.axes[0].bin_centers,
+        leading_failed_subleading_correct.values,
+        yerr=leading_failed_subleading_correct.errors,
+        xerr=leading_failed_subleading_correct.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        # label="",
+    )
+    # Skip this panel
+    axes[1, 0].set_visible(False)
+    # Swapped (ie. reversed)
+    reversed = binned_data.BinnedData.from_existing_data(hists.reversed)
+    reversed /= normalization
+    axes[1, 1].errorbar(
+        reversed.axes[0].bin_centers,
+        reversed.values,
+        yerr=reversed.errors,
+        xerr=reversed.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        # label="",
+    )
+    # Leading failed, subleading mistag
+    leading_failed_subleading_mistag = binned_data.BinnedData.from_existing_data(hists.leading_failed_subleading_mistag)
+    leading_failed_subleading_mistag /= normalization
+    axes[1, 2].errorbar(
+        leading_failed_subleading_mistag.axes[0].bin_centers,
+        leading_failed_subleading_mistag.values,
+        yerr=leading_failed_subleading_mistag.errors,
+        xerr=leading_failed_subleading_mistag.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        # label="",
+    )
+    # Leading correct, subleading failed
+    leading_correct_subleading_failed = binned_data.BinnedData.from_existing_data(
+        hists.leading_correct_subleading_failed
+    )
+    leading_correct_subleading_failed /= normalization
+    axes[2, 0].errorbar(
+        leading_correct_subleading_failed.axes[0].bin_centers,
+        leading_correct_subleading_failed.values,
+        yerr=leading_correct_subleading_failed.errors,
+        xerr=leading_correct_subleading_failed.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        # label="",
+    )
+    # Leading mistag, subleading failed
+    leading_mistag_subleading_failed = binned_data.BinnedData.from_existing_data(hists.leading_mistag_subleading_failed)
+    leading_mistag_subleading_failed /= normalization
+    axes[2, 1].errorbar(
+        leading_mistag_subleading_failed.axes[0].bin_centers,
+        leading_mistag_subleading_failed.values,
+        yerr=leading_mistag_subleading_failed.errors,
+        xerr=leading_mistag_subleading_failed.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        # label="",
+    )
+    # Both failed
+    both_failed = binned_data.BinnedData.from_existing_data(hists.both_failed)
+    both_failed /= normalization
+    axes[2, 2].errorbar(
+        both_failed.axes[0].bin_centers,
+        both_failed.values,
+        yerr=both_failed.errors,
+        xerr=both_failed.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        # label="",
+    )
+
+    # Set range
+    for ax in axes.flat:
+        ax.set_ylim([0, 1.2])
+
+    # Labeling
+    text = identifier.display_str()
+    text += "\n" + hists.title
+    axes[0, 1].text(
+        0.95,
+        0.95,
+        text,
+        transform=axes[0, 1].transAxes,
+        horizontalalignment="right",
+        verticalalignment="top",
+        multialignment="right",
+    )
+
+    # Presentation
+    # Axis labels
+    axes[0, 0].set_ylabel("Subleading correct")
+    axes[1, 0].set_ylabel("Subleading in leading")
+    axes[2, 0].set_ylabel("Subleading in no prong")
+    axes[2, 0].set_xlabel("Leading correct")
+    axes[2, 1].set_xlabel("Leading in subleading")
+    axes[2, 2].set_xlabel("Leading in no prong")
+    # ax.set_xlabel(r"$\log{(1/\Delta R)}$")
+    # ax.set_ylabel(r"$\log{(k_{\text{T}})}$")
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.10,
+        bottom=0.10,
+        right=0.99,
+        top=0.99,
+    )
+
+    # Store and reset
+    fig.savefig(path / f"subjet_matching_{identifier.iterative_splittings_label}_splittngs_{technique}.pdf")
+    plt.close(fig)
+
+
+def matching(
+    all_matching_hists: Dict[
+        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
+    ],
+    path: Path,
+) -> None:
+    # Validation
+    path.mkdir(parents=True, exist_ok=True)
+
+    for identifier, matching_hists in all_matching_hists.items():
+        for technique, hists in matching_hists:
+            # Plot matching distributions
+            _plot_matching(technique=technique, identifier=identifier, hists=hists, path=path)
