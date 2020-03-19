@@ -308,7 +308,7 @@ int main(int argc, char* argv[])
   Int_t underlingEvent = 1;    // underlying event (ISR+MPI)
 
   if (argc != 6) {
-    cout << "Usage:" << endl << "./pygen <PythiaTune> <Number> <nEvts> <underlingEvent> <jetR>" << endl;
+    cout << "Usage:" << endl << "./pygen <PythiaTune> <Seed> <nEvts> <underlingEvent> <jetR>" << endl;
     return 0;
   }
   tune = atoi(argv[1]);
