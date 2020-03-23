@@ -232,6 +232,110 @@ def _plot_distribution(
     plt.close(fig)
 
 
+def _plot_total_number_of_splittings(
+    masked_recursive_hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
+    masked_iterative_hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
+    identifier: analysis_objects.Identifier,
+    plot_config: PlotConfig,
+    path: Path,
+) -> None:
+    # Setup
+    fig, axes = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+    ax, ax_ratio = axes
+    logger.info(f"Plotting total_number_of_splittings, {identifier} with ratio")
+
+    recursive_hists = masked_recursive_hists.inclusive
+    h: Union[bh.Histogram, binned_data.BinnedData] = recursive_hists.total_number_of_splittings
+    h = binned_data.BinnedData.from_existing_data(h)
+
+    # Scale by bin widths and number of jets
+    h /= h.axis.bin_widths
+    h /= recursive_hists.n_jets
+
+    ax.errorbar(
+        h.axis.bin_centers,
+        h.values,
+        yerr=h.errors,
+        xerr=h.axis.bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Recursive",
+    )
+
+    # Plot iterative splittings
+    iterative_hists = masked_iterative_hists.inclusive
+    h_iterative: Union[bh.Histogram, binned_data.BinnedData] = iterative_hists.total_number_of_splittings
+    h_iterative = binned_data.BinnedData.from_existing_data(h_iterative)
+
+    # Scale by bin widths and number of jets
+    h_iterative /= h_iterative.axis.bin_widths
+    h_iterative /= iterative_hists.n_jets
+
+    ax.errorbar(
+        h_iterative.axis.bin_centers,
+        h_iterative.values,
+        yerr=h_iterative.errors,
+        xerr=h_iterative.axis.bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Iterative",
+    )
+
+    # Ratio
+    # Don't apply any further normalization! We want the direct ratio of the values!
+    h_ratio = h / h_iterative
+
+    logger.warning(f"Ratio integral: {np.sum(h_ratio.values * h_ratio.axis.bin_widths)}")
+
+    # Plot the ratio
+    ax_ratio.errorbar(
+        h_ratio.axis.bin_centers,
+        h_ratio.values,
+        yerr=h_ratio.errors,
+        xerr=h_ratio.axis.bin_widths / 2,
+        marker=".",
+        linestyle="",
+        alpha=0.6,
+    )
+
+    # Labeling
+    text = identifier.display_str()
+    ax.text(
+        0.95,
+        0.95,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="right",
+        verticalalignment="top",
+        multialignment="right",
+    )
+
+    # Presentation
+    ax.legend(frameon=False, loc=plot_config.legend_location)
+    if plot_config.log_y:
+        ax.set_yscale("log")
+    ax.set_ylabel(plot_config.y_label)
+    ax_ratio.set_xlabel(plot_config.x_label)
+    ax_ratio.set_ylabel("Recur./Iter.")
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.12,
+        bottom=0.11,
+        right=0.98,
+        top=0.98,
+    )
+    fig.align_ylabels()
+
+    # Store and cleanup
+    filename = f"{plot_config.name}_inclusive_{str(identifier)}_ratio"
+    fig.savefig(path / f"{filename}.pdf")
+    plt.close(fig)
+
+
 def _plot_lund_plane(
     technique: str, identifier: analysis_objects.Identifier, hists: analysis_objects.SubstructureHists, path: Path,
 ) -> None:
@@ -347,6 +451,13 @@ def lund_plane(
         legend_location="center right",
         log_y=False,
     )
+    total_number_of_splittings_label = PlotConfig(
+        name="total_number_of_splittings",
+        x_label=r"$n_{\text{total}}$",
+        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{total}}$",
+        legend_location="center right",
+        log_y=False,
+    )
 
     distributions: List[Tuple[str, PlotConfig]] = [
         ("kt", kt_label),
@@ -355,6 +466,9 @@ def lund_plane(
         ("theta", theta_label),
         ("splitting_number", splitting_number_label),
         ("splitting_number_perturbative", splitting_number_perturbative_label),
+        # total number of splittings is intentionally _not_ included because we only case about
+        # the inclusive case.
+        # ("total_number_of_splittings", total_number_of_splittings_label),
     ]
     for identifier, masked_hists in all_hists.items():
         for attribute_name, plot_config in distributions:
@@ -378,13 +492,29 @@ def lund_plane(
                     ],
                 )
 
+        # Plot the inclusive case for total number of splittings.
+        # We directly compare the iterative and recursive cases, so we only plot once and show both sets of values.
+        if not identifier.iterative_splittings:
+            # It will fail for 0 jets, so skip it
+            if masked_hists.inclusive.n_jets != 0:
+                _plot_total_number_of_splittings(
+                    masked_recursive_hists=masked_hists,
+                    masked_iterative_hists=all_hists[
+                        analysis_objects.Identifier(iterative_splittings=True, jet_pt_bin=identifier.jet_pt_bin)
+                    ],
+                    identifier=identifier,
+                    plot_config=total_number_of_splittings_label,
+                    path=path,
+                )
+            else:
+                logger.warning(f"No jets within {identifier}_total_number_of_splittings. Skipping bin!")
+
         for technique, hists in masked_hists:
             if hists.n_jets == 0:
                 logger.warning(f"No jets within {identifier}_{technique}. Skipping bin!")
                 continue
             # Plot Lund Plane
             _plot_lund_plane(technique=technique, identifier=identifier, hists=hists, path=path)
-            # TODO: What about plotting _all_ of the splittings. Would I ever even want to do that??
 
 
 def _plot_matching(

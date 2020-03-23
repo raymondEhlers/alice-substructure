@@ -113,6 +113,7 @@ class SubstructureHists(SubstructureHistsBase):
     splitting_number: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     splitting_number_perturbative: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     lund_plane: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    total_number_of_splittings: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
 
     @property
     def attributes_to_skip(self) -> List[str]:
@@ -178,6 +179,7 @@ class SubstructureHists(SubstructureHistsBase):
         delta_R_axis = bh.axis.Regular(20, 0, 0.4)
         theta_axis = bh.axis.Regular(50, 0, 1)
         splitting_number_axis = bh.axis.Regular(10, 0, 10)
+        total_number_of_splittings_axis = bh.axis.Regular(50, 0, 50)
         lund_plane_axes = [bh.axis.Regular(25, 0, 5), bh.axis.Regular(25, -5.0, 5.0)]
         return cls(
             name=name,
@@ -191,6 +193,7 @@ class SubstructureHists(SubstructureHistsBase):
             theta=bh.Histogram(theta_axis, storage=bh.storage.Weight()),
             splitting_number=bh.Histogram(splitting_number_axis, storage=bh.storage.Weight()),
             splitting_number_perturbative=bh.Histogram(splitting_number_axis, storage=bh.storage.Weight()),
+            total_number_of_splittings=bh.Histogram(total_number_of_splittings_axis, storage=bh.storage.Weight()),
             lund_plane=bh.Histogram(*lund_plane_axes, storage=bh.storage.Weight()),
         )
 
@@ -209,6 +212,7 @@ class SubstructureHists(SubstructureHistsBase):
             and isinstance(self.theta, bh.Histogram)
             and isinstance(self.splitting_number, bh.Histogram)
             and isinstance(self.splitting_number_perturbative, bh.Histogram)
+            and isinstance(self.total_number_of_splittings, bh.Histogram)
             and isinstance(self.lund_plane, bh.Histogram)
         )
         # Need to store the number of jets along the histograms.
@@ -227,6 +231,7 @@ class SubstructureHists(SubstructureHistsBase):
         #       In this simpler case, we can just select directly on the indices.
         splitting_number_perturbative = (inputs.indices + 1)[inputs.splittings.kt > 5].flatten()
         self.splitting_number_perturbative.fill(splitting_number_perturbative)
+        self.total_number_of_splittings.fill(inputs.splittings.counts)
         self.lund_plane.fill(np.log(1.0 / inputs.splittings.delta_R.flatten()), np.log(inputs.splittings.kt.flatten()))
 
         # Check the second peak in the z_cutoff recursive Lund Plane.
