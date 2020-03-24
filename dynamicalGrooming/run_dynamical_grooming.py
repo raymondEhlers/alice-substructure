@@ -12,7 +12,6 @@ from typing import Any, Optional, Sequence, Type, TypeVar, Union
 
 import attr
 import numpy as np
-
 import ROOT
 
 
@@ -20,7 +19,9 @@ import ROOT
 ROOT.gROOT.SetBatch(True)
 
 # Type helpers
-AnalysisTask = ROOT.AliAnalysisTaskSE
+# AnalysisTask = ROOT.AliAnalysisTaskSE
+AnalysisTask = Any
+
 
 @attr.s
 class CppEnum:
@@ -33,6 +34,7 @@ class CppEnum:
         """
         return str(self.value)
 
+
 def _normalize_period(period: str) -> str:
     """ Normalize period name to have "LHC" in all caps.
 
@@ -42,6 +44,7 @@ def _normalize_period(period: str) -> str:
         Normalized period name.
     """
     return period[:3].upper() + period[3:]
+
 
 def _is_run2_data(period: str) -> bool:
     """ Determine if the period was data taken during Run 2.
@@ -60,6 +63,7 @@ def _is_run2_data(period: str) -> bool:
             return True
     return False
 
+
 def _is_MC(period: str) -> bool:
     """ Determine if we are running over MC.
 
@@ -73,21 +77,26 @@ def _is_MC(period: str) -> bool:
     """
     return len(period) > 6
 
+
 class DataType(enum.Enum):
     """ ALICE data type.
 
     Either AOD or ESD.
     """
+
     AOD = 0
     ESD = 1
 
+
 _T_BeamType = TypeVar("_T_BeamType", bound="BeamType")
+
 
 class BeamType(enum.Enum):
     """ Beam type.
 
     Uses the AliAnalysisTaskEmcal enum.
     """
+
     pp = ROOT.AliAnalysisTaskEmcal.kpp
     pPb = ROOT.AliAnalysisTaskEmcal.kpA
     PbPb = ROOT.AliAnalysisTaskEmcal.kAA
@@ -107,11 +116,18 @@ class BeamType(enum.Enum):
         """
         # Validation
         period = _normalize_period(period)
-        PbPb_run_periods = [
-            "LHC10h", "LHC11h", "LHC15o", "LHC18q", "LHC18r"
-        ]
+        PbPb_run_periods = ["LHC10h", "LHC11h", "LHC15o", "LHC18q", "LHC18r"]
         pPb_run_periods = [
-            "LHC12g", "LHC13b", "LHC13c", "LHC13d", "LHC13e", "LHC13f", "LHC16q", "LHC16r", "LHC16s", "LHC16t"
+            "LHC12g",
+            "LHC13b",
+            "LHC13c",
+            "LHC13d",
+            "LHC13e",
+            "LHC13f",
+            "LHC16q",
+            "LHC16r",
+            "LHC16s",
+            "LHC16t",
         ]
         # Initialized via str to help out mypy...
         if period in PbPb_run_periods:
@@ -120,14 +136,17 @@ class BeamType(enum.Enum):
             return cls["pPb"]
         return cls["pp"]
 
+
 class AnalysisMode(enum.Enum):
     """ Analysis mode.
 
     """
+
     pp = enum.auto()
     pythia = enum.auto()
     PbPb = enum.auto()
     embedPythia = enum.auto()
+
 
 def _run_add_task_macro(task_path: Union[str, Path], task_class_name: str, *args: Any) -> Any:
     """ Run a given add task macro.
@@ -152,9 +171,9 @@ def _run_add_task_macro(task_path: Union[str, Path], task_class_name: str, *args
         False: "false",
         True: "true",
     }
-    task_args = ", ".join([f'"{v}"' if isinstance(v, str) else
-                           bool_map[v] if isinstance(v, bool) else
-                           str(v) for v in args])
+    task_args = ", ".join(
+        [f'"{v}"' if isinstance(v, str) else bool_map[v] if isinstance(v, bool) else str(v) for v in args]
+    )
     print(f"Running: {task_path}({task_args})")
     address = ROOT.gROOT.ProcessLine(f".x {task_path}({task_args})")
     # Need to convert the address into the task. Unfortunately, we can't cast the address directly into an object.
@@ -169,34 +188,35 @@ def _run_add_task_macro(task_path: Union[str, Path], task_class_name: str, *args
     # And then retrieve and return the actual task.
     return getattr(ROOT, cpp_temp_task_name)
 
+
 def _add_physics_selection(is_MC: bool, beam_type: BeamType) -> AnalysisTask:
     # Enable pileup rejection (second argument) for pp
-    #physics_selection_task = _run_add_task_macro(
+    # physics_selection_task = _run_add_task_macro(
     #    "$ALICE_PHYSICS/OADB/macros/AddTaskPhysicsSelection.C", "AliPhysicsSelectionTask",
     #    is_MC, beam_type == BeamType.pp
-    #)
+    # )
     physics_selection_task = ROOT.AliPhysicsSelectionTask.AddTaskPhysicsSelection(is_MC, beam_type == BeamType.pp)
     return physics_selection_task
+
 
 def _add_mult_selection(is_run2_data: bool, physics_selection: int) -> Optional[AnalysisTask]:
     # Works for both pp and PbPb for the periods that it is calibrated
     # However, I seem to have trouble with pp MCs
     if is_run2_data:
-        #multiplicity_selection_task = _run_add_task_macro(
+        # multiplicity_selection_task = _run_add_task_macro(
         #    "$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C",
         #    "AliMultSelectionTask",
         #    False
-        #)
+        # )
         multiplicity_selection_task = ROOT.AliMultSelectionTask.AddTaskMultSelection(False)
         multiplicity_selection_task.SelectCollisionCandidates(physics_selection)
         return multiplicity_selection_task
     return None
 
-def run_dynamical_grooming(task_name: str,
-                           analysis_mode: AnalysisMode,
-                           period: str,
-                           physics_selection: int,
-                           data_type: DataType) -> ROOT.AliAnalysisManager:
+
+def run_dynamical_grooming(
+    task_name: str, analysis_mode: AnalysisMode, period: str, physics_selection: int, data_type: DataType
+) -> ROOT.AliAnalysisManager:
     """ Run the event extractor.
 
     Args:
@@ -219,9 +239,12 @@ def run_dynamical_grooming(task_name: str,
     # Setup
     # pt hard binning is for pp MC, embedding
     if analysis_mode in [AnalysisMode.pythia, AnalysisMode.embedPythia]:
+        # Unfortunately, we have to pass a TArrayI because that is the only accepted type...
         pt_hard_binning = np.array(
-            [0, 5, 7, 9, 12, 16, 21, 28, 36, 45, 57, 70, 85, 99, 115, 132, 150, 169, 190, 212, 235, 1000], dtype=np.int32
+            [0, 5, 7, 9, 12, 16, 21, 28, 36, 45, 57, 70, 85, 99, 115, 132, 150, 169, 190, 212, 235, 1000],
+            dtype=np.int32,
         )
+        pt_hard_binning_root = ROOT.TArrayI(len(pt_hard_binning), pt_hard_binning)
 
     # Basic setup (analysis manager and input handler).
     analysis_manager = ROOT.AliAnalysisManager(task_name)
@@ -234,15 +257,15 @@ def run_dynamical_grooming(task_name: str,
     _add_physics_selection(is_MC, beam_type)
 
     # Multiplicity selection task.
-    _add_mult_selection(is_run2_data = is_run2_data, physics_selection = physics_selection)
+    _add_mult_selection(is_run2_data=is_run2_data, physics_selection=physics_selection)
 
     ################
     # Debug settings
     ################
-    #ROOT.AliLog.SetClassDebugLevel("AliEmcalCorrectionComponent", AliLog::kDebug+3)
-    #ROOT.AliLog.SetClassDebugLevel("AliAnalysisTaskEmcalJetHCorrelations", AliLog::kDebug+1)
-    #ROOT.AliLog.SetClassDebugLevel("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming", ROOT.AliLog.kDebug-1)
-    #ROOT.AliLog.SetClassDebugLevel("AliJetContainer", AliLog::kDebug+7);
+    # ROOT.AliLog.SetClassDebugLevel("AliEmcalCorrectionComponent", AliLog::kDebug+3)
+    # ROOT.AliLog.SetClassDebugLevel("AliAnalysisTaskEmcalJetHCorrelations", AliLog::kDebug+1)
+    # ROOT.AliLog.SetClassDebugLevel("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming", ROOT.AliLog.kDebug-1)
+    # ROOT.AliLog.SetClassDebugLevel("AliJetContainer", AliLog::kDebug+7);
 
     # Shared jet finding settings
     ghost_area = 0.005
@@ -252,15 +275,30 @@ def run_dynamical_grooming(task_name: str,
         # Rho related
         # Jet finder for rho. Wagon name: "JetFinderKtTpcQG_EScheme"
         kt_jet_finder = ROOT.AliEmcalJetTask.AddTaskEmcalJet(
-            "usedefault", "", ROOT.AliJetContainer.kt_algorithm, 0.2, ROOT.AliJetContainer.kChargedJet,
-            0.15, 0, ghost_area, ROOT.AliJetContainer.E_scheme, "Jet", 0, False, False
+            "usedefault",
+            "",
+            ROOT.AliJetContainer.kt_algorithm,
+            0.2,
+            ROOT.AliJetContainer.kChargedJet,
+            0.15,
+            0,
+            ghost_area,
+            ROOT.AliJetContainer.E_scheme,
+            "Jet",
+            0,
+            False,
+            False,
         )
         kt_jet_finder.SelectCollisionCandidates(physics_selection)
         kt_jet_finder.SetUseNewCentralityEstimation(True)
         # Rho. Wagon name: AliAnalysisTaskQGRhoTpcExLJ_EScheme
         rho_task = _run_add_task_macro(
-            "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskRhoNew.C", "AliAnalysisTaskRho",
-            "usedefault", "", "Rho", 0.2,
+            "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskRhoNew.C",
+            "AliAnalysisTaskRho",
+            "usedefault",
+            "",
+            "Rho",
+            0.2,
             CppEnum("AliJetContainer::kTPCfid"),
             CppEnum("AliJetContainer::kChargedJet"),
             True,
@@ -269,9 +307,9 @@ def run_dynamical_grooming(task_name: str,
         rho_task.SetExcludeLeadJets(2)
         rho_task.SelectCollisionCandidates(physics_selection)
         rho_task.SetUseNewCentralityEstimation(True)
-        #rho_task.GetParticleContainer(0).SetMCTrackBitMap(TObject.kBitMask)
-        #rho_task.GetClusterContainer(0).SetMCClusterBitMap(TObject.kBitMask)
-        #rho_task.SetHistoBins(250,0,250)
+        # rho_task.GetParticleContainer(0).SetMCTrackBitMap(TObject.kBitMask)
+        # rho_task.GetClusterContainer(0).SetMCClusterBitMap(TObject.kBitMask)
+        # rho_task.SetHistoBins(250,0,250)
         rho_task.SetNeedEmcalGeom(False)
         rho_task.SetZvertexDiffValue(0.1)
         cont_rho = rho_task.GetJetContainer(0)
@@ -281,13 +319,25 @@ def run_dynamical_grooming(task_name: str,
 
         # Rho mass. Wagon name: "RhoMassQGTPC"
         rho_mass = _run_add_task_macro(
-            "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskRhoMass.C", "AliAnalysisTaskRhoMass",
-            "Jet_KTChargedR020_tracks_pT0150_E_scheme", "tracks", "", "Rhomass", 0.2, "TPC", 0.01, 0, 0, 2, True, "RhoMass"
+            "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskRhoMass.C",
+            "AliAnalysisTaskRhoMass",
+            "Jet_KTChargedR020_tracks_pT0150_E_scheme",
+            "tracks",
+            "",
+            "Rhomass",
+            0.2,
+            "TPC",
+            0.01,
+            0,
+            0,
+            2,
+            True,
+            "RhoMass",
         )
         rho_mass.SelectCollisionCandidates(physics_selection)
         rho_mass.SetUseNewCentralityEstimation(True)
         rho_mass.SetHistoBins(250, 0, 250)
-        #rho_mass.SetScaleFunction(srhomfunc)
+        # rho_mass.SetScaleFunction(srhomfunc)
         rho_mass.SetNeedEmcalGeom(False)
         cont_rho_mass = rho_mass.GetJetContainer(0)
         cont_rho_mass.SetJetRadius(0.2)
@@ -298,8 +348,19 @@ def run_dynamical_grooming(task_name: str,
 
     # Standard akt jet finder. Wagon name: "JetFinderQGAKTCharged_R04_Escheme" from PbPb train.
     akt_jet_finder = ROOT.AliEmcalJetTask.AddTaskEmcalJet(
-        "tracks", "", ROOT.AliJetContainer.antikt_algorithm, 0.4, ROOT.AliJetContainer.kChargedJet, 0.15, 0.30,
-        ghost_area, ROOT.AliJetContainer.E_scheme, "Jet", 0, False, False
+        "tracks",
+        "",
+        ROOT.AliJetContainer.antikt_algorithm,
+        0.4,
+        ROOT.AliJetContainer.kChargedJet,
+        0.15,
+        0.30,
+        ghost_area,
+        ROOT.AliJetContainer.E_scheme,
+        "Jet",
+        0,
+        False,
+        False,
     )
     akt_jet_finder.SelectCollisionCandidates(physics_selection)
     akt_jet_finder.SetNeedEmcalGeom(False)
@@ -309,7 +370,7 @@ def run_dynamical_grooming(task_name: str,
     if beam_type == BeamType.PbPb:
         akt_jet_finder.SetUseNewCentralityEstimation(True)
 
-        #constUtil = akt_jet_finder.AddUtility(ROOT.AliEmcalJetUtilityConstSubtractor("ConstSubtractor"))
+        # constUtil = akt_jet_finder.AddUtility(ROOT.AliEmcalJetUtilityConstSubtractor("ConstSubtractor"))
         constUtil = akt_jet_finder.AddUtility(ROOT.AliEmcalJetUtilityEventSubtractor("EventSubtractor"))
         genSub = akt_jet_finder.AddUtility(ROOT.AliEmcalJetUtilityGenSubtractor("GenSubtractor"))
 
@@ -327,40 +388,60 @@ def run_dynamical_grooming(task_name: str,
         constUtil.SetMaxDelR(0.8)
 
     # Particle level jet finder
-    if analysis_mode in [AnalysisMode.embedPythia]:
+    if analysis_mode in [AnalysisMode.pythia, AnalysisMode.embedPythia]:
         # JetFinderAKTChargedMC_R04_Escheme
         akt_particle_level_jet_finder = ROOT.AliEmcalJetTask.AddTaskEmcalJet(
-            "mcparticles", "",
-            ROOT.AliJetContainer.antikt_algorithm, 0.4, ROOT.AliJetContainer.kChargedJet, 0., 0.,
-            ghost_area, ROOT.AliJetContainer.E_scheme, "Jet", 0, False, False,
+            "mcparticles",
+            "",
+            ROOT.AliJetContainer.antikt_algorithm,
+            0.4,
+            ROOT.AliJetContainer.kChargedJet,
+            0.0,
+            0.0,
+            ghost_area,
+            ROOT.AliJetContainer.E_scheme,
+            "Jet",
+            0,
+            False,
+            False,
         )
         akt_particle_level_jet_finder.SelectCollisionCandidates(physics_selection)
 
-    if analysis_mode in [AnalysisMode.embedPythia]:
+    # Pythia detector to particle level tagger
+    if analysis_mode in [AnalysisMode.pythia, AnalysisMode.embedPythia]:
         # Tagger
         # JetTaggerMCChargedR040
         tagger = _run_add_task_macro(
-            "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskEmcalJetTagger.C", "AliAnalysisTaskEmcalJetTagger",
+            "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskEmcalJetTagger.C",
+            "AliAnalysisTaskEmcalJetTagger",
             "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
             "Jet_AKTChargedR040_mcparticles_pT0000_E_scheme",
-            0.4, "", "", "tracks", "", "TPC", "", CppEnum("AliVEvent::kMB"), ""
+            0.4,
+            "",
+            "",
+            "tracks",
+            "",
+            "TPC",
+            "",
+            CppEnum("AliVEvent::kMB"),
+            "",
         )
         tagger.SetNCentBins(1)
         tagger.SelectCollisionCandidates(ROOT.AliVEvent.kMB)
-        #tagger.SetUseInternalEventSelection(kTRUE)
-        #tagger.SetForceBeamType(AliAnalysisTaskEmcal::kpp)
+        # tagger.SetUseInternalEventSelection(kTRUE)
+        # tagger.SetForceBeamType(AliAnalysisTaskEmcal::kpp)
         if is_MC:
             tagger.SetIsPythia(True)
         tagger.SetJetTaggingType(ROOT.AliAnalysisTaskEmcalJetTagger.kClosest)
         tagger.SetJetTaggingMethod(ROOT.AliAnalysisTaskEmcalJetTagger.kGeo)
         tagger.SetTypeAcceptance(3)
         tagger.SetNumberOfPtHardBins(len(pt_hard_binning) - 1)
-        tagger.SetUserPtHardBinning(pt_hard_binning)
+        tagger.SetUserPtHardBinning(pt_hard_binning_root)
         tagger.SetMaxDistance(1.0)
 
     # Dynamical grooming
     if analysis_mode == AnalysisMode.PbPb:
-        #task = _run_add_task_macro(
+        # task = _run_add_task_macro(
         #    "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskJetDynamicalGrooming.C", "PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming",
         #    "Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
         #    "Jet_AKTChargedR040_tracks_pT0150_E_scheme", "", "", 0.4, "Rho",
@@ -371,20 +452,33 @@ def run_dynamical_grooming(task_name: str,
         #    0, 0, 0.6,
         #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kSecondOrder"),
         #    "Raw"
-        #)
+        # )
         dynamical_grooming = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
             "Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
-            "Jet_AKTChargedR040_tracks_pT0150_E_scheme", "", "", 0.4, "Rho",
-            "tracksSubR02", "tracks", "", "", "", "TPC", "V0M", physics_selection,
+            "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
+            "",
+            "",
+            0.4,
+            "Rho",
+            "tracksSubR02",
+            "tracks",
+            "",
+            "",
+            "",
+            "TPC",
+            "V0M",
+            physics_selection,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kData,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kConstSub,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kInclusive,
-            0, 0, 0.6,
+            0,
+            0,
+            0.6,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kSecondOrder,
-            "Raw"
+            "Raw",
         )
     elif analysis_mode == AnalysisMode.pp:
-        #dynamical_grooming = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
+        # dynamical_grooming = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
         #    "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
         #    "", "", "", 0.4, "",
         #    "tracks", "", "", "", "", "TPC", "V0M", physics_selection,
@@ -394,27 +488,55 @@ def run_dynamical_grooming(task_name: str,
         #    0, 0, 0.6,
         #    ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kSecondOrder,
         #    "Raw"
-        #)
+        # )
         dynamical_grooming = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
             "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
-            "", "", "", 0.4, "",
-            "tracks", "", "", "", "", "TPC", "V0M", physics_selection,
+            "",
+            "",
+            "",
+            0.4,
+            "",
+            "tracks",
+            "",
+            "",
+            "",
+            "",
+            "TPC",
+            "V0M",
+            physics_selection,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kData,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kNoSub,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kInclusive,
-            0, 0, 0.6,
+            0,
+            0,
+            0.6,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kSecondOrder,
-            "Raw"
+            "Raw",
         )
-    elif analysis_mode == AnalysisMode.embedPythia:
+    elif analysis_mode == AnalysisMode.pythia:
         dynamical_grooming = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
-            "Jet_AKTChargedR040_tracks_pT0150_E_scheme", "",
-            "Jet_AKTChargedR040_mcparticles_pT0000_E_scheme", "", 0.4, "tracks", "", "", "mcparticles", "", "", "TPC", "V0M", physics_selection, ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kPythiaDef, ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kNoSub, ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kInclusive,
+            "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
+            "",
+            "Jet_AKTChargedR040_mcparticles_pT0000_E_scheme",
+            "",
+            0.4,
+            "tracks",
+            "",
+            "",
+            "mcparticles",
+            "",
+            "",
+            "TPC",
+            "V0M",
+            physics_selection,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kPythiaDef,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kNoSub,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kInclusive,
         )
     dynamical_grooming.SelectCollisionCandidates(physics_selection)
     if analysis_mode in [AnalysisMode.pythia, AnalysisMode.embedPythia]:
         dynamical_grooming.SetNumberOfPtHardBins(len(pt_hard_binning) - 1)
-        dynamical_grooming.SetUserPtHardBinning(pt_hard_binning)
+        dynamical_grooming.SetUserPtHardBinning(pt_hard_binning_root)
     cont = dynamical_grooming.GetJetContainer(0)
     if beam_type == BeamType.PbPb:
         cont.SetRhoName("Rho")
@@ -436,12 +558,12 @@ def run_dynamical_grooming(task_name: str,
 
     dynamical_grooming.SetJetPtThreshold(20)
     dynamical_grooming.SetNeedEmcalGeom(False)
-    #dynamical_grooming.SetZvertexDiffValue(0.1)
+    # dynamical_grooming.SetZvertexDiffValue(0.1)
     dynamical_grooming.SetStoreRecursiveJetSplittings(True)
 
-    #dynamical_grooming.SetDoTwoTrack(kTRUE)
+    # dynamical_grooming.SetDoTwoTrack(kTRUE)
     # The hard cutoff isn't meaningful when storing all splittings.
-    #dynamical_grooming.SetHardCutoff(0.1)
+    # dynamical_grooming.SetHardCutoff(0.1)
 
     if is_MC:
         dynamical_grooming.SetIsPythia(True)
@@ -476,10 +598,10 @@ def run_dynamical_grooming(task_name: str,
 
     return analysis_manager
 
-def start_analysis_manager(analysis_manager: ROOT.AliAnalysisManager,
-                           mode: str,
-                           n_events: int,
-                           input_files: Sequence[Path]) -> None:
+
+def start_analysis_manager(
+    analysis_manager: ROOT.AliAnalysisManager, mode: str, n_events: int, input_files: Sequence[Path]
+) -> None:
     """ Start the given analysis manager.
 
     Note:
@@ -505,6 +627,7 @@ def start_analysis_manager(analysis_manager: ROOT.AliAnalysisManager,
     elif mode == "grid":
         raise RuntimeError("Not implemented yet!")
 
+
 def run(analysis_mode: AnalysisMode, period_name: str, physics_selection: int, input_files: Sequence[Path]) -> None:
     # Setup and validation
     task_name = "DynamicalGrooming"
@@ -520,22 +643,20 @@ def run(analysis_mode: AnalysisMode, period_name: str, physics_selection: int, i
         data_type=data_type,
     )
 
-    start_analysis_manager(analysis_manager = analysis_manager,
-                           mode = "local",
-                           n_events = 1000,
-                           input_files = input_files)
+    start_analysis_manager(analysis_manager=analysis_manager, mode="local", n_events=1000, input_files=input_files)
+
 
 if __name__ == "__main__":
-    analysis_mode = AnalysisMode.PbPb
+    analysis_mode = AnalysisMode.pythia
     if analysis_mode == AnalysisMode.PbPb:
         run(
             analysis_mode=analysis_mode,
-            period_name = "LHC18q",
+            period_name="LHC18q",
             # NOTE: For some reason, kAnyINT will include some events where the centrality seems to be uncalibrated.
             #       It's unclear why this occurs, but since we're only interested in semi-central at the moment, it
             #       doesn't matter.
-            physics_selection = ROOT.AliVEvent.kSemiCentral,
-            input_files = [
+            physics_selection=ROOT.AliVEvent.kSemiCentral,
+            input_files=[
                 Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/001/AliAOD.root"),
                 Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/002/AliAOD.root"),
                 Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/003/AliAOD.root"),
@@ -544,14 +665,14 @@ if __name__ == "__main__":
                 Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/002/AliAOD.root"),
                 Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/003/AliAOD.root"),
                 Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/004/AliAOD.root"),
-            ]
+            ],
         )
     if analysis_mode == AnalysisMode.pp:
         run(
             analysis_mode=analysis_mode,
-            period_name = "LHC17q",
-            physics_selection = ROOT.AliVEvent.kAnyINT,
-            input_files = [
+            period_name="LHC17q",
+            physics_selection=ROOT.AliVEvent.kAnyINT,
+            input_files=[
                 Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/001/AliAOD.root"),
                 Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/002/AliAOD.root"),
                 Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/003/AliAOD.root"),
@@ -560,14 +681,14 @@ if __name__ == "__main__":
                 Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/006/AliAOD.root"),
                 Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/007/AliAOD.root"),
                 Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/008/AliAOD.root"),
-            ]
+            ],
         )
     if analysis_mode == AnalysisMode.pythia:
         run(
             analysis_mode=analysis_mode,
-            period_name = "LHC16j5",
-            physics_selection = 0,
-            input_files = [
+            period_name="LHC16j5",
+            physics_selection=0,
+            input_files=[
                 Path("/Users/re239/code/alice/data/LHC16j5/4/246945/AOD200/0003/AliAOD.root"),
                 Path("/Users/re239/code/alice/data/LHC16j5/4/246945/AOD200/0002/AliAOD.root"),
                 Path("/Users/re239/code/alice/data/LHC16j5/4/246945/AOD200/0001/AliAOD.root"),
@@ -576,7 +697,7 @@ if __name__ == "__main__":
                 Path("/Users/re239/code/alice/data/LHC16j5/5/246945/AOD200/0002/AliAOD.root"),
                 Path("/Users/re239/code/alice/data/LHC16j5/5/246945/AOD200/0001/AliAOD.root"),
                 Path("/Users/re239/code/alice/data/LHC16j5/5/246945/AOD200/0006/AliAOD.root"),
-            ]
+            ],
         )
     if analysis_mode == AnalysisMode.embedPythia:
         raise NotImplementedError("Still need to implement embedding run macro.")
