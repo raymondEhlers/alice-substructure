@@ -311,38 +311,6 @@ class SubjetArrayMethods(ArrayMethods):
         """
         return splittings[self["parent_splitting_index"]]
 
-    # def constituents(self, jet_constituents: Result[Sequence[JetConstituent]]) -> Result[Sequence[JetConstituent]]:
-    #    """ Constituents of the subjets.
-
-    #    Args:
-    #        jet_constituents: Constituents of the overall jets which contain the subjets.
-    #    Returns:
-    #        Jet constituents of the subjets.
-    #    """
-    #    #return self._try_memo(
-    #    #    "constituents",
-    #    #    lambda self: ak.JaggedArray.fromoffsets(
-    #    #            self._constituents_indices.offsets,
-    #    #            jet_constituents[self._constituents_indices.flatten()],
-    #    #    ),
-    #    #)
-    #    # TODO: Need to rewarp as constituents.
-    #    #result = ak.JaggedArray.fromoffsets(
-    #    #    self._constituents_indices.offsets,
-    #    #    ak.JaggedArray.fromoffsets(
-    #    #        self._constituents_indices.flatten().offsets,
-    #    #        jet_constituents[self._constituents_indices.flatten(axis=1)].flatten().content,
-    #    #    ),
-    #    #)
-    #    # return jet_constituents[self._constituents_indices]
-    #    # This doesn't seem super efficient, but I can't seem to broadcast it directly.
-    #    return ak.JaggedArray.fromoffsets(
-    #        self._constituents_indices.offsets, ak.JaggedArray.fromoffsets(
-    #            self._constituents_indices.flatten().offsets,
-    #            jet_constituents[self._constituents_indices.flatten(axis=1)].flatten()
-    #        )
-    #    )
-
 
 # Adds in JaggedArray methods for constructing objects with jagged structure.
 JaggedSubjetArrayMethods = SubjetArrayMethods.mixin(SubjetArrayMethods, ak.JaggedArray)
