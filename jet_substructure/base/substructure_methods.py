@@ -95,7 +95,7 @@ class JetConstituent:
         return self._global_index
 
     def delta_R(self, other: "JetConstituent") -> float:
-        return np.sqrt((self.phi - other.phi) ** 2 + (self.eta - other.eta) ** 2)
+        return cast(float, np.sqrt((self.phi - other.phi) ** 2 + (self.eta - other.eta) ** 2))
 
 
 class JetConstituentArrayMethods(ArrayMethods):
