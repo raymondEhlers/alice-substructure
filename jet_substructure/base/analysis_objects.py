@@ -39,6 +39,13 @@ class Identifier:
 
 
 @attr.s
+class MatchingResult:
+    properly: UprootArray[bool] = attr.ib()
+    mistag: UprootArray[bool] = attr.ib()
+    failed: UprootArray[bool] = attr.ib()
+
+
+@attr.s
 class FillHistogramInput:
     jets: "substructure_methods.SubstructureJetArray" = attr.ib()
     _splittings: "substructure_methods.JetSplittingArray" = attr.ib()
@@ -462,9 +469,7 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
             both_failed=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
         )
 
-    def fill(
-        self, matched_inputs: FillHistogramInput, leading: "MatchingResult", subleading: "MatchingResult",
-    ) -> None:
+    def fill(self, matched_inputs: FillHistogramInput, leading: MatchingResult, subleading: MatchingResult,) -> None:
         # Validation
         # Give a useful error message
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):

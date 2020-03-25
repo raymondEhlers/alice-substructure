@@ -56,7 +56,7 @@ class SubstructureResult:
         self._splitting_number = value
 
 
-def setup_yaml() -> yaml.ruamel.yaml.Yaml:
+def setup_yaml() -> yaml.ruamel.yaml.YAML:
     return yaml.yaml(modules_to_register=[binned_data, analysis_objects, helpers])
 
 
@@ -64,7 +64,7 @@ def _convert_and_write_hists(
     hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]],
     tree_filename: Path,
     yaml_filename: Path,
-    y: yaml.ruamel.yaml.Yaml,
+    y: yaml.ruamel.yaml.YAML,
 ) -> Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]:
     # Convert to BinnedData and store the hists
     for h in hists.values():
@@ -82,7 +82,7 @@ def analyze_single_tree(
     R: float,
     jet_pt_bins: Sequence[helpers.RangeSelector],
     progress_manager: enlighten.Manager,
-    y: yaml.ruamel.yaml.Yaml,
+    y: yaml.ruamel.yaml.YAML,
     output: Path,
     force_reprocessing: bool = False,
 ) -> Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]]:
@@ -198,13 +198,6 @@ def _select_and_retrieve_splittings(
     return restricted_jets, splittings
 
 
-@attr.s
-class MatchingResult:
-    properly: UprootArray[bool] = attr.ib()
-    mistag: UprootArray[bool] = attr.ib()
-    failed: UprootArray[bool] = attr.ib()
-
-
 def _get_leading_and_subleading_subjets(
     subjets_unsorted: substructure_methods.SubjetArray,
 ) -> Tuple[substructure_methods.SubjetArray, substructure_methods.SubjetArray]:
@@ -244,7 +237,7 @@ def determine_matching_types(
 
 def determine_matched_jets(
     hybrid_inputs: analysis_objects.FillHistogramInput, matched_inputs: analysis_objects.FillHistogramInput
-) -> Tuple[MatchingResult, MatchingResult]:
+) -> Tuple[analysis_objects.MatchingResult, analysis_objects.MatchingResult]:
     """
 
     The passed jets need to have the selected indices already applied.
@@ -301,8 +294,10 @@ def determine_matched_jets(
     # IPython.embed()
 
     return (
-        MatchingResult(matched_leading_properly, matched_leading_mistag, matched_leading_failed),
-        MatchingResult(matched_subleading_properly, matched_subleading_mistag, matched_subleading_failed),
+        analysis_objects.MatchingResult(matched_leading_properly, matched_leading_mistag, matched_leading_failed),
+        analysis_objects.MatchingResult(
+            matched_subleading_properly, matched_subleading_mistag, matched_subleading_failed
+        ),
     )
 
     # Moved to function
@@ -372,8 +367,8 @@ def determine_matched_jets(
     # return False
 
 
-# def process_matching_results(matched_inputs: analysis_objects.FillHistogramInput, leading_matching: MatchingResult,
-#                             subleading_matching: MatchingResult) -> None:
+# def process_matching_results(matched_inputs: analysis_objects.FillHistogramInput, leading_matching: analysis_objects.MatchingResult,
+#                             subleading_matching: analysis_objects.MatchingResult) -> None:
 #    h_leading_matched_all.fill(matched_inputs.jets.jet_pt)
 #    h_leading_matched_properly.fill(matched_inputs.jets.jet_pt[leading_matching.properly])
 #    h_leading_matched_missed.fill(matched_inputs.jets.jet_pt[leading_matching.mistag])
@@ -386,7 +381,7 @@ def analyze_single_tree_embedding(
     R: float,
     jet_pt_bins: Sequence[helpers.RangeSelector],
     progress_manager: enlighten.Manager,
-    y: yaml.ruamel.yaml.Yaml,
+    y: yaml.ruamel.yaml.YAML,
     output: Path,
     force_reprocessing: bool = False,
 ) -> Tuple[
