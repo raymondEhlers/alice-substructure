@@ -31,14 +31,14 @@ logger = logging.getLogger(__name__)
 class SubstructureResult:
     name: str = attr.ib()
     title: str = attr.ib()
-    values: UprootArray = attr.ib()
-    indices: UprootArray = attr.ib()
+    values: UprootArray[float] = attr.ib()
+    indices: UprootArray[int] = attr.ib()
     subjet: substructure_methods.JetSplittingArray
     # TODO: Need to store iterative splitting information somehow!
     #       Perhaps just below...?
 
     @property
-    def splitting_number(self) -> UprootArray:
+    def splitting_number(self) -> UprootArray[int]:
         try:
             return self._splitting_number
         except AttributeError:
@@ -47,12 +47,12 @@ class SubstructureResult:
             # If there were no splittings, we want to set that to 0.
             splitting_number = splitting_number.pad(1).fillna(0)
             # Must flatten because the indices are still jagged.
-            self._splitting_number: UprootArray = splitting_number.flatten()
+            self._splitting_number: UprootArray[int] = splitting_number.flatten()
 
         return self._splitting_number
 
     @splitting_number.setter
-    def splitting_number(self, value: UprootArray) -> None:
+    def splitting_number(self, value: UprootArray[int]) -> None:
         self._splitting_number = value
 
 
@@ -179,7 +179,7 @@ def analyze_single_tree(
 
 
 def _select_and_retrieve_splittings(
-    jets: substructure_methods.SubstructureJetArray, jet_pt_mask: UprootArray, iterative_splittings: bool
+    jets: substructure_methods.SubstructureJetArray, jet_pt_mask: UprootArray[bool], iterative_splittings: bool
 ) -> Tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray]:
     # Ensure that there are sufficient counts
     restricted_jets = jets[jet_pt_mask]
@@ -200,9 +200,9 @@ def _select_and_retrieve_splittings(
 
 @attr.s
 class MatchingResult:
-    properly: UprootArray = attr.ib()
-    mistag: UprootArray = attr.ib()
-    failed: UprootArray = attr.ib()
+    properly: UprootArray[bool] = attr.ib()
+    mistag: UprootArray[bool] = attr.ib()
+    failed: UprootArray[bool] = attr.ib()
 
 
 def _get_leading_and_subleading_subjets(
@@ -221,7 +221,7 @@ def _get_leading_and_subleading_subjets(
 
 def determine_matching_types(
     matched_subjets: substructure_methods.SubjetArray, hybrid_subjets: substructure_methods.SubjetArray,
-) -> UprootArray:
+) -> UprootArray[bool]:
     constituent_pairs = matched_subjets.constituents.argcross(hybrid_subjets.constituents)
     matched_leading_indices, hybrid_leading_indices = constituent_pairs.unzip()
 
@@ -239,12 +239,12 @@ def determine_matching_types(
         raise ValueError("Constituent pts are greater than the subjet pts...")
 
     matched = (constituent_pts / matched_subjets.constituents.pt.sum()) > 0.5
-    return matched
+    return cast(UprootArray[bool], matched)
 
 
 def determine_matched_jets(
     hybrid_inputs: analysis_objects.FillHistogramInput, matched_inputs: analysis_objects.FillHistogramInput
-) -> UprootArray:
+) -> Tuple[MatchingResult, MatchingResult]:
     """
 
     The passed jets need to have the selected indices already applied.

@@ -42,11 +42,11 @@ class Identifier:
 class FillHistogramInput:
     jets: "substructure_methods.SubstructureJetArray" = attr.ib()
     _splittings: "substructure_methods.JetSplittingArray" = attr.ib()
-    values: UprootArray = attr.ib()
-    indices: UprootArray = attr.ib()
+    values: UprootArray[float] = attr.ib()
+    indices: UprootArray[int] = attr.ib()
 
     @property
-    def splittings(self) -> UprootArray:
+    def splittings(self) -> "substructure_methods.JetSplittingArray":
         try:
             return self._restricted_splittings
         except AttributeError:
@@ -64,7 +64,7 @@ class FillHistogramInput:
         return len(self.jets)
 
 
-def _calculate_splitting_number(indices: UprootArray) -> UprootArray:
+def _calculate_splitting_number(indices: UprootArray[int]) -> UprootArray[int]:
     # +1 because splittings counts from 1, but indexing starts from 0.
     splitting_number = indices + 1
     # If there were no splittings, we want to set that to 0.
@@ -197,7 +197,9 @@ class SubstructureHists(SubstructureHistsBase):
             lund_plane=bh.Histogram(*lund_plane_axes, storage=bh.storage.Weight()),
         )
 
-    def fill(self, inputs: FillHistogramInput, jet_R: float, splitting_number: Optional[UprootArray] = None,) -> None:
+    def fill(
+        self, inputs: FillHistogramInput, jet_R: float, splitting_number: Optional[UprootArray[int]] = None,
+    ) -> None:
         # Validation
         # Give a useful error message
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):

@@ -10,14 +10,13 @@ from __future__ import annotations
 import functools
 import logging
 import typing
-from typing import TYPE_CHECKING, Callable, Collection, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Callable, Optional, Tuple, Type, TypeVar, cast
 
 import attr
 import awkward as ak
 import numpy as np
 
-
-# from jet_substructure.base.helpers import UprootArray
+from jet_substructure.base.helpers import ArrayOrScalar, UprootArray
 
 
 logger = logging.getLogger(__name__)
@@ -26,90 +25,10 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class UprootArrayTyped(Collection[T]):
-    """ Effectively a protocol for the UprootArray type.
-
-    The main advantage is that it allows us to keep track of the types. I don't believe
-    that they're closely checked, but if nothing else, they're useful as sanity checks
-    for me.
-
-    These definitely _aren't_ comprehensive, but they're a good start.
-    """
-
-    @typing.overload
-    def __getitem__(self, key: UprootArrayTyped[bool]) -> UprootArrayTyped[T]:
-        ...
-
-    @typing.overload
-    def __getitem__(self, key: UprootArrayTyped[int]) -> UprootArrayTyped[T]:
-        ...
-
-    @typing.overload
-    def __getitem__(self, key: Tuple[slice, slice]) -> UprootArrayTyped[T]:
-        ...
-
-    @typing.overload
-    def __getitem__(self, key: bool) -> T:
-        ...
-
-    @typing.overload
-    def __getitem__(self, key: int) -> T:
-        ...
-
-    def __getitem__(self, key):  # type: ignore
-        raise NotImplementedError("Just typing information.")
-
-    @typing.overload
-    def __truediv__(self, other: float) -> UprootArrayTyped[T]:
-        ...
-
-    @typing.overload
-    def __truediv__(self, other: UprootArrayTyped[T]) -> UprootArrayTyped[T]:
-        ...
-
-    def __truediv__(self, other):  # type: ignore
-        raise NotImplementedError("Just typing information.")
-
-    def argmax(self) -> UprootArrayTyped[int]:
-        raise NotImplementedError("Just typing information.")
-
-    def offsets(self) -> np.ndarray:
-        raise NotImplementedError("Just typing information.")
-
-    def flatten(self, axis: Optional[int] = ...) -> np.ndarray:
-        raise NotImplementedError("Just typing information.")
-
-    @property
-    def localindex(self) -> UprootArrayTyped[int]:
-        raise NotImplementedError("Just typing information.")
-
-    def count_nonzero(self) -> UprootArrayTyped[int]:
-        raise NotImplementedError("Just typing information.")
-
-    def __gt__(self, other: float) -> UprootArrayTyped[bool]:
-        raise NotImplementedError("Just typing information.")
-
-
-ArrayOrScalar = Union[UprootArrayTyped[T], T]
-# Result = Union[UprootArray, T]
-# More ideally, I would like:
-# It's supposed to carry the semantics of Union[np.ndarray, ak.JaggedArray]
-# class NDArray(Generic[T]):
-#    def argmax(self) -> T: ...
-# class UprootArrayTyped(Generic[T]):
-#    def argmax(self) -> NDArray[int]: ...
-#    @overload
-#    def __getitem__(self, key: NDArray[bool]) -> Union[UprootArrayTyped[T], NDArray[T]]: ...
-#    @overload
-#    def __getitem__(self, key: NDArray[int]) -> NDArray[T]: ...
-
-# UprootArrayTyped = Union[UprootArray[T], T]
-
-
 @typing.overload
 def _dynamical_hardness_measure(
-    delta_R: UprootArrayTyped[float], z: UprootArrayTyped[float], parent_pt: UprootArrayTyped[float], R: float, a: float
-) -> UprootArrayTyped[float]:
+    delta_R: UprootArray[float], z: UprootArray[float], parent_pt: UprootArray[float], R: float, a: float
+) -> UprootArray[float]:
     ...
 
 
@@ -127,7 +46,7 @@ dynamical_kt = functools.partial(_dynamical_hardness_measure, a=1.0)
 dynamical_time = functools.partial(_dynamical_hardness_measure, a=2.0)
 
 
-def find_leading(values: UprootArrayTyped[T]) -> Tuple[np.ndarray, UprootArrayTyped[int]]:
+def find_leading(values: UprootArray[T]) -> Tuple[np.ndarray, UprootArray[int]]:
     """ Calculate hardest value given a set of values.
 
     Used for dynamical grooming, hardest kt, etc.
@@ -207,35 +126,33 @@ class JetConstituentArrayMethods(ArrayMethods):
         )
 
     @property
-    def pt(self) -> UprootArrayTyped[float]:
+    def pt(self) -> UprootArray[float]:
         """ Constituent pts. """
-        return cast(UprootArrayTyped[float], self["pt"])
+        return cast(UprootArray[float], self["pt"])
 
     @property
-    def eta(self) -> UprootArrayTyped[float]:
+    def eta(self) -> UprootArray[float]:
         """ Constituent etas. """
-        return cast(UprootArrayTyped[float], self["eta"])
+        return cast(UprootArray[float], self["eta"])
 
     @property
-    def phi(self) -> UprootArrayTyped[float]:
+    def phi(self) -> UprootArray[float]:
         """ Constituent phis. """
-        return cast(UprootArrayTyped[float], self["phi"])
+        return cast(UprootArray[float], self["phi"])
 
     @property
-    def index(self) -> UprootArrayTyped[int]:
+    def index(self) -> UprootArray[int]:
         """ Constituent global indices. """
-        return cast(UprootArrayTyped[int], self["global_index"])
+        return cast(UprootArray[int], self["global_index"])
 
     @property
     def max_pt(self) -> ArrayOrScalar[float]:
         """ Maximum pt of the stored constituent. """
         return cast(ArrayOrScalar[float], self["pt"].max())
 
-    def delta_R(self, other: "JetConstituentArray") -> UprootArrayTyped[float]:
+    def delta_R(self, other: "JetConstituentArray") -> UprootArray[float]:
         """ Delta R between one set of constituents and the others. """
-        return cast(
-            UprootArrayTyped[float], np.sqrt((self["phi"] - other["phi"]) ** 2 + (self["eta"] - other["eta"]) ** 2)
-        )
+        return cast(UprootArray[float], np.sqrt((self["phi"] - other["phi"]) ** 2 + (self["eta"] - other["eta"]) ** 2))
 
 
 # Adds in JaggedArray methods for constructing objects with jagged structure.
@@ -255,11 +172,7 @@ class JetConstituentArray(JetConstituentArrayMethods, ak.ObjectArray):  # type:i
     """
 
     def __init__(
-        self,
-        pt: UprootArrayTyped[float],
-        eta: UprootArrayTyped[float],
-        phi: UprootArrayTyped[float],
-        global_index: UprootArrayTyped[int],
+        self, pt: UprootArray[float], eta: UprootArray[float], phi: UprootArray[float], global_index: UprootArray[int],
     ) -> None:
         self._init_object_array(ak.Table())
         self["pt"] = pt
@@ -283,10 +196,10 @@ class JetConstituentArray(JetConstituentArrayMethods, ak.ObjectArray):  # type:i
     @ak.util.wrapjaggedmethod(JaggedJetConstituentArrayMethods)  # type: ignore
     def from_jagged(
         cls: Type[T],
-        pt: UprootArrayTyped[UprootArrayTyped[float]],
-        eta: UprootArrayTyped[UprootArrayTyped[float]],
-        phi: UprootArrayTyped[UprootArrayTyped[float]],
-        global_index: UprootArrayTyped[UprootArrayTyped[int]],
+        pt: UprootArray[UprootArray[float]],
+        eta: UprootArray[UprootArray[float]],
+        phi: UprootArray[UprootArray[float]],
+        global_index: UprootArray[UprootArray[int]],
     ) -> T:
         """ Creates a view of constituents with jagged structure.
 
@@ -325,7 +238,7 @@ class Subjet:
         cls: Type["Subjet"],
         part_of_iterative_splitting: bool,
         parent_splitting_index: int,
-        constituent_indices: UprootArrayTyped[int],
+        constituent_indices: UprootArray[int],
         jet_constituents: JetConstituentArray,
     ) -> "Subjet":
         """ Construct the subjet from the constituent indices and jet constituents.
@@ -351,7 +264,7 @@ class Subjet:
         return self._parent_splitting_index
 
     @typing.overload
-    def parent_splitting(self, splittings: UprootArrayTyped[JetSplittingArray]) -> JetSplittingArray:
+    def parent_splitting(self, splittings: UprootArray[JetSplittingArray]) -> JetSplittingArray:
         ...
 
     @typing.overload
@@ -433,7 +346,7 @@ class SubjetArrayMethods(ArrayMethods):
         )
 
     @property
-    def part_of_iterative_splitting(self) -> UprootArrayTyped[bool]:
+    def part_of_iterative_splitting(self) -> UprootArray[bool]:
         """ Whether subjets are part of the iterative splitting.
 
         Args:
@@ -441,19 +354,19 @@ class SubjetArrayMethods(ArrayMethods):
         Returns:
             True if the subjets are part of the iterative splitting.
         """
-        return cast(UprootArrayTyped[bool], self["part_of_iterative_splitting"])
+        return cast(UprootArray[bool], self["part_of_iterative_splitting"])
 
     @property
-    def parent_splitting_index(self) -> UprootArrayTyped[int]:
+    def parent_splitting_index(self) -> UprootArray[int]:
         """ Indices of the parent splittings. """
-        return cast(UprootArrayTyped[int], self["parent_splitting_index"])
+        return cast(UprootArray[int], self["parent_splitting_index"])
 
     @property
-    def iterative_splitting_index(self) -> UprootArrayTyped[int]:
+    def iterative_splitting_index(self) -> UprootArray[int]:
         """ Indices of splittings which were part of the iterative splitting chain. """
         return self.parent_splitting_index[self.part_of_iterative_splitting]
 
-    def parent_splitting(self, splittings: UprootArrayTyped[JetSplittingArray]) -> UprootArrayTyped[JetSplittingArray]:
+    def parent_splitting(self, splittings: UprootArray[JetSplittingArray]) -> UprootArray[JetSplittingArray]:
         """ Retrieve the parent splittings of the subjets.
 
         Args:
@@ -461,7 +374,7 @@ class SubjetArrayMethods(ArrayMethods):
         Returns:
             Parent splittings for the subjets.
         """
-        return cast(UprootArrayTyped[JetSplittingArray], splittings[self["parent_splitting_index"]])
+        return cast(UprootArray[JetSplittingArray], splittings[self["parent_splitting_index"]])
 
 
 # Adds in JaggedArray methods for constructing objects with jagged structure.
@@ -483,9 +396,9 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
 
     def __init__(
         self,
-        part_of_iterative_splitting: UprootArrayTyped[bool],
-        parent_splitting_index: UprootArrayTyped[int],
-        constituents: UprootArrayTyped[JetConstituentArray],
+        part_of_iterative_splitting: UprootArray[bool],
+        parent_splitting_index: UprootArray[int],
+        constituents: UprootArray[JetConstituentArray],
     ) -> None:
         self._init_object_array(ak.Table())
         self["part_of_iterative_splitting"] = part_of_iterative_splitting
@@ -495,12 +408,12 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
     @classmethod
     def from_jagged(
         cls: Type[_T_SubjetArray],
-        part_of_iterative_splitting: UprootArrayTyped[bool],
-        parent_splitting_index: UprootArrayTyped[int],
-        constituents_indices: UprootArrayTyped[int],
-        subjet_constituents: Optional[UprootArrayTyped[JetConstituentArray]] = None,
-        jet_constituents: Optional[UprootArrayTyped[JetConstituentArray]] = None,
-        constituents_jagged_indices: Optional[UprootArrayTyped[int]] = None,
+        part_of_iterative_splitting: UprootArray[bool],
+        parent_splitting_index: UprootArray[int],
+        constituents_indices: UprootArray[int],
+        subjet_constituents: Optional[UprootArray[JetConstituentArray]] = None,
+        jet_constituents: Optional[UprootArray[JetConstituentArray]] = None,
+        constituents_jagged_indices: Optional[UprootArray[int]] = None,
     ) -> _T_SubjetArray:
         """ Creates a view of subjets with jagged structure.
 
@@ -577,9 +490,9 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
     @ak.util.wrapjaggedmethod(JaggedSubjetArrayMethods)  # type: ignore
     def _from_jagged_impl(
         cls: Type[_T_SubjetArray],
-        part_of_iterative_splitting: UprootArrayTyped[bool],
-        parent_splitting_index: UprootArrayTyped[int],
-        constituents: UprootArrayTyped[JetConstituentArray],
+        part_of_iterative_splitting: UprootArray[bool],
+        parent_splitting_index: UprootArray[int],
+        constituents: UprootArray[JetConstituentArray],
     ) -> _T_SubjetArray:
         """ Creates a view of subjets with jagged structure.
 
@@ -727,21 +640,21 @@ class JetSplittingArrayMethods(ArrayMethods):
         )
 
     @property
-    def kt(self) -> UprootArrayTyped[float]:
+    def kt(self) -> UprootArray[float]:
         """ Kt of the splittings. """
-        return cast(UprootArrayTyped[float], self["kt"])
+        return cast(UprootArray[float], self["kt"])
 
     @property
-    def delta_R(self) -> UprootArrayTyped[float]:
+    def delta_R(self) -> UprootArray[float]:
         """ Delta R of the splittings. """
-        return cast(UprootArrayTyped[float], self["delta_R"])
+        return cast(UprootArray[float], self["delta_R"])
 
     @property
-    def z(self) -> UprootArrayTyped[float]:
+    def z(self) -> UprootArray[float]:
         """ z of the splitting. """
-        return cast(UprootArrayTyped[float], self["z"])
+        return cast(UprootArray[float], self["z"])
 
-    def part_of_iterative_splitting(self, subjets: SubjetArray) -> UprootArrayTyped[bool]:
+    def part_of_iterative_splitting(self, subjets: SubjetArray) -> UprootArray[bool]:
         """ Determine whether the splitting is iterative.
 
         Args:
@@ -752,7 +665,7 @@ class JetSplittingArrayMethods(ArrayMethods):
         # TODO: I don't think this works!!
         # iterative_splittings = subjets.parent_splitting_index[subjets.part_of_iterative_splitting]
         iterative_splittings = subjets.iterative_splitting_index
-        return cast(UprootArrayTyped[bool], self["parent_index"] in iterative_splittings)
+        return cast(UprootArray[bool], self["parent_index"] in iterative_splittings)
 
     def iterative_splittings(self, subjets: SubjetArray) -> SubjetArray:
         """ Retriieve the iterative splittings.
@@ -765,7 +678,7 @@ class JetSplittingArrayMethods(ArrayMethods):
         return cast(SubjetArray, self[subjets.iterative_splitting_index])
 
     @property
-    def parent_pt(self) -> UprootArrayTyped[float]:
+    def parent_pt(self) -> UprootArray[float]:
         """ Pt of the (parent) subjets which lead to the splittings.
 
         The pt can be calculated from the splitting properties via:
@@ -778,9 +691,9 @@ class JetSplittingArrayMethods(ArrayMethods):
             None.
         """
         # parent_pt = subleading / z = kt / sin(delta_R) / z
-        return cast(UprootArrayTyped[float], self.kt / np.sin(self.delta_R) / self.z)
+        return cast(UprootArray[float], self.kt / np.sin(self.delta_R) / self.z)
 
-    def theta(self, jet_R: float) -> UprootArrayTyped[float]:
+    def theta(self, jet_R: float) -> UprootArray[float]:
         """ Theta of the splittings.
 
         This is defined as delta_R normalized by the jet resolution parameter.
@@ -792,7 +705,7 @@ class JetSplittingArrayMethods(ArrayMethods):
         """
         return self.delta_R / jet_R
 
-    def dynamical_z(self, R: float) -> Tuple[UprootArrayTyped[float], UprootArrayTyped[int]]:
+    def dynamical_z(self, R: float) -> Tuple[UprootArray[float], UprootArray[int]]:
         """ Dynamical z of the jet splittings.
 
         Args:
@@ -802,7 +715,7 @@ class JetSplittingArrayMethods(ArrayMethods):
         """
         return find_leading(dynamical_z(self.delta_R, self.z, self.parent_pt, R))
 
-    def dynamical_kt(self, R: float) -> Tuple[UprootArrayTyped[float], UprootArrayTyped[int]]:
+    def dynamical_kt(self, R: float) -> Tuple[UprootArray[float], UprootArray[int]]:
         """ Dynamical kt of the jet splittings.
 
         Args:
@@ -812,7 +725,7 @@ class JetSplittingArrayMethods(ArrayMethods):
         """
         return find_leading(dynamical_kt(self.delta_R, self.z, self.parent_pt, R))
 
-    def dynamical_time(self, R: float) -> Tuple[UprootArrayTyped[float], UprootArrayTyped[int]]:
+    def dynamical_time(self, R: float) -> Tuple[UprootArray[float], UprootArray[int]]:
         """ Dynamical time of the jet splittings.
 
         Args:
@@ -822,7 +735,7 @@ class JetSplittingArrayMethods(ArrayMethods):
         """
         return find_leading(dynamical_time(self.delta_R, self.z, self.parent_pt, R))
 
-    def leading_kt(self, z_cutoff: Optional[float] = None) -> Tuple[UprootArrayTyped[float], UprootArrayTyped[int]]:
+    def leading_kt(self, z_cutoff: Optional[float] = None) -> Tuple[UprootArray[float], UprootArray[int]]:
         """ Leading kt of the jet splittings.
 
         Args:
@@ -840,9 +753,7 @@ class JetSplittingArrayMethods(ArrayMethods):
         values, indices = find_leading(self.kt[local_index_mask])
         return values, local_index_mask[indices]
 
-    def soft_drop(
-        self, z_cutoff: float
-    ) -> Tuple[UprootArrayTyped[float], UprootArrayTyped[int], UprootArrayTyped[int]]:
+    def soft_drop(self, z_cutoff: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
         """ Calculate soft drop of the splittings.
 
         Args:
@@ -877,10 +788,10 @@ class JetSplittingArray(JetSplittingArrayMethods, ak.ObjectArray):  # type: igno
 
     def __init__(
         self,
-        kt: UprootArrayTyped[float],
-        delta_R: UprootArrayTyped[float],
-        z: UprootArrayTyped[float],
-        parent_index: UprootArrayTyped[int],
+        kt: UprootArray[float],
+        delta_R: UprootArray[float],
+        z: UprootArray[float],
+        parent_index: UprootArray[int],
     ) -> None:
         self._init_object_array(ak.Table())
         self["kt"] = kt
@@ -892,10 +803,10 @@ class JetSplittingArray(JetSplittingArrayMethods, ak.ObjectArray):  # type: igno
     @ak.util.wrapjaggedmethod(JaggedJetSplittingArrayMethods)  # type: ignore
     def from_jagged(
         cls: Type[T],
-        kt: UprootArrayTyped[float],
-        delta_R: UprootArrayTyped[float],
-        z: UprootArrayTyped[float],
-        parent_index: UprootArrayTyped[int],
+        kt: UprootArray[float],
+        delta_R: UprootArray[float],
+        z: UprootArray[float],
+        parent_index: UprootArray[int],
     ) -> T:
         """ Creates a view of splittings with jagged structure.
 
@@ -1047,9 +958,9 @@ class SubstructureJetArrayMethods(SubstructureJetCommonMethods, ArrayMethods):
         )
 
     @property
-    def jet_pt(self) -> UprootArrayTyped[float]:
+    def jet_pt(self) -> UprootArray[float]:
         """ Jet pt. """
-        return cast(UprootArrayTyped[float], self["jet_pt"])
+        return cast(UprootArray[float], self["jet_pt"])
 
     @property
     def constituents(self) -> JetConstituentArray:
@@ -1082,10 +993,10 @@ class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):  # type
 
     def __init__(
         self,
-        jet_pt: UprootArrayTyped[float],
-        jet_constituents: UprootArrayTyped[JetConstituentArray],
-        subjets: UprootArrayTyped[SubjetArray],
-        jet_splittings: UprootArrayTyped[JetSplittingArray],
+        jet_pt: UprootArray[float],
+        jet_constituents: UprootArray[JetConstituentArray],
+        subjets: UprootArray[SubjetArray],
+        jet_splittings: UprootArray[JetSplittingArray],
     ) -> None:
         self._init_object_array(ak.Table())
         self["jet_pt"] = jet_pt
