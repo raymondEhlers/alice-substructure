@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+
+""" Functionality for drawing and exploring splittings.
+
+.. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
+"""
+
+import logging
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+
+from jet_substructure.base import substructure_methods
+
+
+if TYPE_CHECKING:
+    import networkx
+
+logger = logging.getLogger(__name__)
+
+
+def splittings_graph(  # noqa: C901
+    jet: substructure_methods.SubstructureJet, path: Path, filename: Optional[str] = None
+) -> "networkx.DiGraph":
+    """ Draw a splitting graph for a given jet.
+
+    In the graph, inner nodes represent splittings, and lines represent subjets. Outer nodes (ie those with no
+    nodes leaving them) represent particles. The iterative splitting nodes are shown in green, while the iterative
+    splitting subjets are shown in blue.  Each node is labeled with the constituents pt of the subjet which leads
+    to that node. Additional labels on the node are the kt of each splitting.
+
+    Args:
+        jet: Jet to be plotted.
+        path: Path to where the plot should be stored.
+        filename: Filename under which the plot should be stored.
+    Returns:
+        The directed graph representing the splitting. A plot of the graph is also stored at the provided path and filename.
+    """
+    # Import the necessary packages. We make this a lazy import because we don't want a hard dependency.
+    try:
+        import networkx as nx
+
+        # pygraphviz is required for drawing the graph. We only use it indirectly, but importing it ensures
+        # that it's available.
+        import pygraphviz  # noqa: F401
+    except ImportError as exc:
+        logger.warning(
+            "Failed to import network or pygraphviz. Please install them."
+            " You also need to install graphviz externally (for example, via brew)."
+        )
+        raise exc
+
+    # Validation
+    if filename is None:
+        filename = f"splitting_graph_jetPt_{jet.jet_pt:.1f}GeV"
+
+    # We want a directed graph showing the splitting.
+    graph = nx.DiGraph()
+    # Nodes represent each splitting
+    # We create the notes by specifying the edges, which then will create the necessary nodes.
+    # NOTE: We can't just use enumerate because we have a directed graph and we need to have the parent index first.
+    splittings_indices = list(zip(jet.splittings.parent_index, range(len(jet.splittings.parent_index))))
+    splittings: List[Tuple[str, str]] = []
+    # Add prefix to the splittings nodes so we can differentiate them from the subjets
+    for v in splittings_indices:
+        splittings.append((f"s{v[0]}", f"s{v[1]}"))
+    # Add edges from the edges (and implicitly, the nodes that are necessary for those edges)
+    graph.add_edges_from(splittings)
+    # Remove the -1 node, as it's a fake node to indicate the root (origin) splitting.
+    graph.remove_node("s-1")
+    # Associate the splittings index with the nodes so we can get the splitting later.
+    # We don't store a reference to the object directly because pygraphviz requires it to be a str.
+    # It might work for networkx, but it's not worth changing now.
+    for i, splitting in enumerate(jet.splittings):
+        n = graph.nodes[f"s{i}"]
+        n["splitting_index"] = i
+
+    # Add subjets edges
+    subjets: List[Tuple[str, int]] = []
+    subjets_indices = list(
+        zip(
+            jet.subjets, jet.subjets.parent_splitting_index, range(len(jet.subjets.parent_splitting_index))  # type: ignore
+        )
+    )
+    for subjet, parent_splitting_index, subjet_index in subjets_indices:
+        # Need to label the splittings with the prefix.
+        subjets.append((f"s{parent_splitting_index}", subjet_index))
+    graph.add_edges_from(subjets)
+    # Associated the subjets with the edges.
+    for subjet, parent_splitting_index, subjet_index in subjets_indices:
+        e = graph.edges[(f"s{parent_splitting_index}", subjet_index)]
+        e["subjet_index"] = subjet_index
+
+    # Now that all necessary parts of the graph have been created, we need to remove any duplicated edges
+    # First, We need to be able to identify all iterative splitting nodes. Critically, this also must include
+    # the splitting node prefix.
+    iterative_splitting_indices_with_prefix = [f"s{v}" for v in jet.subjets.iterative_splitting_index]  # type: ignore
+
+    # Now, we can merge subjets edges into the edges created by the splittings.
+    nodes_to_remove: List[Union[str, int]] = []
+    for n in graph.nodes():
+        # We are only interested in splitting nodes.
+        if "s" not in str(n):
+            continue
+        # There should only be two edges leaving the node.
+        edges_labels = graph.out_edges(n)
+        # Sanity check
+        if len(edges_labels) > 4:
+            raise ValueError(f"Too many edges for node {n} (len: {len(edges_labels)}). Something has gone wrong!")
+        # Only remove edges if necessary.
+        if len(edges_labels) > 2:
+            # There should always only be two edges leaving a given node.
+            number_of_subjets_to_remove = len(edges_labels) - 2
+            # To determine which edges to remove, we need to identify which edges correspond to subjets
+            # and which edges are from the splittings. We want to effectively merge the subjet edges into
+            # the splitting edges.
+            subjet_edges: List[Tuple[Tuple[Union[str, int], Union[str, int]], int, substructure_methods.Subjet]] = []
+            splitting_edges: List[Tuple[Dict[str, Any], bool]] = []
+            for e in edges_labels:
+                print(type(e))
+                print(type(e[0]), type(e[1]))
+                # "s" in the outgoing edge name indicates that it points to a splitting.
+                if "s" not in str(e[1]):
+                    subjet_edges.append((e, int(e[1]), jet.subjets[int(e[1])].constituents.pt.sum()))
+                else:
+                    n = graph.nodes[e[1]]
+                    splitting_edges.append((e, f"s{n['splitting_index']}" in iterative_splitting_indices_with_prefix))
+            # We want to match up the subjets with the iterative splittings.
+            # To do so, we sort such that the hardest subjet is first, and that the iterative splitting is first.
+            # If there are no iterative splittings, then the order isn't meaningful, so the ordering might be off.
+            # But in that case, we don't care so much - it's just going to be included in the recursive case.
+            subjet_edges = sorted(subjet_edges, key=lambda x: x[2], reverse=True)
+            splitting_edges = sorted(splitting_edges, key=lambda x: x[1], reverse=True)
+            # logger.debug(subjet_edges)
+            # logger.debug(splitting_edges)
+            for subjet_edge, splitting_edge in zip(subjet_edges[:number_of_subjets_to_remove], splitting_edges):
+                graph.edges[splitting_edge[0]]["subjet_index"] = graph.edges[subjet_edge[0]]["subjet_index"]
+                # logger.debug(f"subjet_edge: {subjet_edge}, splitting_edge: {splitting_edge}")
+                nodes_to_remove.append(subjet_edge[0][1])
+
+    # Actually remove the nodes. We can't do it above because it will invalidate the iterator.
+    for node in nodes_to_remove:
+        graph.remove_node(node)
+
+    # All iterative splittings are green.
+    for name in iterative_splitting_indices_with_prefix:
+        n = graph.nodes[name]
+        n["color"] = "/greens3/3"
+
+    # Label the nodes and edges.
+    # Each node is labeled with the sum of the constituents pt of the subjet leading to that node.
+    # Each node also has a secondary label with the kt (via the `xlabel` parameter with graphviz).
+    # This information allows us to confirm that the harder branch was always identified.
+    for name in graph.nodes:
+        # Retrieve the node since it appears that we cannot directly iterate over the nodes.
+        n = graph.nodes[name]
+        # Skip the origin (which doesn't contain any incoming edges)
+        if name == "s0":
+            n["label"] = "Origin"
+            continue
+
+        # in_edges are edges which are incoming into the node.
+        edges_labels = graph.in_edges(name)
+        # Each node should only have one incoming edge
+        if len(edges_labels) != 1:
+            raise ValueError(
+                "Node {n} has too many edges: {len(edges_labels)}. This shouldn't ever happen, so you'll need to check it out!"
+            )
+        e = list(edges_labels)[0]
+        # Add the constituents pt label
+        subjet = jet.subjets[int(graph.edges[e]["subjet_index"])]
+        n["label"] = f"{subjet.constituents.pt.sum():.01f}"
+        # Identify edges via the subjet properties.
+        if subjet.part_of_iterative_splitting:
+            graph.edges[e]["color"] = "/blues3/3"
+
+        # Add the kt as a secondary label of the node.
+        # NOTE: Not all nodes will have the splitting index because we also end all subjets with a node, which
+        #       is obviously not a splitting.
+        if "splitting_index" in n:
+            # logger.debug(f"splitting_index for {n}: {n['splitting_index']}")
+            splitting = jet.splittings[int(n["splitting_index"])]
+            n["xlabel"] = f"{splitting.kt:.01f}"
+
+    # Now we want to draw the graph.
+    # We convert to graphviz for plotting because networkx requires too much plotting configuration for labels, etc.
+    graphviz_graph = nx.nx_agraph.to_agraph(graph)
+    # Show the graph from left to right
+    graphviz_graph.graph_attr.update(rankdir="LR")
+    # Determine and the layout and draw
+    graphviz_graph.layout("dot")
+    graphviz_graph.draw(str(path / f"{filename}.pdf"))
+
+    return graph

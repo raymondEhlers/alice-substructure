@@ -34,6 +34,8 @@ isort = {extras = ["toml"], version = "^4.3.21"}
 IPython = "^7.12.0"
 jupyterlab = "^1.2.6"
 jupyter_nbextensions_configurator = "^0.4.1"
+pygraphviz = "^1.5"
+networkx = "^2.4"
 
 [tool.isort]
 known_standard_library = ["setuptools"]
