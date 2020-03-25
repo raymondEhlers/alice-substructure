@@ -1,4 +1,4 @@
-# 1/usr/bin/env python3
+#!/usr/bin/env python3
 
 """ Tests for Jet Substructure interpretation for uproot.
 
@@ -558,6 +558,7 @@ class JetSplittingArrayMethods(ArrayMethods):
         return self.kt / np.sin(self.delta_R) / self.z
 
     def part_of_iterative_splitting(self, subjets: Result[SubjetArray]) -> Result[bool]:
+        # TODO: I don't think this works!!
         # iterative_splittings = subjets.parent_splitting_index[subjets.part_of_iterative_splitting]
         iterative_splittings = subjets.iterative_splitting_index
         return self["parent_index"] in iterative_splittings
