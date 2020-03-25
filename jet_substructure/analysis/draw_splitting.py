@@ -77,9 +77,7 @@ def splittings_graph(  # noqa: C901
     # Add subjets edges
     subjets: List[Tuple[str, int]] = []
     subjets_indices = list(
-        zip(
-            jet.subjets, jet.subjets.parent_splitting_index, range(len(jet.subjets.parent_splitting_index))  # type: ignore
-        )
+        zip(jet.subjets, jet.subjets.parent_splitting_index, range(len(jet.subjets.parent_splitting_index)))
     )
     for subjet, parent_splitting_index, subjet_index in subjets_indices:
         # Need to label the splittings with the prefix.
@@ -93,7 +91,7 @@ def splittings_graph(  # noqa: C901
     # Now that all necessary parts of the graph have been created, we need to remove any duplicated edges
     # First, We need to be able to identify all iterative splitting nodes. Critically, this also must include
     # the splitting node prefix.
-    iterative_splitting_indices_with_prefix = [f"s{v}" for v in jet.subjets.iterative_splitting_index]  # type: ignore
+    iterative_splitting_indices_with_prefix = [f"s{v}" for v in jet.subjets.iterative_splitting_index]
 
     # Now, we can merge subjets edges into the edges created by the splittings.
     nodes_to_remove: List[Union[str, int]] = []
