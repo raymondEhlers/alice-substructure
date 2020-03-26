@@ -298,13 +298,38 @@ void Reclustering(SubstructureTree::JetSubstructureSplittings & jetSplittings, f
   }
 }
 
-std::vector<fastjet::PseudoJet> ExtractDaughters(const Event & event, unsigned int index, bool storeGlobalIndex = true)
+void RetrieveFinalStateDaughterIndices(const Event & event, unsigned int index, std::vector<int> & daughters, bool keepOnlyCharged = true)
 {
-  std::vector<fastjet::PseudoJet> daughters;
   std::vector<int> daughterIndices = event.daughterList(index);
-  unsigned int constituentIndex = 0;
   for (auto i : daughterIndices)
   {
+    // If final state particle, store it.
+    //if (event[i].pT() < 0.150) {
+    //    continue;
+    //}
+    //if (std::abs(event[i].eta()) > 1)
+    //    continue; // eta cut
+    if (event[i].isFinal() ) {
+      bool store = keepOnlyCharged ? event[i].isCharged() : true;
+      if (store == true) {
+        daughters.emplace_back(i);
+      }
+    }
+    // Otherwise, recurse.
+    RetrieveFinalStateDaughterIndices(event, i, daughters, keepOnlyCharged);
+  }
+}
+
+std::vector<fastjet::PseudoJet> RetrieveFinalStateDaughters(const Event & event, unsigned int index, bool keepOnlyCharged, bool storeGlobalIndex = true)
+{
+  std::vector<fastjet::PseudoJet> daughters;
+  std::vector<int> daughterIndices;
+  RetrieveFinalStateDaughterIndices(event, index, daughterIndices, keepOnlyCharged);
+  unsigned int constituentIndex = 0;
+  //std::cout << "index " << index << " -> daughterIndices.size(): " << daughterIndices.size() << "\n";
+  for (auto i : daughterIndices)
+  {
+    //std::cout << "daughter " << i << ", index: " << (storeGlobalIndex ? i : constituentIndex) << "\n";
     fastjet::PseudoJet j(
       event[i].px(),
       event[i].py(),
@@ -380,7 +405,7 @@ void ExtractTruePythiaSplittings(SubstructureTree::JetSubstructureSplittings & j
   // First, extract the constituents.
   // We only store those that are descended from the starting index.
   // NOTE: The order of the constituents may be different than for the other splittings, but it shouldn't matter.
-  std::vector<fastjet::PseudoJet> daughters = ExtractDaughters(event, startingIndex);
+  std::vector<fastjet::PseudoJet> daughters = RetrieveFinalStateDaughters(event, startingIndex);
   for (auto part : daughters) {
     // Store the pythia constituents in the output.
     jetSplittings.AddJetConstituent(part);
@@ -409,22 +434,26 @@ void ExtractTruePythiaSplittings(SubstructureTree::JetSubstructureSplittings & j
   }*/
 //}
 
-std::vector<unsigned short> FindSubjetConstituentsFromAllConstituents(const std::vector<fastjet::PseudoJet> & subjetConstituents, const std::vector<fastjet::PseudoJet> & allConstituents)
+std::vector<unsigned short> FindSubjetConstituentsFromAllConstituents(const std::vector<int> & subjetConstituentGlobalIndices, const std::vector<fastjet::PseudoJet> & allConstituents)
 {
   std::vector<unsigned short> subjetConstituentIndices;
-  //for (std::size_t subjetConstituentIndex = 0; subjetConstituentIndex < subjetConstituents.size(); subjetConstituentIndex++)
-  for (const auto & subjetConstituent : subjetConstituents)
+  //std::cout << "Number of all constituents: " << allConstituents.size() << "\n";
+  for (const auto & subjetConstituentGobalIndex : subjetConstituentGlobalIndices)
   {
     bool found = false;
+    //std::cout << "Looking at subjet constituent with user_index: " << subjetConstituentGobalIndex << "\n";
     for (std::size_t constituentIndex = 0; constituentIndex < allConstituents.size(); constituentIndex++)
     {
-      if (subjetConstituent.user_index() == allConstituents[constituentIndex].user_index()) {
+      //std::cout << "constituent " << constituentIndex << ", user_index: " << allConstituents[constituentIndex].user_index() << "\n";
+      if (subjetConstituentGobalIndex == allConstituents[constituentIndex].user_index()) {
         found = true;
+        //std::cout << "Found match with constituentIndex: " << constituentIndex << "\n";
         subjetConstituentIndices.emplace_back(constituentIndex);
+        break;
       }
     }
     if (found == false) {
-      std::cout << "Failed to find matching constituent for " << subjetConstituent.user_index() << "\n";
+      std::cout << "Failed to find matching constituent for " << subjetConstituentGobalIndex << "\n";
       std::exit(1);
     }
   }
@@ -456,7 +485,7 @@ int main(int argc, char* argv[])
   //                        ANALYSIS SETTINGS
 
   double jetParameterR = (double)atof(argv[5]); // jet R
-  double trackLowPtCut = 1.150;                 // GeV
+  double trackLowPtCut = 0.150;                 // GeV
   double trackEtaCut = 1;
   Float_t ptHatMin = 20;
   Float_t ptHatMax = 300;
@@ -664,7 +693,8 @@ int main(int argc, char* argv[])
         splittingsObj.SetJetPt(pythia.event[i].pT());
 
         // Add jet constituents
-        std::vector<fastjet::PseudoJet> daughters = ExtractDaughters(pythia.event, i);
+        //std::cout << "\nEvent " << iEvent << ", particle " << i << "\n\n";
+        std::vector<fastjet::PseudoJet> daughters = RetrieveFinalStateDaughters(pythia.event, i, charged, true);
         for (const auto & part : daughters) {
           splittingsObj.AddJetConstituent(part);
         }
@@ -699,10 +729,12 @@ int main(int argc, char* argv[])
         splittingNodeIndex = splittingsObj.GetNumberOfSplittings() - 1;
         // Given our mode here, this should always be 0!
         assert(splittingNodeIndex == 0);
-        std::vector<fastjet::PseudoJet> j1Constituents = ExtractDaughters(pythia.event, index1, false);
-        std::vector<fastjet::PseudoJet> j2Constituents = ExtractDaughters(pythia.event, index2, false);
-        std::vector<unsigned short> j1ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j1Constituents, daughters);
-        std::vector<unsigned short> j2ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j2Constituents, daughters);
+        std::vector<int> j1DaughterIndices;
+        RetrieveFinalStateDaughterIndices(pythia.event, index1, j1DaughterIndices, charged);
+        std::vector<int> j2DaughterIndices;
+        RetrieveFinalStateDaughterIndices(pythia.event, index2, j2DaughterIndices, charged);
+        std::vector<unsigned short> j1ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j1DaughterIndices, daughters);
+        std::vector<unsigned short> j2ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j2DaughterIndices, daughters);
         splittingsObj.AddSubjet(splittingNodeIndex, true, j1ConstituentIndices);
         splittingsObj.AddSubjet(splittingNodeIndex, false, j2ConstituentIndices);
 
@@ -715,6 +747,7 @@ int main(int argc, char* argv[])
         }
       }
     }
+    //std::cout << "Number of particles (globalIndex): " << globalIndex << "\n";
 
     // Thermal Particles loop
     // Add an offset for thermal particles.
