@@ -298,21 +298,13 @@ void Reclustering(SubstructureTree::JetSubstructureSplittings & jetSplittings, f
   }
 }
 
-std::vector<fastjet::PseudoJet> ExtractParticlesFromPythia(const Event & event, unsigned int startingIndex)
+std::vector<fastjet::PseudoJet> ExtractDaughters(const Event & event, unsigned int index)
 {
-  unsigned int index = startingIndex;
+  std::vector<fastjet::PseudoJet> daughters;
+  std::vector<int> daughterIndices = event.daughterList(index);
   unsigned int constituentIndex = 0;
-  while (event[index].daughter1() > 0 && event[index].daughter2() > 0) {
-    unsigned int index1 = event[index].daughter1();
-    unsigned int index2 = event[index].daughter2();
-
-    // If we want hadrons, we can use this selection.
-    /*int fhadron = 0;
-    if ((TMath::Abs(pythia.event[index1].status()) >= 80) ||
-      (TMath::Abs(pythia.event[index2].status()) >= 80)) {
-      fhadron = 1;
-    }*/
-
+  for (auto i : daughterIndices)
+  {
     fastjet::PseudoJet j1(
       event[index1].px(),
       event[index1].py(),
@@ -321,19 +313,10 @@ std::vector<fastjet::PseudoJet> ExtractParticlesFromPythia(const Event & event, 
     );
     j1.set_user_index(constituentIndex);
     // Store the pythia constituents in the output
-    jetSplittings.AddJetConstituent(j1);
+    daughters.emplace_back(j1);
     constituentIndex++;
-    fastjet::PseudoJet j2(
-      event[index2].px(),
-      event[index2].py(),
-      event[index2].pz(),
-      event[index2].pAbs()
-    );
-    j2.set_user_index(constituentIndex);
-    // Store the pythia constituents in the output
-    jetSplittings.AddJetConstituent(j2);
   }
-
+  return daughters;
 }
 
 void ExtractTruePythiaSplittings(SubstructureTree::JetSubstructureSplittings & jetSplittings, Event & event, const int inputIndex, int splittingNodeIndex, bool followingIterativeSplitting, const bool storeRecursiveSplittings = true)
@@ -397,40 +380,17 @@ void RecursiveTruePythia(SubstructureTree::JetSubstructureSplittings & jetSplitt
   // We only store those that are descended from the starting index.
   // NOTE: The order of the constituents is different than for the other splittings, but it shouldn't matter.
   unsigned int index = startingIndex;
-  unsigned int constituentIndex = 0;
-  while (event[index].daughter1() > 0 && event[index].daughter2() > 0) {
-    unsigned int index1 = event[index].daughter1();
-    unsigned int index2 = event[index].daughter2();
-
-    // If we want hadrons, we can use this selection.
-    /*int fhadron = 0;
-    if ((TMath::Abs(pythia.event[index1].status()) >= 80) ||
-      (TMath::Abs(pythia.event[index2].status()) >= 80)) {
-      fhadron = 1;
-    }*/
-
-    fastjet::PseudoJet j1(
-      event[index1].px(),
-      event[index1].py(),
-      event[index1].pz(),
-      event[index1].pAbs()
-    );
-    j1.set_user_index(constituentIndex);
-    // Store the pythia constituents in the output
-    jetSplittings.AddJetConstituent(j1);
-    constituentIndex++;
-    fastjet::PseudoJet j2(
-      event[index2].px(),
-      event[index2].py(),
-      event[index2].pz(),
-      event[index2].pAbs()
-    );
-    j2.set_user_index(constituentIndex);
-    // Store the pythia constituents in the output
-    jetSplittings.AddJetConstituent(j2);
+  std::vector<fastjet::PseudoJet> daughters = ExtractDaughters(startingIndex);
+  for (auto part : daughters) {
+    // Store the pythia constituents in the output.
+    jetSplittings.AddJetConstituent(part);
   }
 
-  while (event[index].daughter1() > 0 && event[index].daughter2() > 0) {
+  // Store the jet splittings.
+  int splittingNodeIndex = -1;
+  ExtractTruePythiaSplittings(jetSplittings, event, inputIndex, splittingNodeIndex, true, storeRecursiveSplittings);
+
+  /*while (event[index].daughter1() > 0 && event[index].daughter2() > 0) {
     // j1 should always be the harder of the two subjets.
     if (j1.perp() < j2.perp()) {
       swap(j1, j2);
@@ -446,8 +406,7 @@ void RecursiveTruePythia(SubstructureTree::JetSubstructureSplittings & jetSplitt
       kt = xkt;
       deltaR = xDeltaR;
     }
-  }
-
+  }*/
 }
 
 //___________________________________________________________________
