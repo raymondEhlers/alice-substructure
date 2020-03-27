@@ -487,7 +487,7 @@ int main(int argc, char* argv[])
   double jetParameterR = (double)atof(argv[5]); // jet R
   double trackLowPtCut = 0.150;                 // GeV
   double trackEtaCut = 1;
-  Float_t ptHatMin = 20;
+  Float_t ptHatMin = 50;
   Float_t ptHatMax = 300;
 
   //__________________________________________________________________________
@@ -834,9 +834,13 @@ int main(int argc, char* argv[])
     // Only fill if we're actually close to a splitting. Otherwise, we get empty true jet splittings
     // and/or we pull the hybrid jets to the edges of the eta acceptance.
     if (deltaR6 < 0.1 || deltaR7 < 0.1) {
+      //std::cout << "True pt: " << trueJetSplittings.GetJetPt() << "\n";
       hybridJetSplittings.SetJetPt(hybridProbeJet.pt());
       Reclustering(hybridJetSplittings, hybridProbeJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
       trueSplittingsTree.Fill();
+    }
+    else {
+      //std::cout << "True splitting failed! deltaR6=" << deltaR6 << ", deltaR7=" << deltaR7 << "\n";
     }
 
     // Match jets
@@ -916,7 +920,7 @@ int main(int argc, char* argv[])
   TString tag = TString::Format("pythia+thermal_substructure_toy_antikt_%02d", TMath::Nint(jetParameterR * 10));
 
   TFile* outFile =
-   new TFile(TString::Format("%s_tune_%d_seed_%03d_%s%s.root", tag.Data(), tune, randomSeed, charged ? "charged" : "full", underlingEvent ? "_underlyingEvent" : ""), "RECREATE");
+   new TFile(TString::Format("%s_tune_%d_seed_%03d_%s%s_ptHatMin_%d.root", tag.Data(), tune, randomSeed, charged ? "charged" : "full", underlingEvent ? "_underlyingEvent" : "", static_cast<int>(ptHatMin)), "RECREATE");
 
   outFile->cd();
   // Write out hists
