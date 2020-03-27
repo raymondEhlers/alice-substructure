@@ -553,7 +553,7 @@ int main(int argc, char* argv[])
   std::vector<fastjet::PseudoJet> inputsPythia;
   std::vector<fastjet::PseudoJet> inputsHybrid;
 
-  //_________Thermal Particl_densityes Distribuitions (toy model)
+  //_________Thermal Particle density distributions (toy model)
 
   TF1* f_pT = new TF1("f_pT", "x*exp(-x/0.3)", 0.0, 400.0);
   f_pT->SetNpx(40000);
