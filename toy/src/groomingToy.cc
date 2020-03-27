@@ -465,10 +465,10 @@ std::vector<unsigned short> FindSubjetConstituentsFromAllConstituents(const std:
 //___________________________________________________________________
 int main(int argc, char* argv[])
 {
-  Int_t randomSeed = -1;  // unique number for each file
-  Int_t tune = -1;   // pythia tune
-  Int_t charged = 0; // full or track-based jets
-  Int_t underlingEvent = 1;    // underlying event (ISR+MPI)
+  int randomSeed = -1;  // unique number for each file
+  int tune = -1;   // pythia tune
+  int charged = 1; // full or track-based jets
+  int underlingEvent = 1;    // underlying event (ISR+MPI)
 
   if (argc != 6) {
     cout << "Usage:" << endl << "./pygen <PythiaTune> <Seed> <nEvts> <underlingEvent> <jetR>" << endl;
@@ -912,7 +912,7 @@ int main(int argc, char* argv[])
   TString tag = TString::Format("pythia+thermal_substructure_toy_antikt_%02d", TMath::Nint(jetParameterR * 10));
 
   TFile* outFile =
-   new TFile(TString::Format("%s_tune_%d_seed_%d_%s%s.root", tag.Data(), tune, randomSeed, charged ? "charged" : "full", underlingEvent ? "_underlyingEvent" : ""), "RECREATE");
+   new TFile(TString::Format("%s_tune_%d_seed_%03d_%s%s.root", tag.Data(), tune, randomSeed, charged ? "charged" : "full", underlingEvent ? "_underlyingEvent" : ""), "RECREATE");
 
   outFile->cd();
   // Write out hists
