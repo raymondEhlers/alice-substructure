@@ -252,6 +252,124 @@ class SubstructureHists(SubstructureHistsBase):
 
 
 @attr.s
+class SubstructureToyHists(SubstructureHistsBase):
+    name: str = attr.ib()
+    title: str = attr.ib()
+    iterative_splittings: bool = attr.ib()
+    n_jets: int = attr.ib()
+    values: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    kt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    z: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    delta_R: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    theta: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+
+    @property
+    def attributes_to_skip(self) -> List[str]:
+        attrs = super().attributes_to_skip
+        attrs.extend(["n_jets"])
+        return attrs
+
+    def __add__(self, other: "SubstructureToyHists") -> "SubstructureToyHists":
+        """ Handles a = b + c """
+        new = copy.deepcopy(self)
+        new += other
+        return new
+
+    def __iadd__(self, other: "SubstructureToyHists") -> "SubstructureToyHists":
+        """ Handles a += b """
+        # Validation
+        if self.iterative_splittings != other.iterative_splittings:
+            raise TypeError(
+                f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
+            )
+
+        self.name = f"{self.name}_{other.name}" if self.name != other.name else self.name
+        self.title = f"{self.title}_{other.title}" if self.title != other.title else self.title
+        # Don't need to update iterative_splittings since they must be the same!
+        self.n_jets += other.n_jets
+        for (k, v), (k_other, v_other) in zip(self, other):
+            v += v_other
+
+        return self
+
+    def __radd__(self, other: "SubstructureToyHists") -> "SubstructureToyHists":
+        """ For use with sum(...). """
+        if other == 0:
+            return self
+        else:
+            return self + other
+
+    def __truediv__(self, other: "SubstructureToyHists") -> "SubstructureToyHists":
+        data = []
+        for (k, v), (k_other, v_other) in zip(self, other):
+            # Sanity check
+            if k != k_other:
+                raise ValueError(f"Somehow keys mismatch. self key: {k}, other key: {k_other}")
+            # First, normalize the hists by the number of jets.
+            temp_v = v / self.n_jets
+            temp_v_other = v_other / other.n_jets
+            data.append(temp_v / temp_v_other)
+
+        return type(self)(
+            f"{self.name}_{other.name}",
+            f"{self.title}_{other.title}",
+            self.iterative_splittings and other.iterative_splittings,
+            1,
+            *data,
+        )
+
+    @classmethod
+    def create_boost_histograms(
+        cls: Type["SubstructureToyHists"], name: str, title: str, iterative_splittings: bool, values_axis: bh.Histogram
+    ) -> "SubstructureToyHists":
+        kt_axis = bh.axis.Regular(50, 0, 25)
+        z_axis = bh.axis.Regular(20, 0, 0.5)
+        delta_R_axis = bh.axis.Regular(20, 0, 0.4)
+        theta_axis = bh.axis.Regular(50, 0, 1)
+        return cls(
+            name=name,
+            title=title,
+            iterative_splittings=iterative_splittings,
+            n_jets=0,
+            values=bh.Histogram(values_axis, values_axis, storage=bh.storage.Weight()),
+            kt=bh.Histogram(kt_axis, kt_axis, storage=bh.storage.Weight()),
+            z=bh.Histogram(z_axis, z_axis, storage=bh.storage.Weight()),
+            delta_R=bh.Histogram(delta_R_axis, delta_R_axis, storage=bh.storage.Weight()),
+            theta=bh.Histogram(theta_axis, theta_axis, storage=bh.storage.Weight()),
+        )
+
+    def fill(
+        self, hybrid_inputs: FillHistogramInput, true_inputs: FillHistogramInput, weight: float, jet_R: float,
+    ) -> None:
+        # Validation
+        # Give a useful error message
+        if not all(isinstance(hist, bh.Histogram) for _, hist in self):
+            raise ValueError("Not all hists are boost histograms! Cannot fill!")
+
+        # And then help out mypy...
+        assert (
+            isinstance(self.values, bh.Histogram)
+            and isinstance(self.kt, bh.Histogram)
+            and isinstance(self.z, bh.Histogram)
+            and isinstance(self.delta_R, bh.Histogram)
+            and isinstance(self.theta, bh.Histogram)
+        )
+        # Need to store the number of jets along the histograms.
+        self.n_jets += hybrid_inputs.n_jets
+        self.values.fill(hybrid_inputs.values, true_inputs.values)
+        self.kt.fill(hybrid_inputs.splittings.kt.flatten(), true_inputs.splittings.kt.flatten())
+        self.z.fill(hybrid_inputs.splittings.z.flatten(), true_inputs.splittings.z.flatten())
+        self.delta_R.fill(hybrid_inputs.splittings.delta_R.flatten(), true_inputs.splittings.delta_R.flatten())
+        self.theta.fill(
+            hybrid_inputs.splittings.theta(jet_R).flatten(), true_inputs.splittings.theta(jet_R).flatten(),
+        )
+        # self.kt.fill(hybrid_inputs.splittings.kt.pad(1).fillna(0).flatten(), true_inputs.splittings.kt.pad(1).fillna(0).flatten())
+        # self.z.fill(hybrid_inputs.splittings.z.pad(1).fillna(0).flatten(), true_inputs.splittings.z.pad(1).fillna(0).flatten())
+        # self.delta_R.fill(hybrid_inputs.splittings.delta_R.pad(1).fillna(0).flatten(), true_inputs.splittings.delta_R.pad(1).fillna(0).flatten())
+        # self.theta.fill(hybrid_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten(), true_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten(),)
+
+
+@attr.s
 class SubstructureResponseHists(SubstructureHistsBase):
     name: str = attr.ib()
     title: str = attr.ib()
@@ -498,7 +616,11 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
 
 
 T_SubstructureHists = TypeVar(
-    "T_SubstructureHists", SubstructureHists, SubstructureResponseHists, SubstructureMatchingSubjetHists
+    "T_SubstructureHists",
+    SubstructureHists,
+    SubstructureToyHists,
+    SubstructureResponseHists,
+    SubstructureMatchingSubjetHists,
 )
 
 
@@ -580,6 +702,54 @@ def create_substructure_hists(iterative_splittings: bool, z_cutoff: float) -> Hi
         values_axis=kt_axis,
     )
     leading_kt_hard_cutoff = SubstructureHists.create_boost_histograms(
+        name="leading_kt_hard_cutoff",
+        title=fr"SD $z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
+        iterative_splittings=iterative_splittings,
+        values_axis=kt_axis,
+    )
+
+    # TODO: SD
+    return Hists(
+        inclusive=inclusive,
+        dynamical_z=dynamical_z,
+        dynamical_kt=dynamical_kt,
+        dynamical_time=dynamical_time,
+        leading_kt=leading_kt,
+        leading_kt_hard_cutoff=leading_kt_hard_cutoff,
+    )
+
+
+def create_substructure_toy_hists(iterative_splittings: bool, z_cutoff: float) -> Hists[SubstructureToyHists]:
+    kt_axis = bh.axis.Regular(50, 0, 25)
+    inclusive = SubstructureToyHists.create_boost_histograms(
+        name="inclusive",
+        title="Inclusive",
+        iterative_splittings=iterative_splittings,
+        # This isn't really going to be meaningful for the inclusive case...
+        values_axis=bh.axis.Regular(10, 0, 100),
+    )
+    dynamical_z = SubstructureToyHists.create_boost_histograms(
+        name="dynamical_z",
+        title="zDrop",
+        iterative_splittings=iterative_splittings,
+        values_axis=bh.axis.Regular(50, 0, 50),
+    )
+    dynamical_kt = SubstructureToyHists.create_boost_histograms(
+        name="dynamical_kt", title="ktDrop", iterative_splittings=iterative_splittings, values_axis=kt_axis,
+    )
+    dynamical_time = SubstructureToyHists.create_boost_histograms(
+        name="dynamical_time",
+        title="timeDrop",
+        iterative_splittings=iterative_splittings,
+        values_axis=bh.axis.Regular(50, 0, 50),
+    )
+    leading_kt = SubstructureToyHists.create_boost_histograms(
+        name="leading_kt",
+        title=r"Leading $k_{\text{T}}$",
+        iterative_splittings=iterative_splittings,
+        values_axis=kt_axis,
+    )
+    leading_kt_hard_cutoff = SubstructureToyHists.create_boost_histograms(
         name="leading_kt_hard_cutoff",
         title=fr"SD $z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
         iterative_splittings=iterative_splittings,

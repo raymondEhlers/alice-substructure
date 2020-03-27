@@ -678,3 +678,134 @@ def matching(
         for technique, hists in matching_hists:
             # Plot matching distributions
             _plot_matching(technique=technique, identifier=identifier, hists=hists, path=path)
+
+
+def _plot_toy(
+    technique: str,
+    identifier: analysis_objects.Identifier,
+    attribute_name: str,
+    hists: analysis_objects.SubstructureToyHists,
+    plot_config: PlotConfig,
+    path: Path,
+) -> None:
+    # Setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+    logger.info(f"Plotting toy hist for {technique}, {identifier}, {attribute_name}")
+
+    h: Union[bh.Histogram, binned_data.BinnedData] = getattr(hists, attribute_name)
+    if isinstance(h, bh.Histogram):
+        h = binned_data.BinnedData.from_existing_data(h)
+
+    # TODO: Should the hists be normalized earlier??
+    # Scale by bin width
+    x_bin_widths, y_bin_widths = np.meshgrid(*h.axes.bin_widths)
+    bin_widths = x_bin_widths * y_bin_widths
+    # print(f"x_bin_widths: {x_bin_widths.size}")
+    # print(f"y_bin_widths: {y_bin_widths.size}")
+    # print(f"bin_widths size: {bin_widths.size}")
+    h /= bin_widths
+    # Scale by njets.
+    h /= hists.n_jets
+
+    # Determine the normalization range
+    z_axis_range = {
+        "vmin": h.values[h.values > 0].min(),
+        "vmax": h.values.max(),
+    }
+    # if technique == "inclusive":
+    #    z_axis_range = {
+    #        "vmin": 10e-3,
+    #        "vmax": 5,
+    #    }
+
+    # Make the plot
+    mesh = ax.pcolormesh(
+        h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+    )
+    fig.colorbar(mesh, pad=0.02)
+
+    # Labeling
+    text = identifier.display_str()
+    text += "\n" + hists.title
+    ax.text(
+        0.95,
+        0.95,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="right",
+        verticalalignment="top",
+        multialignment="right",
+    )
+
+    # Presentation
+    ax.set_xlabel(r"$\log{(1/\Delta R)}$")
+    ax.set_ylabel(r"$\log{(k_{\text{T}})}$")
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.10,
+        bottom=0.11,
+        right=0.99,
+        top=0.98,
+    )
+
+    # Store and reset
+    fig.savefig(path / f"{attribute_name}_{str(identifier)}_{technique}.pdf")
+    plt.close(fig)
+
+
+def toy(
+    all_toy_hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]],
+    path: Path,
+) -> None:
+    # Validation
+    path.mkdir(parents=True, exist_ok=True)
+
+    # Plot labels
+    kt_label = PlotConfig(
+        name="kt",
+        x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+        legend_location="lower left",
+    )
+    z_label = PlotConfig(
+        name="z", x_label=r"$z$", y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$", legend_location="lower right",
+    )
+    delta_R_label = PlotConfig(
+        name="delta_R",
+        x_label=r"$R$",
+        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}R$",
+        legend_location="lower right",
+    )
+    theta_label = PlotConfig(
+        name="theta",
+        x_label=r"$\theta$",
+        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\theta$",
+        legend_location="lower right",
+    )
+
+    distributions: List[Tuple[str, PlotConfig]] = [
+        ("kt", kt_label),
+        ("z", z_label),
+        ("delta_R", delta_R_label),
+        ("theta", theta_label),
+    ]
+
+    for identifier, toy_hists in all_toy_hists.items():
+        for technique, hists in toy_hists:
+            if hists.n_jets == 0:
+                logger.warning(f"No jets within {identifier}_{technique}. Skipping bin!")
+                continue
+            for attribute_name, plot_config in distributions:
+                # Plot toy distributions
+                _plot_toy(
+                    technique=technique,
+                    identifier=identifier,
+                    attribute_name=attribute_name,
+                    hists=hists,
+                    plot_config=plot_config,
+                    path=path,
+                )
