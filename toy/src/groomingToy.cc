@@ -831,9 +831,13 @@ int main(int argc, char* argv[])
     if (deltaR7 < 0.1) {
       trueJetSplittings = parton7Splittings;
     }
-    hybridJetSplittings.SetJetPt(hybridProbeJet.pt());
-    Reclustering(hybridJetSplittings, hybridProbeJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
-    trueSplittingsTree.Fill();
+    // Only fill if we're actually close to a splitting. Otherwise, we get empty true jet splittings
+    // and/or we pull the hybrid jets to the edges of the eta acceptance.
+    if (deltaR6 < 0.1 || deltaR7 < 0.1) {
+      hybridJetSplittings.SetJetPt(hybridProbeJet.pt());
+      Reclustering(hybridJetSplittings, hybridProbeJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
+      trueSplittingsTree.Fill();
+    }
 
     // Match jets
     // Need to do rudimentary matching
