@@ -334,7 +334,7 @@ std::vector<fastjet::PseudoJet> RetrieveFinalStateDaughters(const Event & event,
       event[i].px(),
       event[i].py(),
       event[i].pz(),
-      event[i].pAbs()
+      event[i].e()
     );
     j.set_user_index(storeGlobalIndex ? i : constituentIndex);
     // Store the pythia constituents in the output
@@ -359,13 +359,13 @@ void ExtractTruePythiaSplittings(SubstructureTree::JetSubstructureSplittings & j
     event[index1].px(),
     event[index1].py(),
     event[index1].pz(),
-    event[index1].pAbs()
+    event[index1].e()
   );
   fastjet::PseudoJet j2(
     event[index2].px(),
     event[index2].py(),
     event[index2].pz(),
-    event[index2].pAbs()
+    event[index2].e()
   );
 
   // j1 should always be the harder of the two subjets.
@@ -671,7 +671,7 @@ int main(int argc, char* argv[])
           pythia.event[i].px(),
           pythia.event[i].py(),
           pythia.event[i].pz(),
-          pythia.event[i].pAbs()
+          pythia.event[i].e()
         );
         particle.set_user_index(globalIndex);
         inputsPythia.push_back(particle);
