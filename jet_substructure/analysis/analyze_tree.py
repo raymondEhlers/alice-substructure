@@ -248,6 +248,9 @@ def analyze_single_tree_toy(
             # We want to restrict a constant hybrid jet pt range for both true and hybrid.
             # This will allow us to compare to measured jet pt ranges.
             jet_pt_mask = identifier.jet_pt_bin.mask_array(hybrid_jets.jet_pt)
+            # Add additional restrictions that we can't handle single constituent jets.
+            # TODO: Can we do better???
+            jet_pt_mask = jet_pt_mask & (hybrid_jets.constituents.counts > 1)
             restricted_hybrid_jets, restricted_hybrid_jets_splittings = _select_and_retrieve_splittings(
                 hybrid_jets, jet_pt_mask, identifier.iterative_splittings
             )
@@ -324,10 +327,11 @@ def analyze_single_tree_toy(
                 *restricted_true_jets_splittings.leading_kt(z_cutoff=z_cutoff),
             )
             # Ensure that there are sufficient values!
+            # TODO: This doesn't work because the true frequently fails. They somehow need to be the same length...
             # IPython.embed()
-            hists[identifier].leading_kt.fill(
-                hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
-            )
+            # hists[identifier].leading_kt.fill(
+            #    hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
+            # )
 
     # IPython.start_ipython(user_ns=locals())
 

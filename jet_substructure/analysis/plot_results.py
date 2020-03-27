@@ -738,8 +738,8 @@ def _plot_toy(
     )
 
     # Presentation
-    ax.set_xlabel(r"$\log{(1/\Delta R)}$")
-    ax.set_ylabel(r"$\log{(k_{\text{T}})}$")
+    ax.set_xlabel(plot_config.x_label)
+    ax.set_ylabel(plot_config.y_label)
     fig.tight_layout()
     fig.subplots_adjust(
         # Reduce spacing between subplots
@@ -767,24 +767,23 @@ def toy(
     # Plot labels
     kt_label = PlotConfig(
         name="kt",
-        x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
-        legend_location="lower left",
+        x_label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$",
+        y_label=r"$k_{\text{T}}^{\text{first splitting}}\:(\text{GeV}/c)$",
     )
     z_label = PlotConfig(
-        name="z", x_label=r"$z$", y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$", legend_location="lower right",
+        name="z",
+        x_label=r"$z^{\text{hybrid}}\:(\text{GeV}/c)$",
+        y_label=r"$z^{\text{first splitting}}\:(\text{GeV}/c)$",
     )
     delta_R_label = PlotConfig(
         name="delta_R",
-        x_label=r"$R$",
-        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}R$",
-        legend_location="lower right",
+        x_label=r"$R^{\text{hybrid}}\:(\text{GeV}/c)$",
+        y_label=r"$R^{\text{first splitting}}\:(\text{GeV}/c)$",
     )
     theta_label = PlotConfig(
         name="theta",
-        x_label=r"$\theta$",
-        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\theta$",
-        legend_location="lower right",
+        x_label=r"$\theta^{\text{hybrid}}\:(\text{GeV}/c)$",
+        y_label=r"$\theta^{\text{first splitting}}\:(\text{GeV}/c)$",
     )
 
     distributions: List[Tuple[str, PlotConfig]] = [
