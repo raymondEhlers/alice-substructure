@@ -699,51 +699,59 @@ int main(int argc, char* argv[])
           splittingsObj.AddJetConstituent(part);
         }
         unsigned int index1 = pythia.event[i].daughter1();
-        fastjet::PseudoJet j1(
-          pythia.event[index1].px(),
-          pythia.event[index1].py(),
-          pythia.event[index1].pz(),
-          pythia.event[index1].pAbs()
-        );
         unsigned int index2 = pythia.event[i].daughter2();
-        fastjet::PseudoJet j2(
-          pythia.event[index2].px(),
-          pythia.event[index2].py(),
-          pythia.event[index2].pz(),
-          pythia.event[index2].pAbs()
-        );
+        //if (index1 == index2) {
+        //    std::cout << "Daughter indices are equal!!!" << "\n";
+        //}
+        if (((index1 > 0) && (index2 > 0)) && (index1 != index2)) {
+          fastjet::PseudoJet j1(
+            pythia.event[index1].px(),
+            pythia.event[index1].py(),
+            pythia.event[index1].pz(),
+            pythia.event[index1].e()
+          );
+          fastjet::PseudoJet j2(
+            pythia.event[index2].px(),
+            pythia.event[index2].py(),
+            pythia.event[index2].pz(),
+            pythia.event[index2].e()
+          );
 
-        // j1 should always be the harder of the two subjets.
-        if (j1.perp() < j2.perp()) {
-          swap(j1, j2);
+          // j1 should always be the harder of the two subjets.
+          if (j1.perp() < j2.perp()) {
+            swap(j1, j2);
+          }
+          // Calculate the splitting properties and store them
+          double xz = j2.perp() / (j2.perp() + j1.perp());
+          double xDeltaR = j1.delta_R(j2);
+          double xkt = j2.perp() * std::sin(xDeltaR);
+          // Add splitting
+          int splittingNodeIndex = -1;
+          splittingsObj.AddSplitting(xkt, xDeltaR, xz, splittingNodeIndex);
+
+          // Add subjet
+          splittingNodeIndex = splittingsObj.GetNumberOfSplittings() - 1;
+          // Given our mode here, this should always be 0!
+          assert(splittingNodeIndex == 0);
+          std::vector<int> j1DaughterIndices;
+          RetrieveFinalStateDaughterIndices(pythia.event, index1, j1DaughterIndices, charged);
+          std::vector<int> j2DaughterIndices;
+          RetrieveFinalStateDaughterIndices(pythia.event, index2, j2DaughterIndices, charged);
+          std::vector<unsigned short> j1ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j1DaughterIndices, daughters);
+          std::vector<unsigned short> j2ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j2DaughterIndices, daughters);
+          splittingsObj.AddSubjet(splittingNodeIndex, true, j1ConstituentIndices);
+          splittingsObj.AddSubjet(splittingNodeIndex, false, j2ConstituentIndices);
+
+          // Add the splitting node to the particular parton
+          if (i == 5) {
+            parton6Splittings = splittingsObj;
+          }
+          if (i == 6) {
+            parton7Splittings = splittingsObj;
+          }
         }
-        // Calculate the splitting properties and store them
-        double xz = j2.perp() / (j2.perp() + j1.perp());
-        double xDeltaR = j1.delta_R(j2);
-        double xkt = j2.perp() * std::sin(xDeltaR);
-        // Add splitting
-        int splittingNodeIndex = -1;
-        splittingsObj.AddSplitting(xkt, xDeltaR, xz, splittingNodeIndex);
-
-        // Add subjet
-        splittingNodeIndex = splittingsObj.GetNumberOfSplittings() - 1;
-        // Given our mode here, this should always be 0!
-        assert(splittingNodeIndex == 0);
-        std::vector<int> j1DaughterIndices;
-        RetrieveFinalStateDaughterIndices(pythia.event, index1, j1DaughterIndices, charged);
-        std::vector<int> j2DaughterIndices;
-        RetrieveFinalStateDaughterIndices(pythia.event, index2, j2DaughterIndices, charged);
-        std::vector<unsigned short> j1ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j1DaughterIndices, daughters);
-        std::vector<unsigned short> j2ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j2DaughterIndices, daughters);
-        splittingsObj.AddSubjet(splittingNodeIndex, true, j1ConstituentIndices);
-        splittingsObj.AddSubjet(splittingNodeIndex, false, j2ConstituentIndices);
-
-        // Add the splitting node to the particular parton
-        if (i == 5) {
-          parton6Splittings = splittingsObj;
-        }
-        if (i == 6) {
-          parton7Splittings = splittingsObj;
+        else {
+          // Daughter 1 or 2 is not suitable. Skip this parton.
         }
       }
     }
@@ -816,7 +824,8 @@ int main(int argc, char* argv[])
     }
 
     // Fill true tree!
-    fastjet::PseudoJet hybridProbeJet = hybridJets[0];
+    // NOTE: We want the leading hybrid jet, so we sort by pt.
+    fastjet::PseudoJet hybridProbeJet = sorted_by_pt(hybridJets)[0];
     fastjet::PseudoJet parton6(pythia.event[5].px(), pythia.event[5].py(), pythia.event[5].pz(),
                   pythia.event[5].e());
     fastjet::PseudoJet parton7(pythia.event[6].px(), pythia.event[6].py(), pythia.event[6].pz(),
@@ -833,10 +842,33 @@ int main(int argc, char* argv[])
     }
     // Only fill if we're actually close to a splitting. Otherwise, we get empty true jet splittings
     // and/or we pull the hybrid jets to the edges of the eta acceptance.
-    if (deltaR6 < 0.1 || deltaR7 < 0.1) {
+    if ((deltaR6 < 0.1 || deltaR7 < 0.1) && trueJetSplittings.GetJetPt() > 0) {
       //std::cout << "True pt: " << trueJetSplittings.GetJetPt() << "\n";
+      //// Splitting properties
+      //float kt = 0, deltaR = 0, z = 0;
+      //short parentIndex = 0;
+      //std::tie(kt, deltaR, z, parentIndex) = trueJetSplittings.GetSplitting(0);
+      //std::cout << "splitting info: kt=" << kt << ", deltaR=" << deltaR << ", z=" << z <<  "\n";
+      //// Constituents
+      // True jet splittings info
+      std::cout << "True jet: " << trueJetSplittings << "\n";
       hybridJetSplittings.SetJetPt(hybridProbeJet.pt());
       Reclustering(hybridJetSplittings, hybridProbeJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
+      //std::cout << "hybrid jet pt=" << hybridJetSplittings.GetJetPt() << "\n";
+      // Hybrid jet splittings info
+      std::cout << "Hybrid jet: " << hybridJetSplittings << "\n";
+
+      // Sanity check on the kt value.
+      // It must be positive (but apparently sometimes it isn't...)!
+      // Apparently if deltaR is sufficiently large, it can lead to a negative kt because sin goes negative for values
+      // greater than pi!
+      //float kt = 0, deltaR = 0, z = 0;
+      //short parentIndex = 0;
+      //std::tie(kt, deltaR, z, parentIndex) = trueJetSplittings.GetSplitting(0);
+      //if (kt <= 0) {
+      //    std::cout << "kt <= 0. Waaaaat?\n";
+      //    std::exit(1);
+      //}
       trueSplittingsTree.Fill();
     }
     else {
