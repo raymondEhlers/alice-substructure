@@ -322,7 +322,6 @@ class SubstructureToyHists(SubstructureHistsBase):
     def create_boost_histograms(
         cls: Type["SubstructureToyHists"], name: str, title: str, iterative_splittings: bool, values_axis: bh.Histogram
     ) -> "SubstructureToyHists":
-        kt_axis = bh.axis.Regular(50, 0, 25)
         z_axis = bh.axis.Regular(20, 0, 0.5)
         delta_R_axis = bh.axis.Regular(20, 0, 0.4)
         theta_axis = bh.axis.Regular(20, 0, 1)
@@ -332,7 +331,7 @@ class SubstructureToyHists(SubstructureHistsBase):
             iterative_splittings=iterative_splittings,
             n_jets=0,
             values=bh.Histogram(values_axis, values_axis, storage=bh.storage.Weight()),
-            kt=bh.Histogram(kt_axis, kt_axis, storage=bh.storage.Weight()),
+            kt=bh.Histogram(bh.axis.Regular(50, 0, 5), bh.axis.Regular(50, -5, 5), storage=bh.storage.Weight()),
             z=bh.Histogram(z_axis, z_axis, storage=bh.storage.Weight()),
             delta_R=bh.Histogram(delta_R_axis, delta_R_axis, storage=bh.storage.Weight()),
             theta=bh.Histogram(theta_axis, theta_axis, storage=bh.storage.Weight()),
@@ -356,13 +355,11 @@ class SubstructureToyHists(SubstructureHistsBase):
         )
         # Need to store the number of jets along the histograms.
         self.n_jets += data_inputs.n_jets
-        self.values.fill(data_inputs.values, true_inputs.values)
-        self.kt.fill(data_inputs.splittings.kt.flatten(), true_inputs.splittings.kt.flatten())
-        self.z.fill(data_inputs.splittings.z.flatten(), true_inputs.splittings.z.flatten())
-        self.delta_R.fill(data_inputs.splittings.delta_R.flatten(), true_inputs.splittings.delta_R.flatten())
-        self.theta.fill(
-            data_inputs.splittings.theta(jet_R).flatten(), true_inputs.splittings.theta(jet_R).flatten(),
-        )
+        self.values.fill(true_inputs.values, data_inputs.values)
+        self.kt.fill(np.log(true_inputs.splittings.kt.flatten()), np.log(data_inputs.splittings.kt.flatten()))
+        self.z.fill(true_inputs.splittings.z.flatten(), data_inputs.splittings.z.flatten())
+        self.delta_R.fill(true_inputs.splittings.delta_R.flatten(), data_inputs.splittings.delta_R.flatten())
+        self.theta.fill(true_inputs.splittings.theta(jet_R).flatten(), data_inputs.splittings.theta(jet_R).flatten())
         # self.kt.fill(data_inputs.splittings.kt.pad(1).fillna(0).flatten(), true_inputs.splittings.kt.pad(1).fillna(0).flatten())
         # self.z.fill(data_inputs.splittings.z.pad(1).fillna(0).flatten(), true_inputs.splittings.z.pad(1).fillna(0).flatten())
         # self.delta_R.fill(data_inputs.splittings.delta_R.pad(1).fillna(0).flatten(), true_inputs.splittings.delta_R.pad(1).fillna(0).flatten())
