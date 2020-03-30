@@ -725,7 +725,7 @@ def _plot_toy(
     fig.colorbar(mesh, pad=0.02)
 
     # Labeling
-    text = identifier.display_str()
+    text = identifier.display_str(jet_pt_label="hybrid")
     text += "\n" + hists.title
     ax.text(
         0.95,

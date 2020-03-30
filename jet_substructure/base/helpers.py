@@ -200,5 +200,5 @@ class RangeSelector:
     def __str__(self) -> str:
         return f"jetPt_{self.min}_{self.max}"
 
-    def display_str(self) -> str:
-        return fr"{self.min} < p_{{\text{{T}}}}^{{\text{{jet}}}} < {self.max}"
+    def display_str(self, label: str = "") -> str:
+        return fr"{self.min} < p_{{\text{{T,jet}}}}^{{\text{{{label}}}}} < {self.max}"

@@ -34,8 +34,8 @@ class Identifier:
     def __str__(self) -> str:
         return f"jetPt_{self.jet_pt_bin.min}_{self.jet_pt_bin.max}_{self.iterative_splittings_label}_splittings"
 
-    def display_str(self) -> str:
-        return f"{self.iterative_splittings_label.capitalize()} splittings\n${self.jet_pt_bin.display_str()}$"
+    def display_str(self, jet_pt_label: str = "") -> str:
+        return f"{self.iterative_splittings_label.capitalize()} splittings\n${self.jet_pt_bin.display_str(label=jet_pt_label)}$"
 
 
 @attr.s
