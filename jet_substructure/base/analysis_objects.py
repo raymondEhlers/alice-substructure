@@ -184,7 +184,7 @@ class SubstructureHists(SubstructureHistsBase):
         kt_axis = bh.axis.Regular(50, 0, 25)
         z_axis = bh.axis.Regular(20, 0, 0.5)
         delta_R_axis = bh.axis.Regular(20, 0, 0.4)
-        theta_axis = bh.axis.Regular(50, 0, 1)
+        theta_axis = bh.axis.Regular(20, 0, 1)
         splitting_number_axis = bh.axis.Regular(10, 0, 10)
         total_number_of_splittings_axis = bh.axis.Regular(50, 0, 50)
         lund_plane_axes = [bh.axis.Regular(25, 0, 5), bh.axis.Regular(25, -5.0, 5.0)]
@@ -325,7 +325,7 @@ class SubstructureToyHists(SubstructureHistsBase):
         kt_axis = bh.axis.Regular(50, 0, 25)
         z_axis = bh.axis.Regular(20, 0, 0.5)
         delta_R_axis = bh.axis.Regular(20, 0, 0.4)
-        theta_axis = bh.axis.Regular(50, 0, 1)
+        theta_axis = bh.axis.Regular(20, 0, 1)
         return cls(
             name=name,
             title=title,
@@ -339,7 +339,7 @@ class SubstructureToyHists(SubstructureHistsBase):
         )
 
     def fill(
-        self, hybrid_inputs: FillHistogramInput, true_inputs: FillHistogramInput, weight: float, jet_R: float,
+        self, data_inputs: FillHistogramInput, true_inputs: FillHistogramInput, weight: float, jet_R: float,
     ) -> None:
         # Validation
         # Give a useful error message
@@ -355,18 +355,18 @@ class SubstructureToyHists(SubstructureHistsBase):
             and isinstance(self.theta, bh.Histogram)
         )
         # Need to store the number of jets along the histograms.
-        self.n_jets += hybrid_inputs.n_jets
-        self.values.fill(hybrid_inputs.values, true_inputs.values)
-        self.kt.fill(hybrid_inputs.splittings.kt.flatten(), true_inputs.splittings.kt.flatten())
-        self.z.fill(hybrid_inputs.splittings.z.flatten(), true_inputs.splittings.z.flatten())
-        self.delta_R.fill(hybrid_inputs.splittings.delta_R.flatten(), true_inputs.splittings.delta_R.flatten())
+        self.n_jets += data_inputs.n_jets
+        self.values.fill(data_inputs.values, true_inputs.values)
+        self.kt.fill(data_inputs.splittings.kt.flatten(), true_inputs.splittings.kt.flatten())
+        self.z.fill(data_inputs.splittings.z.flatten(), true_inputs.splittings.z.flatten())
+        self.delta_R.fill(data_inputs.splittings.delta_R.flatten(), true_inputs.splittings.delta_R.flatten())
         self.theta.fill(
-            hybrid_inputs.splittings.theta(jet_R).flatten(), true_inputs.splittings.theta(jet_R).flatten(),
+            data_inputs.splittings.theta(jet_R).flatten(), true_inputs.splittings.theta(jet_R).flatten(),
         )
-        # self.kt.fill(hybrid_inputs.splittings.kt.pad(1).fillna(0).flatten(), true_inputs.splittings.kt.pad(1).fillna(0).flatten())
-        # self.z.fill(hybrid_inputs.splittings.z.pad(1).fillna(0).flatten(), true_inputs.splittings.z.pad(1).fillna(0).flatten())
-        # self.delta_R.fill(hybrid_inputs.splittings.delta_R.pad(1).fillna(0).flatten(), true_inputs.splittings.delta_R.pad(1).fillna(0).flatten())
-        # self.theta.fill(hybrid_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten(), true_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten(),)
+        # self.kt.fill(data_inputs.splittings.kt.pad(1).fillna(0).flatten(), true_inputs.splittings.kt.pad(1).fillna(0).flatten())
+        # self.z.fill(data_inputs.splittings.z.pad(1).fillna(0).flatten(), true_inputs.splittings.z.pad(1).fillna(0).flatten())
+        # self.delta_R.fill(data_inputs.splittings.delta_R.pad(1).fillna(0).flatten(), true_inputs.splittings.delta_R.pad(1).fillna(0).flatten())
+        # self.theta.fill(data_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten(), true_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten(),)
 
 
 @attr.s
@@ -429,7 +429,7 @@ class SubstructureResponseHists(SubstructureHistsBase):
         kt_axis = bh.axis.Regular(50, 0, 25)
         z_axis = bh.axis.Regular(20, 0, 0.5)
         delta_R_axis = bh.axis.Regular(20, 0, 0.4)
-        theta_axis = bh.axis.Regular(50, 0, 1)
+        theta_axis = bh.axis.Regular(20, 0, 1)
         splitting_number_axis = bh.axis.Regular(10, 0, 10)
         return cls(
             name=name,

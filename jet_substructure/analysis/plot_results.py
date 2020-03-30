@@ -686,6 +686,7 @@ def _plot_toy(
     attribute_name: str,
     hists: analysis_objects.SubstructureToyHists,
     plot_config: PlotConfig,
+    data_label: str,
     path: Path,
 ) -> None:
     # Setup
@@ -725,7 +726,7 @@ def _plot_toy(
     fig.colorbar(mesh, pad=0.02)
 
     # Labeling
-    text = identifier.display_str(jet_pt_label="hybrid")
+    text = identifier.display_str(jet_pt_label=data_label)
     text += "\n" + hists.title
     ax.text(
         0.95,
@@ -759,30 +760,36 @@ def _plot_toy(
 
 def toy(
     all_toy_hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]],
+    data_prefix: str,
     path: Path,
 ) -> None:
     # Validation
     path.mkdir(parents=True, exist_ok=True)
 
     # Plot labels
+    label_map: Dict[str, str] = {
+        "data": "hybrid",
+        "pythia": "pythia",
+    }
+    label = label_map[data_prefix]
     kt_label = PlotConfig(
         name="kt",
-        x_label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$",
+        x_label=r"$k_{\text{T}}^{\text{" + label + r"}}\:(\text{GeV}/c)$",
         y_label=r"$k_{\text{T}}^{\text{first splitting}}\:(\text{GeV}/c)$",
     )
     z_label = PlotConfig(
         name="z",
-        x_label=r"$z^{\text{hybrid}}\:(\text{GeV}/c)$",
+        x_label=r"$z^{\text{" + label + r"}}\:(\text{GeV}/c)$",
         y_label=r"$z^{\text{first splitting}}\:(\text{GeV}/c)$",
     )
     delta_R_label = PlotConfig(
         name="delta_R",
-        x_label=r"$R^{\text{hybrid}}\:(\text{GeV}/c)$",
+        x_label=r"$R^{\text{" + label + r"}}\:(\text{GeV}/c)$",
         y_label=r"$R^{\text{first splitting}}\:(\text{GeV}/c)$",
     )
     theta_label = PlotConfig(
         name="theta",
-        x_label=r"$\theta^{\text{hybrid}}\:(\text{GeV}/c)$",
+        x_label=r"$\theta^{\text{" + label + r"}}\:(\text{GeV}/c)$",
         y_label=r"$\theta^{\text{first splitting}}\:(\text{GeV}/c)$",
     )
 
@@ -806,5 +813,6 @@ def toy(
                     attribute_name=attribute_name,
                     hists=hists,
                     plot_config=plot_config,
+                    data_label=label,
                     path=path,
                 )

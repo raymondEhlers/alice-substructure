@@ -182,6 +182,7 @@ def analyze_single_tree(
 
 def analyze_single_tree_toy(
     tree: data_manager.Tree,
+    data_prefix: str,
     z_cutoff: float,
     R: float,
     jet_pt_bins: Sequence[helpers.RangeSelector],
@@ -216,11 +217,11 @@ def analyze_single_tree_toy(
     try:
         # If there are 0 entries, then just return - it won't work...
         if len(tree) > 0:
-            prefix = "data"
-            hybrid_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
+            prefix = data_prefix
+            data_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
             prefix = "true"
             true_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
-            for prefix, jets in [("data", hybrid_jets), ("true", true_jets)]:
+            for prefix, jets in [(data_prefix, data_jets), ("true", true_jets)]:
                 # Save calculate columns so we don't need to re-calculate them every time.
                 # NOTE: We always check if they already exist because HDF5 doesn't like us
                 #       overwriting columns.
@@ -247,12 +248,12 @@ def analyze_single_tree_toy(
         for identifier, h in variations_counter(hists.items()):
             # We want to restrict a constant hybrid jet pt range for both true and hybrid.
             # This will allow us to compare to measured jet pt ranges.
-            jet_pt_mask = identifier.jet_pt_bin.mask_array(hybrid_jets.jet_pt)
+            jet_pt_mask = identifier.jet_pt_bin.mask_array(data_jets.jet_pt)
             # Add additional restrictions that we can't handle single constituent jets.
             # TODO: Can we do better???
-            jet_pt_mask = jet_pt_mask & (hybrid_jets.constituents.counts > 1)
-            restricted_hybrid_jets, restricted_hybrid_jets_splittings = _select_and_retrieve_splittings(
-                hybrid_jets, jet_pt_mask, identifier.iterative_splittings
+            jet_pt_mask = jet_pt_mask & (data_jets.constituents.counts > 1)
+            restricted_data_jets, restricted_data_jets_splittings = _select_and_retrieve_splittings(
+                data_jets, jet_pt_mask, identifier.iterative_splittings
             )
             restricted_true_jets, restricted_true_jets_splittings = _select_and_retrieve_splittings(
                 true_jets, jet_pt_mask, identifier.iterative_splittings
@@ -264,22 +265,22 @@ def analyze_single_tree_toy(
             # Fill the hists as appropriate
             # TODO: Inclusive
             # Dynamical z
-            hybrid_inputs = analysis_objects.FillHistogramInput(
-                restricted_hybrid_jets,
-                restricted_hybrid_jets_splittings,
-                *restricted_hybrid_jets_splittings.dynamical_z(R=R),
+            data_inputs = analysis_objects.FillHistogramInput(
+                restricted_data_jets,
+                restricted_data_jets_splittings,
+                *restricted_data_jets_splittings.dynamical_z(R=R),
             )
             true_inputs = analysis_objects.FillHistogramInput(
                 restricted_true_jets, restricted_true_jets_splittings, *restricted_true_jets_splittings.dynamical_z(R=R)
             )
             hists[identifier].dynamical_z.fill(
-                hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
+                data_inputs=data_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
             )
             # Dynamical kt
-            hybrid_inputs = analysis_objects.FillHistogramInput(
-                restricted_hybrid_jets,
-                restricted_hybrid_jets_splittings,
-                *restricted_hybrid_jets_splittings.dynamical_kt(R=R),
+            data_inputs = analysis_objects.FillHistogramInput(
+                restricted_data_jets,
+                restricted_data_jets_splittings,
+                *restricted_data_jets_splittings.dynamical_kt(R=R),
             )
             true_inputs = analysis_objects.FillHistogramInput(
                 restricted_true_jets,
@@ -287,13 +288,13 @@ def analyze_single_tree_toy(
                 *restricted_true_jets_splittings.dynamical_kt(R=R),
             )
             hists[identifier].dynamical_kt.fill(
-                hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
+                data_inputs=data_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
             )
             # Dynamical time
-            hybrid_inputs = analysis_objects.FillHistogramInput(
-                restricted_hybrid_jets,
-                restricted_hybrid_jets_splittings,
-                *restricted_hybrid_jets_splittings.dynamical_time(R=R),
+            data_inputs = analysis_objects.FillHistogramInput(
+                restricted_data_jets,
+                restricted_data_jets_splittings,
+                *restricted_data_jets_splittings.dynamical_time(R=R),
             )
             true_inputs = analysis_objects.FillHistogramInput(
                 restricted_true_jets,
@@ -301,25 +302,23 @@ def analyze_single_tree_toy(
                 *restricted_true_jets_splittings.dynamical_time(R=R),
             )
             hists[identifier].dynamical_time.fill(
-                hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
+                data_inputs=data_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
             )
             # Leading kt
-            hybrid_inputs = analysis_objects.FillHistogramInput(
-                restricted_hybrid_jets,
-                restricted_hybrid_jets_splittings,
-                *restricted_hybrid_jets_splittings.leading_kt(),
+            data_inputs = analysis_objects.FillHistogramInput(
+                restricted_data_jets, restricted_data_jets_splittings, *restricted_data_jets_splittings.leading_kt(),
             )
             true_inputs = analysis_objects.FillHistogramInput(
                 restricted_true_jets, restricted_true_jets_splittings, *restricted_true_jets_splittings.leading_kt()
             )
             hists[identifier].leading_kt.fill(
-                hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
+                data_inputs=data_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
             )
             # Leading kt with z cutoff
-            hybrid_inputs = analysis_objects.FillHistogramInput(
-                restricted_hybrid_jets,
-                restricted_hybrid_jets_splittings,
-                *restricted_hybrid_jets_splittings.leading_kt(z_cutoff=z_cutoff),
+            data_inputs = analysis_objects.FillHistogramInput(
+                restricted_data_jets,
+                restricted_data_jets_splittings,
+                *restricted_data_jets_splittings.leading_kt(z_cutoff=z_cutoff),
             )
             true_inputs = analysis_objects.FillHistogramInput(
                 restricted_true_jets,
@@ -330,7 +329,7 @@ def analyze_single_tree_toy(
             # TODO: This doesn't work because the true frequently fails. They somehow need to be the same length...
             # IPython.embed()
             # hists[identifier].leading_kt.fill(
-            #    hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
+            #    data_inputs=data_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
             # )
 
     # IPython.start_ipython(user_ns=locals())
@@ -918,7 +917,11 @@ def run(
 
 
 def run_toy(
-    collision_system: str, jet_pt_bins: Sequence[helpers.RangeSelector], dataset_config_filename: Path, output: Path
+    collision_system: str,
+    data_prefix: str,
+    jet_pt_bins: Sequence[helpers.RangeSelector],
+    dataset_config_filename: Path,
+    output: Path,
 ) -> Tuple[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]], Path]:
     # Setup
     z_cutoff = 0.2
@@ -950,6 +953,7 @@ def run_toy(
             logger.info(f"Processing toy tree from file {tree.filename}")
             tree_hists = analyze_single_tree_toy(
                 tree,
+                data_prefix=data_prefix,
                 z_cutoff=z_cutoff,
                 R=R,
                 jet_pt_bins=jet_pt_bins,
@@ -1080,7 +1084,9 @@ if __name__ == "__main__":
     logging.getLogger("pachyderm.binned_data").setLevel(logging.INFO)
 
     # Setup and run
-    collision_system = "toy_true_splittings"
+    # collision_system = "toy"
+    data_prefix = "pythia"
+    collision_system = f"toy_true_{data_prefix}_splittings"
     jet_pt_bins = [
         helpers.RangeSelector(min=0, max=120),
         helpers.RangeSelector(min=60, max=80),
@@ -1091,19 +1097,20 @@ if __name__ == "__main__":
         helpers.RangeSelector(min=80, max=120),
     ]
     # hists, output = run(
-    #    collision_system=collision_system,
-    #    jet_pt_bins=jet_pt_bins,
-    #    dataset_config_filename=Path("config") / "datasets.yaml",
-    #    output=Path("output"),
+    #   collision_system=collision_system,
+    #   jet_pt_bins=jet_pt_bins,
+    #   dataset_config_filename=Path("config") / "datasets.yaml",
+    #   output=Path("output"),
     # )
     # plot_results.lund_plane(all_hists=hists, path=output)
     hists, output = run_toy(
         collision_system=collision_system,
+        data_prefix=data_prefix,
         jet_pt_bins=jet_pt_bins,
         dataset_config_filename=Path("config") / "datasets.yaml",
         output=Path("output"),
     )
-    plot_results.toy(all_toy_hists=hists, path=output)
+    plot_results.toy(all_toy_hists=hists, data_prefix=data_prefix, path=output)
     # hists_response, matching_hists, output = run_embedding(
     #    collision_system=collision_system,
     #    jet_pt_bins=jet_pt_bins,
