@@ -558,6 +558,57 @@ void ExtractFirstPythiaSplitting(SubstructureTree::JetSubstructureSplittings & s
   splittingsObj.AddSubjet(splittingNodeIndex, false, j2ConstituentIndices);
 }
 
+void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
+            SubstructureTree::JetSubstructureSplittings& jetSplittings, const Event& event,
+            SubstructureTree::JetSubstructureSplittings& trueJetSplittings,
+            SubstructureTree::JetSubstructureSplittings& parton6Splittings,
+            SubstructureTree::JetSubstructureSplittings& parton7Splittings,
+            const bool storeRecursiveSplittings, const bool applyTwoParticleAcceptanceCut)
+{
+  // We want to compare to the leading jet, so we must sort by pt (it may already be sorted,
+  // but in that case, it's perfectly fine to sort again - it's not expensive compared to other
+  // operations).
+  fastjet::PseudoJet probeJet = sorted_by_pt(jets)[0];
+  fastjet::PseudoJet parton6(event[5].px(), event[5].py(), event[5].pz(), event[5].e());
+  fastjet::PseudoJet parton7(event[6].px(), event[6].py(), event[6].pz(), event[6].e());
+  double deltaR6 = probeJet.delta_R(parton6);
+  double deltaR7 = probeJet.delta_R(parton7);
+
+  // We're only going to fill if we are close to a true parton.
+  if (deltaR6 < 0.1) {
+    trueJetSplittings = parton6Splittings;
+  }
+  if (deltaR7 < 0.1) {
+    trueJetSplittings = parton7Splittings;
+  }
+  // Only fill if we're actually close to a splitting. Otherwise, we get empty true jet splittings
+  // and/or we pull the jets to the edges of the eta acceptance.
+  if ((deltaR6 < 0.1 || deltaR7 < 0.1) && trueJetSplittings.GetJetPt() > 0) {
+    //// Splitting properties
+    // True jet splittings info
+    //std::cout << "True jet: " << trueJetSplittings << "\n";
+    jetSplittings.SetJetPt(probeJet.pt());
+    Reclustering(jetSplittings, probeJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
+    // Hybrid jet splittings info
+    //std::cout << "Other jet: " << jetSplittings << "\n";
+
+    // Sanity check on the kt value.
+    // It must be positive (but apparently sometimes it isn't...)!
+    // Apparently if deltaR is sufficiently large, it can lead to a negative kt because sin goes negative for values
+    // greater than pi!
+    //float kt = 0, deltaR = 0, z = 0;
+    //short parentIndex = 0;
+    //std::tie(kt, deltaR, z, parentIndex) = trueJetSplittings.GetSplitting(0);
+    //if (kt <= 0) {
+    //    std::cout << "kt <= 0. Waaaaat?\n";
+    //    std::exit(1);
+    //}
+    tree.Fill();
+  }
+  else {
+    //std::cout << "Failed to match true splitting! deltaR6=" << deltaR6 << ", deltaR7=" << deltaR7 << "\n";
+  }
+}
 
 //___________________________________________________________________
 int main(int argc, char* argv[])
@@ -641,7 +692,7 @@ int main(int argc, char* argv[])
 
   fastjet::JetDefinition* jetDefAKT_Sig = new fastjet::JetDefinition(fastjet::antikt_algorithm, jetParameterR, recombScheme, strategy);
 
-  fastjet::GhostedAreaSpec ghostareaspec(trackEtaCut, 1, 0.05); // ghost
+  //fastjet::GhostedAreaSpec ghostareaspec(trackEtaCut, 1, 0.05); // ghost
   // max rap, repeat, ghostarea default 0.01
   fastjet::AreaType areaType = fastjet::active_area_explicit_ghosts;
   fastjet::AreaDefinition* areaDef = new fastjet::AreaDefinition(areaType, ghostareaspec);
@@ -711,17 +762,24 @@ int main(int argc, char* argv[])
   int splitLevel = 4;
   int bufferSize = 32000;
   // We have two sets of trees:
-  // 1. true <-> hybrid (which doesn't care about matching). Called `trueSplittingsTree`.
+  // 1. true <-> pythia (which doesn't care about matching). Called `truePythiaSplittingsTree`
+  // 2. true <-> hybrid (which doesn't care about matching). Called `trueHybridSplittingsTree`.
   // 2. pythia <-> hybrid (which does care). Called `pythiaHybridTree`.
   SubstructureTree::JetSubstructureSplittings trueJetSplittings;
   SubstructureTree::JetSubstructureSplittings pythiaJetSplittings;
   SubstructureTree::JetSubstructureSplittings hybridJetSplittings;
   // Contains the correlation between true splittings and hybrid splittings.
-  TTree trueSplittingsTree("trueSplittingsTree", "trueSplittingsTree");
+  TTree truePythiaSplittingsTree("truePythiaSplittingsTree", "truePythiaSplittingsTree");
+  // True will containing the true splittings as determined directly from pythia.
+  truePythiaSplittingsTree.Branch("true.", &trueJetSplittings, bufferSize, splitLevel);
+  // data will contain the pythia jets
+  truePythiaSplittingsTree.Branch("pythia.", &pythiaJetSplittings, bufferSize, splitLevel);
+  // Contains the correlation between true splittings and hybrid splittings.
+  TTree trueHybridSplittingsTree("trueHybridSplittingsTree", "trueHybridSplittingsTree");
+  // True will containing the true splittings as determined directly from pythia.
+  trueHybridSplittingsTree.Branch("true.", &trueJetSplittings, bufferSize, splitLevel);
   // data will contain the hybrid jets
-  trueSplittingsTree.Branch("data.", &hybridJetSplittings, bufferSize, splitLevel);
-  // True will containing the true splittings as determined from pythia.
-  trueSplittingsTree.Branch("true.", &trueJetSplittings, bufferSize, splitLevel);
+  trueHybridSplittingsTree.Branch("data.", &hybridJetSplittings, bufferSize, splitLevel);
 
   // Contains matches between pythia and hybrid (pythia + thermal) jets and splittings.
   // We reuse the hybrid jet splittings object above, adding the pythia jet splittings.
@@ -784,6 +842,7 @@ int main(int argc, char* argv[])
       }
 
       // Extract the primary splitting for comparison.
+      // 23 is the status for outgoing partons.
       if (std::abs(pythia.event[i].status()) == 23) {
         SubstructureTree::JetSubstructureSplittings splittingsObj;
         ExtractFirstPythiaSplitting(splittingsObj, pythia.event, i, static_cast<bool>(charged));
@@ -865,55 +924,12 @@ int main(int argc, char* argv[])
 
     // Fill true tree!
     // NOTE: We want the leading hybrid jet, so we sort by pt.
-    fastjet::PseudoJet hybridProbeJet = sorted_by_pt(hybridJets)[0];
-    fastjet::PseudoJet parton6(pythia.event[5].px(), pythia.event[5].py(), pythia.event[5].pz(),
-                  pythia.event[5].e());
-    fastjet::PseudoJet parton7(pythia.event[6].px(), pythia.event[6].py(), pythia.event[6].pz(),
-                  pythia.event[6].e());
-    double deltaR6 = hybridProbeJet.delta_R(parton6);
-    double deltaR7 = hybridProbeJet.delta_R(parton7);
-    // Fill true pt with what?
-
-    if (deltaR6 < 0.1) {
-      trueJetSplittings = parton6Splittings;
-    }
-    if (deltaR7 < 0.1) {
-      trueJetSplittings = parton7Splittings;
-    }
-    // Only fill if we're actually close to a splitting. Otherwise, we get empty true jet splittings
-    // and/or we pull the hybrid jets to the edges of the eta acceptance.
-    if ((deltaR6 < 0.1 || deltaR7 < 0.1) && trueJetSplittings.GetJetPt() > 0) {
-      //std::cout << "True pt: " << trueJetSplittings.GetJetPt() << "\n";
-      //// Splitting properties
-      //float kt = 0, deltaR = 0, z = 0;
-      //short parentIndex = 0;
-      //std::tie(kt, deltaR, z, parentIndex) = trueJetSplittings.GetSplitting(0);
-      //std::cout << "splitting info: kt=" << kt << ", deltaR=" << deltaR << ", z=" << z <<  "\n";
-      //// Constituents
-      // True jet splittings info
-      //std::cout << "True jet: " << trueJetSplittings << "\n";
-      hybridJetSplittings.SetJetPt(hybridProbeJet.pt());
-      Reclustering(hybridJetSplittings, hybridProbeJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
-      //std::cout << "hybrid jet pt=" << hybridJetSplittings.GetJetPt() << "\n";
-      // Hybrid jet splittings info
-      //std::cout << "Hybrid jet: " << hybridJetSplittings << "\n";
-
-      // Sanity check on the kt value.
-      // It must be positive (but apparently sometimes it isn't...)!
-      // Apparently if deltaR is sufficiently large, it can lead to a negative kt because sin goes negative for values
-      // greater than pi!
-      //float kt = 0, deltaR = 0, z = 0;
-      //short parentIndex = 0;
-      //std::tie(kt, deltaR, z, parentIndex) = trueJetSplittings.GetSplitting(0);
-      //if (kt <= 0) {
-      //    std::cout << "kt <= 0. Waaaaat?\n";
-      //    std::exit(1);
-      //}
-      trueSplittingsTree.Fill();
-    }
-    else {
-      //std::cout << "Failed to match true splitting! deltaR6=" << deltaR6 << ", deltaR7=" << deltaR7 << "\n";
-    }
+    FillTrueSplitting(truePythiaSplittingsTree, pythiaJets, pythiaJetSplittings,
+             pythia.event, trueJetSplittings, parton6Splittings,
+             parton7Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
+    FillTrueSplitting(trueHybridSplittingsTree, hybridJets, hybridJetSplittings,
+             pythia.event, trueJetSplittings, parton6Splittings,
+             parton7Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
 
     // Match jets
     // Need to do rudimentary matching
@@ -923,7 +939,8 @@ int main(int argc, char* argv[])
 
     // Extract the splittings for each set of matched jets.
     //std::cout << "About to recluster event " << iEvent << "\n";
-    for (std::size_t hybridIndex = 0; hybridIndex < hybridJets.size(); hybridIndex++) {
+    for (std::size_t hybridIndex = 0; hybridIndex < hybridJets.size(); hybridIndex++)
+    {
       // Setup. Ensure that the tree outputs are clear for each set of jets to fill it.
       hybridJetSplittings.Clear();
       pythiaJetSplittings.Clear();
@@ -983,7 +1000,8 @@ int main(int argc, char* argv[])
 
   } // end of event
 
-  std::cout << "Number of true splittings: " << trueSplittingsTree.GetEntries() << "\n";
+  std::cout << "Number of true <-> pythia splittings: " << truePythiaSplittingsTree.GetEntries() << "\n";
+  std::cout << "Number of true <-> hybrid splittings: " << trueHybridSplittingsTree.GetEntries() << "\n";
   std::cout << "Number of matched jets: " << pythiaHybridTree.GetEntries() << "\n";
 
   //____________________________________________________
@@ -1000,7 +1018,8 @@ int main(int argc, char* argv[])
     h->Write();
   }
   // And tree
-  trueSplittingsTree.Write();
+  truePythiaSplittingsTree.Write();
+  trueHybridSplittingsTree.Write();
   pythiaHybridTree.Write();
   outFile->Close();
 
