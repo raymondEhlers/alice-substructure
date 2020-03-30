@@ -548,9 +548,8 @@ void ExtractFirstPythiaSplitting(SubstructureTree::JetSubstructureSplittings & s
   splittingNodeIndex = splittingsObj.GetNumberOfSplittings() - 1;
   // Given our mode here, this should always be 0!
   assert(splittingNodeIndex == 0);
-  std::vector<int> j1DaughterIndices;
+  std::vector<int> j1DaughterIndices, j2DaughterIndices;
   RetrieveFinalStateDaughterIndices(event, index1, j1DaughterIndices, charged);
-  std::vector<int> j2DaughterIndices;
   RetrieveFinalStateDaughterIndices(event, index2, j2DaughterIndices, charged);
   std::vector<unsigned short> j1ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j1DaughterIndices, daughters);
   std::vector<unsigned short> j2ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j2DaughterIndices, daughters);
@@ -692,7 +691,7 @@ int main(int argc, char* argv[])
 
   fastjet::JetDefinition* jetDefAKT_Sig = new fastjet::JetDefinition(fastjet::antikt_algorithm, jetParameterR, recombScheme, strategy);
 
-  //fastjet::GhostedAreaSpec ghostareaspec(trackEtaCut, 1, 0.05); // ghost
+  fastjet::GhostedAreaSpec ghostareaspec(trackEtaCut, 1, 0.05); // ghost
   // max rap, repeat, ghostarea default 0.01
   fastjet::AreaType areaType = fastjet::active_area_explicit_ghosts;
   fastjet::AreaDefinition* areaDef = new fastjet::AreaDefinition(areaType, ghostareaspec);
