@@ -461,6 +461,103 @@ std::vector<unsigned short> FindSubjetConstituentsFromAllConstituents(const std:
   return subjetConstituentIndices;
 }
 
+void ExtractFirstPythiaSplitting(SubstructureTree::JetSubstructureSplittings & splittingsObj, const Event & event, const int startingIndex, const bool charged)
+{
+  // Search for the first splitting with a non-zero kt, starting with the startingIndex splitting.
+  int i = startingIndex;
+  bool foundSplitting = false;
+  unsigned int index1 = 0;
+  unsigned int index2 = 0;
+  fastjet::PseudoJet j1, j2;
+  while (foundSplitting == false)
+  {
+    index1 = event[i].daughter1();
+    index2 = event[i].daughter2();
+    //if (index1 == index2) {
+    //    std::cout << "Daughter indices are equal!!!" << "\n";
+    //}
+    j1.reset(
+      event[index1].px(),
+      event[index1].py(),
+      event[index1].pz(),
+      event[index1].e()
+    );
+    j2.reset(
+      event[index2].px(),
+      event[index2].py(),
+      event[index2].pz(),
+      event[index2].e()
+    );
+
+    // j1 should always be the harder of the two subjets.
+    if (j1.perp() < j2.perp()) {
+      swap(j1, j2);
+      swap(index1, index2);
+    }
+
+    // If we are looking at index1 0, there are no more daughters. We didn't find a kt > 0 splitting,
+    // and we have to give up here.
+    if (index1 == 0) {
+      break;
+    }
+
+    double xDeltaR = j1.delta_R(j2);
+    double xkt = j2.perp() * std::sin(xDeltaR);
+
+    // kt > 0 should be roughly equivalent to:
+    // if (((index1 > 0) && (index2 > 0)) && (index1 != index2)) {
+    // However, kt > 0 is better because it's a clearly physics motivated measure of the splitting.
+    if (xkt > 0) {
+      foundSplitting = true;
+    }
+    else {
+      // Reassign i to the leading daughter index
+      //std::cout << "Found kt=" << xkt << " for " << i << "->" << index1 << ", " << index2 << ". Recursing with " << index1 << "\n";
+      i = index1;
+    }
+  }
+
+  // This really shouldn't be possible!
+  if (foundSplitting == false) {
+    // For example, we ran out of daughters.
+    std::cout << "Didn't find any kt > 0 splitting for index " << i << "->" << index1 << ", " << index2 <<"! Skipping splitting " << startingIndex << "!\n";
+    return;
+  }
+
+  // We have found a splitting. Now extract the properties.
+  // Base properties
+  splittingsObj.SetJetPt(event[i].pT());
+
+  // Add jet constituents
+  //std::cout << "\nEvent " << iEvent << ", particle " << i << "\n\n";
+  std::vector<fastjet::PseudoJet> daughters = RetrieveFinalStateDaughters(event, i, charged, true);
+  for (const auto & part : daughters) {
+    splittingsObj.AddJetConstituent(part);
+  }
+
+  // Calculate the splitting properties and store them
+  double xz = j2.perp() / (j2.perp() + j1.perp());
+  double xDeltaR = j1.delta_R(j2);
+  double xkt = j2.perp() * std::sin(xDeltaR);
+  //std::cout << "Found non-zero kt=" << xkt << ". Storing!\n";
+  // Add splitting
+  int splittingNodeIndex = -1;
+  splittingsObj.AddSplitting(xkt, xDeltaR, xz, splittingNodeIndex);
+
+  // Add subjet
+  splittingNodeIndex = splittingsObj.GetNumberOfSplittings() - 1;
+  // Given our mode here, this should always be 0!
+  assert(splittingNodeIndex == 0);
+  std::vector<int> j1DaughterIndices;
+  RetrieveFinalStateDaughterIndices(event, index1, j1DaughterIndices, charged);
+  std::vector<int> j2DaughterIndices;
+  RetrieveFinalStateDaughterIndices(event, index2, j2DaughterIndices, charged);
+  std::vector<unsigned short> j1ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j1DaughterIndices, daughters);
+  std::vector<unsigned short> j2ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j2DaughterIndices, daughters);
+  splittingsObj.AddSubjet(splittingNodeIndex, true, j1ConstituentIndices);
+  splittingsObj.AddSubjet(splittingNodeIndex, false, j2ConstituentIndices);
+}
+
 
 //___________________________________________________________________
 int main(int argc, char* argv[])
@@ -689,69 +786,12 @@ int main(int argc, char* argv[])
       // Extract the primary splitting for comparison.
       if (std::abs(pythia.event[i].status()) == 23) {
         SubstructureTree::JetSubstructureSplittings splittingsObj;
-        // Base properties
-        splittingsObj.SetJetPt(pythia.event[i].pT());
-
-        // Add jet constituents
-        //std::cout << "\nEvent " << iEvent << ", particle " << i << "\n\n";
-        std::vector<fastjet::PseudoJet> daughters = RetrieveFinalStateDaughters(pythia.event, i, charged, true);
-        for (const auto & part : daughters) {
-          splittingsObj.AddJetConstituent(part);
+        ExtractFirstPythiaSplitting(splittingsObj, pythia.event, i, static_cast<bool>(charged));
+        if (i == 5) {
+          parton6Splittings = splittingsObj;
         }
-        unsigned int index1 = pythia.event[i].daughter1();
-        unsigned int index2 = pythia.event[i].daughter2();
-        //if (index1 == index2) {
-        //    std::cout << "Daughter indices are equal!!!" << "\n";
-        //}
-        if (((index1 > 0) && (index2 > 0)) && (index1 != index2)) {
-          fastjet::PseudoJet j1(
-            pythia.event[index1].px(),
-            pythia.event[index1].py(),
-            pythia.event[index1].pz(),
-            pythia.event[index1].e()
-          );
-          fastjet::PseudoJet j2(
-            pythia.event[index2].px(),
-            pythia.event[index2].py(),
-            pythia.event[index2].pz(),
-            pythia.event[index2].e()
-          );
-
-          // j1 should always be the harder of the two subjets.
-          if (j1.perp() < j2.perp()) {
-            swap(j1, j2);
-          }
-          // Calculate the splitting properties and store them
-          double xz = j2.perp() / (j2.perp() + j1.perp());
-          double xDeltaR = j1.delta_R(j2);
-          double xkt = j2.perp() * std::sin(xDeltaR);
-          // Add splitting
-          int splittingNodeIndex = -1;
-          splittingsObj.AddSplitting(xkt, xDeltaR, xz, splittingNodeIndex);
-
-          // Add subjet
-          splittingNodeIndex = splittingsObj.GetNumberOfSplittings() - 1;
-          // Given our mode here, this should always be 0!
-          assert(splittingNodeIndex == 0);
-          std::vector<int> j1DaughterIndices;
-          RetrieveFinalStateDaughterIndices(pythia.event, index1, j1DaughterIndices, charged);
-          std::vector<int> j2DaughterIndices;
-          RetrieveFinalStateDaughterIndices(pythia.event, index2, j2DaughterIndices, charged);
-          std::vector<unsigned short> j1ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j1DaughterIndices, daughters);
-          std::vector<unsigned short> j2ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j2DaughterIndices, daughters);
-          splittingsObj.AddSubjet(splittingNodeIndex, true, j1ConstituentIndices);
-          splittingsObj.AddSubjet(splittingNodeIndex, false, j2ConstituentIndices);
-
-          // Add the splitting node to the particular parton
-          if (i == 5) {
-            parton6Splittings = splittingsObj;
-          }
-          if (i == 6) {
-            parton7Splittings = splittingsObj;
-          }
-        }
-        else {
-          // Daughter 1 or 2 is not suitable. Skip this parton.
+        if (i == 6) {
+          parton7Splittings = splittingsObj;
         }
       }
     }
@@ -851,12 +891,12 @@ int main(int argc, char* argv[])
       //std::cout << "splitting info: kt=" << kt << ", deltaR=" << deltaR << ", z=" << z <<  "\n";
       //// Constituents
       // True jet splittings info
-      std::cout << "True jet: " << trueJetSplittings << "\n";
+      //std::cout << "True jet: " << trueJetSplittings << "\n";
       hybridJetSplittings.SetJetPt(hybridProbeJet.pt());
       Reclustering(hybridJetSplittings, hybridProbeJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
       //std::cout << "hybrid jet pt=" << hybridJetSplittings.GetJetPt() << "\n";
       // Hybrid jet splittings info
-      std::cout << "Hybrid jet: " << hybridJetSplittings << "\n";
+      //std::cout << "Hybrid jet: " << hybridJetSplittings << "\n";
 
       // Sanity check on the kt value.
       // It must be positive (but apparently sometimes it isn't...)!
@@ -872,7 +912,7 @@ int main(int argc, char* argv[])
       trueSplittingsTree.Fill();
     }
     else {
-      //std::cout << "True splitting failed! deltaR6=" << deltaR6 << ", deltaR7=" << deltaR7 << "\n";
+      //std::cout << "Failed to match true splitting! deltaR6=" << deltaR6 << ", deltaR7=" << deltaR7 << "\n";
     }
 
     // Match jets
