@@ -884,7 +884,8 @@ int main(int argc, char* argv[])
 
     //________________signal jets____________________________________________________
     fastjet::ClusterSequenceArea clustSeq_Sig(inputsPythia, *jetDefAKT_Sig, *areaDef);
-    std::vector<fastjet::PseudoJet> pythiaJets = clustSeq_Sig.inclusive_jets(30.);
+    // NOTE: 1 GeV cut on pythia jets is applied here!
+    std::vector<fastjet::PseudoJet> pythiaJets = clustSeq_Sig.inclusive_jets(1.);
 
     if (pythiaJets.size() == 0) {
       // No true jets, so nothing else to be done.
@@ -899,6 +900,7 @@ int main(int argc, char* argv[])
     fastjet::GhostedAreaSpec New_ghost_spec(1, 1, 0.05); // Ghosts to calculate the Jet Area
     fastjet::AreaDefinition New_fAreaDef(fastjet::active_area_explicit_ghosts, New_ghost_spec); // Area Definition
     fastjet::ClusterSequenceArea New_clustSeq_Sig(inputsHybrid, *jetDefAKT_Sig, New_fAreaDef);     // Cluster Sequence
+    // NOTE: 1 GeV cut on hybrid jets is applied here.
     std::vector<fastjet::PseudoJet> hybridJets = New_clustSeq_Sig.inclusive_jets(1.); // Vector with the Reconstructed Jets
 
     fastjet::JetMedianBackgroundEstimator bge;
@@ -932,9 +934,15 @@ int main(int argc, char* argv[])
 
     // Match jets
     // Need to do rudimentary matching
+    // We'll take at most the first two pythia jets (the other ones aren't worth the time to try to match).
+    std::vector<fastjet::PseudoJet> pythiaJetsForMatching;
+    pythiaJetsForMatching.emplace_back(pythiaJets[0]);
+    if (pythiaJets.size() > 1) {
+      pythiaJetsForMatching.emplace_back(pythiaJets[1]);
+    }
     std::map<int, int> pythiaToHybridIndex;
     std::map<int, int> hybridToPythiaIndex;
-    std::tie(pythiaToHybridIndex, hybridToPythiaIndex) = MatchJets(hybridJets, pythiaJets);
+    std::tie(pythiaToHybridIndex, hybridToPythiaIndex) = MatchJets(hybridJets, pythiaJetsForMatching);
 
     // Extract the splittings for each set of matched jets.
     //std::cout << "About to recluster event " << iEvent << "\n";
@@ -963,7 +971,7 @@ int main(int argc, char* argv[])
         // No match - continue.
         continue;
       }
-      fastjet::PseudoJet & pythiaJet = pythiaJets[pythiaJetIndex];
+      fastjet::PseudoJet & pythiaJet = pythiaJetsForMatching[pythiaJetIndex];
       if (AcceptJet(pythiaJet, jetEtaMin, jetEtaMax) == false) {
         //std::cout << "True jet rejected.\n";
         continue;
@@ -973,14 +981,14 @@ int main(int argc, char* argv[])
       // Check distance is reasonable.
       if (matchingDistance > jetParameterR) {
         // Too far away!
-        std::cout << "Too far away! Delta_R = " << matchingDistance << "\n";
+        //std::cout << "Too far away! Delta_R = " << matchingDistance << "\n";
         continue;
       }
       // Check shared momentum fraction
       if (SharedMomentumFraction(hybridJet, pythiaJet) < 0.5)
       {
         // Insufficiently similar jets.
-        std::cout << "Insufficient shared momentum fraction: " << SharedMomentumFraction(hybridJet, pythiaJet) << "\n";
+        //std::cout << "Insufficient shared momentum fraction: " << SharedMomentumFraction(hybridJet, pythiaJet) << "\n";
         continue;
       }
 
