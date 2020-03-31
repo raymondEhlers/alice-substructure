@@ -590,7 +590,7 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
             TH1D & hPtParton, TH1D & hPhiParton, TH1D & hEtaParton, TH1D & hTrueDataMatchingDistance,
             TH1D & hPtPartonAccepted, TH1D & hPhiPartonAccepted, TH1D & hEtaPartonAccepted,
             TH1D & hTrueDataMatchingDistanceClosest,
-            int iEvent
+            double partonDeltaRMax, int iEvent
             )
 {
   // We want to compare to the leading jet, so we must sort by pt (it may already be sorted,
@@ -624,13 +624,13 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
   }
 
   // We're only going to fill if we are close to a true parton.
-  if (deltaR6 < 0.1) {
+  if (deltaR6 < partonDeltaRMax) {
     trueJetSplittings = parton6Splittings;
     hPtPartonAccepted.Fill(parton6.pt());
     hPhiPartonAccepted.Fill(parton6.phi_std());
     hEtaPartonAccepted.Fill(parton6.eta());
   }
-  if (deltaR7 < 0.1) {
+  if (deltaR7 < partonDeltaRMax) {
     trueJetSplittings = parton7Splittings;
     hPtPartonAccepted.Fill(parton7.pt());
     hPhiPartonAccepted.Fill(parton7.phi_std());
@@ -684,8 +684,8 @@ int main(int argc, char* argv[])
   int charged = 1; // full or track-based jets
   int underlingEvent = 1;    // underlying event (ISR+MPI)
 
-  if (argc != 6) {
-    cout << "Usage:" << endl << "./pygen <PythiaTune> <Seed> <nEvts> <underlingEvent> <jetR>" << endl;
+  if (argc != 7) {
+    cout << "Usage:" << endl << "./pygen <PythiaTune> <Seed> <nEvts> <underlingEvent> <jetR> <partonDeltaRMax>" << endl;
     return 0;
   }
   tune = atoi(argv[1]);
@@ -699,6 +699,7 @@ int main(int argc, char* argv[])
   //                        ANALYSIS SETTINGS
 
   double jetParameterR = (double)atof(argv[5]); // jet R
+  double partonDeltaRMax = (double)std::stod(argv[6]); // Max delta R between parton and jet.
   double trackLowPtCut = 0.150;                 // GeV
   double trackEtaCut = 1;
   Float_t ptHatMin = 50;
@@ -1024,14 +1025,14 @@ int main(int argc, char* argv[])
              parton7Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut,
              hPtParton, hPhiParton, hEtaParton, hTruePythiaMatchingDistance,
              hPtPartonAccepted, hPhiPartonAccepted, hEtaPartonAccepted, hTruePythiaMatchingDistanceClosest,
-             iEvent
+             partonDeltaRMax, iEvent
              );
     FillTrueSplitting(trueHybridSplittingsTree, hybridJets, hybridJetSplittings,
              pythia.event, trueJetSplittings, parton6Splittings,
              parton7Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut,
              hPtParton, hPhiParton, hEtaParton, hTrueHybridMatchingDistance,
              hPtPartonAccepted, hPhiPartonAccepted, hEtaPartonAccepted, hTrueHybridMatchingDistanceClosest,
-             iEvent
+             partonDeltaRMax, iEvent
              );
 
     // Match jets
@@ -1119,7 +1120,7 @@ int main(int argc, char* argv[])
   TString tag = TString::Format("pythia+thermal_substructure_toy_antikt_%02d", TMath::Nint(jetParameterR * 10));
 
   TFile* outFile =
-   new TFile(TString::Format("%s_tune_%d_seed_%03d_jetR%03d_%s%s_ptHatMin_%d.root", tag.Data(), tune, randomSeed, int(100 * jetParameterR), charged ? "charged" : "full", underlingEvent ? "_underlyingEvent" : "", static_cast<int>(ptHatMin)), "RECREATE");
+   new TFile(TString::Format("%s_tune_%d_seed_%03d_jetR%03d_partonDeltaRMax%03d_%s%s_ptHatMin_%d.root", tag.Data(), tune, randomSeed, int(100 * jetParameterR), int(100 * partonDeltaRMax), charged ? "charged" : "full", underlingEvent ? "_underlyingEvent" : "", static_cast<int>(ptHatMin)), "RECREATE");
 
   outFile->cd();
   // Write out hists
