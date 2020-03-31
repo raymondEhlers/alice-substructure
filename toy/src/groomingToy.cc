@@ -565,7 +565,8 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
             const bool storeRecursiveSplittings, const bool applyTwoParticleAcceptanceCut,
             TH1D & hPtParton, TH1D & hPhiParton, TH1D & hEtaParton, TH1D & hTrueDataMatchingDistance,
             TH1D & hPtPartonAccepted, TH1D & hPhiPartonAccepted, TH1D & hEtaPartonAccepted,
-            TH1D & hTrueDataMatchingDistanceClosest
+            TH1D & hTrueDataMatchingDistanceClosest,
+            int iEvent
             )
 {
   // We want to compare to the leading jet, so we must sort by pt (it may already be sorted,
@@ -617,6 +618,10 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
     //// Splitting properties
     // True jet splittings info
     //std::cout << "True jet: " << trueJetSplittings << "\n";
+    float kt = 0, deltaR = 0, z = 0;
+    short parentIndex = 0;
+    std::tie(kt, deltaR, z, parentIndex) = trueJetSplittings.GetSplitting(0);
+    std::cout << "event " << iEvent << ": true kt=" << kt << "\n";
     jetSplittings.SetJetPt(probeJet.pt());
     Reclustering(jetSplittings, probeJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
     // Hybrid jet splittings info
@@ -991,13 +996,15 @@ int main(int argc, char* argv[])
              pythia.event, trueJetSplittings, parton6Splittings,
              parton7Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut,
              hPtParton, hPhiParton, hEtaParton, hTruePythiaMatchingDistance,
-             hPtPartonAccepted, hPhiPartonAccepted, hEtaPartonAccepted, hTruePythiaMatchingDistanceClosest
+             hPtPartonAccepted, hPhiPartonAccepted, hEtaPartonAccepted, hTruePythiaMatchingDistanceClosest,
+             iEvent
              );
     FillTrueSplitting(trueHybridSplittingsTree, hybridJets, hybridJetSplittings,
              pythia.event, trueJetSplittings, parton6Splittings,
              parton7Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut,
              hPtParton, hPhiParton, hEtaParton, hTrueHybridMatchingDistance,
-             hPtPartonAccepted, hPhiPartonAccepted, hEtaPartonAccepted, hTrueHybridMatchingDistanceClosest
+             hPtPartonAccepted, hPhiPartonAccepted, hEtaPartonAccepted, hTrueHybridMatchingDistanceClosest,
+             iEvent
              );
 
     // Match jets
