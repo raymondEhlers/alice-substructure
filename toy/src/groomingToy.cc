@@ -562,7 +562,11 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
             SubstructureTree::JetSubstructureSplittings& trueJetSplittings,
             SubstructureTree::JetSubstructureSplittings& parton6Splittings,
             SubstructureTree::JetSubstructureSplittings& parton7Splittings,
-            const bool storeRecursiveSplittings, const bool applyTwoParticleAcceptanceCut)
+            const bool storeRecursiveSplittings, const bool applyTwoParticleAcceptanceCut,
+            TH1D & hPtParton, TH1D & hPhiParton, TH1D & hEtaParton, TH1D & hTrueDataMatchingDistance,
+            TH1D & hPtPartonAccepted, TH1D & hPhiPartonAccepted, TH1D & hEtaPartonAccepted,
+            TH1D & hTrueDataMatchingDistanceClosest
+            )
 {
   // We want to compare to the leading jet, so we must sort by pt (it may already be sorted,
   // but in that case, it's perfectly fine to sort again - it's not expensive compared to other
@@ -572,13 +576,40 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
   fastjet::PseudoJet parton7(event[6].px(), event[6].py(), event[6].pz(), event[6].e());
   double deltaR6 = probeJet.delta_R(parton6);
   double deltaR7 = probeJet.delta_R(parton7);
+  //if (jets.size() > 1) {
+  //    fastjet::PseudoJet subleadingJet = sorted_by_pt(jets)[1];
+  //    std::cout << "probeJet.pt()=" << probeJet.pt() << ", subleading.pt()=" << subleadingJet.pt() << ". subleading deltaR6=" << subleadingJet.delta_R(parton6) << ", deltaR7=" << subleadingJet.delta_R(parton7) << "\n";
+  //}
+
+  // Store parton properties
+  hPtParton.Fill(parton6.pt());
+  hPhiParton.Fill(parton6.phi_std());
+  hEtaParton.Fill(parton6.eta());
+  hTrueDataMatchingDistance.Fill(deltaR6);
+  hPtParton.Fill(parton7.pt());
+  hPhiParton.Fill(parton7.phi_std());
+  hEtaParton.Fill(parton7.eta());
+  hTrueDataMatchingDistance.Fill(deltaR7);
+  if (deltaR6 < deltaR7) {
+    hTrueDataMatchingDistanceClosest.Fill(deltaR6);
+  }
+  else {
+    hTrueDataMatchingDistanceClosest.Fill(deltaR7);
+
+  }
 
   // We're only going to fill if we are close to a true parton.
   if (deltaR6 < 0.1) {
     trueJetSplittings = parton6Splittings;
+    hPtPartonAccepted.Fill(parton6.pt());
+    hPhiPartonAccepted.Fill(parton6.phi_std());
+    hEtaPartonAccepted.Fill(parton6.eta());
   }
   if (deltaR7 < 0.1) {
     trueJetSplittings = parton7Splittings;
+    hPtPartonAccepted.Fill(parton7.pt());
+    hPhiPartonAccepted.Fill(parton7.phi_std());
+    hEtaPartonAccepted.Fill(parton7.eta());
   }
   // Only fill if we're actually close to a splitting. Otherwise, we get empty true jet splittings
   // and/or we pull the jets to the edges of the eta acceptance.
@@ -602,10 +633,17 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
     //    std::cout << "kt <= 0. Waaaaat?\n";
     //    std::exit(1);
     //}
+    //std::cout << "Found true<->data match with parton " << (deltaR6 < deltaR7 ? "5" : "6") << "\n";
     tree.Fill();
   }
   else {
-    //std::cout << "Failed to match true splitting! deltaR6=" << deltaR6 << ", deltaR7=" << deltaR7 << "\n";
+    //std::cout << "Failed to match true splitting! " << "jet eta, phi: (" << probeJet.eta() << "," << probeJet.phi() << "), ";
+    //if (deltaR6 < deltaR7) {
+    //    std::cout << "parton 6 (closest) eta, phi: (" << parton6.eta() << "," << parton6.phi() << "), -> deltaR=" << deltaR6 << "\n";
+    //}
+    //else {
+    //    std::cout << "parton 7 (closest) eta, phi: (" << parton7.eta() << "," << parton7.phi() << "), -> deltaR=" << deltaR7 << "\n";
+    //}
   }
 }
 
@@ -739,6 +777,29 @@ int main(int argc, char* argv[])
   hists.emplace_back(&hPtThermal);
   hists.emplace_back(&hEtaThermal);
   hists.emplace_back(&hPhiThermal);
+  // Partons
+  TH1D hPtParton("hPtParton", ";p_{T}", 4000, 0.0, 400);
+  TH1D hEtaParton("hEtaParton", ";#eta", 200, -5.0, 5.0);
+  TH1D hPhiParton("hPhiParton", ";#varphi", 700, -3.5, 3.5);
+  hists.emplace_back(&hPtParton);
+  hists.emplace_back(&hEtaParton);
+  hists.emplace_back(&hPhiParton);
+  // Accepted (stored) partons
+  TH1D hPtPartonAccepted("hPtPartonAccepted", ";p_{T}", 4000, 0.0, 400);
+  TH1D hEtaPartonAccepted("hEtaPartonAccepted", ";#eta", 200, -5.0, 5.0);
+  TH1D hPhiPartonAccepted("hPhiPartonAccepted", ";#varphi", 700, -3.5, 3.5);
+  hists.emplace_back(&hPtPartonAccepted);
+  hists.emplace_back(&hEtaPartonAccepted);
+  hists.emplace_back(&hPhiPartonAccepted);
+  // True <-> data matching distance
+  TH1D hTruePythiaMatchingDistance("hTruePythiaMatchingDistance", "", 600, 0, 6);
+  hists.emplace_back(&hTruePythiaMatchingDistance);
+  TH1D hTrueHybridMatchingDistance("hTrueHybridMatchingDistance", "", 600, 0, 6);
+  hists.emplace_back(&hTrueHybridMatchingDistance);
+  TH1D hTruePythiaMatchingDistanceClosest("hTruePythiaMatchingDistanceClosest", "", 600, 0, 6);
+  hists.emplace_back(&hTruePythiaMatchingDistanceClosest);
+  TH1D hTrueHybridMatchingDistanceClosest("hTrueHybridMatchingDistanceClosest", "", 600, 0, 6);
+  hists.emplace_back(&hTrueHybridMatchingDistanceClosest);
 
   // Pythia information
   TProfile hXsection("fHistXsection", "fHistXsection;;xsection", 1, 0, 1);
@@ -888,7 +949,8 @@ int main(int argc, char* argv[])
     std::vector<fastjet::PseudoJet> pythiaJets = clustSeq_Sig.inclusive_jets(1.);
 
     if (pythiaJets.size() == 0) {
-      // No true jets, so nothing else to be done.
+      // No pythia jets, so nothing else to be done.
+      //std::cout << "No pythia jets. Returning.\n";
       continue;
     }
 
@@ -927,10 +989,16 @@ int main(int argc, char* argv[])
     // NOTE: We want the leading hybrid jet, so we sort by pt.
     FillTrueSplitting(truePythiaSplittingsTree, pythiaJets, pythiaJetSplittings,
              pythia.event, trueJetSplittings, parton6Splittings,
-             parton7Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
+             parton7Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut,
+             hPtParton, hPhiParton, hEtaParton, hTruePythiaMatchingDistance,
+             hPtPartonAccepted, hPhiPartonAccepted, hEtaPartonAccepted, hTruePythiaMatchingDistanceClosest
+             );
     FillTrueSplitting(trueHybridSplittingsTree, hybridJets, hybridJetSplittings,
              pythia.event, trueJetSplittings, parton6Splittings,
-             parton7Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
+             parton7Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut,
+             hPtParton, hPhiParton, hEtaParton, hTrueHybridMatchingDistance,
+             hPtPartonAccepted, hPhiPartonAccepted, hEtaPartonAccepted, hTrueHybridMatchingDistanceClosest
+             );
 
     // Match jets
     // Need to do rudimentary matching
