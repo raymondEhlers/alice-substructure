@@ -50,6 +50,7 @@ def splittings_graph(  # noqa: C901
         raise exc
 
     # Validation
+    path = Path(path)
     if filename is None:
         filename = f"splitting_graph_jetPt_{jet.jet_pt:.1f}GeV"
 
