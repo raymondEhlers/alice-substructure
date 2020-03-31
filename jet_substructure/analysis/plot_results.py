@@ -7,7 +7,7 @@
 
 import logging
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import attr
 import boost_histogram as bh
@@ -15,10 +15,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
-from pachyderm import binned_data, histogram
+from pachyderm import binned_data
 
-from jet_substructure.analysis import substructure
-from jet_substructure.base import analysis_objects, helpers
+from jet_substructure.base import analysis_objects
 
 
 logger = logging.getLogger(__name__)
@@ -40,83 +39,6 @@ class PlotConfig:
     y_label: str = attr.ib()
     legend_location: str = attr.ib(default="center right")
     log_y: bool = attr.ib(default=True)
-
-
-def _plot_distribution_old(
-    results: Sequence[substructure.SubstructureResult],
-    retrieve_values_func: Callable[[substructure.SubstructureResult], substructure.T_Array],
-    jet_pt: substructure.T_Array,
-    axis: bh.axis.Regular,
-    jet_pt_bins: Sequence[helpers.RangeSelector],
-    label: PlotConfig,
-    path: Path,
-) -> None:
-    # Validation
-    path.mkdir(parents=True, exist_ok=True)
-
-    # Setup
-    fig, ax = plt.subplots(figsize=(8, 6))
-
-    for jet_pt_bin in jet_pt_bins:
-        jet_pt_mask = jet_pt_bin.mask_array(jet_pt)
-        # Number of jets includes untagged.
-        n_jets = len(jet_pt[jet_pt_mask])
-        if n_jets == 0:
-            logger.warning(f"No jets within {jet_pt_bin.min}-{jet_pt_bin.max}. Skipping bin!")
-            continue
-
-        for result in results:
-            logger.debug(f"Processing {jet_pt_bin}, {result.title}")
-            # To get the jet pt mask to match the result, we need to apply the indices.
-            # However, we can't apply them directly because the indices are jagged. By taking
-            # those which have a count, we'll match the structure.
-            jet_pt_substructure_result_mask = jet_pt_mask[result.indices.counts > 0]
-            # TODO: Fix for nspliitings. See TEMP below.
-            # TEMP - Should use the above.
-            # This works for the splitting but nothing else because for the splittings we fill in 0,
-            # but for the others, those are just empty entries.
-            # jet_pt_substructure_result_mask = jet_pt_mask
-            # ENDTEMP
-            bh_hist = bh.Histogram(axis, storage=bh.storage.Weight())
-            # print(f"{retrieve_values_func(result)}")
-            # print(f"Values: {retrieve_values_func(result)[jet_pt_substructure_result_mask]}")
-            bh_hist.fill(retrieve_values_func(result)[jet_pt_substructure_result_mask])
-            h = histogram.Histogram1D(
-                bin_edges=bh_hist.axes[0].edges,
-                y=bh_hist.view().value,
-                errors_squared=np.copy(bh_hist.view().variance),
-            )
-            # Scale by bin width
-            h /= h.bin_widths
-            # Normalize by number of jets
-            h /= n_jets
-
-            ax.errorbar(h.x, h.y, yerr=h.errors, xerr=h.bin_widths / 2, marker=".", linestyle="", label=result.title)
-
-        # Labeling
-        text = fr"${jet_pt_bin.min} < p_{{\text{{T}}}}^{{\text{{jet}}}} < {jet_pt_bin.max}$"
-        ax.text(
-            0.95,
-            0.95,
-            text,
-            transform=ax.transAxes,
-            horizontalalignment="right",
-            verticalalignment="top",
-            multialignment="right",
-        )
-
-        # Presentation
-        ax.legend(frameon=False, loc="center right")
-        ax.set_yscale("log")
-        ax.set_xlabel(label.x_label)
-        ax.set_ylabel(label.y_label)
-        fig.tight_layout()
-
-        # Store and reset
-        fig.savefig(path / f"{label.name}_jetPt_{jet_pt_bin.min}_{jet_pt_bin.max}.pdf")
-        ax.clear()
-
-    plt.close(fig)
 
 
 def _plot_distribution(
@@ -147,7 +69,6 @@ def _plot_distribution(
         h: Union[bh.Histogram, binned_data.BinnedData] = getattr(technique_hists, attribute_name)
         h = binned_data.BinnedData.from_existing_data(h)
 
-        # TODO: Should the hists be normalized earlier??
         # Scale by bin widths and number of jets
         h /= h.axis.bin_widths
         h /= technique_hists.n_jets
@@ -347,7 +268,6 @@ def _plot_lund_plane(
     if isinstance(h, bh.Histogram):
         h = binned_data.BinnedData.from_existing_data(h)
 
-    # TODO: Should the hists be normalized earlier??
     # Scale by bin width
     x_bin_widths, y_bin_widths = np.meshgrid(*h.axes.bin_widths)
     bin_widths = x_bin_widths * y_bin_widths
@@ -697,7 +617,6 @@ def _plot_toy(
     if isinstance(h, bh.Histogram):
         h = binned_data.BinnedData.from_existing_data(h)
 
-    # TODO: Should the hists be normalized earlier??
     # Scale by bin width
     x_bin_widths, y_bin_widths = np.meshgrid(*h.axes.bin_widths)
     bin_widths = x_bin_widths * y_bin_widths
