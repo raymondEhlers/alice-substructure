@@ -474,11 +474,17 @@ void RecursiveTruePythia(SubstructureTree::JetSubstructureSplittings & splitting
   }*/
 }
 
-void ExtractSinglePythiaSplitting(const Event & event, const unsigned int inputIndex, double & z, double & deltaR, double & kt, unsigned int & leadingIndex, bool & leadingIsIterative, double jetParameterR, const bool followingIterativeSplitting, const bool storeRecursiveSplittings)
+void ExtractSinglePythiaSplitting(const Event & event, const unsigned int inputIndex, double & z, double & deltaR, double & kt, unsigned int & leadingIndex, bool & leadingIsIterative, double jetParameterR, const bool followingIterativeSplitting, const bool takeFirstTrueSplitting, const bool storeRecursiveSplittings)
 {
   if ((event[inputIndex].daughter1() > 0 && event[inputIndex].daughter2() > 0) == false) {
     // No more daughters, so we're done - just return.
     //std::cout << "Found no viable daughters for inputIndex=" << inputIndex << ". Returning.\n";
+    return;
+  }
+
+  // If we want to take the first true splitting and we have a kt > 0, then we're done. Return immediately.
+  if (kt > 0 && takeFirstTrueSplitting) {
+    //std::cout << "inputIndex=" << inputIndex << ": Found a splitting when taking first true splitting. Returning!\n";
     return;
   }
 
@@ -519,16 +525,24 @@ void ExtractSinglePythiaSplitting(const Event & event, const unsigned int inputI
     kt = xkt;
     leadingIndex = inputIndex;
     leadingIsIterative = followingIterativeSplitting;
+    if (takeFirstTrueSplitting) {
+      // Early return when appropriate. This allows us to avoid unnecessary recursion.
+      // However, we still need to have the additional check above because it's possilbe that we've already moved
+      // through splittings to get here (and already asked for recursive consideration of other indices). So we
+      // a check to catch those cases too.
+      //std::cout << "inputIndex=" << inputIndex << ": Found a splitting when taking first true splitting. Early returning!\n";
+      return;
+    }
   }
 
   // Recurse as necessary to get the rest of the splittings.
-  ExtractSinglePythiaSplitting(event, index1, z, deltaR, kt, leadingIndex, leadingIsIterative, jetParameterR, followingIterativeSplitting, storeRecursiveSplittings);
+  ExtractSinglePythiaSplitting(event, index1, z, deltaR, kt, leadingIndex, leadingIsIterative, jetParameterR, followingIterativeSplitting, takeFirstTrueSplitting, storeRecursiveSplittings);
   if (storeRecursiveSplittings == true) {
-    ExtractSinglePythiaSplitting(event, index2, z, deltaR, kt, leadingIndex, leadingIsIterative, jetParameterR, false, storeRecursiveSplittings);
+    ExtractSinglePythiaSplitting(event, index2, z, deltaR, kt, leadingIndex, leadingIsIterative, jetParameterR, false, takeFirstTrueSplitting, storeRecursiveSplittings);
   }
 }
 
-void RecursiveSinglePythiaSplitting(SubstructureTree::JetSubstructureSplittings & splittingsObj, const Event & event, const int startingIndex, const bool charged, const double jetParameterR, const bool storeRecursiveSplittings)
+void RecursiveSinglePythiaSplitting(SubstructureTree::JetSubstructureSplittings & splittingsObj, const Event & event, const int startingIndex, const bool charged, const double jetParameterR, const bool takeFirstTrueSplitting, const bool storeRecursiveSplittings)
 {
   // Search for the hardest splitting, starting with the startingIndex splitting.
   double z = 0;
@@ -536,7 +550,7 @@ void RecursiveSinglePythiaSplitting(SubstructureTree::JetSubstructureSplittings 
   double kt = 0;
   unsigned int leadingIndex = 0;
   bool leadingIsIterative = true;
-  ExtractSinglePythiaSplitting(event, startingIndex, z, deltaR, kt, leadingIndex, leadingIsIterative, jetParameterR, true, storeRecursiveSplittings);
+  ExtractSinglePythiaSplitting(event, startingIndex, z, deltaR, kt, leadingIndex, leadingIsIterative, jetParameterR, true, takeFirstTrueSplitting, storeRecursiveSplittings);
   //std::cout << "Result: z=" << z << ", deltaR=" << deltaR << ", kt=" << kt << ", leadingIndex=" << leadingIndex << ", leadingIsIterative=" << leadingIsIterative << "\n";
 
   // This really shouldn't be common!
@@ -642,26 +656,15 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
     //// Splitting properties
     // True jet splittings info
     //std::cout << "True jet: " << trueJetSplittings << "\n";
-    float kt = 0, deltaR = 0, z = 0;
-    short parentIndex = 0;
-    std::tie(kt, deltaR, z, parentIndex) = trueJetSplittings.GetSplitting(0);
+    //float kt = 0, deltaR = 0, z = 0;
+    //short parentIndex = 0;
+    //std::tie(kt, deltaR, z, parentIndex) = trueJetSplittings.GetSplitting(0);
     //std::cout << "event " << iEvent << ": true kt=" << kt << "\n";
     jetSplittings.SetJetPt(probeJet.pt());
     Reclustering(jetSplittings, probeJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
     // Hybrid jet splittings info
     //std::cout << "Other jet: " << jetSplittings << "\n";
 
-    // Sanity check on the kt value.
-    // It must be positive (but apparently sometimes it isn't...)!
-    // Apparently if deltaR is sufficiently large, it can lead to a negative kt because sin goes negative for values
-    // greater than pi!
-    //float kt = 0, deltaR = 0, z = 0;
-    //short parentIndex = 0;
-    //std::tie(kt, deltaR, z, parentIndex) = trueJetSplittings.GetSplitting(0);
-    //if (kt <= 0) {
-    //    std::cout << "kt <= 0. Waaaaat?\n";
-    //    std::exit(1);
-    //}
     //std::cout << "Found true<->data match with parton " << (deltaR6 < deltaR7 ? "5" : "6") << "\n";
     tree.Fill();
   }
@@ -682,28 +685,45 @@ int main(int argc, char* argv[])
   int randomSeed = -1;  // unique number for each file
   int tune = -1;   // pythia tune
   int charged = 1; // full or track-based jets
-  int underlingEvent = 1;    // underlying event (ISR+MPI)
+  bool underlyingEvent = true;    // underlying event (ISR+MPI)
 
-  if (argc != 7) {
-    cout << "Usage:" << endl << "./pygen <PythiaTune> <Seed> <nEvts> <underlingEvent> <jetR> <partonDeltaRMax>" << endl;
+  if (argc != 9) {
+    cout << "Usage:" << endl << "./pygen <PythiaTune> <Seed> <nEvts> <underlyingEvent> <jetR> <partonDeltaRMax> <storeRecursiveSplittings> <takeFirstTrueSplitting>" << endl;
     return 0;
   }
-  tune = atoi(argv[1]);
-  randomSeed = atoi(argv[2]);
-  underlingEvent = atoi(argv[4]);
+  tune = std::stoi(argv[1]);
+  randomSeed = std::stoi(argv[2]);
+  underlyingEvent = static_cast<bool>(std::stoi(argv[4]));
 
-  Int_t nEvent = atoi(argv[3]); //(Int_t) 1e3 + 1.0;
+  int nEvent = std::stoi(argv[3]); //(Int_t) 1e3 + 1.0;
   TString name;
 
   //__________________________________________________________________________
   //                        ANALYSIS SETTINGS
 
-  double jetParameterR = (double)atof(argv[5]); // jet R
-  double partonDeltaRMax = (double)std::stod(argv[6]); // Max delta R between parton and jet.
+  bool applyTwoParticleAcceptanceCut = false;
+  double jetParameterR = std::stod(argv[5]); // jet R
+  double partonDeltaRMax = std::stod(argv[6]); // Max delta R between parton and jet.
+  bool storeRecursiveSplittings = static_cast<bool>(std::stoi(argv[7]));
+  bool takeFirstTrueSplitting = static_cast<bool>(std::stoi(argv[8]));
   double trackLowPtCut = 0.150;                 // GeV
   double trackEtaCut = 1;
   Float_t ptHatMin = 50;
-  Float_t ptHatMax = 300;
+  Float_t ptHatMax = 5020;
+
+  // Print settings
+  std::cout << "Settings:\n"
+       << std::boolalpha
+       << "Pythia:\n"
+       << "\tTune: " << tune << "\n"
+       << "\tRandom seed: " << randomSeed << "\n"
+       << "\tNumber of events: " << nEvent << "\n"
+       << "\tInclude underlying event: " << underlyingEvent << "\n"
+       << "Analysis properties:\n"
+       << "\tResolution parameter: " << jetParameterR << "\n"
+       << "\tMax deltaR between parton and jet: " << partonDeltaRMax << "\n"
+       << "\tStore recursive splittings: " << storeRecursiveSplittings << "\n"
+       << "\tStore the first true splitting (instead of the leading): " << takeFirstTrueSplitting << "\n";
 
   //__________________________________________________________________________
   //                        PYTHIA SETTINGS
@@ -732,7 +752,7 @@ int main(int argc, char* argv[])
     pythia.readString(name.Data());
   }
 
-  if (underlingEvent == 0) {
+  if (underlyingEvent == false) {
     pythia.readString("PartonLevel:MPI = off");
     pythia.readString("PartonLevel:ISR = off");
   }
@@ -847,8 +867,6 @@ int main(int argc, char* argv[])
   }
 
   // Define output trees.
-  bool storeRecursiveSplittings = true;
-  bool applyTwoParticleAcceptanceCut = false;
   int splitLevel = 4;
   int bufferSize = 32000;
   // We have two sets of trees:
@@ -936,8 +954,7 @@ int main(int argc, char* argv[])
       if (std::abs(pythia.event[i].status()) == 23) {
         SubstructureTree::JetSubstructureSplittings splittingsObj;
         // Extract just the recursive splitting
-        // TEMP: Return to recursive after testing.
-        RecursiveSinglePythiaSplitting(splittingsObj, pythia.event, i, static_cast<bool>(charged), jetParameterR, false);
+        RecursiveSinglePythiaSplitting(splittingsObj, pythia.event, i, static_cast<bool>(charged), jetParameterR, takeFirstTrueSplitting, storeRecursiveSplittings);
         //RecursiveTruePythia(splittingsObj, pythia.event, i, static_cast<bool>(charged), storeRecursiveSplittings);
         if (i == 6) {
           parton6Splittings = splittingsObj;
@@ -1119,8 +1136,13 @@ int main(int argc, char* argv[])
 
   TString tag = TString::Format("pythia+thermal_substructure_toy_antikt_%02d", TMath::Nint(jetParameterR * 10));
 
-  TFile* outFile =
-   new TFile(TString::Format("%s_tune_%d_seed_%03d_jetR%03d_partonDeltaRMax%03d_%s%s_ptHatMin_%d.root", tag.Data(), tune, randomSeed, int(100 * jetParameterR), int(100 * partonDeltaRMax), charged ? "charged" : "full", underlingEvent ? "_underlyingEvent" : "", static_cast<int>(ptHatMin)), "RECREATE");
+  TFile* outFile = new TFile(
+   TString::Format("%s_tune_%d_seed_%03d_jetR%03d_partonDeltaRMax%03d_%s_splittings%s_%s%s_ptHatMin_%d.root",
+           tag.Data(), tune, randomSeed, int(100 * jetParameterR), int(100 * partonDeltaRMax),
+           storeRecursiveSplittings ? "recursive" : "iterative",
+           takeFirstTrueSplitting ? "_firstTrueSplitting" : "", charged ? "charged" : "full",
+           underlyingEvent ? "_underlyingEvent" : "", static_cast<int>(ptHatMin)),
+   "RECREATE");
 
   outFile->cd();
   // Write out hists
