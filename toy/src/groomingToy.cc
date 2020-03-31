@@ -542,7 +542,7 @@ void RecursiveSinglePythiaSplitting(SubstructureTree::JetSubstructureSplittings 
   // This really shouldn't be common!
   if (kt <= 0.0001) {
     // For example, we ran out of daughters.
-    std::cout << "Didn't find any kt > 0 splitting for parton " << startingIndex << "! Skipping splitting!\n";
+    //std::cout << "Didn't find any kt > 0 splitting for parton " << startingIndex << "! Skipping splitting!\n";
     return;
   }
 
@@ -645,7 +645,7 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
     float kt = 0, deltaR = 0, z = 0;
     short parentIndex = 0;
     std::tie(kt, deltaR, z, parentIndex) = trueJetSplittings.GetSplitting(0);
-    std::cout << "event " << iEvent << ": true kt=" << kt << "\n";
+    //std::cout << "event " << iEvent << ": true kt=" << kt << "\n";
     jetSplittings.SetJetPt(probeJet.pt());
     Reclustering(jetSplittings, probeJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
     // Hybrid jet splittings info
