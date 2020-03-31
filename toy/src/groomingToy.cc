@@ -414,11 +414,18 @@ void ExtractTruePythiaSplittings(SubstructureTree::JetSubstructureSplittings & j
     // -1 because we want to index the parent splitting that was just stored.
     splittingNodeIndex = jetSplittings.GetNumberOfSplittings() - 1;
     // Store the subjets
+    // Take all related final state constituents as the subjets constituents
     std::vector<int> j1DaughterIndices, j2DaughterIndices;
     RetrieveFinalStateDaughterIndices(event, index1, j1DaughterIndices, charged);
     RetrieveFinalStateDaughterIndices(event, index2, j2DaughterIndices, charged);
     std::vector<unsigned short> j1ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j1DaughterIndices, allDaughters);
     std::vector<unsigned short> j2ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j2DaughterIndices, allDaughters);
+    // Just take the two daughters
+    //std::vector<unsigned short> j1ConstituentIndices, j2ConstituentIndices;
+    //j1ConstituentIndices.emplace_back(event[index1].daughter1());
+    //j1ConstituentIndices.emplace_back(event[index1].daughter2());
+    //j2ConstituentIndices.emplace_back(event[index2].daughter1());
+    //j2ConstituentIndices.emplace_back(event[index2].daughter2());
     jetSplittings.AddSubjet(splittingNodeIndex, followingIterativeSplitting, j1ConstituentIndices);
     jetSplittings.AddSubjet(splittingNodeIndex, false, j2ConstituentIndices);
   }
@@ -467,15 +474,20 @@ void RecursiveTruePythia(SubstructureTree::JetSubstructureSplittings & splitting
   }*/
 }
 
-void ExtractFirstPythiaSplitting(SubstructureTree::JetSubstructureSplittings & splittingsObj, const Event & event, const int startingIndex, const bool charged)
+void ExtractFirstPythiaSplitting(SubstructureTree::JetSubstructureSplittings & splittingsObj, const Event & event, const int startingIndex, const bool charged, const double jetParameterR)
 {
   // Search for the first splitting with a non-zero kt, starting with the startingIndex splitting.
   int i = startingIndex;
-  bool foundSplitting = false;
+  //bool foundSplitting = false;
   unsigned int index1 = 0;
   unsigned int index2 = 0;
   fastjet::PseudoJet j1, j2;
-  while (foundSplitting == false)
+
+  unsigned int leadingIndex = 0;
+  double z = 0;
+  double deltaR = 0;
+  double kt = 0;
+  while (event[i].daughter1() > 0 && event[i].daughter2() > 0)
   {
     index1 = event[i].daughter1();
     index2 = event[i].daughter2();
@@ -503,28 +515,33 @@ void ExtractFirstPythiaSplitting(SubstructureTree::JetSubstructureSplittings & s
 
     // If we are looking at index1 0, there are no more daughters. We didn't find a kt > 0 splitting,
     // and we have to give up here.
-    if (index1 == 0) {
-      break;
-    }
+    //if (index1 == 0) {
+    //    break;
+    //}
 
+    double xz = j2.perp() / (j2.perp() + j1.perp());
     double xDeltaR = j1.delta_R(j2);
     double xkt = j2.perp() * std::sin(xDeltaR);
 
     // kt > 0 should be roughly equivalent to:
-    // if (((index1 > 0) && (index2 > 0)) && (index1 != index2)) {
+    // if (((index1 > 0) && (index2 > 0)) && (index1 != index2)) { }
     // However, kt > 0 is better because it's a clearly physics motivated measure of the splitting.
-    if (xkt > 0) {
-      foundSplitting = true;
+
+    // Store if it has a larger kt.
+    // We also require the deltaR to be less than the jetR so that it actually could be contained in a jet.
+    if (xkt > kt && xDeltaR <= jetParameterR) {
+      std::cout << "Found new hardest kt=" << xkt << " at i=" << i
+           << " and following index1=" << index1 << " next.\n";
+      z = xz;
+      deltaR = xDeltaR;
+      kt = xkt;
+      leadingIndex = i;
     }
-    else {
-      // Reassign i to the leading daughter index
-      //std::cout << "Found kt=" << xkt << " for " << i << "->" << index1 << ", " << index2 << ". Recursing with " << index1 << "\n";
-      i = index1;
-    }
+    i = index1;
   }
 
   // This really shouldn't be possible!
-  if (foundSplitting == false) {
+  if (kt <= 0.0001) {
     // For example, we ran out of daughters.
     std::cout << "Didn't find any kt > 0 splitting for index " << i << "->" << index1 << ", " << index2 <<"! Skipping splitting " << startingIndex << "!\n";
     return;
@@ -536,19 +553,19 @@ void ExtractFirstPythiaSplitting(SubstructureTree::JetSubstructureSplittings & s
 
   // Add jet constituents
   //std::cout << "\nEvent " << iEvent << ", particle " << i << "\n\n";
-  std::vector<fastjet::PseudoJet> daughters = RetrieveFinalStateDaughters(event, i, charged, true);
+  std::vector<fastjet::PseudoJet> daughters = RetrieveFinalStateDaughters(event, leadingIndex, charged, true);
   for (const auto & part : daughters) {
     splittingsObj.AddJetConstituent(part);
   }
 
   // Calculate the splitting properties and store them
-  double xz = j2.perp() / (j2.perp() + j1.perp());
-  double xDeltaR = j1.delta_R(j2);
-  double xkt = j2.perp() * std::sin(xDeltaR);
+  //double xz = j2.perp() / (j2.perp() + j1.perp());
+  //double xDeltaR = j1.delta_R(j2);
+  //double xkt = j2.perp() * std::sin(xDeltaR);
   //std::cout << "Found non-zero kt=" << xkt << ". Storing!\n";
   // Add splitting
   int splittingNodeIndex = -1;
-  splittingsObj.AddSplitting(xkt, xDeltaR, xz, splittingNodeIndex);
+  splittingsObj.AddSplitting(kt, deltaR, z, splittingNodeIndex);
 
   // Add subjet
   splittingNodeIndex = splittingsObj.GetNumberOfSplittings() - 1;
@@ -916,8 +933,8 @@ int main(int argc, char* argv[])
       // 23 is the status for outgoing partons.
       if (std::abs(pythia.event[i].status()) == 23) {
         SubstructureTree::JetSubstructureSplittings splittingsObj;
-        //ExtractFirstPythiaSplitting(splittingsObj, pythia.event, i, static_cast<bool>(charged));
-        RecursiveTruePythia(splittingsObj, pythia.event, i, static_cast<bool>(charged), storeRecursiveSplittings);
+        ExtractFirstPythiaSplitting(splittingsObj, pythia.event, i, static_cast<bool>(charged), jetParameterR);
+        //RecursiveTruePythia(splittingsObj, pythia.event, i, static_cast<bool>(charged), storeRecursiveSplittings);
         if (i == 6) {
           parton6Splittings = splittingsObj;
         }
