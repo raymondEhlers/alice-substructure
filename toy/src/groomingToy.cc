@@ -779,7 +779,7 @@ int main(int argc, char* argv[])
 
   fastjet::JetDefinition* jetDefAKT_Sig = new fastjet::JetDefinition(fastjet::antikt_algorithm, jetParameterR, recombScheme, strategy);
 
-  fastjet::GhostedAreaSpec ghostareaspec(trackEtaCut, 1, 0.05); // ghost
+  fastjet::GhostedAreaSpec ghostareaspec(trackEtaCut, 1, 0.01); // ghost
   // max rap, repeat, ghostarea default 0.01
   fastjet::AreaType areaType = fastjet::active_area_explicit_ghosts;
   fastjet::AreaDefinition* areaDef = new fastjet::AreaDefinition(areaType, ghostareaspec);
@@ -1009,7 +1009,7 @@ int main(int argc, char* argv[])
     fastjet::PseudoJet probeJet = pythiaJets[0];
 
     //_________________HI jets_______________________________________________________
-    fastjet::GhostedAreaSpec New_ghost_spec(1, 1, 0.05); // Ghosts to calculate the Jet Area
+    fastjet::GhostedAreaSpec New_ghost_spec(1, 1, 0.01); // Ghosts to calculate the Jet Area
     fastjet::AreaDefinition New_fAreaDef(fastjet::active_area_explicit_ghosts, New_ghost_spec); // Area Definition
     fastjet::ClusterSequenceArea New_clustSeq_Sig(inputsHybrid, *jetDefAKT_Sig, New_fAreaDef);     // Cluster Sequence
     // NOTE: 1 GeV cut on hybrid jets is applied here.
