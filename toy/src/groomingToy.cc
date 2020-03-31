@@ -474,7 +474,61 @@ void RecursiveTruePythia(SubstructureTree::JetSubstructureSplittings & splitting
   }*/
 }
 
-void ExtractFirstPythiaSplitting(SubstructureTree::JetSubstructureSplittings & splittingsObj, const Event & event, const int startingIndex, const bool charged, const double jetParameterR)
+void ExtractSinglePythiaSplitting(const Event & event, const unsigned int inputIndex, double & z, double & deltaR, double & kt, unsigned int & leadingIndex, bool & leadingIsIterative, double jetParameterR, const bool followingIterativeSplitting, const bool storeRecursiveSplittings)
+{
+  if ((event[inputIndex].daughter1() > 0 && event[inputIndex].daughter2() > 0) == false) {
+    // No more daughters, so we're done - just return.
+    //std::cout << "Found no viable daughters for inputIndex=" << inputIndex << ". Returning.\n";
+    return;
+  }
+
+  // Retrieve the daughters.
+  unsigned int index1 = event[inputIndex].daughter1();
+  unsigned int index2 = event[inputIndex].daughter2();
+  //std::cout << "Considering " << inputIndex << "->" << index1 << ", " << index2 << "\n";
+  fastjet::PseudoJet j1(
+    event[index1].px(),
+    event[index1].py(),
+    event[index1].pz(),
+    event[index1].e()
+  );
+  fastjet::PseudoJet j2(
+    event[index2].px(),
+    event[index2].py(),
+    event[index2].pz(),
+    event[index2].e()
+  );
+
+  // j1 should always be the harder of the two subjets.
+  if (j1.perp() < j2.perp()) {
+    swap(j1, j2);
+    // We need to also keep the index correspondence because we need to keep it to keep track of additional
+    // properties (unlike with jet finding, where everything relevant is stored in the PseudoJet).
+    swap(index1, index2);
+  }
+
+  // Extract splitting and compare
+  double xz = j2.perp() / (j2.perp() + j1.perp());
+  double xDeltaR = j1.delta_R(j2);
+  double xkt = j2.perp() * std::sin(xDeltaR);
+  if (xkt > kt && xDeltaR <= jetParameterR) {
+    //std::cout << "Found new hardest kt=" << xkt << " at i=" << inputIndex
+    //          << " and following index1=" << index1 << " next.\n";
+    z = xz;
+    deltaR = xDeltaR;
+    kt = xkt;
+    leadingIndex = inputIndex;
+    leadingIsIterative = followingIterativeSplitting;
+  }
+
+  // Recurse as necessary to get the rest of the splittings.
+  ExtractSinglePythiaSplitting(event, index1, z, deltaR, kt, leadingIndex, leadingIsIterative, jetParameterR, followingIterativeSplitting, storeRecursiveSplittings);
+  if (storeRecursiveSplittings == true) {
+    ExtractSinglePythiaSplitting(event, index2, z, deltaR, kt, leadingIndex, leadingIsIterative, jetParameterR, false, storeRecursiveSplittings);
+  }
+}
+
+void RecursiveSinglePythiaSplitting(SubstructureTree::JetSubstructureSplittings & splittingsObj, const Event & event, const int startingIndex, const bool charged, const double jetParameterR, const bool storeRecursiveSplittings)
 {
   // Search for the first splitting with a non-zero kt, starting with the startingIndex splitting.
   int i = startingIndex;
@@ -483,64 +537,15 @@ void ExtractFirstPythiaSplitting(SubstructureTree::JetSubstructureSplittings & s
   unsigned int index2 = 0;
   fastjet::PseudoJet j1, j2;
 
-  unsigned int leadingIndex = 0;
   double z = 0;
   double deltaR = 0;
   double kt = 0;
-  while (event[i].daughter1() > 0 && event[i].daughter2() > 0)
-  {
-    index1 = event[i].daughter1();
-    index2 = event[i].daughter2();
-    //if (index1 == index2) {
-    //    std::cout << "Daughter indices are equal!!!" << "\n";
-    //}
-    j1.reset(
-      event[index1].px(),
-      event[index1].py(),
-      event[index1].pz(),
-      event[index1].e()
-    );
-    j2.reset(
-      event[index2].px(),
-      event[index2].py(),
-      event[index2].pz(),
-      event[index2].e()
-    );
+  unsigned int leadingIndex = 0;
+  bool leadingIsIterative = true;
+  ExtractSinglePythiaSplitting(event, i, z, deltaR, kt, leadingIndex, leadingIsIterative, jetParameterR, true, storeRecursiveSplittings);
+  //std::cout << "Result: z=" << z << ", deltaR=" << deltaR << ", kt=" << kt << ", leadingIndex=" << leadingIndex << ", leadingIsIterative=" << leadingIsIterative << "\n";
 
-    // j1 should always be the harder of the two subjets.
-    if (j1.perp() < j2.perp()) {
-      swap(j1, j2);
-      swap(index1, index2);
-    }
-
-    // If we are looking at index1 0, there are no more daughters. We didn't find a kt > 0 splitting,
-    // and we have to give up here.
-    //if (index1 == 0) {
-    //    break;
-    //}
-
-    double xz = j2.perp() / (j2.perp() + j1.perp());
-    double xDeltaR = j1.delta_R(j2);
-    double xkt = j2.perp() * std::sin(xDeltaR);
-
-    // kt > 0 should be roughly equivalent to:
-    // if (((index1 > 0) && (index2 > 0)) && (index1 != index2)) { }
-    // However, kt > 0 is better because it's a clearly physics motivated measure of the splitting.
-
-    // Store if it has a larger kt.
-    // We also require the deltaR to be less than the jetR so that it actually could be contained in a jet.
-    if (xkt > kt && xDeltaR <= jetParameterR) {
-      std::cout << "Found new hardest kt=" << xkt << " at i=" << i
-           << " and following index1=" << index1 << " next.\n";
-      z = xz;
-      deltaR = xDeltaR;
-      kt = xkt;
-      leadingIndex = i;
-    }
-    i = index1;
-  }
-
-  // This really shouldn't be possible!
+  // This really shouldn't be common!
   if (kt <= 0.0001) {
     // For example, we ran out of daughters.
     std::cout << "Didn't find any kt > 0 splitting for index " << i << "->" << index1 << ", " << index2 <<"! Skipping splitting " << startingIndex << "!\n";
@@ -576,7 +581,7 @@ void ExtractFirstPythiaSplitting(SubstructureTree::JetSubstructureSplittings & s
   RetrieveFinalStateDaughterIndices(event, index2, j2DaughterIndices, charged);
   std::vector<unsigned short> j1ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j1DaughterIndices, daughters);
   std::vector<unsigned short> j2ConstituentIndices = FindSubjetConstituentsFromAllConstituents(j2DaughterIndices, daughters);
-  splittingsObj.AddSubjet(splittingNodeIndex, true, j1ConstituentIndices);
+  splittingsObj.AddSubjet(splittingNodeIndex, leadingIsIterative, j1ConstituentIndices);
   splittingsObj.AddSubjet(splittingNodeIndex, false, j2ConstituentIndices);
 }
 
@@ -933,7 +938,8 @@ int main(int argc, char* argv[])
       // 23 is the status for outgoing partons.
       if (std::abs(pythia.event[i].status()) == 23) {
         SubstructureTree::JetSubstructureSplittings splittingsObj;
-        ExtractFirstPythiaSplitting(splittingsObj, pythia.event, i, static_cast<bool>(charged), jetParameterR);
+        // Extract just the recursive splitting
+        RecursiveSinglePythiaSplitting(splittingsObj, pythia.event, i, static_cast<bool>(charged), jetParameterR, storeRecursiveSplittings);
         //RecursiveTruePythia(splittingsObj, pythia.event, i, static_cast<bool>(charged), storeRecursiveSplittings);
         if (i == 6) {
           parton6Splittings = splittingsObj;
