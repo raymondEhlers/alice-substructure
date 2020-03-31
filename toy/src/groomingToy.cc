@@ -1119,7 +1119,7 @@ int main(int argc, char* argv[])
   TString tag = TString::Format("pythia+thermal_substructure_toy_antikt_%02d", TMath::Nint(jetParameterR * 10));
 
   TFile* outFile =
-   new TFile(TString::Format("%s_tune_%d_seed_%03d_%s%s_ptHatMin_%d.root", tag.Data(), tune, randomSeed, charged ? "charged" : "full", underlingEvent ? "_underlyingEvent" : "", static_cast<int>(ptHatMin)), "RECREATE");
+   new TFile(TString::Format("%s_tune_%d_seed_%03d_jetR%03d_%s%s_ptHatMin_%d.root", tag.Data(), tune, randomSeed, int(100 * jetParameterR), charged ? "charged" : "full", underlingEvent ? "_underlyingEvent" : "", static_cast<int>(ptHatMin)), "RECREATE");
 
   outFile->cd();
   // Write out hists
