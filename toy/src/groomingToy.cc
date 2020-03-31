@@ -530,31 +530,25 @@ void ExtractSinglePythiaSplitting(const Event & event, const unsigned int inputI
 
 void RecursiveSinglePythiaSplitting(SubstructureTree::JetSubstructureSplittings & splittingsObj, const Event & event, const int startingIndex, const bool charged, const double jetParameterR, const bool storeRecursiveSplittings)
 {
-  // Search for the first splitting with a non-zero kt, starting with the startingIndex splitting.
-  int i = startingIndex;
-  //bool foundSplitting = false;
-  unsigned int index1 = 0;
-  unsigned int index2 = 0;
-  fastjet::PseudoJet j1, j2;
-
+  // Search for the hardest splitting, starting with the startingIndex splitting.
   double z = 0;
   double deltaR = 0;
   double kt = 0;
   unsigned int leadingIndex = 0;
   bool leadingIsIterative = true;
-  ExtractSinglePythiaSplitting(event, i, z, deltaR, kt, leadingIndex, leadingIsIterative, jetParameterR, true, storeRecursiveSplittings);
+  ExtractSinglePythiaSplitting(event, startingIndex, z, deltaR, kt, leadingIndex, leadingIsIterative, jetParameterR, true, storeRecursiveSplittings);
   //std::cout << "Result: z=" << z << ", deltaR=" << deltaR << ", kt=" << kt << ", leadingIndex=" << leadingIndex << ", leadingIsIterative=" << leadingIsIterative << "\n";
 
   // This really shouldn't be common!
   if (kt <= 0.0001) {
     // For example, we ran out of daughters.
-    std::cout << "Didn't find any kt > 0 splitting for index " << i << "->" << index1 << ", " << index2 <<"! Skipping splitting " << startingIndex << "!\n";
+    std::cout << "Didn't find any kt > 0 splitting for parton " << startingIndex << "! Skipping splitting!\n";
     return;
   }
 
   // We have found a splitting. Now extract the properties.
   // Base properties
-  splittingsObj.SetJetPt(event[i].pT());
+  splittingsObj.SetJetPt(event[leadingIndex].pT());
 
   // Add jet constituents
   //std::cout << "\nEvent " << iEvent << ", particle " << i << "\n\n";
@@ -576,6 +570,8 @@ void RecursiveSinglePythiaSplitting(SubstructureTree::JetSubstructureSplittings 
   splittingNodeIndex = splittingsObj.GetNumberOfSplittings() - 1;
   // Given our mode here, this should always be 0!
   assert(splittingNodeIndex == 0);
+  unsigned int index1 = event[leadingIndex].daughter1();
+  unsigned int index2 = event[leadingIndex].daughter2();
   std::vector<int> j1DaughterIndices, j2DaughterIndices;
   RetrieveFinalStateDaughterIndices(event, index1, j1DaughterIndices, charged);
   RetrieveFinalStateDaughterIndices(event, index2, j2DaughterIndices, charged);
@@ -939,7 +935,8 @@ int main(int argc, char* argv[])
       if (std::abs(pythia.event[i].status()) == 23) {
         SubstructureTree::JetSubstructureSplittings splittingsObj;
         // Extract just the recursive splitting
-        RecursiveSinglePythiaSplitting(splittingsObj, pythia.event, i, static_cast<bool>(charged), jetParameterR, storeRecursiveSplittings);
+        // TEMP: Return to recursive after testing.
+        RecursiveSinglePythiaSplitting(splittingsObj, pythia.event, i, static_cast<bool>(charged), jetParameterR, false);
         //RecursiveTruePythia(splittingsObj, pythia.event, i, static_cast<bool>(charged), storeRecursiveSplittings);
         if (i == 6) {
           parton6Splittings = splittingsObj;
