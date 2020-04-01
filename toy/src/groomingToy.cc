@@ -252,10 +252,7 @@ void Reclustering(SubstructureTree::JetSubstructureSplittings & jetSplittings, f
     if (part.user_index() == -1) {
       continue;
     }
-    if (part.pt() < 0.15) {
-      std::cout << "Soft constituent! pt: " << part.pt() << ". Shouldn't be possibe!\n";
-      std::exit(1);
-    }
+    // NOTE: Soft constituents with pt < 0.15 are possible after constituent subtraction!
     pseudoTrack.reset(part.px(), part.py(), part.pz(), part.e());
     pseudoTrack.set_user_index(constituentIndex);
     inputVectors.push_back(pseudoTrack);
@@ -717,7 +714,7 @@ int main(int argc, char* argv[])
   bool takeFirstTrueSplitting = static_cast<bool>(std::stoi(argv[8]));
   double trackLowPtCut = 0.150;                 // GeV
   double trackEtaCut = 1;
-  Float_t ptHatMin = 50;
+  Float_t ptHatMin = 70;
   Float_t ptHatMax = 5020;
 
   // Print settings
@@ -791,12 +788,19 @@ int main(int argc, char* argv[])
   fastjet::Strategy strategy = fastjet::Best;
   fastjet::RecombinationScheme recombScheme = fastjet::E_scheme;
 
-  fastjet::JetDefinition* jetDefAKT_Sig = new fastjet::JetDefinition(fastjet::antikt_algorithm, jetParameterR, recombScheme, strategy);
+  // Jet definitions
+  fastjet::JetDefinition antiKTJetDef(fastjet::antikt_algorithm, jetParameterR, recombScheme, strategy);
+  fastjet::JetDefinition bgJetDef(fastjet::kt_algorithm, jetParameterR, recombScheme, strategy);
 
-  fastjet::GhostedAreaSpec ghostareaspec(trackEtaCut, 1, 0.01); // ghost
+  // Area definitions
+  // Pythia
   // max rap, repeat, ghostarea default 0.01
-  fastjet::AreaType areaType = fastjet::active_area_explicit_ghosts;
-  fastjet::AreaDefinition* areaDef = new fastjet::AreaDefinition(areaType, ghostareaspec);
+  fastjet::GhostedAreaSpec pythiaGhostSpec(trackEtaCut, 1, 0.01);
+  fastjet::AreaDefinition pythiaAreaDef(fastjet::passive_area, pythiaGhostSpec);
+  // Hybrid + background subtraction
+  fastjet::GhostedAreaSpec hybridGhostSpec(trackEtaCut, 1, 0.01);
+  fastjet::AreaDefinition hybridAreaDef(fastjet::active_area_explicit_ghosts, hybridGhostSpec);
+  fastjet::AreaDefinition bgAreaDef(fastjet::active_area_explicit_ghosts, hybridGhostSpec);
 
   // Fastjet inputs
   std::vector<fastjet::PseudoJet> inputsPythia;
@@ -981,7 +985,7 @@ int main(int argc, char* argv[])
     }
 
     // Pythia jets finding.
-    fastjet::ClusterSequenceArea pythiaCS(inputsPythia, *jetDefAKT_Sig, *areaDef);
+    fastjet::ClusterSequenceArea pythiaCS(inputsPythia, antiKTJetDef, pythiaAreaDef);
     // NOTE: 1 GeV cut on pythia jets is applied here!
     std::vector<fastjet::PseudoJet> pythiaJets = pythiaCS.inclusive_jets(1.);
 
@@ -1036,8 +1040,9 @@ int main(int argc, char* argv[])
     // We're only going to embed the leading pythia jet for convenience.
     // To simplify further, we only embed the constituents from that pythia jet.
     fastjet::PseudoJet pythiaProbeJet = sorted_by_pt(pythiaJets)[0];
-    for (auto particle : pythiaProbeJet.constituents())
+    for (auto particle : sorted_by_pt(pythiaProbeJet.constituents()))
     {
+      // No need to exclude ghosts because we are using passive ghosts for the pythia jets.
       // Add the particle to the hybrid input and store the properties.
       inputsHybrid.push_back(particle);
       hPtPythiaProbe.Fill(particle.pt());
@@ -1049,18 +1054,14 @@ int main(int argc, char* argv[])
     }
 
     // Hybrid jet finding.
-    fastjet::GhostedAreaSpec New_ghost_spec(1, 1, 0.01); // Ghosts to calculate the Jet Area
-    fastjet::AreaDefinition New_fAreaDef(fastjet::active_area_explicit_ghosts, New_ghost_spec); // Area Definition
-    fastjet::ClusterSequenceArea hybridCS(inputsHybrid, *jetDefAKT_Sig, New_fAreaDef);     // Cluster Sequence
+    fastjet::ClusterSequenceArea hybridCS(inputsHybrid, antiKTJetDef, hybridAreaDef);
     // NOTE: 1 GeV cut on hybrid jets is applied here.
     std::vector<fastjet::PseudoJet> hybridJets = hybridCS.inclusive_jets(1.); // Vector with the Reconstructed Jets
 
     // Background subtraction
     fastjet::JetMedianBackgroundEstimator bge;
-    fastjet::Selector BGSelector = fastjet::SelectorAbsEtaMax(1.0);
-    fastjet::JetDefinition jetDefBG(fastjet::kt_algorithm, jetParameterR, recombScheme, strategy);
-    fastjet::AreaDefinition fAreaDefBG(fastjet::active_area_explicit_ghosts, New_ghost_spec);
-    fastjet::ClusterSequenceArea clustSeqBG(inputsHybrid, jetDefBG, fAreaDefBG);
+    fastjet::Selector BGSelector = fastjet::SelectorAbsEtaMax(trackEtaCut);
+    fastjet::ClusterSequenceArea clustSeqBG(inputsHybrid, bgJetDef, bgAreaDef);
     std::vector<fastjet::PseudoJet> BGJets = clustSeqBG.inclusive_jets();
     bge.set_selector(BGSelector);
     bge.set_jets(BGJets);
