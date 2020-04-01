@@ -1091,7 +1091,7 @@ int main(int argc, char* argv[])
     // Again, we'll only take the pythia probe jet, as that's all that we've embedded.
     // NOTE: The matching was written generically, so we need to put the probe jet into a length one vector.
     std::vector<fastjet::PseudoJet> pythiaJetsForMatching;
-    pythiaJetsForMatching.emplace_back(pythiaJets[0]);
+    pythiaJetsForMatching.emplace_back(pythiaProbeJet);
     std::map<int, int> pythiaToHybridIndex;
     std::map<int, int> hybridToPythiaIndex;
     std::tie(pythiaToHybridIndex, hybridToPythiaIndex) = MatchJets(hybridJets, pythiaJetsForMatching);
