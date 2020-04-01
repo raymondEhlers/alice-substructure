@@ -134,7 +134,7 @@ void IterativeDeclustering(fastjet::PseudoJet jet, Int_t type, Int_t flag, Doubl
   // cout<<"***************************************************"<<endl;
   //_________________________________________________________________________________________
 
-  double jet_radius_ca = 0.4;
+  double jet_radius_ca = 1;
   fastjet::JetDefinition jet_def(fastjet::genkt_algorithm, jet_radius_ca, 0,
                   static_cast<fastjet::RecombinationScheme>(0), fastjet::Best);
 
@@ -519,14 +519,14 @@ int main(int argc, char* argv[])
           }
 
           if (flag == 5) {
-            if (xkt > xktmax5 && delta_R <= 0.4) {
+            if (xkt > xktmax5 && delta_R <= 0.8) {
               xktmax5 = xkt;
               tfmin5 = form;
             }
           }
 
           if (flag == 6) {
-            if (xkt > xktmax6 && delta_R <= 0.4) {
+            if (xkt > xktmax6 && delta_R <= 0.8) {
               xktmax6 = xkt;
               tfmin6 = form;
             }
@@ -602,7 +602,6 @@ int main(int argc, char* argv[])
     hJetPt_B->Fill(ProbeJet.pt());
 
     hJetArea_B->Fill(ProbeJet.area());
-    cout << "flago" << flago << "i am here" << endl;
     if (flago == 5)
       IterativeDeclustering(ProbeJet, 0, flago, xktmax5,
                  tfmin5); // Fill the deltaR and groomed deltaR "B-Histograms"
