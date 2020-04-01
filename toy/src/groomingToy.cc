@@ -735,7 +735,7 @@ int main(int argc, char* argv[])
   bool takeFirstTrueSplitting = static_cast<bool>(std::stoi(argv[8]));
   double trackLowPtCut = 0.150;                 // GeV
   double trackEtaCut = 1;
-  Float_t ptHatMin = 70;
+  Float_t ptHatMin = 80;
   Float_t ptHatMax = 5020;
 
   // Print settings
