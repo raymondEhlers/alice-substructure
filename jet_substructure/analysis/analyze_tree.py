@@ -339,7 +339,7 @@ def analyze_single_tree_toy(
             #    data_inputs=data_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
             # )
 
-    # IPython.start_ipython(user_ns=locals())
+    IPython.start_ipython(user_ns=locals())
 
     # Store hists with pickle because it takes too longer otherwise.
     with open(pkl_filename, "wb") as pkl_file:
@@ -558,19 +558,29 @@ def analyze_single_tree_embedding(
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]],
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]],
 ]:
+    """ Determine the response and prong matching for jets substructure techniques.
+
+    Why combine them together? Because then we only have to open and process a tree once.
+    At a future date (beyond the start of April 2020), it would be better to refactor them more separately,
+    such that we can enable or disable the different options and still have appropriate return values.
+    But for now, we don't worry about it.
+    """
     # Setup
     hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]] = {}
-    # If the hists already exist, skip processing the tree and just return the hists instead (which is way faster!)
+    matching_hists: Dict[
+        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
+    ] = {}
+    # If the output file already exist, skip processing the tree and just return the hists instead (which is way faster!)
     train_number = tree.filename.parent.name
-    yaml_filename = output / f"{train_number}_{tree.filename.with_suffix('.yaml').name}"
-    # TODO: Re-enable properly. Don't forget about the matching hists.
-    # if yaml_filename.exists() and not force_reprocessing:
-    #    logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
-    #    with open(yaml_filename, "r") as f:
-    #        hists = y.load(f)
-    #        return hists
+    pkl_filename = output / f"{train_number}_{tree.filename.with_suffix('.pkl').name}"
+    if pkl_filename.exists() and not force_reprocessing:
+        logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
+        with open(pkl_filename, "rb") as f:
+            hists, matching_hists = pickle.load(f)
+            return hists, matching_hists
 
     # Since we're actually processing, we setup the output hists
+    # Responses
     for iterative_splittings in [False, True]:
         for jet_pt_bin in jet_pt_bins:
             hists[
@@ -578,6 +588,11 @@ def analyze_single_tree_embedding(
             ] = analysis_objects.create_substructure_response_hists(
                 iterative_splittings=iterative_splittings, z_cutoff=z_cutoff
             )
+    # Matching
+    for iterative_splittings in [False, True]:
+        matching_hists[
+            analysis_objects.Identifier(iterative_splittings, jet_pt_bin=helpers.RangeSelector(0, 200))
+        ] = analysis_objects.create_matching_hists(iterative_splittings=iterative_splittings, z_cutoff=z_cutoff)
 
     # Add a convenient wrapper.
     logger.debug(f"Accessing data from the tree {tree.filename}.")
@@ -589,10 +604,9 @@ def analyze_single_tree_embedding(
             hybrid_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
             prefix = "matched"
             true_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
-            # prefix = "detLevel"
-            # det_level_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
-            # for prefix, jets in [("data", hybrid_jets), ("matched", true_jets), ("detLevel", det_level_jets)]:
-            for prefix, jets in [("data", hybrid_jets), ("matched", true_jets)]:
+            prefix = "detLevel"
+            det_level_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
+            for prefix, jets in [("data", hybrid_jets), ("matched", true_jets), ("detLevel", det_level_jets)]:
                 # Save calculate columns so we don't need to re-calculate them every time.
                 # NOTE: We always check if they already exist because HDF5 doesn't like us
                 #       overwriting columns.
@@ -610,8 +624,7 @@ def analyze_single_tree_embedding(
     # Catch all failed cases.
     if not successfully_accessed_data:
         # Convert, write, and return the empty hists. We can't process this data :-(
-        # TODO: Fix the case for the matching hists.
-        return _convert_and_write_hists(hists=hists, tree_filename=tree.filename, yaml_filename=yaml_filename, y=y)
+        return hists, matching_hists
 
     # Loop over iterations (jet pt ranges, iterative splitting)
     with progress_manager.counter(
@@ -705,55 +718,47 @@ def analyze_single_tree_embedding(
                 hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
             )
 
+            # TODO: USE THESE HISTS!!!
+
     # Convert to BinnedData and store the hists
     # for h in hists.values():
     #    h.convert_boost_histograms_to_binned_data()
     # Store hists with pickle because it takes too longer otherwise.
-    with open(yaml_filename.with_suffix(".pkl"), "wb") as f:
-        pickle.dump(hists, f)
-    # Still need to convert to BinnedData
-    for h in hists.values():
-        h.convert_boost_histograms_to_binned_data()
-    # with open(yaml_filename, "w") as f:
-    #    logger.info(f"Writing hists of the tree {tree.filename} to {yaml_filename}")
-    #    IPython.embed()
-    #    y.dump(hists, f)
+    with open(pkl_filename, "wb") as pkl_file:
+        pickle.dump((hists, matching_hists), pkl_file)
 
     # Look at matched jets
     matching_hists = matching(
-        matched_jets=true_jets, hybrid_jets=hybrid_jets, z_cutoff=z_cutoff, R=R, progress_manager=progress_manager
+        matching_hists=matching_hists,
+        matched_jets=det_level_jets,
+        hybrid_jets=hybrid_jets,
+        z_cutoff=z_cutoff,
+        R=R,
+        progress_manager=progress_manager,
     )
+
+    # Store hists with pickle because it takes too longer otherwise.
+    # Write again here (despite the waste of writing twice) so we can keep the response hists even
+    # if the matching fails
+    with open(pkl_filename, "wb") as pkl_file:
+        pickle.dump((hists, matching_hists), pkl_file)
+
     return hists, matching_hists
 
 
 def matching(
+    matching_hists: Dict[
+        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
+    ],
     matched_jets: substructure_methods.SubstructureJetArray,
     hybrid_jets: substructure_methods.SubstructureJetArray,
     z_cutoff: float,
     R: float,
     progress_manager: enlighten.Manager,
 ) -> Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]]:
+    """ Determine the prong matching for jets substructure techniques.
 
-    # We want to plot as a function of jet pt, so we don't select on jet pt here.
-    # Setup
-    matching_hists: Dict[
-        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
-    ] = {}
-    # If the hists already exist, skip processing the tree and just return the hists instead (which is way faster!)
-    # train_number = tree.filename.parent.name
-    # yaml_filename_matching = output / f"{train_number}_matching_{tree.filename.with_suffix('.yaml').name}"
-    # if yaml_filename.exists() and not force_reprocessing:
-    #    logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
-    #    with open(yaml_filename, "r") as f:
-    #        hists = y.load(f)
-    #        return hists
-
-    # Since we're actually processing, we setup the output hists
-    for iterative_splittings in [False, True]:
-        matching_hists[
-            analysis_objects.Identifier(iterative_splittings, jet_pt_bin=helpers.RangeSelector(0, 200))
-        ] = analysis_objects.create_matching_hists(iterative_splittings=iterative_splittings, z_cutoff=z_cutoff)
-
+    """
     with progress_manager.counter(
         total=len(matching_hists), desc="Analyzing", unit="variation", leave=False
     ) as variations_counter:
@@ -1050,6 +1055,15 @@ def run_embedding(
             results.append(tree_hists)
             matching_results.append(matching_hists)
 
+    # Convert hists from boost hist to pachyderm
+    # Still need to convert to BinnedData (because we stored data with pickle instead to speed up writing).
+    for hists in results:
+        for h in hists.values():
+            h.convert_boost_histograms_to_binned_data()
+    for matching_hists in matching_results:
+        for match_hist in matching_hists.values():
+            match_hist.convert_boost_histograms_to_binned_data()
+
     # Merge the hists
     full_hists: Dict[
         analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]
@@ -1069,7 +1083,7 @@ def run_embedding(
         )
 
     # Write out the merged hists
-    # Disable for now...
+    # Disable for now because it's super slow!
     # with open(output / "response_hists.yaml", "w") as f:
     #    y.dump(full_hists, f)
 
@@ -1099,9 +1113,9 @@ if __name__ == "__main__":
     logging.getLogger("pachyderm.binned_data").setLevel(logging.INFO)
 
     # Setup and run
-    # collision_system = "toy"
-    data_prefix = "hybrid"
-    collision_system = f"toy_true_{data_prefix}_splittings_iterative_allTrueSplittings_delta_R_040"
+    collision_system = "embedPythia"
+    # data_prefix = "hybrid"
+    # collision_system = f"toy_true_{data_prefix}_splittings_iterative_allTrueSplittings_delta_R_040"
     jet_pt_bins = [
         helpers.RangeSelector(min=0, max=120),
         helpers.RangeSelector(min=60, max=80),
@@ -1118,20 +1132,20 @@ if __name__ == "__main__":
     #   output=Path("output"),
     # )
     # plot_results.lund_plane(all_hists=hists, path=output)
-    hists, output = run_toy(
-        collision_system=collision_system,
-        data_prefix=data_prefix,
-        jet_pt_bins=jet_pt_bins,
-        dataset_config_filename=Path("config") / "datasets.yaml",
-        output=Path("output"),
-    )
-    plot_results.toy(all_toy_hists=hists, data_prefix=data_prefix, path=output)
-    # hists_response, matching_hists, output = run_embedding(
+    # hists, output = run_toy(
     #    collision_system=collision_system,
+    #    data_prefix=data_prefix,
     #    jet_pt_bins=jet_pt_bins,
     #    dataset_config_filename=Path("config") / "datasets.yaml",
     #    output=Path("output"),
     # )
-    # plot_results.matching(all_matching_hists=matching_hists, path=output)
+    # plot_results.toy(all_toy_hists=hists, data_prefix=data_prefix, path=output)
+    hists_response, matching_hists, output = run_embedding(
+        collision_system=collision_system,
+        jet_pt_bins=jet_pt_bins,
+        dataset_config_filename=Path("config") / "datasets.yaml",
+        output=Path("output"),
+    )
+    plot_results.matching(all_matching_hists=matching_hists, path=output)
 
     IPython.start_ipython(user_ns=locals())
