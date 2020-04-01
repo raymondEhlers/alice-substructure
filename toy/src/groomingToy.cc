@@ -1,5 +1,4 @@
-// Adapted from main01.cc from PYTHIA and from code from Leticia.
-// Copyright (C) 2014 Torbjorn Sjostrand.
+// Grooming toy model
 
 #include <math.h>
 #include <stdlib.h>
@@ -684,7 +683,6 @@ int main(int argc, char* argv[])
 {
   int randomSeed = -1;  // unique number for each file
   int tune = -1;   // pythia tune
-  int charged = 1; // full or track-based jets
   bool underlyingEvent = true;    // underlying event (ISR+MPI)
 
   if (argc != 9) {
@@ -701,6 +699,7 @@ int main(int argc, char* argv[])
   //__________________________________________________________________________
   //                        ANALYSIS SETTINGS
 
+  bool charged = true; // full or track-based jets
   bool applyTwoParticleAcceptanceCut = false;
   double jetParameterR = std::stod(argv[5]); // jet R
   double partonDeltaRMax = std::stod(argv[6]); // Max delta R between parton and jet.
@@ -722,6 +721,7 @@ int main(int argc, char* argv[])
        << "\tMinimum pt hat: " << ptHatMin << "\n"
        << "\tMaximum pt hat: " << ptHatMax << "\n"
        << "Analysis properties:\n"
+       << "\tUse only charged tracks: " << charged << "\n"
        << "\tTrack pt cut: " << trackLowPtCut << "\n"
        << "\tTrack eta cut: " << trackEtaCut << "\n"
        << "\tResolution parameter: " << jetParameterR << "\n"
@@ -901,7 +901,6 @@ int main(int argc, char* argv[])
   // data will contain the hybrid (pythia + thermal) jets
   pythiaHybridTree.Branch("data.", &hybridJetSplittings, bufferSize, splitLevel);
 
-
   //___________________________________________________
   // Begin event loop. Generate event. Skip if error. List first one.
   for (int iEvent = 0; iEvent < nEvent; iEvent++) {
@@ -925,11 +924,11 @@ int main(int argc, char* argv[])
     SubstructureTree::JetSubstructureSplittings parton7Splittings;
     unsigned int globalIndex = 0;
     for (int i = 0; i < pythia.event.size(); ++i) {
-      // Extract final state charged hadrons for jet-finding
+      // Extract final state charged hadrons for pythia jet-finding
       if (pythia.event[i].isFinal()) {
-        if (charged == 1)
-          if (!pythia.event[i].isCharged())
-            continue; // only charged particles
+        if (charged && !pythia.event[i].isCharged()) {
+          continue; // only charged particles
+        }
         if (pythia.event[i].pT() < trackLowPtCut)
           continue; // pt cut
         if (std::abs(pythia.event[i].eta()) > trackEtaCut)
@@ -944,9 +943,6 @@ int main(int argc, char* argv[])
         inputsPythia.push_back(particle);
         inputsHybrid.push_back(particle);
         // Store particle properties
-        hPtAllParticles.Fill(particle.pt());
-        hEtaAllParticles.Fill(particle.eta());
-        hPhiAllParticles.Fill(particle.phi_std());
         hPtPythia.Fill(particle.pt());
         hEtaPythia.Fill(particle.eta());
         hPhiPythia.Fill(particle.phi_std());
@@ -958,9 +954,9 @@ int main(int argc, char* argv[])
       if (std::abs(pythia.event[i].status()) == 23) {
         SubstructureTree::JetSubstructureSplittings splittingsObj;
         // Extract just the recursive splitting
-        RecursiveSinglePythiaSplitting(splittingsObj, pythia.event, i, static_cast<bool>(charged), jetParameterR, takeFirstTrueSplitting, storeRecursiveSplittings);
-        //RecursiveTruePythia(splittingsObj, pythia.event, i, static_cast<bool>(charged), storeRecursiveSplittings);
-        if (i == 6) {
+        RecursiveSinglePythiaSplitting(splittingsObj, pythia.event, i, charged, jetParameterR, takeFirstTrueSplitting, storeRecursiveSplittings);
+        //RecursiveTruePythia(splittingsObj, pythia.event, i, charged, storeRecursiveSplittings);
+        if (i == 5) {
           parton6Splittings = splittingsObj;
         }
         if (i == 6) {
@@ -996,6 +992,10 @@ int main(int argc, char* argv[])
       hPhiThermal.Fill(thermalParticle.phi_std());
       ++globalIndex;
     }
+
+    hPtAllParticles.Fill(particle.pt());
+    hEtaAllParticles.Fill(particle.eta());
+    hPhiAllParticles.Fill(particle.phi_std());
 
     //________________signal jets____________________________________________________
     fastjet::ClusterSequenceArea clustSeq_Sig(inputsPythia, *jetDefAKT_Sig, *areaDef);
