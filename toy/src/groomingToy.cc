@@ -47,6 +47,7 @@
 #include "output.h"
 
 #define nThermalParticles 4000
+#define THERMAL_PARTICLE_OFFSET 100000
 
 using namespace Pythia8;
 
@@ -166,16 +167,36 @@ std::tuple<std::map<int, int>, std::map<int, int>> MatchJets(std::vector<fastjet
   return std::make_tuple(trueToHybridIndexVerified, hybridToTrueIndexVerified);
 }
 
-double SharedMomentumFraction(fastjet::PseudoJet & hybridJet, fastjet::PseudoJet & trueJet)
+double SharedMomentumFraction(fastjet::PseudoJet & hybridJet, fastjet::PseudoJet & trueJet, bool verbose = false)
 {
   double constituentsPt = 0;
+  if (verbose) {
+    std::cout << "True constituents:\n";
+    for (const auto & trueConstituent : trueJet.constituents())
+    {
+      std::cout << trueConstituent.user_index() << ", ";
+    }
+    std::cout << "\n";
+    std::cout << "Hybrid constituents:\n";
+    for (const auto & hybridConstituent : hybridJet.constituents())
+    {
+      std::cout << hybridConstituent.user_index() << ", ";
+    }
+    std::cout << "\n";
+  }
   for (const auto & trueConstituent : trueJet.constituents())
   {
     for (const auto & hybridConstituent : hybridJet.constituents())
     {
       // Perform matching based solely on constituent global index.
       if (trueConstituent.user_index() == hybridConstituent.user_index()) {
-        constituentsPt += trueConstituent.pt();
+        if (verbose) {
+          std::cout << "Matched true constituent (index=" << trueConstituent.user_index() << "), pt=" << trueConstituent.pt() << " to hybridConstituent (index=" << hybridConstituent.user_index() << "), pt=" << hybridConstituent.pt() << "\n";
+        }
+        // We must use the hybrid constituent because it's constituent subtracted, which lowers
+        // the constituent pt! Otherwise, we would overestimate the amount of pythia pt in the jet
+        // (plus, this is what we do experimentally).
+        constituentsPt += hybridConstituent.pt();
       }
     }
   }
@@ -1011,7 +1032,7 @@ int main(int argc, char* argv[])
 
     // Thermal Particles loop
     // Add an offset for thermal particles.
-    globalIndex = 100000;
+    globalIndex = THERMAL_PARTICLE_OFFSET;
     for (int j = 0; j < nThermalParticles; j++) {
       double pT = f_pT->GetRandom();
       double eta = f_eta->GetRandom();
@@ -1091,26 +1112,30 @@ int main(int argc, char* argv[])
     // Again, we'll only take the pythia probe jet, as that's all that we've embedded.
     // NOTE: The matching was written generically, so we need to put the probe jet into a length one vector.
     std::vector<fastjet::PseudoJet> pythiaJetsForMatching;
+
     pythiaJetsForMatching.emplace_back(pythiaProbeJet);
     std::map<int, int> pythiaToHybridIndex;
     std::map<int, int> hybridToPythiaIndex;
     std::tie(pythiaToHybridIndex, hybridToPythiaIndex) = MatchJets(hybridJets, pythiaJetsForMatching);
 
     // Extract the splittings for each set of matched jets.
-    //std::cout << "About to recluster event " << iEvent << "\n";
+    //int fullMatchingMatchedHybridIndex = -1;
+    //std::cout << "n hybrid jets=" << hybridJets.size() << "\n";
+    //std::cout << "Full matching\n";
     for (std::size_t hybridIndex = 0; hybridIndex < hybridJets.size(); hybridIndex++)
     {
       // Setup. Ensure that the tree outputs are clear for each set of jets to fill it.
       hybridJetSplittings.Clear();
       pythiaJetSplittings.Clear();
+      // Hybrid jet
+      fastjet::PseudoJet & hybridJet = hybridJets[hybridIndex];
+      //std::cout << "Considering hybrid jet=" << hybridIndex << ", with pt=" << hybridJet.pt() << "\n";
 
       if (hybridToPythiaIndex.count(hybridIndex) == 0) {
         // This jet doesn't have a match. Skip it.
         //std::cout << "No match for this hybrid jet. Skipping\n";
         continue;
       }
-      // Hybrid jet
-      fastjet::PseudoJet & hybridJet = hybridJets[hybridIndex];
       if (AcceptJet(hybridJet, jetEtaMin, jetEtaMax) == false) {
         //std::cout << "Hybrid jet rejected.\n";
         continue;
@@ -1123,10 +1148,12 @@ int main(int argc, char* argv[])
         continue;
       }
       fastjet::PseudoJet & pythiaJet = pythiaJetsForMatching[pythiaJetIndex];
-      if (AcceptJet(pythiaJet, jetEtaMin, jetEtaMax) == false) {
-        //std::cout << "True jet rejected.\n";
+      /*if (AcceptJet(pythiaJet, jetEtaMin, jetEtaMax) == false) {
+        std::cout << "True jet rejected. Jet eta=" << pythiaJet.eta() << ", pt=" << pythiaJet.pt() << "\n";
+        std::cout << "Accept in eta=" << (JetInsideEtaLimits(pythiaJet, jetEtaMin, jetEtaMax) == false) << "\n";
+        std::cout << "Accept in pt=" << ((pythiaJet.pt() < 0.15) == false) << "\n";
         continue;
-      }
+      }*/
       double matchingDistance = hybridJet.delta_R(pythiaJet);
       hMatchingDistance.Fill(matchingDistance);
       // Check distance is reasonable.
@@ -1145,6 +1172,10 @@ int main(int argc, char* argv[])
 
       Reclustering(pythiaJetSplittings, pythiaJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
 
+      // Take note for comparison below.
+      //std::cout << "Found match for hybridIndex=" << hybridIndex << ". jet pt=" << hybridJet.pt() << ", shared momentum fraction=" <<  SharedMomentumFraction(hybridJet, pythiaJet, true) << "\n";
+      //fullMatchingMatchedHybridIndex = hybridIndex;
+
       // Check number of stored jet constituents
       /*std::cout << "Number of hybrid jet constituents: " << hybridJet.constituents().size() << "\n";
       std::cout << "hybrid constituents: " << hybridJetSplittings.GetNumberOfJetConstituents() << "\n";
@@ -1154,6 +1185,52 @@ int main(int argc, char* argv[])
       // Fill the matched jets.
       pythiaHybridTree.Fill();
     }
+
+    // Try simplified matching following the same approach as Leticia
+    // As of 1 April 2020, this method gives the same matching as the above.
+    // It can be compared by uncommenting the code here, and storing the index of the matched hybrid level jet above.
+    //int matchedHybridIndex = -1;
+    //std::cout << "Simplified matching\n";
+    /*for (std::size_t hybridIndex = 0; hybridIndex < hybridJets.size(); hybridIndex++)
+    {
+      // Hybrid jet
+      fastjet::PseudoJet & hybridJet = hybridJets[hybridIndex];
+      //std::cout << "Considering hybrid jet=" << hybridIndex << ", with pt=" << hybridJet.pt() << "\n";
+      if (AcceptJet(hybridJet, jetEtaMin, jetEtaMax) == false) {
+        //std::cout << "Hybrid jet rejected.\n";
+        continue;
+      }
+
+      if (hybridJet.pt() < (0.5 * pythiaProbeJet.pt())) {
+        //std::cout << "Rejected by probe jet pt requirement.\n";
+        continue;
+      }
+
+      double matchedPt = 0;
+
+      for (auto & constituent : sorted_by_pt(hybridJet.constituents()))
+      {
+        if (constituent.user_index() < THERMAL_PARTICLE_OFFSET) {
+          //std::cout << "Adding constituent (index=" << constituent.user_index() << ") pt=" << constituent.pt() << "\n";
+          matchedPt += constituent.pt();
+        }
+      }
+
+      if (matchedPt >= 0.5 * pythiaProbeJet.pt()) {
+        matchedHybridIndex = hybridIndex;
+        //std::cout << "Found match for hybridIndex=" << hybridIndex << ". jet pt=" << hybridJet.pt() << "\n";
+        //std::cout << "matchedPt/pythia pt=" << (matchedPt / pythiaProbeJet.pt()) << "\n";
+        break;
+      }
+      else {
+        //std::cout << "Failed matched pt cut. matchedPt/pythia pt=" << (matchedPt / pythiaProbeJet.pt()) << "\n";
+      }
+    }
+
+    if (fullMatchingMatchedHybridIndex != matchedHybridIndex) {
+      std::cout << "Matching mismatch! fullMatchingMatchedHybridIndex=" << fullMatchingMatchedHybridIndex << ", matchedHybridIndex=" << matchedHybridIndex << "\n";
+      std::exit(1);
+    }*/
 
   } // end of event
 
