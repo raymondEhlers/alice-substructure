@@ -624,8 +624,6 @@ def _plot_toy(
     # print(f"y_bin_widths: {y_bin_widths.size}")
     # print(f"bin_widths size: {bin_widths.size}")
     h /= bin_widths
-    # Scale by njets.
-    h /= hists.n_jets
 
     # Determine the normalization range
     z_axis_range = {
