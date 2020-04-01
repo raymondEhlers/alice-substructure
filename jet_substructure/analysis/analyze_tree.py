@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import pickle
 import zlib
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple, cast
@@ -198,11 +199,11 @@ def analyze_single_tree_toy(
     hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]] = {}
     # If the hists already exist, skip processing the tree and just return the hists instead (which is way faster!)
     train_number = tree.filename.parent.name
-    yaml_filename = output / f"{train_number}_{tree.filename.with_suffix('.yaml').name}"
-    if yaml_filename.exists() and not force_reprocessing:
+    pkl_filename = output / f"{train_number}_{tree.filename.with_suffix('.pkl').name}"
+    if pkl_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
-        with open(yaml_filename, "r") as f:
-            hists = y.load(f)
+        with open(pkl_filename, "rb") as f:
+            hists = pickle.load(f)
             return hists
 
     # Since we're actually processing, we setup the output hists
@@ -242,7 +243,7 @@ def analyze_single_tree_toy(
     # Catch all failed cases.
     if not successfully_accessed_data:
         # Convert, write, and return the empty hists. We can't process this data :-(
-        return _convert_and_write_hists(hists=hists, tree_filename=tree.filename, yaml_filename=yaml_filename, y=y)
+        return hists
 
     # Loop over iterations (jet pt ranges, iterative splitting)
     with progress_manager.counter(
@@ -337,7 +338,11 @@ def analyze_single_tree_toy(
 
     # IPython.start_ipython(user_ns=locals())
 
-    return _convert_and_write_hists(hists=hists, tree_filename=tree.filename, yaml_filename=yaml_filename, y=y)
+    # Store hists with pickle because it takes too longer otherwise.
+    with open(pkl_filename, "wb") as pkl_file:
+        pickle.dump(hists, pkl_file)
+
+    return hists
 
 
 def _select_and_retrieve_splittings(
@@ -702,8 +707,6 @@ def analyze_single_tree_embedding(
     #    h.convert_boost_histograms_to_binned_data()
     # Store hists with pickle because it takes too longer otherwise.
     with open(yaml_filename.with_suffix(".pkl"), "wb") as f:
-        import pickle
-
         pickle.dump(hists, f)
     # Still need to convert to BinnedData
     for h in hists.values():
@@ -963,10 +966,16 @@ def run_toy(
                 progress_manager=progress_manager,
                 y=y,
                 output=output,
-                force_reprocessing=True,
+                force_reprocessing=False,
             )
             # hists[tree.filename] = tree_hists
             results.append(tree_hists)
+
+    # Convert hists from boost hist to pachyderm
+    # Still need to convert to BinnedData (because we stored data with pickle instead to speed up writing).
+    for hists in results:
+        for h in hists.values():
+            h.convert_boost_histograms_to_binned_data()
 
     # Merge the hists
     full_hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]] = {}
@@ -1088,7 +1097,7 @@ if __name__ == "__main__":
 
     # Setup and run
     # collision_system = "toy"
-    data_prefix = "pythia"
+    data_prefix = "hybrid"
     collision_system = f"toy_true_{data_prefix}_splittings_iterative_allTrueSplittings_delta_R_040"
     jet_pt_bins = [
         helpers.RangeSelector(min=0, max=120),
