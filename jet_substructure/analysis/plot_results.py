@@ -687,28 +687,28 @@ def toy(
 
     # Plot labels
     label_map: Dict[str, str] = {
-        "data": "hybrid",
+        "hybrid": "hybrid",
         "pythia": "pythia",
     }
     label = label_map[data_prefix]
     kt_label = PlotConfig(
         name="kt",
-        x_label=r"$k_{\text{T}}^{\text{first splitting}}\:(\text{GeV}/c)$",
+        x_label=r"$k_{\text{T}}^{\text{hardest graph}}\:(\text{GeV}/c)$",
         y_label=r"$k_{\text{T}}^{\text{" + label + r"}}\:(\text{GeV}/c)$",
     )
     z_label = PlotConfig(
         name="z",
-        x_label=r"$z^{\text{first splitting}}\:(\text{GeV}/c)$",
+        x_label=r"$z^{\text{hardest graph}}\:(\text{GeV}/c)$",
         y_label=r"$z^{\text{" + label + r"}}\:(\text{GeV}/c)$",
     )
     delta_R_label = PlotConfig(
         name="delta_R",
-        x_label=r"$R^{\text{first splitting}}\:(\text{GeV}/c)$",
+        x_label=r"$R^{\text{hardest graph}}\:(\text{GeV}/c)$",
         y_label=r"$R^{\text{" + label + r"}}\:(\text{GeV}/c)$",
     )
     theta_label = PlotConfig(
         name="theta",
-        x_label=r"$\theta^{\text{first splitting}}\:(\text{GeV}/c)$",
+        x_label=r"$\theta^{\text{hardest graph}}\:(\text{GeV}/c)$",
         y_label=r"$\theta^{\text{" + label + r"}}\:(\text{GeV}/c)$",
     )
 

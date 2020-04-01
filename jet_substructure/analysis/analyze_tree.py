@@ -191,6 +191,9 @@ def analyze_single_tree_toy(
     output: Path,
     force_reprocessing: bool = False,
 ) -> Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]]:
+    # Validation
+    if data_prefix == "hybrid":
+        data_prefix = "data"
     # Setup
     hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]] = {}
     # If the hists already exist, skip processing the tree and just return the hists instead (which is way faster!)
@@ -251,7 +254,7 @@ def analyze_single_tree_toy(
             jet_pt_mask = identifier.jet_pt_bin.mask_array(data_jets.jet_pt)
             # Add additional restrictions that we can't handle single constituent jets.
             # TODO: Can we do better???
-            jet_pt_mask = jet_pt_mask & (data_jets.constituents.counts > 1)
+            jet_pt_mask = jet_pt_mask & (data_jets.subjets.counts > 2)
             restricted_data_jets, restricted_data_jets_splittings = _select_and_retrieve_splittings(
                 data_jets, jet_pt_mask, identifier.iterative_splittings
             )
@@ -1086,7 +1089,7 @@ if __name__ == "__main__":
     # Setup and run
     # collision_system = "toy"
     data_prefix = "pythia"
-    collision_system = f"toy_true_{data_prefix}_splittings"
+    collision_system = f"toy_true_{data_prefix}_splittings_iterative_allTrueSplittings_delta_R_040"
     jet_pt_bins = [
         helpers.RangeSelector(min=0, max=120),
         helpers.RangeSelector(min=60, max=80),
