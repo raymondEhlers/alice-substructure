@@ -18,7 +18,7 @@ datasets:
                 - "data.fSubjets.fConstituentIndices"
     embedPythia:
         dataset:
-            name: "LHC18b8_embedded_into_LHC18qr"
+            name: "LHC19f4_embedded_into_LHC18qr"
             branches:
                 - "data.fJetPt"
                 - "data.fJetConstituents.fPt"
@@ -104,7 +104,7 @@ available_datasets:
             - "trains/PbPb/5537/AnalysisResults.18q.3.root"
             - "trains/PbPb/5537/AnalysisResults.18r.1.root"
             - "trains/PbPb/5537/AnalysisResults.18r.2.root"
-    LHC18b8_embedded_into_LHC18qr:
+    LHC19f4_embedded_into_LHC18qr:
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
         jet_R: 0.4
