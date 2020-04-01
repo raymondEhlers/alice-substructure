@@ -232,6 +232,14 @@ void ExtractJetSplittings(SubstructureTree::JetSubstructureSplittings & jetSplit
 
 void Reclustering(SubstructureTree::JetSubstructureSplittings & jetSplittings, fastjet::PseudoJet & jet, const bool storeRecursiveSplittings = true, const bool isData = false)
 {
+  // First, we clear the splittings. We're about to fill them for a new iteration,
+  // so we need to be certain that they're empty.
+  jetSplittings.Clear();
+
+  // Now, we process the splitting.
+  // First, we set the basic properties - jet pt and constituents.
+  // Set the jet pt
+  jetSplittings.SetJetPt(jet.pt());
   // Grab the jet constituents from the jet.
   // They will be stored with the splitting, and also used for the declustering.
   std::vector<fastjet::PseudoJet> inputVectors;
@@ -244,9 +252,10 @@ void Reclustering(SubstructureTree::JetSubstructureSplittings & jetSplittings, f
     if (part.user_index() == -1) {
       continue;
     }
-    //if (part.pt() < 0.15) {
-    //    std::cout << "Soft particle! pt: " << part.pt() << "\n";
-    //}
+    if (part.pt() < 0.15) {
+      std::cout << "Soft constituent! pt: " << part.pt() << ". Shouldn't be possibe!\n";
+      std::exit(1);
+    }
     pseudoTrack.reset(part.px(), part.py(), part.pz(), part.e());
     pseudoTrack.set_user_index(constituentIndex);
     inputVectors.push_back(pseudoTrack);
@@ -480,6 +489,8 @@ void ExtractSinglePythiaSplitting(const Event & event, const unsigned int inputI
     //std::cout << "Found no viable daughters for inputIndex=" << inputIndex << ". Returning.\n";
     return;
   }
+  // TODO: Exclude any hadrons from contributing by excluding those with code > 80.
+  //       However, wait until I can reproduce Leticia's studies.
 
   // If we want to take the first true splitting and we have a kt > 0, then we're done. Return immediately.
   if (kt > 0 && takeFirstTrueSplitting) {
@@ -597,8 +608,8 @@ void RecursiveSinglePythiaSplitting(SubstructureTree::JetSubstructureSplittings 
 void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
             SubstructureTree::JetSubstructureSplittings& jetSplittings, const Event& event,
             SubstructureTree::JetSubstructureSplittings& trueJetSplittings,
+            SubstructureTree::JetSubstructureSplittings& parton5Splittings,
             SubstructureTree::JetSubstructureSplittings& parton6Splittings,
-            SubstructureTree::JetSubstructureSplittings& parton7Splittings,
             const bool storeRecursiveSplittings, const bool applyTwoParticleAcceptanceCut,
             TH1D & hPtParton, TH1D & hPhiParton, TH1D & hEtaParton, TH1D & hTrueDataMatchingDistance,
             TH1D & hPtPartonAccepted, TH1D & hPhiPartonAccepted, TH1D & hEtaPartonAccepted,
@@ -610,23 +621,23 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
   // but in that case, it's perfectly fine to sort again - it's not expensive compared to other
   // operations).
   fastjet::PseudoJet probeJet = sorted_by_pt(jets)[0];
-  fastjet::PseudoJet parton6(event[5].px(), event[5].py(), event[5].pz(), event[5].e());
-  fastjet::PseudoJet parton7(event[6].px(), event[6].py(), event[6].pz(), event[6].e());
-  double deltaR6 = probeJet.delta_R(parton6);
-  double deltaR7 = probeJet.delta_R(parton7);
+  fastjet::PseudoJet parton5(event[5].px(), event[5].py(), event[5].pz(), event[5].e());
+  fastjet::PseudoJet parton6(event[6].px(), event[6].py(), event[6].pz(), event[6].e());
+  double deltaR6 = probeJet.delta_R(parton5);
+  double deltaR7 = probeJet.delta_R(parton6);
   //if (jets.size() > 1) {
   //    fastjet::PseudoJet subleadingJet = sorted_by_pt(jets)[1];
-  //    std::cout << "probeJet.pt()=" << probeJet.pt() << ", subleading.pt()=" << subleadingJet.pt() << ". subleading deltaR6=" << subleadingJet.delta_R(parton6) << ", deltaR7=" << subleadingJet.delta_R(parton7) << "\n";
+  //    std::cout << "probeJet.pt()=" << probeJet.pt() << ", subleading.pt()=" << subleadingJet.pt() << ". subleading deltaR6=" << subleadingJet.delta_R(parton5) << ", deltaR7=" << subleadingJet.delta_R(parton6) << "\n";
   //}
 
   // Store parton properties
+  hPtParton.Fill(parton5.pt());
+  hPhiParton.Fill(parton5.phi_std());
+  hEtaParton.Fill(parton5.eta());
+  hTrueDataMatchingDistance.Fill(deltaR6);
   hPtParton.Fill(parton6.pt());
   hPhiParton.Fill(parton6.phi_std());
   hEtaParton.Fill(parton6.eta());
-  hTrueDataMatchingDistance.Fill(deltaR6);
-  hPtParton.Fill(parton7.pt());
-  hPhiParton.Fill(parton7.phi_std());
-  hEtaParton.Fill(parton7.eta());
   hTrueDataMatchingDistance.Fill(deltaR7);
   if (deltaR6 < deltaR7) {
     hTrueDataMatchingDistanceClosest.Fill(deltaR6);
@@ -638,16 +649,16 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
 
   // We're only going to fill if we are close to a true parton.
   if (deltaR6 < partonDeltaRMax) {
+    trueJetSplittings = parton5Splittings;
+    hPtPartonAccepted.Fill(parton5.pt());
+    hPhiPartonAccepted.Fill(parton5.phi_std());
+    hEtaPartonAccepted.Fill(parton5.eta());
+  }
+  if (deltaR7 < partonDeltaRMax) {
     trueJetSplittings = parton6Splittings;
     hPtPartonAccepted.Fill(parton6.pt());
     hPhiPartonAccepted.Fill(parton6.phi_std());
     hEtaPartonAccepted.Fill(parton6.eta());
-  }
-  if (deltaR7 < partonDeltaRMax) {
-    trueJetSplittings = parton7Splittings;
-    hPtPartonAccepted.Fill(parton7.pt());
-    hPhiPartonAccepted.Fill(parton7.phi_std());
-    hEtaPartonAccepted.Fill(parton7.eta());
   }
   // Only fill if we're actually close to a splitting. Otherwise, we get empty true jet splittings
   // and/or we pull the jets to the edges of the eta acceptance.
@@ -659,7 +670,6 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
     //short parentIndex = 0;
     //std::tie(kt, deltaR, z, parentIndex) = trueJetSplittings.GetSplitting(0);
     //std::cout << "event " << iEvent << ": true kt=" << kt << "\n";
-    jetSplittings.SetJetPt(probeJet.pt());
     Reclustering(jetSplittings, probeJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
     // Hybrid jet splittings info
     //std::cout << "Other jet: " << jetSplittings << "\n";
@@ -670,10 +680,10 @@ void FillTrueSplitting(TTree& tree, std::vector<fastjet::PseudoJet>& jets,
   else {
     //std::cout << "Failed to match true splitting! " << "jet eta, phi: (" << probeJet.eta() << "," << probeJet.phi() << "), ";
     //if (deltaR6 < deltaR7) {
-    //    std::cout << "parton 6 (closest) eta, phi: (" << parton6.eta() << "," << parton6.phi() << "), -> deltaR=" << deltaR6 << "\n";
+    //    std::cout << "parton 6 (closest) eta, phi: (" << parton5.eta() << "," << parton5.phi() << "), -> deltaR=" << deltaR6 << "\n";
     //}
     //else {
-    //    std::cout << "parton 7 (closest) eta, phi: (" << parton7.eta() << "," << parton7.phi() << "), -> deltaR=" << deltaR7 << "\n";
+    //    std::cout << "parton 7 (closest) eta, phi: (" << parton6.eta() << "," << parton6.phi() << "), -> deltaR=" << deltaR7 << "\n";
     //}
   }
 }
@@ -810,13 +820,13 @@ int main(int argc, char* argv[])
   std::vector<TH1*> hists;
 
   // Particle distributions
-  // All particles
-  TH1D hPtAllParticles("hPtAllParticles", ";p_{T}", 4000, 0.0, 400);
-  TH1D hEtaAllParticles("hEtaAllParticles", ";#eta", 200, -1.0, 1.0);
-  TH1D hPhiAllParticles("hPhiAllParticles", ";#phi", 700, -3.5, 3.5);
-  hists.emplace_back(&hPtAllParticles);
-  hists.emplace_back(&hEtaAllParticles);
-  hists.emplace_back(&hPhiAllParticles);
+  // Hybrid particles
+  TH1D hPtHybrid("hPtHybrid", ";p_{T}", 4000, 0.0, 400);
+  TH1D hEtaHybrid("hEtaHybrid", ";#eta", 200, -1.0, 1.0);
+  TH1D hPhiHybrid("hPhiHybrid", ";#phi", 700, -3.5, 3.5);
+  hists.emplace_back(&hPtHybrid);
+  hists.emplace_back(&hEtaHybrid);
+  hists.emplace_back(&hPhiHybrid);
   // Pythia
   TH1D hPtPythia("hPtPythia", ";p_{T}", 4000, 0.0, 400);
   TH1D hEtaPythia("hEtaPythia", ";#eta", 200, -1.0, 1.0);
@@ -824,6 +834,13 @@ int main(int argc, char* argv[])
   hists.emplace_back(&hPtPythia);
   hists.emplace_back(&hEtaPythia);
   hists.emplace_back(&hPhiPythia);
+  // Pythia probe
+  TH1D hPtPythiaProbe("hPtPythiaProbe", ";p_{T}", 4000, 0.0, 400);
+  TH1D hEtaPythiaProbe("hEtaPythiaProbe", ";#eta", 200, -1.0, 1.0);
+  TH1D hPhiPythiaProbe("hPhiPythiaProbe", ";#varphi", 700, -3.5, 3.5);
+  hists.emplace_back(&hPtPythiaProbe);
+  hists.emplace_back(&hEtaPythiaProbe);
+  hists.emplace_back(&hPhiPythiaProbe);
   // Thermal
   TH1D hPtThermal("hPtThermal", ";p_{T}", 4000, 0.0, 400);
   TH1D hEtaThermal("hEtaThermal", ";#eta", 200, -1.0, 1.0);
@@ -914,16 +931,30 @@ int main(int argc, char* argv[])
     // Cleanup
     // Reset jet finding inputs
     inputsPythia.clear();
-    inputsHybrid.clear();
     // Reset jet splittings
     trueJetSplittings.Clear();
     pythiaJetSplittings.Clear();
-    hybridJetSplittings.Clear();
 
+    SubstructureTree::JetSubstructureSplittings parton5Splittings;
     SubstructureTree::JetSubstructureSplittings parton6Splittings;
-    SubstructureTree::JetSubstructureSplittings parton7Splittings;
     unsigned int globalIndex = 0;
     for (int i = 0; i < pythia.event.size(); ++i) {
+      // Extract the primary splitting for comparison.
+      // 23 is the status for outgoing partons.
+      if (std::abs(pythia.event[i].status()) == 23) {
+        // Validation
+        if (i != 5 && i != 6) {
+          std::cout << "Apparent outgoing parton at i=" << i << " in event " << iEvent << ". This shouldn't occur. Investigate.\n";
+          std::exit(1);
+        }
+        // Extract a single splitting from the graph correspond to the hardest kt.
+        // The precise procedure for how the hardest is found depends on the settings.
+        RecursiveSinglePythiaSplitting((i == 5) ? parton5Splittings : parton6Splittings, pythia.event, i, charged, jetParameterR, takeFirstTrueSplitting, storeRecursiveSplittings);
+        // Alternatively, we can extract all of the splittings.
+        // NOTE: This is extremely expensive!
+        //RecursiveTruePythia((i == 5) ? parton5Splittings : parton6Splittings, pythia.event, i, charged, storeRecursiveSplittings);
+      }
+
       // Extract final state charged hadrons for pythia jet-finding
       if (pythia.event[i].isFinal()) {
         if (charged && !pythia.event[i].isCharged()) {
@@ -941,30 +972,38 @@ int main(int argc, char* argv[])
         );
         particle.set_user_index(globalIndex);
         inputsPythia.push_back(particle);
-        inputsHybrid.push_back(particle);
         // Store particle properties
         hPtPythia.Fill(particle.pt());
         hEtaPythia.Fill(particle.eta());
         hPhiPythia.Fill(particle.phi_std());
         ++globalIndex;
       }
-
-      // Extract the primary splitting for comparison.
-      // 23 is the status for outgoing partons.
-      if (std::abs(pythia.event[i].status()) == 23) {
-        SubstructureTree::JetSubstructureSplittings splittingsObj;
-        // Extract just the recursive splitting
-        RecursiveSinglePythiaSplitting(splittingsObj, pythia.event, i, charged, jetParameterR, takeFirstTrueSplitting, storeRecursiveSplittings);
-        //RecursiveTruePythia(splittingsObj, pythia.event, i, charged, storeRecursiveSplittings);
-        if (i == 5) {
-          parton6Splittings = splittingsObj;
-        }
-        if (i == 6) {
-          parton7Splittings = splittingsObj;
-        }
-      }
     }
-    //std::cout << "Number of particles (globalIndex): " << globalIndex << "\n";
+
+    // Pythia jets finding.
+    fastjet::ClusterSequenceArea pythiaCS(inputsPythia, *jetDefAKT_Sig, *areaDef);
+    // NOTE: 1 GeV cut on pythia jets is applied here!
+    std::vector<fastjet::PseudoJet> pythiaJets = pythiaCS.inclusive_jets(1.);
+
+    // No pythia jets, so nothing else to be done.
+    if (pythiaJets.size() == 0) {
+      //std::cout << "No pythia jets. Returning.\n";
+      continue;
+    }
+
+    // Fill the true <-> pythia correspondence.
+    FillTrueSplitting(truePythiaSplittingsTree, pythiaJets, pythiaJetSplittings,
+             pythia.event, trueJetSplittings, parton5Splittings,
+             parton6Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut,
+             hPtParton, hPhiParton, hEtaParton, hTruePythiaMatchingDistance,
+             hPtPartonAccepted, hPhiPartonAccepted, hEtaPartonAccepted, hTruePythiaMatchingDistanceClosest,
+             partonDeltaRMax, iEvent
+             );
+
+    // Part 2. Construct the pythia + thermal hybrid jets
+    // Cleanup
+    inputsHybrid.clear();
+    hybridJetSplittings.Clear();
 
     // Thermal Particles loop
     // Add an offset for thermal particles.
@@ -973,8 +1012,9 @@ int main(int argc, char* argv[])
       double pT = f_pT->GetRandom();
       double eta = f_eta->GetRandom();
       double phi = f_phi->GetRandom();
-      if (pT < trackLowPtCut)
+      if (pT < trackLowPtCut) {
         continue; // pt cut
+      }
       fastjet::PseudoJet thermalParticle(
         Calculate_pX(pT, eta, phi),
         Calculate_pY(pT, eta, phi),
@@ -984,41 +1024,38 @@ int main(int argc, char* argv[])
       thermalParticle.set_user_index(globalIndex);
       inputsHybrid.push_back(thermalParticle);
       // Store particle properties
-      hPtAllParticles.Fill(thermalParticle.pt());
-      hEtaAllParticles.Fill(thermalParticle.eta());
-      hPhiAllParticles.Fill(thermalParticle.phi_std());
+      hPtHybrid.Fill(thermalParticle.pt());
+      hEtaHybrid.Fill(thermalParticle.eta());
+      hPhiHybrid.Fill(thermalParticle.phi_std());
       hPtThermal.Fill(thermalParticle.pt());
       hEtaThermal.Fill(thermalParticle.eta());
       hPhiThermal.Fill(thermalParticle.phi_std());
       ++globalIndex;
     }
 
-    hPtAllParticles.Fill(particle.pt());
-    hEtaAllParticles.Fill(particle.eta());
-    hPhiAllParticles.Fill(particle.phi_std());
-
-    //________________signal jets____________________________________________________
-    fastjet::ClusterSequenceArea clustSeq_Sig(inputsPythia, *jetDefAKT_Sig, *areaDef);
-    // NOTE: 1 GeV cut on pythia jets is applied here!
-    std::vector<fastjet::PseudoJet> pythiaJets = clustSeq_Sig.inclusive_jets(1.);
-
-    if (pythiaJets.size() == 0) {
-      // No pythia jets, so nothing else to be done.
-      //std::cout << "No pythia jets. Returning.\n";
-      continue;
+    // We're only going to embed the leading pythia jet for convenience.
+    // To simplify further, we only embed the constituents from that pythia jet.
+    fastjet::PseudoJet pythiaProbeJet = sorted_by_pt(pythiaJets)[0];
+    for (auto particle : pythiaProbeJet.constituents())
+    {
+      // Add the particle to the hybrid input and store the properties.
+      inputsHybrid.push_back(particle);
+      hPtPythiaProbe.Fill(particle.pt());
+      hEtaPythiaProbe.Fill(particle.eta());
+      hPhiPythiaProbe.Fill(particle.phi_std());
+      hPtHybrid.Fill(particle.pt());
+      hEtaHybrid.Fill(particle.eta());
+      hPhiHybrid.Fill(particle.phi_std());
     }
 
-    // We'll just take the leading jet for convenience.
-    // We put it in a vector since the code was written for taking everything.
-    fastjet::PseudoJet probeJet = pythiaJets[0];
-
-    //_________________HI jets_______________________________________________________
+    // Hybrid jet finding.
     fastjet::GhostedAreaSpec New_ghost_spec(1, 1, 0.01); // Ghosts to calculate the Jet Area
     fastjet::AreaDefinition New_fAreaDef(fastjet::active_area_explicit_ghosts, New_ghost_spec); // Area Definition
-    fastjet::ClusterSequenceArea New_clustSeq_Sig(inputsHybrid, *jetDefAKT_Sig, New_fAreaDef);     // Cluster Sequence
+    fastjet::ClusterSequenceArea hybridCS(inputsHybrid, *jetDefAKT_Sig, New_fAreaDef);     // Cluster Sequence
     // NOTE: 1 GeV cut on hybrid jets is applied here.
-    std::vector<fastjet::PseudoJet> hybridJets = New_clustSeq_Sig.inclusive_jets(1.); // Vector with the Reconstructed Jets
+    std::vector<fastjet::PseudoJet> hybridJets = hybridCS.inclusive_jets(1.); // Vector with the Reconstructed Jets
 
+    // Background subtraction
     fastjet::JetMedianBackgroundEstimator bge;
     fastjet::Selector BGSelector = fastjet::SelectorAbsEtaMax(1.0);
     fastjet::JetDefinition jetDefBG(fastjet::kt_algorithm, jetParameterR, recombScheme, strategy);
@@ -1028,7 +1065,7 @@ int main(int argc, char* argv[])
     bge.set_selector(BGSelector);
     bge.set_jets(BGJets);
     fastjet::contrib::ConstituentSubtractor subtractor(&bge);
-    //
+    // for massless input particles it does not make any difference (rho_m is always zero)
     subtractor.set_common_bge_for_rho_and_rhom(true);
     subtractor.set_max_standardDeltaR(jetParameterR);
     // subtractor.set_alpha(0.5);
@@ -1039,18 +1076,10 @@ int main(int argc, char* argv[])
       hybridJets[j] = subtracted_Jet;
     }
 
-    // Fill true tree!
-    // NOTE: We want the leading hybrid jet, so we sort by pt.
-    FillTrueSplitting(truePythiaSplittingsTree, pythiaJets, pythiaJetSplittings,
-             pythia.event, trueJetSplittings, parton6Splittings,
-             parton7Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut,
-             hPtParton, hPhiParton, hEtaParton, hTruePythiaMatchingDistance,
-             hPtPartonAccepted, hPhiPartonAccepted, hEtaPartonAccepted, hTruePythiaMatchingDistanceClosest,
-             partonDeltaRMax, iEvent
-             );
+    // Fill the hybrid <-> pythia correspondence.
     FillTrueSplitting(trueHybridSplittingsTree, hybridJets, hybridJetSplittings,
-             pythia.event, trueJetSplittings, parton6Splittings,
-             parton7Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut,
+             pythia.event, trueJetSplittings, parton5Splittings,
+             parton6Splittings, storeRecursiveSplittings, applyTwoParticleAcceptanceCut,
              hPtParton, hPhiParton, hEtaParton, hTrueHybridMatchingDistance,
              hPtPartonAccepted, hPhiPartonAccepted, hEtaPartonAccepted, hTrueHybridMatchingDistanceClosest,
              partonDeltaRMax, iEvent
@@ -1058,12 +1087,10 @@ int main(int argc, char* argv[])
 
     // Match jets
     // Need to do rudimentary matching
-    // We'll take at most the first two pythia jets (the other ones aren't worth the time to try to match).
+    // Again, we'll only take the pythia probe jet, as that's all that we've embedded.
+    // NOTE: The matching was written generically, so we need to put the probe jet into a length one vector.
     std::vector<fastjet::PseudoJet> pythiaJetsForMatching;
     pythiaJetsForMatching.emplace_back(pythiaJets[0]);
-    if (pythiaJets.size() > 1) {
-      pythiaJetsForMatching.emplace_back(pythiaJets[1]);
-    }
     std::map<int, int> pythiaToHybridIndex;
     std::map<int, int> hybridToPythiaIndex;
     std::tie(pythiaToHybridIndex, hybridToPythiaIndex) = MatchJets(hybridJets, pythiaJetsForMatching);
@@ -1087,7 +1114,6 @@ int main(int argc, char* argv[])
         //std::cout << "Hybrid jet rejected.\n";
         continue;
       }
-      hybridJetSplittings.SetJetPt(hybridJet.pt());
       Reclustering(hybridJetSplittings, hybridJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
       // True jet
       int pythiaJetIndex = hybridToPythiaIndex[hybridIndex];
@@ -1116,7 +1142,6 @@ int main(int argc, char* argv[])
         continue;
       }
 
-      pythiaJetSplittings.SetJetPt(pythiaJet.pt());
       Reclustering(pythiaJetSplittings, pythiaJet, storeRecursiveSplittings, applyTwoParticleAcceptanceCut);
 
       // Check number of stored jet constituents
