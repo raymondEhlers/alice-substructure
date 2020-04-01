@@ -816,10 +816,12 @@ int main(int argc, char* argv[])
   // Area definitions
   // Pythia
   // max rap, repeat, ghostarea default 0.01
-  fastjet::GhostedAreaSpec pythiaGhostSpec(trackEtaCut, 1, 0.01);
+  // NOTE: Annecdotally, it appears the value of the ghost area can have an impact on the matching rate.
+  //       Which is obviously quite odd, but not worth investigating at the moment.
+  fastjet::GhostedAreaSpec pythiaGhostSpec(trackEtaCut, 1, 0.05);
   fastjet::AreaDefinition pythiaAreaDef(fastjet::passive_area, pythiaGhostSpec);
   // Hybrid + background subtraction
-  fastjet::GhostedAreaSpec hybridGhostSpec(trackEtaCut, 1, 0.01);
+  fastjet::GhostedAreaSpec hybridGhostSpec(trackEtaCut, 1, 0.05);
   fastjet::AreaDefinition hybridAreaDef(fastjet::active_area_explicit_ghosts, hybridGhostSpec);
   fastjet::AreaDefinition bgAreaDef(fastjet::active_area_explicit_ghosts, hybridGhostSpec);
 
@@ -1148,6 +1150,8 @@ int main(int argc, char* argv[])
         continue;
       }
       fastjet::PseudoJet & pythiaJet = pythiaJetsForMatching[pythiaJetIndex];
+      // TODO: Re-enable after comparison with Leticia.
+      // NOTE: This shouldn't make a drastic difference.
       /*if (AcceptJet(pythiaJet, jetEtaMin, jetEtaMax) == false) {
         std::cout << "True jet rejected. Jet eta=" << pythiaJet.eta() << ", pt=" << pythiaJet.pt() << "\n";
         std::cout << "Accept in eta=" << (JetInsideEtaLimits(pythiaJet, jetEtaMin, jetEtaMax) == false) << "\n";
