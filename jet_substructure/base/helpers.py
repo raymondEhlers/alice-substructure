@@ -79,16 +79,16 @@ class UprootArray(Collection[T]):
     def count_nonzero(self) -> UprootArray[int]:
         raise NotImplementedError("Just typing information.")
 
-    def __lt__(self, other: float) -> UprootArray[bool]:
+    def __lt__(self, other: Union[UprootArray[T], float]) -> UprootArray[bool]:
         raise NotImplementedError("Just typing information.")
 
-    def __le__(self, other: float) -> UprootArray[bool]:
+    def __le__(self, other: Union[UprootArray[T], float]) -> UprootArray[bool]:
         raise NotImplementedError("Just typing information.")
 
-    def __gt__(self, other: float) -> UprootArray[bool]:
+    def __gt__(self, other: Union[UprootArray[T], float]) -> UprootArray[bool]:
         raise NotImplementedError("Just typing information.")
 
-    def __ge__(self, other: float) -> UprootArray[bool]:
+    def __ge__(self, other: Union[UprootArray[T], float]) -> UprootArray[bool]:
         raise NotImplementedError("Just typing information.")
 
     def __and__(self, other: UprootArray[bool]) -> UprootArray[bool]:
