@@ -7,11 +7,12 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import pickle
 import zlib
 from pathlib import Path
-from typing import Dict, List, Mapping, Sequence, Tuple, cast
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 import attr
 import awkward as ak
@@ -1016,12 +1017,15 @@ def run_toy(
 
 
 def run_embedding(
-    collision_system: str, jet_pt_bins: Sequence[helpers.RangeSelector], dataset_config_filename: Path, output: Path
+    collision_system: str, jet_pt_bins: Sequence[helpers.RangeSelector], dataset_config_filename: Path, output: Path, filenames: Optional[Sequence[Union[str, Path]]] = None,
 ) -> Tuple[
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]],
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]],
     Path,
 ]:
+    # Validation
+    if filenames is None:
+        filenames = []
     # Setup
     z_cutoff = 0.2
     # Configuration
@@ -1039,8 +1043,12 @@ def run_embedding(
     R = selected_dataset_config["jet_R"]
     scale_factors = selected_dataset_config["scale_factors"]
     train_number_to_pt_hard_bin = selected_dataset_config["train_number_to_pt_hard_bin"]
+    # Take the passed filenames if provided. Otherwise, use the files in the configuration file.
+    if not filenames:
+        filenames = selected_dataset_config["files"]
+    # And then setup the data manager.
     dm = data_manager.IterateTrees(
-        filenames=selected_dataset_config["files"],
+        filenames=filenames,
         tree_name=selected_dataset_config["tree_name"],
         branches=dataset_config["branches"],
     )
@@ -1067,7 +1075,7 @@ def run_embedding(
                 scale_factors=scale_factors,
                 train_number_to_pt_hard_bin=train_number_to_pt_hard_bin,
                 output=output,
-                force_reprocessing=True,
+                force_reprocessing=False,
             )
             # hists[tree.filename] = tree_hists
             results.append(tree_hists)
@@ -1119,8 +1127,7 @@ def run_embedding(
 #        embedded_hists = y.load(f)
 #    ...
 
-
-if __name__ == "__main__":
+def setup_entry_point() -> None:
     # Basic setup
     coloredlogs.install(level=logging.DEBUG, fmt="%(asctime)s %(name)s:%(lineno)d %(levelname)s %(message)s")
     # Quiet down the matplotlib logging
@@ -1129,6 +1136,44 @@ if __name__ == "__main__":
     logging.getLogger("parso").setLevel(logging.INFO)
     # Quiet down BinndData copy warnings
     logging.getLogger("pachyderm.binned_data").setLevel(logging.INFO)
+
+def parse_arguments(name: str) -> List[Path]:
+    parser = argparse.ArgumentParser(description=f"Run {name}")
+
+    parser.add_argument("-f", "--filenames", nargs="+", default=[])
+    args = parser.parse_args()
+    # Validation for filenames
+    filenames = [Path(f) for f in args.filenames]
+    return filenames
+
+def embed_pythia_entry_point() -> None:
+    setup_entry_point()
+    filenames = parse_arguments(name="embed pythia")
+
+    collision_system = "embedPythia"
+    jet_pt_bins = [
+        helpers.RangeSelector(min=0, max=120),
+        helpers.RangeSelector(min=40, max=120),
+        # Most likely where we will actually measure.
+        helpers.RangeSelector(min=80, max=120),
+        helpers.RangeSelector(min=60, max=80),
+        helpers.RangeSelector(min=80, max=100),
+        helpers.RangeSelector(min=100, max=120),
+    ]
+
+    response_hists, matching_hists, output = run_embedding(
+        collision_system=collision_system,
+        jet_pt_bins=jet_pt_bins,
+        dataset_config_filename=Path("config") / "datasets.yaml",
+        output=Path("output"),
+        filenames=filenames,
+    )
+    #return response_hists, matching_hists
+    #plot_results.responses(all_response_hists=response_hists, path=output)
+    #plot_results.matching(all_matching_hists=matching_hists, path=output)
+
+if __name__ == "__main__":
+    setup_entry_point()
 
     # Setup and run
     collision_system = "embedPythia"
