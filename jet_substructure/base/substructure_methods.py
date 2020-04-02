@@ -339,10 +339,10 @@ class SubjetArrayMethods(ArrayMethods):
             self.constituents,
         )
         return serializer.encode_call(
-            ["jet_substructure.base.substructure_methods", "SubjetArrayMethods", "from_jagged"],
-            serializer(part_of_iterative_splitting, "SubjetArrayMethods.part_of_iterative_splitting"),
-            serializer(parent_splitting_index, "SubjetArrayMethods.parent_splitting_index"),
-            serializer(constituents, "SubjetArrayMethods.constituents"),
+            ["jet_substructure.base.substructure_methods", "SubjetArray", "_from_jagged_impl"],
+            serializer(part_of_iterative_splitting, "SubjetArray.part_of_iterative_splitting"),
+            serializer(parent_splitting_index, "SubjetArray.parent_splitting_index"),
+            serializer(constituents, "SubjetArray.constituents"),
         )
 
     @property
@@ -632,11 +632,11 @@ class JetSplittingArrayMethods(ArrayMethods):
         self._valid()
         kt, delta_R, z, parent_index = self.kt, self.delta_R, self.z, self.parent_index
         return serializer.encode_call(
-            ["jet_substructure.base.substructure_methods", "JetSplittingArrayMethods", "from_jagged"],
-            serializer(kt, "JetSplittingArrayMethods.kt"),
-            serializer(delta_R, "JetSplittingArrayMethods.delta_R"),
-            serializer(z, "JetSplittingArrayMethods.z"),
-            serializer(parent_index, "JetSplittingArrayMethods.parent_index"),
+            ["jet_substructure.base.substructure_methods", "JetSplittingArray", "from_jagged"],
+            serializer(kt, "JetSplittingArray.kt"),
+            serializer(delta_R, "JetSplittingArray.delta_R"),
+            serializer(z, "JetSplittingArray.z"),
+            serializer(parent_index, "JetSplittingArray.parent_index"),
         )
 
     @property
@@ -950,11 +950,11 @@ class SubstructureJetArrayMethods(SubstructureJetCommonMethods, ArrayMethods):
         self._valid()
         jet_pt, constituents, subjets, splittings = self.jet_pt, self.constituents, self.subjets, self.splittings
         return serializer.encode_call(
-            ["jet_substructure.base.substructure_methods", "SubstructureJetArrayMethods", "from_jagged"],
-            serializer(jet_pt, "SubstructureJetArrayMethods.jet_pt"),
-            serializer(constituents, "SubstructureJetArrayMethods.constituents"),
-            serializer(subjets, "SubstructureJetArrayMethods.subjets"),
-            serializer(splittings, "SubstructureJetArrayMethods.splittings"),
+            ["jet_substructure.base.substructure_methods", "SubstructureJetArray"],
+            serializer(jet_pt, "SubstructureJetArray.jet_pt"),
+            serializer(constituents, "SubstructureJetArray.constituents"),
+            serializer(subjets, "SubstructureJetArray.subjets"),
+            serializer(splittings, "SubstructureJetArray.splittings"),
         )
 
     @property
@@ -1043,4 +1043,16 @@ class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):  # type
         # Construct substructure jets using the above
         return cls(  # type: ignore
             tree[f"{prefix}.fJetPt"], constituents, subjets, splittings,
+        )
+
+    def __awkward_serialize__(self, serializer: ak.persist.Serializer) -> ak.persist.Serializer:
+        """ Serialize to storage. """
+        self._valid()
+        jet_pt, constituents, subjets, splittings = self.jet_pt, self.constituents, self.subjets, self.splittings
+        return serializer.encode_call(
+            ["jet_substructure.base.substructure_methods", "SubstructureJetArray"],
+            serializer(jet_pt, "SubstructureJetArray.jet_pt"),
+            serializer(constituents, "SubstructureJetArray.constituents"),
+            serializer(subjets, "SubstructureJetArray.subjets"),
+            serializer(splittings, "SubstructureJetArray.splittings"),
         )

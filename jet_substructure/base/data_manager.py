@@ -231,8 +231,9 @@ class HDF5TreeWrapper(TreeMixin, MutableMapping[str, UprootArray[Any]]):
 
         whitelist = ak.persist.whitelist + [
             ["jet_substructure.base.substructure_methods", "JetConstituentArray", "from_jagged"],
-            ["jet_substructure.base.substructure_methods", "SubjetArray", "from_jagged"],
+            ["jet_substructure.base.substructure_methods", "SubjetArray", "_from_jagged_impl"],
             ["jet_substructure.base.substructure_methods", "JetSplittingArray", "from_jagged"],
+            ["jet_substructure.base.substructure_methods", "SubstructureJetArray"],
         ]
         return cls(
             filename=filename,
