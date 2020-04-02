@@ -108,6 +108,48 @@ available_datasets:
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
         jet_R: 0.4
+        scale_factors:
+            1: 16.0695
+            2: 4.60776
+            3: 2.14894
+            4: 0.781811
+            5: 0.26462
+            6: 0.0975008
+            7: 0.0292782
+            8: 0.00988435
+            9: 0.0040435
+            10: 0.00135313
+            11: 0.000529795
+            12: 0.000188235
+            13: 9.22016e-05
+            14: 4.29112e-05
+            15: 2.09133e-05
+            16: 1.06058e-05
+            17: 5.74855e-06
+            18: 3.0036e-06
+            19: 1.61604e-06
+            20: 2.0978e-06
+        train_number_to_pt_hard_bin:
+            5517: 1
+            5518: 2
+            5519: 3
+            5520: 4
+            5521: 5
+            5522: 6
+            5523: 7
+            5524: 8
+            5525: 9
+            5526: 10
+            5527: 11
+            5528: 12
+            5529: 13
+            5530: 14
+            5531: 15
+            5532: 16
+            5533: 17
+            5534: 18
+            5535: 19
+            5536: 20
         files:
             - "trains/embedPythia/5517/AnalysisResults.root"
             - "trains/embedPythia/5518/AnalysisResults.root"
