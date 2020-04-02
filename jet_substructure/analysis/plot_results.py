@@ -733,3 +733,123 @@ def toy(
                     data_label=label,
                     path=path,
                 )
+
+
+def _plot_response(
+    technique: str,
+    identifier: analysis_objects.Identifier,
+    attribute_name: str,
+    hists: analysis_objects.SubstructureResponseHists,
+    plot_config: PlotConfig,
+    path: Path,
+) -> None:
+    # Setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+    logger.info(f"Plotting toy hist for {technique}, {identifier}, {attribute_name}")
+
+    h: Union[bh.Histogram, binned_data.BinnedData] = getattr(hists, f"response_{attribute_name}")
+    if isinstance(h, bh.Histogram):
+        h = binned_data.BinnedData.from_existing_data(h)
+
+    # Project into our axes of interest (namely, the attribute at hybrid and true level.
+    values = np.sum(h.values, axis=(0, 2))
+
+    # If there aren't counts, we  need to stop here.
+    if len(values[values > 0]) == 0:
+        logger.warning(f"No values left for {technique}, {identifier}, {attribute_name}. Skipping")
+        return
+
+    # Determine the normalization range
+    z_axis_range = {
+        "vmin": values[values > 0].min(),
+        "vmax": values.max(),
+    }
+    if technique == "inclusive":
+        z_axis_range = {
+            "vmin": 10e-3,
+            "vmax": 5,
+        }
+
+    # Make the plot
+    mesh = ax.pcolormesh(
+        h.axes[1].bin_edges.T, h.axes[3].bin_edges.T, values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+    )
+    fig.colorbar(mesh, pad=0.02)
+
+    # Labeling
+    text = identifier.display_str()
+    text += "\n" + hists.title
+    ax.text(
+        0.05,
+        0.95,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="left",
+        verticalalignment="top",
+        multialignment="left",
+    )
+
+    # Presentation
+    ax.set_xlabel(plot_config.x_label)
+    ax.set_ylabel(plot_config.y_label)
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.10,
+        bottom=0.11,
+        right=0.99,
+        top=0.98,
+    )
+
+    # Store and reset
+    fig.savefig(path / f"response_{attribute_name}_{str(identifier)}_{technique}.pdf")
+    plt.close(fig)
+
+
+def responses(
+    all_response_hists: Dict[
+        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]
+    ],
+    path: Path,
+) -> None:
+    # Validation
+    path.mkdir(parents=True, exist_ok=True)
+
+    kt_label = PlotConfig(
+        name="kt",
+        x_label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$",
+        y_label=r"$k_{\text{T}}^{\text{part}}\:(\text{GeV}/c)$",
+    )
+    z_label = PlotConfig(name="z", x_label=r"$z^{\text{hybrid}}$", y_label=r"$z^{\text{part}}$",)
+    delta_R_label = PlotConfig(name="delta_R", x_label=r"$R^{\text{hybrid}}$", y_label=r"$R^{\text{part}}$",)
+    theta_label = PlotConfig(name="theta", x_label=r"$\theta^{\text{hybrid}}$", y_label=r"$\theta^{\text{part}}$",)
+    splitting_number_label = PlotConfig(
+        name="splitting_number", x_label=r"$n^{\text{hybrid}}$", y_label=r"$n^{\text{part}}$",
+    )
+
+    distributions: List[Tuple[str, PlotConfig]] = [
+        ("kt", kt_label),
+        ("z", z_label),
+        ("delta_R", delta_R_label),
+        ("theta", theta_label),
+        ("splitting_number", splitting_number_label),
+    ]
+
+    for identifier, toy_hists in all_response_hists.items():
+        for technique, hists in toy_hists:
+            if hists.n_hybrid_jets == 0 or hists.n_true_jets == 0:
+                logger.warning(f"No jets within {identifier}_{technique}. Skipping bin!")
+                continue
+            for attribute_name, plot_config in distributions:
+                # Plot response matrices
+                _plot_response(
+                    technique=technique,
+                    identifier=identifier,
+                    attribute_name=attribute_name,
+                    hists=hists,
+                    plot_config=plot_config,
+                    path=path,
+                )

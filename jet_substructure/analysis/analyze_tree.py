@@ -11,7 +11,7 @@ import logging
 import pickle
 import zlib
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple, cast
+from typing import Dict, List, Mapping, Sequence, Tuple, cast
 
 import attr
 import awkward as ak
@@ -552,6 +552,8 @@ def analyze_single_tree_embedding(
     jet_pt_bins: Sequence[helpers.RangeSelector],
     progress_manager: enlighten.Manager,
     y: yaml.ruamel.yaml.YAML,
+    scale_factors: Mapping[int, float],
+    train_number_to_pt_hard_bin: Mapping[int, int],
     output: Path,
     force_reprocessing: bool = False,
 ) -> Tuple[
@@ -578,6 +580,10 @@ def analyze_single_tree_embedding(
         with open(pkl_filename, "rb") as f:
             hists, matching_hists = pickle.load(f)
             return hists, matching_hists
+    # Determine scale factor
+    # NOTE: This relies on the train_number being up a directory!
+    pt_hard_bin = train_number_to_pt_hard_bin[int(train_number)]
+    scale_factor = scale_factors[pt_hard_bin]
 
     # Since we're actually processing, we setup the output hists
     # Responses
@@ -600,10 +606,13 @@ def analyze_single_tree_embedding(
     try:
         # If there are 0 entries, then just return - it won't work...
         if len(tree) > 0:
+            logger.debug("Constructing hybrid jets")
             prefix = "data"
             hybrid_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
+            logger.debug("Constructing pythia true (matched) jets")
             prefix = "matched"
             true_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
+            logger.debug("Constructing pythia det level jets")
             prefix = "detLevel"
             det_level_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
             for prefix, jets in [("data", hybrid_jets), ("matched", true_jets), ("detLevel", det_level_jets)]:
@@ -637,6 +646,11 @@ def analyze_single_tree_embedding(
             # Add additional restrictions that we can't handle single constituent jets.
             # TODO: Can we do better???
             jet_pt_mask = jet_pt_mask & (hybrid_jets.constituents.counts > 1) & (true_jets.constituents.counts > 1)
+            # Require that we have jets that aren't dominated by hybrid jets.
+            jet_pt_mask = jet_pt_mask & (true_jets.constituents.max_pt > hybrid_jets.constituents.max_pt)
+            # TODO: Do we need any additional cuts??
+
+            # Then restrict our jets.
             restricted_hybrid_jets, restricted_hybrid_jets_splittings = _select_and_retrieve_splittings(
                 hybrid_jets, jet_pt_mask, identifier.iterative_splittings
             )
@@ -644,8 +658,8 @@ def analyze_single_tree_embedding(
                 true_jets, jet_pt_mask, identifier.iterative_splittings
             )
 
-            # TODO: What about additional cuts? Pt hard? etc
-            weight = 1.0
+            # Scale factor to account for pt hard bin.
+            weight = scale_factor
 
             # Fill the hists as appropriate
             # TODO: Inclusive
@@ -1023,6 +1037,8 @@ def run_embedding(
     # Retrieve and setup data
     selected_dataset_config = config["available_datasets"][dataset_name]
     R = selected_dataset_config["jet_R"]
+    scale_factors = selected_dataset_config["scale_factors"]
+    train_number_to_pt_hard_bin = selected_dataset_config["train_number_to_pt_hard_bin"]
     dm = data_manager.IterateTrees(
         filenames=selected_dataset_config["files"],
         tree_name=selected_dataset_config["tree_name"],
@@ -1048,6 +1064,8 @@ def run_embedding(
                 jet_pt_bins=jet_pt_bins,
                 progress_manager=progress_manager,
                 y=y,
+                scale_factors=scale_factors,
+                train_number_to_pt_hard_bin=train_number_to_pt_hard_bin,
                 output=output,
                 force_reprocessing=True,
             )
@@ -1118,12 +1136,12 @@ if __name__ == "__main__":
     # collision_system = f"toy_true_{data_prefix}_splittings_iterative_allTrueSplittings_delta_R_040"
     jet_pt_bins = [
         helpers.RangeSelector(min=0, max=120),
-        helpers.RangeSelector(min=60, max=80),
+        helpers.RangeSelector(min=40, max=120),
+        # Most likely where we will actually measure.
+        helpers.RangeSelector(min=80, max=120),
         helpers.RangeSelector(min=60, max=80),
         helpers.RangeSelector(min=80, max=100),
         helpers.RangeSelector(min=100, max=120),
-        # Most likely where we will actually measure.
-        helpers.RangeSelector(min=80, max=120),
     ]
     # hists, output = run(
     #   collision_system=collision_system,
@@ -1140,12 +1158,13 @@ if __name__ == "__main__":
     #    output=Path("output"),
     # )
     # plot_results.toy(all_toy_hists=hists, data_prefix=data_prefix, path=output)
-    hists_response, matching_hists, output = run_embedding(
+    response_hists, matching_hists, output = run_embedding(
         collision_system=collision_system,
         jet_pt_bins=jet_pt_bins,
         dataset_config_filename=Path("config") / "datasets.yaml",
         output=Path("output"),
     )
+    plot_results.responses(all_response_hists=response_hists, path=output)
     plot_results.matching(all_matching_hists=matching_hists, path=output)
 
     IPython.start_ipython(user_ns=locals())
