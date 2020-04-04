@@ -78,6 +78,42 @@ def _convert_and_write_hists(
     return hists
 
 
+def _construct_jets_from_tree(prefix: str, tree: data_manager.Tree,) -> substructure_methods.SubstructureJetArray:
+    """ Construct the subtructure jet objects for data stored under a given prefix in a tree.
+
+    Ideally, the object has alrady been created and stored. If not, it will be created and then
+    stored in the tree for the future (where retrieving the created object from a file is far faster).
+
+    Args:
+        prefix: Prefix under which the data of interest is stored.
+        tree: Tree where the data is stored.
+    Returns:
+        Constructed jet object.
+    """
+    constructed_name = f"{prefix}_constructed"
+    if constructed_name in tree:
+        logger.debug("Using fully constructed object")
+        jets = cast(substructure_methods.SubstructureJetArray, tree[constructed_name])
+    else:
+        logger.debug("Constructing object")
+        jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
+
+        # Save calculate columns so we don't need to re-calculate them every time.
+        # NOTE: We always check if they already exist because HDF5 doesn't like us
+        #       overwriting columns.
+        # Calculated subjet constituents.
+        name = f"{prefix}.fSubjets.constituents"
+        if name not in tree:
+            tree[name] = jets.subjets.constituents
+
+        # Store the full treee in h5.
+        # This provides a huge speed up in terms of processing speed!
+        if constructed_name not in tree:
+            tree[constructed_name] = jets
+
+    return jets
+
+
 def analyze_single_tree(
     tree: data_manager.Tree,
     z_cutoff: float,
@@ -112,16 +148,8 @@ def analyze_single_tree(
     try:
         # If there are 0 entries, then just return - it won't work...
         if len(tree) > 0:
-            prefix = "data"
-            jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
-            # Save calculate columns so we don't need to re-calculate them every time.
-            # NOTE: We always check if they already exist because HDF5 doesn't like us
-            #       overwriting columns.
-            # Calculated subjet constituents.
-            name = f"{prefix}.fSubjets.constituents"
-            if name not in tree:
-                tree[name] = jets.subjets.constituents
-
+            logger.debug("Constructing data jets")
+            jets = _construct_jets_from_tree(prefix="data", tree=tree)
             successfully_accessed_data = True
         else:
             logger.warning(f"No jets are in file {tree.filename}. Skipping")
@@ -222,19 +250,10 @@ def analyze_single_tree_toy(
     try:
         # If there are 0 entries, then just return - it won't work...
         if len(tree) > 0:
-            prefix = data_prefix
-            data_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
-            prefix = "true"
-            true_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
-            for prefix, jets in [(data_prefix, data_jets), ("true", true_jets)]:
-                # Save calculate columns so we don't need to re-calculate them every time.
-                # NOTE: We always check if they already exist because HDF5 doesn't like us
-                #       overwriting columns.
-                # Calculated subjet constituents.
-                name = f"{prefix}.fSubjets.constituents"
-                if name not in tree:
-                    tree[name] = jets.subjets.constituents
-
+            logger.debug(f"Constructing {data_prefix} jets")
+            data_jets = _construct_jets_from_tree(prefix=data_prefix, tree=tree)
+            logger.debug("Constructing true jets")
+            true_jets = _construct_jets_from_tree(prefix="true", tree=tree)
             successfully_accessed_data = True
         else:
             logger.warning(f"No jets are in file {tree.filename}. Skipping")
@@ -608,23 +627,11 @@ def analyze_single_tree_embedding(
         # If there are 0 entries, then just return - it won't work...
         if len(tree) > 0:
             logger.debug("Constructing hybrid jets")
-            prefix = "data"
-            hybrid_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
+            hybrid_jets = _construct_jets_from_tree(prefix="data", tree=tree)
             logger.debug("Constructing pythia true (matched) jets")
-            prefix = "matched"
-            true_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
+            true_jets = _construct_jets_from_tree(prefix="matched", tree=tree)
             logger.debug("Constructing pythia det level jets")
-            prefix = "detLevel"
-            det_level_jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)
-            for prefix, jets in [("data", hybrid_jets), ("matched", true_jets), ("detLevel", det_level_jets)]:
-                # Save calculate columns so we don't need to re-calculate them every time.
-                # NOTE: We always check if they already exist because HDF5 doesn't like us
-                #       overwriting columns.
-                # Calculated subjet constituents.
-                name = f"{prefix}.fSubjets.constituents"
-                if name not in tree:
-                    tree[name] = jets.subjets.constituents
-
+            det_level_jets = _construct_jets_from_tree(prefix="detLevel", tree=tree)
             successfully_accessed_data = True
         else:
             logger.warning(f"No jets are in file {tree.filename}. Skipping")
