@@ -94,6 +94,14 @@ def _construct_jets_from_tree(prefix: str, tree: data_manager.Tree,) -> substruc
     if constructed_name in tree:
         logger.debug("Using fully constructed object")
         jets = cast(substructure_methods.SubstructureJetArray, tree[constructed_name])
+        # Check whether the JaggedArrays which are stored in the file were constructed properly
+        try:
+            jets.constituents.max_pt
+        except AttributeError:
+            jets = substructure_methods.SubstructureJetArray._from_serialization(
+                jet_pt=jets.jet_pt, jet_constituents=jets.constituents,
+                subjets=jets.subjets, jet_splittings=jets.splittings
+            )
     else:
         logger.debug("Constructing object")
         jets = substructure_methods.SubstructureJetArray.from_tree(tree, prefix=prefix)

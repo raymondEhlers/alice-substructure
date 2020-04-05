@@ -949,8 +949,9 @@ class SubstructureJetArrayMethods(SubstructureJetCommonMethods, ArrayMethods):
         """ Serialize to storage. """
         self._valid()
         jet_pt, constituents, subjets, splittings = self.jet_pt, self.constituents, self.subjets, self.splittings
+        # NOTE: It doesn't appear that the second argument to the serializer is super meaningful...
         return serializer.encode_call(
-            ["jet_substructure.base.substructure_methods", "SubstructureJetArray"],
+            ["jet_substructure.base.substructure_methods", "SubstructureJetArray", "_from_serialization"],
             serializer(jet_pt, "SubstructureJetArray.jet_pt"),
             serializer(constituents, "SubstructureJetArray.constituents"),
             serializer(subjets, "SubstructureJetArray.subjets"),
@@ -1045,14 +1046,32 @@ class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):  # type
             tree[f"{prefix}.fJetPt"], constituents, subjets, splittings,
         )
 
-    def __awkward_serialize__(self, serializer: ak.persist.Serializer) -> ak.persist.Serializer:
-        """ Serialize to storage. """
-        self._valid()
-        jet_pt, constituents, subjets, splittings = self.jet_pt, self.constituents, self.subjets, self.splittings
-        return serializer.encode_call(
-            ["jet_substructure.base.substructure_methods", "SubstructureJetArray"],
-            serializer(jet_pt, "SubstructureJetArray.jet_pt"),
-            serializer(constituents, "SubstructureJetArray.constituents"),
-            serializer(subjets, "SubstructureJetArray.subjets"),
-            serializer(splittings, "SubstructureJetArray.splittings"),
+    @classmethod
+    def _from_serialization(
+        cls: Type[T],
+        jet_pt: UprootArray[float],
+        jet_constituents: JetConstituentArray,
+        subjets: SubjetArray,
+        jet_splittings: JetSplittingArray,
+    ) -> T:
+        """ Serialization doesn't seem to receate these jagged members properly.
+
+        Namely, it creates the object in the jagged array, but it doesn't wrap them up in the
+        external objects properly. So we manually recreate the objects here. It may be that I'm
+        doing something wrong in the serialization, but this seems like it will work too, and
+        it's easy.
+
+        Unfortunately, it loses a good deal of our speed up...
+        """
+        return cls(  # type: ignore
+            jet_pt=jet_pt,
+            jet_constituents=JetConstituentArray.from_jagged(
+                jet_constituents.pt, jet_constituents.eta, jet_constituents.phi, jet_constituents.global_index,
+            ),
+            subjets=SubjetArray._from_jagged_impl(
+                subjets.part_of_iterative_splitting, subjets.parent_splitting_index, subjets.constituents,
+            ),
+            jet_splittings=JetSplittingArray.from_jagged(
+                jet_splittings.kt, jet_splittings.delta_R, jet_splittings.z, jet_splittings.parent_index,
+            ),
         )
