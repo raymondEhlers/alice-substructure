@@ -444,6 +444,7 @@ def _plot_matching(
     path: Path,
 ) -> None:
     fig, axes = plt.subplots(3, 3, figsize=(10, 10), sharex=True, sharey=True)
+    logger.info(f"Plotting matching hist for {technique}, {identifier}")
 
     # NOTE: We convert the hists here to ensure that we're working with copies!
     normalization = binned_data.BinnedData.from_existing_data(hists.all)
@@ -461,7 +462,7 @@ def _plot_matching(
         # label="",
     )
     # Skip this panel
-    axes[0, 1].set_visible(False)
+    # axes[0, 1].set_visible(False)
     # Leading wasn't tagged, but subleading was correctly tagged as subleading.
     leading_failed_subleading_correct = binned_data.BinnedData.from_existing_data(
         hists.leading_failed_subleading_correct
@@ -477,7 +478,7 @@ def _plot_matching(
         # label="",
     )
     # Skip this panel
-    axes[1, 0].set_visible(False)
+    # axes[1, 0].set_visible(False)
     # Swapped (ie. reversed)
     reversed = binned_data.BinnedData.from_existing_data(hists.reversed)
     reversed /= normalization
@@ -549,13 +550,13 @@ def _plot_matching(
     text = identifier.display_str()
     text += "\n" + hists.title
     axes[0, 1].text(
-        0.95,
-        0.95,
+        0.5,
+        0.9,
         text,
         transform=axes[0, 1].transAxes,
-        horizontalalignment="right",
+        horizontalalignment="center",
         verticalalignment="top",
-        multialignment="right",
+        multialignment="center",
     )
 
     # Presentation
@@ -563,9 +564,12 @@ def _plot_matching(
     axes[0, 0].set_ylabel("Subleading correct")
     axes[1, 0].set_ylabel("Subleading in leading")
     axes[2, 0].set_ylabel("Subleading in no prong")
-    axes[2, 0].set_xlabel("Leading correct")
-    axes[2, 1].set_xlabel("Leading in subleading")
-    axes[2, 2].set_xlabel("Leading in no prong")
+    axes[0, 0].set_title("Leading correct", size=18)
+    axes[0, 1].set_title("Leading in subleading", size=18)
+    axes[0, 2].set_title("Leading in no prong", size=18)
+    axes[2, 0].set_xlabel(r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$")
+    axes[2, 1].set_xlabel(r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$")
+    axes[2, 2].set_xlabel(r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$")
     # ax.set_xlabel(r"$\log{(1/\Delta R)}$")
     # ax.set_ylabel(r"$\log{(k_{\text{T}})}$")
     fig.tight_layout()
@@ -575,9 +579,9 @@ def _plot_matching(
         wspace=0,
         # Reduce external spacing
         left=0.10,
-        bottom=0.10,
+        bottom=0.08,
         right=0.99,
-        top=0.99,
+        top=0.96,
     )
 
     # Store and reset
@@ -745,7 +749,7 @@ def _plot_response(
 ) -> None:
     # Setup
     fig, ax = plt.subplots(figsize=(8, 6))
-    logger.info(f"Plotting toy hist for {technique}, {identifier}, {attribute_name}")
+    logger.info(f"Plotting response hist for {technique}, {identifier}, {attribute_name}")
 
     h: Union[bh.Histogram, binned_data.BinnedData] = getattr(hists, f"response_{attribute_name}")
     if isinstance(h, bh.Histogram):
