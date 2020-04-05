@@ -270,6 +270,10 @@ class UprootTreeIterator:
                 cache=self._cache,
                 key_cache=self._key_cache,
             )
+            # Once we're returned from the yield, we're done with the tree in file.
+            # Consequently, we can clear the cache because we don't need those values anymore.
+            self._cache.clear()
+            self._key_cache.clear()
 
 
 @attr.s
@@ -388,6 +392,11 @@ class IterateTrees:
             )
 
             yield self._current_tree
+
+            # Once we're returned from the yield, we're done with the tree in file.
+            # Consequently, we can clear the cache because we don't need those values anymore.
+            uproot_cache.clear()
+            uproot_key_cache.clear()
 
     def active_iteration(self) -> Iterator[Tree]:
         """ Iterate over actively loaded trees.
