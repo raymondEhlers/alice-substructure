@@ -524,8 +524,8 @@ def determine_matched_jets(
 
     matched_leading_properly = determine_matching_types(matched_subjets_leading, hybrid_subjets_leading)
     matched_leading_mistag = determine_matching_types(matched_subjets_leading, hybrid_subjets_subleading)
-    matched_subleading_properly = determine_matching_types(matched_subjets_subleading, hybrid_subjets_leading)
-    matched_subleading_mistag = determine_matching_types(matched_subjets_subleading, hybrid_subjets_subleading)
+    matched_subleading_properly = determine_matching_types(matched_subjets_subleading, hybrid_subjets_subleading)
+    matched_subleading_mistag = determine_matching_types(matched_subjets_subleading, hybrid_subjets_leading)
     matched_leading_failed = ~matched_leading_properly & ~matched_leading_mistag
     matched_subleading_failed = ~matched_subleading_properly & ~matched_subleading_mistag
 
