@@ -97,6 +97,9 @@ class UprootArray(Collection[T]):
     def __add__(self, other: int) -> UprootArray[int]:
         raise NotImplementedError("Just typing information.")
 
+    def __or__(self, other: UprootArray[bool]) -> UprootArray[bool]:
+        raise NotImplementedError("Just typing information.")
+
     def __invert__(self) -> UprootArray[bool]:
         raise NotImplementedError("Just typing information.")
 
