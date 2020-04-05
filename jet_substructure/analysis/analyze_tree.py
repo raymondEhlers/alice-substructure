@@ -12,13 +12,14 @@ import logging
 import pickle
 import zlib
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 import attr
 import awkward as ak
 import coloredlogs
 import enlighten
 import IPython
+import numpy as np
 from pachyderm import binned_data, yaml
 
 from jet_substructure.analysis import plot_results
@@ -396,14 +397,45 @@ def _select_and_retrieve_splittings(
     return restricted_jets, splittings
 
 
+def _subjets_contributing_to_splittings(inputs: analysis_objects.FillHistogramInput) -> substructure_methods.SubjetArray:
+    """ Determine which subjets contribute to the selected splitting.
+
+    We do this by looking for subjets with a a parent splitting index that is equal to the selected index.
+
+    Args:
+        inputs: Jets and splittings selected by a particular algorithm.
+    Returns:
+        Subjets which contributed to the selected splittings. There will always be 2 subjets by definition.
+    """
+    # In order to compare to the subjets directly, we need to expand the indices to the same dimension as the subjets.
+    selected_indices_mask = (
+        inputs.jets.subjets.parent_splitting_index.ones_like() * inputs.indices.flatten()
+    )
+    matched_subjets_unsorted = inputs.jets.subjets[
+        selected_indices_mask == inputs.jets.subjets.parent_splitting_index
+    ]
+    return cast(substructure_methods.SubjetArray, matched_subjets_unsorted)
+
+
 def _get_leading_and_subleading_subjets(
     subjets_unsorted: substructure_methods.SubjetArray,
 ) -> Tuple[substructure_methods.SubjetArray, substructure_methods.SubjetArray]:
+    """ Determine the leading and subleading subjets based on the sum of subjet constituents pt.
+
+    Args:
+        subjets_unsorted: Unsorted subjets of a given splitting. There are two subjets by definition.
+    Returns:
+        Leading subjets, subleading subjets.
+    """
+    # Coerces the bool into an integer by taking 1 - array.
+    # The leading subjet will be have a 0, while the subleading will have a 1.
     subjets_pt_comparison = 1 - (
-        subjets_unsorted[:, 0].constituents.pt.sum() > subjets_unsorted[:, 1].constituents.pt.sum() * 1
+        subjets_unsorted[:, 0].constituents.pt.sum() > subjets_unsorted[:, 1].constituents.pt.sum()
     )
+    # For each subjet_pt_comparison, we want to take the index of the leading subjet and use that to extract the leading subjet.
     leading_indices = ak.JaggedArray.fromoffsets(range(len(subjets_pt_comparison) + 1), subjets_pt_comparison)
     subjets_leading = subjets_unsorted[leading_indices].flatten()
+    # Same idea for the subleading subjet (which is necessarily 1 - subjets_pt_comparison because there are only two subjets.
     subleading_indices = ak.JaggedArray.fromoffsets(range(len(subjets_pt_comparison) + 1), 1 - subjets_pt_comparison)
     subjets_subleading = subjets_unsorted[subleading_indices].flatten()
 
@@ -413,23 +445,39 @@ def _get_leading_and_subleading_subjets(
 def determine_matching_types(
     matched_subjets: substructure_methods.SubjetArray, hybrid_subjets: substructure_methods.SubjetArray,
 ) -> UprootArray[bool]:
-    constituent_pairs = matched_subjets.constituents.argcross(hybrid_subjets.constituents)
-    matched_leading_indices, hybrid_leading_indices = constituent_pairs.unzip()
+    # We split the array into chunks to keep memory usage to a more reasonable level.
+    number_of_chunks = 5
 
-    index_matching = (
-        matched_subjets.constituents[matched_leading_indices].global_index
-        == hybrid_subjets.constituents[hybrid_leading_indices].global_index
-    )
+    def split(a: substructure_methods.SubjetArray, n: int) -> Iterable[Tuple[substructure_methods.SubjetArray, slice]]:
+        """ Split an array into n chunks.
 
-    constituent_pts = matched_subjets.constituents[matched_leading_indices][index_matching].pt.sum()
+        From: https://stackoverflow.com/a/2135920/12907985
+        """
+        k, m = divmod(len(a), n)
+        return ((a[i * k + min(i, m):(i + 1) * k + min(i + 1, m)], slice(i * k + min(i, m), (i + 1) * k + min(i + 1, m))) for i in range(n))
+
+    shared_constituents_pts = np.zeros(len(matched_subjets))
+    #for matched_subset, hybrid_subset, shared_constituents_pts_subset in zip(np.array_split(matched_subjets.constituents, number_of_chunks), np.array_split(hybrid_subjets.constituents, number_of_chunks), np.array_split(shared_constituents_pts, number_of_chunks)):
+    # Can't use np.array_split (even though it would be nice and probably better tested) because the output ends up as numpy array.
+    # In this case, we don't want such a conversion.
+    for (matched_subset, selected_range), (hybrid_subset, _) in zip(split(matched_subjets.constituents, number_of_chunks), split(hybrid_subjets.constituents, number_of_chunks)):
+        constituent_pairs = matched_subset.argcross(hybrid_subset)
+        matched_leading_indices, hybrid_leading_indices = constituent_pairs.unzip()
+
+        index_matching = (
+            matched_subset[matched_leading_indices].global_index
+            == hybrid_subset[hybrid_leading_indices].global_index
+        )
+
+        shared_constituents_pts[selected_range] = matched_subset[matched_leading_indices][index_matching].pt.sum()
 
     # Sanity check
-    if (constituent_pts > matched_subjets.constituents.pt.sum()).any():
+    if (shared_constituents_pts > matched_subjets.constituents.pt.sum()).any():
         logger.warning("Constituent pts are greater than the subjet pts...")
         IPython.embed()
         raise ValueError("Constituent pts are greater than the subjet pts...")
 
-    matched = (constituent_pts / matched_subjets.constituents.pt.sum()) > 0.5
+    matched = (shared_constituents_pts / matched_subjets.constituents.pt.sum()) > 0.5
     return cast(UprootArray[bool], matched)
 
 
@@ -444,18 +492,10 @@ def determine_matched_jets(
     """
     # Setup
     # delta = 0.001
-    selected_indices_mask = (
-        matched_inputs.jets.subjets.parent_splitting_index.ones_like() * matched_inputs.indices.flatten()
-    )
-    matched_subjets_unsorted = matched_inputs.jets.subjets[
-        selected_indices_mask == matched_inputs.jets.subjets.parent_splitting_index
-    ]
-    selected_indices_mask = (
-        hybrid_inputs.jets.subjets.parent_splitting_index.ones_like() * hybrid_inputs.indices.flatten()
-    )
-    hybrid_subjets_unsorted = hybrid_inputs.jets.subjets[
-        selected_indices_mask == hybrid_inputs.jets.subjets.parent_splitting_index
-    ]
+    # Determine which subjets contribute to the selected splitting.
+    matched_subjets_unsorted = _subjets_contributing_to_splittings(inputs=matched_inputs)
+    hybrid_subjets_unsorted = _subjets_contributing_to_splittings(inputs=hybrid_inputs)
+
     # hybrid_inputs.subjets.parent_splitting_index.ones_like() * hybrid_inputs.indices.flatten()
     # Sort the subjets such that 0 is always the leading subjet.
     # matched_subjets_pt_comparison = 1 - (matched_subjets_unsorted[:, 0].constituents.pt.sum() > matched_subjets_unsorted[:, 1].constituents.pt.sum() * 1)
@@ -794,8 +834,11 @@ def matching(
     ) as variations_counter:
         for identifier, h in variations_counter(matching_hists.items()):
             # Ensure that we don't have single track jets because the splitting won't be defined for that case.
-            # Not actual jet pt range restrictions.
+            # No actual jet pt range restrictions.
             mask = (hybrid_jets.constituents.counts > 1) & (matched_jets.constituents.counts > 1)
+            # Require that we have jets that aren't dominated by hybrid jets.
+            mask = mask & (matched_jets.constituents.max_pt > hybrid_jets.constituents.max_pt)
+
             restricted_hybrid_jets, restricted_hybrid_jets_splittings = _select_and_retrieve_splittings(
                 hybrid_jets, mask, identifier.iterative_splittings
             )
