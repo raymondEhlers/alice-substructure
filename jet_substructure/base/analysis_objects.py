@@ -584,7 +584,7 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
             both_failed=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
         )
 
-    def fill(self, matched_inputs: FillHistogramInput, leading: MatchingResult, subleading: MatchingResult,) -> None:
+    def fill(self, matched_inputs: FillHistogramInput, leading: MatchingResult, subleading: MatchingResult, weight: float) -> None:
         # Validation
         # Give a useful error message
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
@@ -602,14 +602,14 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
             and isinstance(self.both_failed, bh.Histogram)
         )
 
-        self.all.fill(matched_inputs.jets.jet_pt)
-        self.both_correct.fill(matched_inputs.jets.jet_pt[leading.properly & subleading.properly])
-        self.leading_failed_subleading_correct.fill(matched_inputs.jets.jet_pt[leading.failed & subleading.properly])
-        self.leading_correct_subleading_failed.fill(matched_inputs.jets.jet_pt[leading.properly & subleading.failed])
-        self.leading_failed_subleading_mistag.fill(matched_inputs.jets.jet_pt[leading.failed & subleading.mistag])
-        self.leading_mistag_subleading_failed.fill(matched_inputs.jets.jet_pt[leading.mistag & subleading.failed])
-        self.reversed.fill(matched_inputs.jets.jet_pt[leading.mistag & subleading.mistag])
-        self.both_failed.fill(matched_inputs.jets.jet_pt[leading.failed & subleading.failed])
+        self.all.fill(matched_inputs.jets.jet_pt, weight=weight)
+        self.both_correct.fill(matched_inputs.jets.jet_pt[leading.properly & subleading.properly], weight=weight)
+        self.leading_failed_subleading_correct.fill(matched_inputs.jets.jet_pt[leading.failed & subleading.properly], weight=weight)
+        self.leading_correct_subleading_failed.fill(matched_inputs.jets.jet_pt[leading.properly & subleading.failed], weight=weight)
+        self.leading_failed_subleading_mistag.fill(matched_inputs.jets.jet_pt[leading.failed & subleading.mistag], weight=weight)
+        self.leading_mistag_subleading_failed.fill(matched_inputs.jets.jet_pt[leading.mistag & subleading.failed], weight=weight)
+        self.reversed.fill(matched_inputs.jets.jet_pt[leading.mistag & subleading.mistag], weight=weight)
+        self.both_failed.fill(matched_inputs.jets.jet_pt[leading.failed & subleading.failed], weight=weight)
 
 
 T_SubstructureHists = TypeVar(

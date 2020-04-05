@@ -804,6 +804,7 @@ def analyze_single_tree_embedding(
         hybrid_jets=hybrid_jets,
         z_cutoff=z_cutoff,
         R=R,
+        scale_factor=scale_factor,
         progress_manager=progress_manager,
     )
 
@@ -824,11 +825,13 @@ def matching(
     hybrid_jets: substructure_methods.SubstructureJetArray,
     z_cutoff: float,
     R: float,
+    scale_factor: float,
     progress_manager: enlighten.Manager,
 ) -> Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]]:
     """ Determine the prong matching for jets substructure techniques.
 
     """
+    logger.info("Starting matching")
     with progress_manager.counter(
         total=len(matching_hists), desc="Analyzing", unit="variation", leave=False
     ) as variations_counter:
@@ -846,6 +849,9 @@ def matching(
                 matched_jets, mask, identifier.iterative_splittings
             )
 
+            # Scale factor to account for pt hard bin.
+            weight = scale_factor
+
             # Dynamical z
             hybrid_inputs = analysis_objects.FillHistogramInput(
                 restricted_hybrid_jets,
@@ -859,7 +865,7 @@ def matching(
             )
             leading_matching, subleading_matching = determine_matched_jets(hybrid_inputs, true_inputs)
             matching_hists[identifier].dynamical_z.fill(
-                matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching,
+                matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching, weight=weight,
             )
             # Dynamical kt
             hybrid_inputs = analysis_objects.FillHistogramInput(
@@ -874,7 +880,7 @@ def matching(
             )
             leading_matching, subleading_matching = determine_matched_jets(hybrid_inputs, true_inputs)
             matching_hists[identifier].dynamical_kt.fill(
-                matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching,
+                matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching, weight=weight,
             )
             # Dynamical time
             hybrid_inputs = analysis_objects.FillHistogramInput(
@@ -889,7 +895,7 @@ def matching(
             )
             leading_matching, subleading_matching = determine_matched_jets(hybrid_inputs, true_inputs)
             matching_hists[identifier].dynamical_time.fill(
-                matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching,
+                matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching, weight=weight,
             )
             # Leading kt
             hybrid_inputs = analysis_objects.FillHistogramInput(
@@ -904,7 +910,7 @@ def matching(
             )
             leading_matching, subleading_matching = determine_matched_jets(hybrid_inputs, true_inputs)
             matching_hists[identifier].leading_kt.fill(
-                matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching,
+                matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching, weight=weight,
             )
             # Leading kt with z cutoff
             hybrid_inputs = analysis_objects.FillHistogramInput(
