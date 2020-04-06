@@ -427,6 +427,7 @@ def _get_leading_and_subleading_subjets(
     Returns:
         Leading subjets, subleading subjets.
     """
+    # Sort the subjets such that 0 is always the leading subjet.
     # Coerces the bool into an integer by taking 1 - array.
     # The leading subjet will be have a 0, while the subleading will have a 1.
     subjets_pt_comparison = 1 - (
@@ -442,11 +443,19 @@ def _get_leading_and_subleading_subjets(
     return subjets_leading, subjets_subleading
 
 
-def determine_matching_types(
+def _determine_matching_types(
     matched_subjets: substructure_methods.SubjetArray, hybrid_subjets: substructure_methods.SubjetArray,
 ) -> UprootArray[bool]:
+    """ Determine whether the given subjets match.
+
+    Args:
+        matched_subjets: Subjets from the matched jets.
+        hybrid_subjets: Subjets from the hybrid jets.
+    Returns:
+        Mask indicating when these subjets matched.
+    """
     # We split the array into chunks to keep memory usage to a more reasonable level.
-    number_of_chunks = 5
+    number_of_chunks = 6
 
     def split(a: substructure_methods.SubjetArray, n: int) -> Iterable[Tuple[substructure_methods.SubjetArray, slice]]:
         """ Split an array into n chunks.
@@ -457,9 +466,8 @@ def determine_matching_types(
         return ((a[i * k + min(i, m):(i + 1) * k + min(i + 1, m)], slice(i * k + min(i, m), (i + 1) * k + min(i + 1, m))) for i in range(n))
 
     shared_constituents_pts = np.zeros(len(matched_subjets))
-    #for matched_subset, hybrid_subset, shared_constituents_pts_subset in zip(np.array_split(matched_subjets.constituents, number_of_chunks), np.array_split(hybrid_subjets.constituents, number_of_chunks), np.array_split(shared_constituents_pts, number_of_chunks)):
-    # Can't use np.array_split (even though it would be nice and probably better tested) because the output ends up as numpy array.
-    # In this case, we don't want such a conversion.
+    # Can't use np.array_split (even though it would be nice and probably better tested) because the output ends up as
+    # numpy array, and in this case, we don't want such a conversion.
     for (matched_subset, selected_range), (hybrid_subset, _) in zip(split(matched_subjets.constituents, number_of_chunks), split(hybrid_subjets.constituents, number_of_chunks)):
         constituent_pairs = matched_subset.argcross(hybrid_subset)
         matched_leading_indices, hybrid_leading_indices = constituent_pairs.unzip()
@@ -484,11 +492,16 @@ def determine_matching_types(
 def determine_matched_jets(
     hybrid_inputs: analysis_objects.FillHistogramInput, matched_inputs: analysis_objects.FillHistogramInput
 ) -> Tuple[analysis_objects.MatchingResult, analysis_objects.MatchingResult]:
-    """
+    """ Determine the matching between subjets.
 
     The passed jets need to have the selected indices already applied.
     We need to work with the indices applied to these jets.
 
+    Args:
+        hybrid_inputs: The selected hybrid jets and splittings.
+        matched_inputs: The selected matched jets and splittings.
+    Returns:
+        Leading subjet matching results, subleading subjet matching results.
     """
     # Setup
     # delta = 0.001
@@ -496,40 +509,18 @@ def determine_matched_jets(
     matched_subjets_unsorted = _subjets_contributing_to_splittings(inputs=matched_inputs)
     hybrid_subjets_unsorted = _subjets_contributing_to_splittings(inputs=hybrid_inputs)
 
-    # hybrid_inputs.subjets.parent_splitting_index.ones_like() * hybrid_inputs.indices.flatten()
     # Sort the subjets such that 0 is always the leading subjet.
-    # matched_subjets_pt_comparison = 1 - (matched_subjets_unsorted[:, 0].constituents.pt.sum() > matched_subjets_unsorted[:, 1].constituents.pt.sum() * 1)
-    # matched_subjets_leading = matched_subjets_unsorted[matched_subjets_pt_comparison]
-    # matched_subjets_subleading = matched_subjets_unsorted[1 - matched_subjets_pt_comparison]
     matched_subjets_leading, matched_subjets_subleading = _get_leading_and_subleading_subjets(matched_subjets_unsorted)
     hybrid_subjets_leading, hybrid_subjets_subleading = _get_leading_and_subleading_subjets(hybrid_subjets_unsorted)
 
-    # This works...
-    # In [119]: matched_subjets[:, 0].constituents.argcross(hybrid_subjets[:, 0].constituents)
-    # Out[119]: <JaggedArray [[(0, 0) (0, 1) (0, 2) ... (10, 9) (10, 10) (10, 11)] [(0, 0) (0, 1) (0, 2) ... (16, 14) (16, 15) (16, 1
-    # 6)] [(0, 0) (0, 1) (0, 2) ... (16, 9) (16, 10) (16, 11)] ... [(0, 0) (0, 1) (0, 2) ... (8, 13) (8, 14) (8, 15)] [(0, 0) (0, 1)
-    # (0, 2) ... (8, 13) (8, 14) (8, 15)] [(0, 0) (0, 1) (0, 2) ... (8, 13) (8, 14) (8, 15)]] at 0x7f035ec61790>
-
-    # shared_constituent_pts_matched_leading_hybrid_leading = determine_matching_types(matched_subjets_leading, hybrid_subjets_leading)
-    # shared_constituent_pts_matched_leading_hybrid_subleading = determine_matching_types(matched_subjets_leading, hybrid_subjets_subleading)
-    # shared_constituent_pts_matched_subleading_hybrid_leading = determine_matching_types(matched_subjets_subleading, hybrid_subjets_leading)
-    # shared_constituent_pts_matched_subleading_hybrid_subleading = determine_matching_types(matched_subjets_subleading, hybrid_subjets_subleading)
-
-    # matched_leading_properly = (shared_constituent_pts_matched_leading_hybrid_leading / matched_inputs.jets.jet_pt) > 0.5
-    # matched_leading_mistag = (shared_constituent_pts_matched_leading_hybrid_subleading / matched_inputs.jets.jet_pt) > 0.5
-    # matched_leading_failed = ~matched_leading_properly & ~matched_leading_mistag
-    # matched_subleading_properly = (shared_constituent_pts_matched_subleading_hybrid_leading / matched_inputs.jets.jet_pt) > 0.5
-    # matched_subleading_mistag = (shared_constituent_pts_matched_subleading_hybrid_subleading / matched_inputs.jets.jet_pt) > 0.5
-    # matched_subleading_failed = ~matched_subleading_properly & ~matched_subleading_mistag
-
-    matched_leading_properly = determine_matching_types(matched_subjets_leading, hybrid_subjets_leading)
-    matched_leading_mistag = determine_matching_types(matched_subjets_leading, hybrid_subjets_subleading)
-    matched_subleading_properly = determine_matching_types(matched_subjets_subleading, hybrid_subjets_subleading)
-    matched_subleading_mistag = determine_matching_types(matched_subjets_subleading, hybrid_subjets_leading)
+    # Now, determine the matching types based on the possible combinations of leading and subleading subjets.
+    matched_leading_properly = _determine_matching_types(matched_subjets_leading, hybrid_subjets_leading)
+    matched_leading_mistag = _determine_matching_types(matched_subjets_leading, hybrid_subjets_subleading)
+    matched_subleading_properly = _determine_matching_types(matched_subjets_subleading, hybrid_subjets_subleading)
+    matched_subleading_mistag = _determine_matching_types(matched_subjets_subleading, hybrid_subjets_leading)
+    # Combine those cases to determine when the we failed to find the leading and subleading subjets.
     matched_leading_failed = ~matched_leading_properly & ~matched_leading_mistag
     matched_subleading_failed = ~matched_subleading_properly & ~matched_subleading_mistag
-
-    # IPython.embed()
 
     return (
         analysis_objects.MatchingResult(matched_leading_properly, matched_leading_mistag, matched_leading_failed),
@@ -537,80 +528,6 @@ def determine_matched_jets(
             matched_subleading_properly, matched_subleading_mistag, matched_subleading_failed
         ),
     )
-
-    # Moved to function
-    # constituent_pairs = matched_subjets_leading.constituents.argcross(hybrid_subjets_leading.constituents)
-    # matched_leading_indices, hybrid_leading_indices = constituent_pairs.unzip()
-
-    # index_matching = (
-    #    matched_subjets_leading.constituents[matched_leading_indices].global_index
-    #    == hybrid_subjets_leading.constituents[hybrid_leading_indices].global_index
-    # )
-
-    # constituent_pts = matched_subjets_leading.constituents[matched_leading_indices][index_matching].pt.sum()
-    # END moved to function
-
-    # IPython.embed()
-
-    # TODO: Use distance at some point. Can use delta_R that I impelemented.
-    # delta_eta = matched_subjets_leading.constituents[matched_leading_indices].eta - \
-    #    hybrid_subjets_leading.constituents[hybrid_leading_indices].eta
-    # delta_phi = matched_subjets_leading.constituents[matched_leading_indices].phi - \
-    #    hybrid_subjets_leading.constituents[hybrid_leading_indices].phi
-
-    # delta_eta_mask = np.abs(delta_eta) < delta
-    # delta_phi_mask = np.abs(delta_phi) < delta
-
-    # subjet_pairs = matched_subjets.argcross(hybrid_subjets)
-    # matched_subjets_indices, hybrid_subjets_indices = subjet_pairs.unzip()
-
-    # matched_subjets_leading = matched_subjets[subjet_pairs][:, 0]
-    # matched_subjets_subleading = matched_subjets[subjet_pairs][:, 1]
-
-    # Work with matched jets.
-    # Match constituents.
-    # Take the two hybrid subjets, and the two detlevel subjets. Compare them.
-    # track_pairs = matched_subjets.constituents.argcross(hybrid_subjets.constituents, nested=True)
-    ##delta_phi = matched_subjets.constituents[track_pairs[0, :]].phi() - hybrid_subjets.constituents[track_pairs[1, :]].phi()
-    ##delta_eta = matched_subjets.constituents[track_pairs[0, :]].eta() - hybrid_subjets.constituents[track_pairs[1, :]].eta()
-    ## use unzip here instead...
-    # matched_subjets_indices, hybrid_subjets_indices = track_pairs.unzip()
-    # delta_phi = matched_subjets.constituents[matched_subjets_indices].phi - hybrid_subjets.constituents[hybrid_subjets_indices].phi
-    # delta_eta = matched_subjets.constituents[matched_subjets_indices].eta - hybrid_subjets.constituents[hybrid_subjets_indices].eta
-
-    # constituent_pts = matched_subjets.constituents[(delta_phi < delta) & (delta_eta < delta)]
-
-    # return (constituent_pts / matched_inputs.jets.jet_pt) > 0.5
-
-    # for (int i = 0; i < constDet->size(); i++)
-    # {
-    #    float eta_det = constDet->at(i).eta();
-    #    float phi_det = constDet->at(i).phi();
-    #    for (int j  = 0; j < constHyb->size(); j++)
-    #    {
-    #        float eta_hyb = constHyb->at(j).eta();
-    #        float phi_hyb = constHyb->at(j).phi();
-    #        float deta = eta_hyb - eta_det;
-    #        deta = std::sqrt(deta*deta);
-    #        if (deta > delta) continue;
-    #        float dphi = phi_hyb - phi_det;
-    #        dphi = std::sqrt(dphi*dphi);
-    #        if (dphi > delta) continue;
-    #        sumpT+=constDet->at(i).pt();
-    #    }
-    # }
-
-    # if sumpT / matched_jets.jet_pt() > 0.5:
-    #    return True
-    # return False
-
-
-# def process_matching_results(matched_inputs: analysis_objects.FillHistogramInput, leading_matching: analysis_objects.MatchingResult,
-#                             subleading_matching: analysis_objects.MatchingResult) -> None:
-#    h_leading_matched_all.fill(matched_inputs.jets.jet_pt)
-#    h_leading_matched_properly.fill(matched_inputs.jets.jet_pt[leading_matching.properly])
-#    h_leading_matched_missed.fill(matched_inputs.jets.jet_pt[leading_matching.mistag])
-#    h_leading_matched_failed.fill(matched_inputs.jets.jet_pt[leading_matching.failed])
 
 
 def analyze_single_tree_embedding(
