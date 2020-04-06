@@ -100,8 +100,10 @@ def _construct_jets_from_tree(prefix: str, tree: data_manager.Tree,) -> substruc
             jets.constituents.max_pt
         except AttributeError:
             jets = substructure_methods.SubstructureJetArray._from_serialization(
-                jet_pt=jets.jet_pt, jet_constituents=jets.constituents,
-                subjets=jets.subjets, jet_splittings=jets.splittings
+                jet_pt=jets.jet_pt,
+                jet_constituents=jets.constituents,
+                subjets=jets.subjets,
+                jet_splittings=jets.splittings,
             )
     else:
         logger.debug("Constructing object")
@@ -397,7 +399,9 @@ def _select_and_retrieve_splittings(
     return restricted_jets, splittings
 
 
-def _subjets_contributing_to_splittings(inputs: analysis_objects.FillHistogramInput) -> substructure_methods.SubjetArray:
+def _subjets_contributing_to_splittings(
+    inputs: analysis_objects.FillHistogramInput,
+) -> substructure_methods.SubjetArray:
     """ Determine which subjets contribute to the selected splitting.
 
     We do this by looking for subjets with a a parent splitting index that is equal to the selected index.
@@ -408,12 +412,8 @@ def _subjets_contributing_to_splittings(inputs: analysis_objects.FillHistogramIn
         Subjets which contributed to the selected splittings. There will always be 2 subjets by definition.
     """
     # In order to compare to the subjets directly, we need to expand the indices to the same dimension as the subjets.
-    selected_indices_mask = (
-        inputs.jets.subjets.parent_splitting_index.ones_like() * inputs.indices.flatten()
-    )
-    matched_subjets_unsorted = inputs.jets.subjets[
-        selected_indices_mask == inputs.jets.subjets.parent_splitting_index
-    ]
+    selected_indices_mask = inputs.jets.subjets.parent_splitting_index.ones_like() * inputs.indices.flatten()
+    matched_subjets_unsorted = inputs.jets.subjets[selected_indices_mask == inputs.jets.subjets.parent_splitting_index]
     return cast(substructure_methods.SubjetArray, matched_subjets_unsorted)
 
 
@@ -443,6 +443,25 @@ def _get_leading_and_subleading_subjets(
     return subjets_leading, subjets_subleading
 
 
+def _split_array(
+    a: substructure_methods.SubjetArray, n: int
+) -> Iterable[Tuple[substructure_methods.SubjetArray, slice]]:
+    """ Split an array into n chunks.
+
+    Currently the typing suggests that it will only work for SubjetArray, but it should work for any array.
+
+    From: https://stackoverflow.com/a/2135920/12907985
+    """
+    k, m = divmod(len(a), n)
+    return (
+        (
+            a[i * k + min(i, m) : (i + 1) * k + min(i + 1, m)],  # noqa: E203 . Conflicts with black...
+            slice(i * k + min(i, m), (i + 1) * k + min(i + 1, m)),
+        )
+        for i in range(n)
+    )
+
+
 def _determine_matching_types(
     matched_subjets: substructure_methods.SubjetArray, hybrid_subjets: substructure_methods.SubjetArray,
 ) -> UprootArray[bool]:
@@ -457,24 +476,18 @@ def _determine_matching_types(
     # We split the array into chunks to keep memory usage to a more reasonable level.
     number_of_chunks = 6
 
-    def split(a: substructure_methods.SubjetArray, n: int) -> Iterable[Tuple[substructure_methods.SubjetArray, slice]]:
-        """ Split an array into n chunks.
-
-        From: https://stackoverflow.com/a/2135920/12907985
-        """
-        k, m = divmod(len(a), n)
-        return ((a[i * k + min(i, m):(i + 1) * k + min(i + 1, m)], slice(i * k + min(i, m), (i + 1) * k + min(i + 1, m))) for i in range(n))
-
     shared_constituents_pts = np.zeros(len(matched_subjets))
     # Can't use np.array_split (even though it would be nice and probably better tested) because the output ends up as
     # numpy array, and in this case, we don't want such a conversion.
-    for (matched_subset, selected_range), (hybrid_subset, _) in zip(split(matched_subjets.constituents, number_of_chunks), split(hybrid_subjets.constituents, number_of_chunks)):
+    for (matched_subset, selected_range), (hybrid_subset, _) in zip(
+        _split_array(matched_subjets.constituents, number_of_chunks),
+        _split_array(hybrid_subjets.constituents, number_of_chunks),
+    ):
         constituent_pairs = matched_subset.argcross(hybrid_subset)
         matched_leading_indices, hybrid_leading_indices = constituent_pairs.unzip()
 
         index_matching = (
-            matched_subset[matched_leading_indices].global_index
-            == hybrid_subset[hybrid_leading_indices].global_index
+            matched_subset[matched_leading_indices].global_index == hybrid_subset[hybrid_leading_indices].global_index
         )
 
         shared_constituents_pts[selected_range] = matched_subset[matched_leading_indices][index_matching].pt.sum()
@@ -1001,8 +1014,13 @@ def run_toy(
     return full_hists, output
 
 
-def run_embedding(
-    collision_system: str, jet_pt_bins: Sequence[helpers.RangeSelector], dataset_config_filename: Path, output: Path, filenames: Optional[Sequence[Union[str, Path]]] = None,
+def run_embedding(  # noqa: C901 . Ignore for now until cleanup later.
+    collision_system: str,
+    jet_pt_bins: Sequence[helpers.RangeSelector],
+    dataset_config_filename: Path,
+    output: Path,
+    filenames: Optional[Sequence[Union[str, Path]]] = None,
+    plot_only: bool = False,
 ) -> Tuple[
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]],
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]],
@@ -1011,18 +1029,42 @@ def run_embedding(
     # Validation
     if filenames is None:
         filenames = []
-    # Setup
-    z_cutoff = 0.2
     # Configuration
     y = setup_yaml()
     with open(dataset_config_filename, "r") as f:
         config = y.load(f)
     dataset_config = config["datasets"][collision_system]["dataset"]
     dataset_name = dataset_config["name"]
-    # finalize setup
+    # Finalize setup
     output = output / collision_system / dataset_name
     output.mkdir(parents=True, exist_ok=True)
+    embedding_hists_filename = output / "embedding_hists.pkl"
 
+    # Output variables
+    full_hists: Dict[
+        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]
+    ] = {}
+    full_matching_hists: Dict[
+        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
+    ] = {}
+
+    # Have a special option if we're plotting only so we can just read the final files.
+    # Even though merging isn't very hard, all of that I/O is still slow than reading them once.
+    if plot_only:
+        if embedding_hists_filename.exists():
+            # Read the stored hists.
+            # We don't use YAML because it would be super slow!
+            with open(embedding_hists_filename, "rb") as f_pkl:
+                full_hists, full_matching_hists = pickle.load(f_pkl)
+
+            return full_hists, full_matching_hists, output
+
+        # If the file doesn't exist, we still need to process
+        logger.warning("Requested plotting only, but the hists aren't available. Continuing on to processing.")
+
+    # Now we know that we are going to process, so finish defining the dataset.
+    # Settings
+    z_cutoff = 0.2
     # Retrieve and setup data
     selected_dataset_config = config["available_datasets"][dataset_name]
     R = selected_dataset_config["jet_R"]
@@ -1031,11 +1073,12 @@ def run_embedding(
     # Take the passed filenames if provided. Otherwise, use the files in the configuration file.
     if not filenames:
         filenames = selected_dataset_config["files"]
+    # Help out mypy...
+    assert filenames is not None
+
     # And then setup the data manager.
     dm = data_manager.IterateTrees(
-        filenames=filenames,
-        tree_name=selected_dataset_config["tree_name"],
-        branches=dataset_config["branches"],
+        filenames=filenames, tree_name=selected_dataset_config["tree_name"], branches=dataset_config["branches"],
     )
     logger.info("Setup complete. Beginning processing of trees.")
 
@@ -1076,17 +1119,11 @@ def run_embedding(
             match_hist.convert_boost_histograms_to_binned_data()
 
     # Merge the hists
-    full_hists: Dict[
-        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]
-    ] = {}
     for k in results[0].keys():
         full_hists[k] = cast(
             analysis_objects.Hists[analysis_objects.SubstructureResponseHists], sum([hists[k] for hists in results])
         )
 
-    full_matching_hists: Dict[
-        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
-    ] = {}
     for k in matching_results[0].keys():
         full_matching_hists[k] = cast(
             analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists],
@@ -1094,9 +1131,9 @@ def run_embedding(
         )
 
     # Write out the merged hists
-    # Disable for now because it's super slow!
-    # with open(output / "response_hists.yaml", "w") as f:
-    #    y.dump(full_hists, f)
+    # Write with pkl because yaml is super slow for hists that are this large.
+    with open(embedding_hists_filename, "wb") as f_pkl:
+        pickle.dump((full_hists, full_matching_hists), f_pkl)
 
     progress_manager.stop()
 
@@ -1112,6 +1149,7 @@ def run_embedding(
 #        embedded_hists = y.load(f)
 #    ...
 
+
 def setup_entry_point() -> None:
     # Basic setup
     coloredlogs.install(level=logging.DEBUG, fmt="%(asctime)s %(name)s:%(lineno)d %(levelname)s %(message)s")
@@ -1122,6 +1160,7 @@ def setup_entry_point() -> None:
     # Quiet down BinndData copy warnings
     logging.getLogger("pachyderm.binned_data").setLevel(logging.INFO)
 
+
 def parse_arguments(name: str) -> List[Path]:
     parser = argparse.ArgumentParser(description=f"Run {name}")
 
@@ -1130,6 +1169,7 @@ def parse_arguments(name: str) -> List[Path]:
     # Validation for filenames
     filenames = [Path(f) for f in args.filenames]
     return filenames
+
 
 def embed_pythia_entry_point() -> None:
     setup_entry_point()
@@ -1153,9 +1193,10 @@ def embed_pythia_entry_point() -> None:
         output=Path("output"),
         filenames=filenames,
     )
-    #return response_hists, matching_hists
-    #plot_results.responses(all_response_hists=response_hists, path=output)
-    #plot_results.matching(all_matching_hists=matching_hists, path=output)
+    # return response_hists, matching_hists
+    # plot_results.responses(all_response_hists=response_hists, path=output)
+    # plot_results.matching(all_matching_hists=matching_hists, path=output)
+
 
 if __name__ == "__main__":
     setup_entry_point()
@@ -1165,19 +1206,21 @@ if __name__ == "__main__":
     # data_prefix = "hybrid"
     # collision_system = f"toy_true_{data_prefix}_splittings_iterative_allTrueSplittings_delta_R_040"
     jet_pt_bins = [
-        helpers.RangeSelector(min=0, max=120),
+        # Broadest range
         helpers.RangeSelector(min=40, max=120),
         # Most likely where we will actually measure.
         helpers.RangeSelector(min=80, max=120),
+        # Individual ranges.
+        helpers.RangeSelector(min=40, max=60),
         helpers.RangeSelector(min=60, max=80),
         helpers.RangeSelector(min=80, max=100),
         helpers.RangeSelector(min=100, max=120),
     ]
     # hists, output = run(
-    #   collision_system=collision_system,
-    #   jet_pt_bins=jet_pt_bins,
-    #   dataset_config_filename=Path("config") / "datasets.yaml",
-    #   output=Path("output"),
+    #    collision_system=collision_system,
+    #    jet_pt_bins=jet_pt_bins,
+    #    dataset_config_filename=Path("config") / "datasets.yaml",
+    #    output=Path("output"),
     # )
     # plot_results.lund_plane(all_hists=hists, path=output)
     # hists, output = run_toy(
@@ -1193,6 +1236,7 @@ if __name__ == "__main__":
         jet_pt_bins=jet_pt_bins,
         dataset_config_filename=Path("config") / "datasets.yaml",
         output=Path("output"),
+        plot_only=True,
     )
     plot_results.responses(all_response_hists=response_hists, path=output)
     plot_results.matching(all_matching_hists=matching_hists, path=output)
