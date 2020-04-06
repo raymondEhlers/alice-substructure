@@ -10,6 +10,7 @@ include = [
 
 [tool.poetry.scripts]
 embedPythia = "jet_substructure.analysis.analyze_tree:embed_pythia_entry_point"
+splitTree = "jet_substructure.base.helpers:split_tree_entry_point"
 
 [tool.poetry.dependencies]
 python = "^3.6.1"

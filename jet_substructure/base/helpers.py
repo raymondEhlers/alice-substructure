@@ -5,9 +5,11 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import typing
-from typing import Any, Collection, Dict, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union
+from pathlib import Path
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 import attr
 import numpy as np
@@ -205,3 +207,79 @@ class RangeSelector:
 
     def display_str(self, label: str = "") -> str:
         return fr"{self.min} < p_{{\text{{T,jet}}}}^{{\text{{{label}}}}} < {self.max}"
+
+
+def split_tree(
+    filename: Union[str, Path],
+    tree_name: str = "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+    number_of_chunks: int = 4,
+) -> List[Path]:
+    """ Split tree into a given number of chunks.
+
+    Args:
+        filename: Name of the file to split.
+        tree_name: Name of the tree to split. Default: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        number_of_chunks: Number of chunks to split the file into. Default: 5.
+
+    Returns:
+        Filenames of the chunked files.
+    """
+    # Validation
+    filename = Path(filename)
+
+    # Setup input tree
+    # Delayed import because we want to depend on ROOT as little as possible.
+    import ROOT
+
+    input_file = ROOT.TFile(str(filename), "READ")
+    input_tree = input_file.Get(tree_name)
+
+    number_of_entires = input_tree.GetEntries()
+    print(f"Total of {number_of_entires} in the tree. Splitting into {number_of_chunks} chunks.")
+
+    output_filenames = []
+    for n in range(number_of_chunks):
+        start = int((number_of_entires / number_of_chunks) * n)
+        end = int((number_of_entires / number_of_chunks) * (n + 1))
+
+        new_filename = filename.with_name(f"{filename.stem}.Chunk{n+1}.root")
+        output_filenames.append(new_filename)
+        new_file = ROOT.TFile(str(new_filename), "RECREATE")
+        new_tree = input_tree.CloneTree(0)
+        ROOT.gROOT.cd()
+
+        print(f"Fill tree {new_filename} with entries {start}-{end}")
+        for i in range(start, end):
+            if i % 10000 == 0:
+                print(f"Done: {(i-start)/(end-start) * 100:.03g}%")
+            input_tree.GetEntry(i)
+            new_tree.Fill()
+
+        new_tree.AutoSave()
+        new_file.Close()
+
+    return output_filenames
+
+
+def split_tree_entry_point() -> None:
+    """ Entry point for splitting a tree into chunks.
+
+    Args:
+        None. It can be configured through command line arguments.
+
+    Returns:
+        None.
+    """
+    parser = argparse.ArgumentParser(description=f"Split tree into chunks.")
+
+    parser.add_argument("-f", "--filename", required=True, type=str)
+    parser.add_argument(
+        "-t",
+        "--treeName",
+        default="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+        type=str,
+    )
+    parser.add_argument("-n", "--nChunks", default=5, type=int)
+    args = parser.parse_args()
+
+    split_tree(filename=args.filename, tree_name=args.treeName, number_of_chunks=args.nChunks)
