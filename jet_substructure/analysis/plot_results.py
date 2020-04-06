@@ -17,7 +17,7 @@ import numpy as np
 import pachyderm.plot
 from pachyderm import binned_data
 
-from jet_substructure.base import analysis_objects
+from jet_substructure.base import analysis_objects, helpers
 
 
 logger = logging.getLogger(__name__)
@@ -755,7 +755,7 @@ def _plot_response(
     if isinstance(h, bh.Histogram):
         h = binned_data.BinnedData.from_existing_data(h)
 
-    # Project into our axes of interest (namely, the attribute at hybrid and true level.
+    # Project into our axes of interest (namely, the attribute at hybrid and true level).
     values = np.sum(h.values, axis=(0, 2))
 
     # If there aren't counts, we  need to stop here.
@@ -813,6 +813,182 @@ def _plot_response(
     plt.close(fig)
 
 
+def _plot_response_jet_spectra(
+    technique: str,
+    identifier: analysis_objects.Identifier,
+    attribute_name: str,
+    hists: analysis_objects.SubstructureResponseHists,
+    plot_config: PlotConfig,
+    path: Path,
+) -> None:
+    # Setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+    logger.info(f"Plotting response jet spectra for {technique}, {identifier}, {attribute_name}")
+
+    h: Union[bh.Histogram, binned_data.BinnedData] = getattr(hists, f"response_{attribute_name}")
+    if isinstance(h, bh.Histogram):
+        h = binned_data.BinnedData.from_existing_data(h)
+
+    # Project into our axes of interest (namely, the spectra at hybrid and true level).
+    # Now get the individual spectra.
+    h_part = binned_data.BinnedData(
+        axes=h.axes[2], values=np.sum(h.values, axis=(0, 1, 3)), variances=np.sum(h.variances, axis=(0, 1, 3))
+    )
+    h_hybrid = binned_data.BinnedData(
+        axes=h.axes[0], values=np.sum(h.values, axis=(1, 2, 3)), variances=np.sum(h.variances, axis=(1, 2, 3))
+    )
+
+    # Normalization
+    # Scale by bin widths and number of jets
+    h_part /= hists.n_true_jets
+    h_part /= h_part.axes[0].bin_widths
+    h_hybrid /= hists.n_hybrid_jets
+    h_hybrid /= h_hybrid.axes[0].bin_widths
+
+    # Plot
+    ax.errorbar(
+        h_part.axes[0].bin_centers,
+        h_part.values,
+        yerr=h_part.errors,
+        xerr=h_part.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Particle level",
+    )
+    # Plot
+    ax.errorbar(
+        h_hybrid.axes[0].bin_centers,
+        h_hybrid.values,
+        yerr=h_hybrid.errors,
+        xerr=h_hybrid.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Hybrid level",
+    )
+
+    # Labeling
+    text = identifier.display_str(jet_pt_label="hybrid")
+    text += "\n" + hists.title
+    ax.text(
+        0.95,
+        0.95,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="right",
+        verticalalignment="top",
+        multialignment="right",
+    )
+
+    # Presentation
+    ax.set_xlabel(plot_config.x_label)
+    ax.set_ylabel(plot_config.y_label)
+    ax.set_yscale("log")
+    ax.legend(frameon=False, loc="lower left")
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.12,
+        bottom=0.11,
+        right=0.99,
+        top=0.98,
+    )
+
+    # Store and reset
+    fig.savefig(path / f"response_spectra_{attribute_name}_{str(identifier)}_{technique}.pdf")
+    plt.close(fig)
+
+
+def _plot_response_kt_distributions(
+    technique: str,
+    identifier: analysis_objects.Identifier,
+    attribute_name: str,
+    hists: analysis_objects.SubstructureResponseHists,
+    plot_config: PlotConfig,
+    path: Path,
+) -> None:
+    # Setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+    logger.info(f"Plotting response kt spectra for {technique}, {identifier}, {attribute_name}")
+
+    h: Union[bh.Histogram, binned_data.BinnedData] = getattr(hists, f"response_{attribute_name}")
+    if isinstance(h, bh.Histogram):
+        h = binned_data.BinnedData.from_existing_data(h)
+
+    # Project into our axes of interest (namely, the spectra at hybrid and true level).
+    # Now get the individual spectra.
+    h_part = binned_data.BinnedData(
+        axes=h.axes[3], values=np.sum(h.values, axis=(0, 1, 2)), variances=np.sum(h.variances, axis=(0, 1, 2))
+    )
+    h_hybrid = binned_data.BinnedData(
+        axes=h.axes[1], values=np.sum(h.values, axis=(0, 2, 3)), variances=np.sum(h.variances, axis=(0, 2, 3))
+    )
+
+    # Normalization
+    # Scale by bin widths and number of jets
+    h_part /= hists.n_true_jets
+    h_part /= h_part.axes[0].bin_widths
+    h_hybrid /= hists.n_hybrid_jets
+    h_hybrid /= h_hybrid.axes[0].bin_widths
+
+    # Plot
+    ax.errorbar(
+        h_part.axes[0].bin_centers,
+        h_part.values,
+        yerr=h_part.errors,
+        xerr=h_part.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Particle level",
+    )
+    # Plot
+    ax.errorbar(
+        h_hybrid.axes[0].bin_centers,
+        h_hybrid.values,
+        yerr=h_hybrid.errors,
+        xerr=h_hybrid.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Hybrid level",
+    )
+
+    # Labeling
+    text = identifier.display_str(jet_pt_label="hybrid")
+    text += "\n" + hists.title
+    ax.text(
+        0.95,
+        0.95,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="right",
+        verticalalignment="top",
+        multialignment="right",
+    )
+
+    # Presentation
+    ax.set_xlabel(plot_config.x_label)
+    ax.set_ylabel(plot_config.y_label)
+    ax.legend(frameon=False, loc="lower left")
+    ax.set_yscale("log")
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.14,
+        bottom=0.11,
+        right=0.99,
+        top=0.98,
+    )
+
+    # Store and reset
+    fig.savefig(path / f"response_kt_spectra_{attribute_name}_{str(identifier)}_{technique}.pdf")
+    plt.close(fig)
+
+
 def responses(
     all_response_hists: Dict[
         analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]
@@ -842,8 +1018,8 @@ def responses(
         ("splitting_number", splitting_number_label),
     ]
 
-    for identifier, toy_hists in all_response_hists.items():
-        for technique, hists in toy_hists:
+    for identifier, response_hists in all_response_hists.items():
+        for technique, hists in response_hists:
             if hists.n_hybrid_jets == 0 or hists.n_true_jets == 0:
                 logger.warning(f"No jets within {identifier}_{technique}. Skipping bin!")
                 continue
@@ -855,5 +1031,34 @@ def responses(
                     attribute_name=attribute_name,
                     hists=hists,
                     plot_config=plot_config,
+                    path=path,
+                )
+            # Only plot once. It's redundant otherwise
+            if identifier.jet_pt_bin in [
+                helpers.RangeSelector(min=40, max=120),
+                helpers.RangeSelector(min=80, max=120),
+            ]:
+                _plot_response_jet_spectra(
+                    technique=technique,
+                    identifier=identifier,
+                    attribute_name="kt",
+                    hists=hists,
+                    plot_config=PlotConfig(
+                        name="response_spectra",
+                        x_label=r"$p_{\text{T}}\:(\text{GeV}/c)$",
+                        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                    ),
+                    path=path,
+                )
+                _plot_response_kt_distributions(
+                    technique=technique,
+                    identifier=identifier,
+                    attribute_name="kt",
+                    hists=hists,
+                    plot_config=PlotConfig(
+                        name="response_spectra",
+                        x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                    ),
                     path=path,
                 )
