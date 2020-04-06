@@ -527,19 +527,6 @@ class JetSplitting:
     z: float = attr.ib()
     _parent_index: int = attr.ib()
 
-    def part_of_iterative_splitting(self, subjets: SubjetArray) -> bool:
-        """ Determine whether the splitting is iterative.
-
-        Args:
-            subjets: Subjets of the overall jet which containing the iterative splitting information.
-        Returns:
-            True if the splitting is part of the iterative splitting chain.
-        """
-        # Determine the parent index of the splittings which are iterative.
-        # This indexes the splittings, so we then apply it to the object.
-        iterative_splittings = subjets.parent_splitting_index[subjets.part_of_iterative_splitting]
-        return self._parent_index in iterative_splittings
-
     @property
     def parent_pt(self) -> float:
         """ Pt of the (parent) subjet which lead to the splitting.
@@ -653,19 +640,6 @@ class JetSplittingArrayMethods(ArrayMethods):
     def z(self) -> UprootArray[float]:
         """ z of the splitting. """
         return cast(UprootArray[float], self["z"])
-
-    def part_of_iterative_splitting(self, subjets: SubjetArray) -> UprootArray[bool]:
-        """ Determine whether the splitting is iterative.
-
-        Args:
-            subjets: Subjets of the jets which containing the iterative splitting information.
-        Returns:
-            True if the splittings are part of the iterative splitting chain.
-        """
-        # TODO: I don't think this works!!
-        # iterative_splittings = subjets.parent_splitting_index[subjets.part_of_iterative_splitting]
-        iterative_splittings = subjets.iterative_splitting_index
-        return cast(UprootArray[bool], self["parent_index"] in iterative_splittings)
 
     def iterative_splittings(self, subjets: SubjetArray) -> SubjetArray:
         """ Retriieve the iterative splittings.
