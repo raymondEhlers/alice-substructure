@@ -703,7 +703,9 @@ def analyze_single_tree_embedding(
             # TODO: Can we do better???
             jet_pt_mask = jet_pt_mask & (hybrid_jets.constituents.counts > 1) & (true_jets.constituents.counts > 1)
             # Require that we have jets that aren't dominated by hybrid jets.
-            jet_pt_mask = jet_pt_mask & (true_jets.constituents.max_pt > hybrid_jets.constituents.max_pt)
+            # It's super important to be ">=". That allows the leading jet in the hybrid to be the same
+            # as the leading jet in the true (which would be good - we've probably found the right jet).
+            jet_pt_mask = jet_pt_mask & (true_jets.constituents.max_pt >= hybrid_jets.constituents.max_pt)
             # TODO: Do we need any additional cuts??
 
             # Then restrict our jets.
@@ -840,7 +842,9 @@ def matching(
             # No actual jet pt range restrictions.
             mask = (hybrid_jets.constituents.counts > 1) & (matched_jets.constituents.counts > 1)
             # Require that we have jets that aren't dominated by hybrid jets.
-            mask = mask & (matched_jets.constituents.max_pt > hybrid_jets.constituents.max_pt)
+            # It's super important to be ">=". That allows the leading jet in the hybrid to be the same
+            # as the leading jet in the true (which would be good - we've probably found the right jet).
+            mask = mask & (matched_jets.constituents.max_pt >= hybrid_jets.constituents.max_pt)
 
             restricted_hybrid_jets, restricted_hybrid_jets_splittings = _select_and_retrieve_splittings(
                 hybrid_jets, mask, identifier.iterative_splittings
