@@ -92,6 +92,146 @@ datasets:
                 - "data.fSubjets.fPartOfIterativeSplitting"
                 - "data.fSubjets.fSplittingNodeIndex"
                 - "data.fSubjets.fConstituentIndices"
+    toy:
+        dataset:
+            name: "toy"
+            branches:
+                - "data.fJetPt"
+                - "data.fJetConstituents.fPt"
+                - "data.fJetConstituents.fEta"
+                - "data.fJetConstituents.fPhi"
+                - "data.fJetConstituents.fGlobalIndex"
+                - "data.fJetSplittings.fKt"
+                - "data.fJetSplittings.fDeltaR"
+                - "data.fJetSplittings.fZ"
+                - "data.fJetSplittings.fParentIndex"
+                - "data.fSubjets.fPartOfIterativeSplitting"
+                - "data.fSubjets.fSplittingNodeIndex"
+                - "data.fSubjets.fConstituentIndices"
+                - "matched.fJetPt"
+                - "matched.fJetConstituents.fPt"
+                - "matched.fJetConstituents.fEta"
+                - "matched.fJetConstituents.fPhi"
+                - "matched.fJetConstituents.fGlobalIndex"
+                - "matched.fJetSplittings.fKt"
+                - "matched.fJetSplittings.fDeltaR"
+                - "matched.fJetSplittings.fZ"
+                - "matched.fJetSplittings.fParentIndex"
+                - "matched.fSubjets.fPartOfIterativeSplitting"
+                - "matched.fSubjets.fSplittingNodeIndex"
+                - "matched.fSubjets.fConstituentIndices"
+    toy_true_pythia_splittings_iterative_allTrueSplittings_delta_R_040:
+        dataset:
+            name: "toy_true_pythia_splittings_iterative_allTrueSplittings_delta_R_040"
+            branches:
+                - "pythia.fJetPt"
+                - "pythia.fJetConstituents.fPt"
+                - "pythia.fJetConstituents.fEta"
+                - "pythia.fJetConstituents.fPhi"
+                - "pythia.fJetConstituents.fGlobalIndex"
+                - "pythia.fJetSplittings.fKt"
+                - "pythia.fJetSplittings.fDeltaR"
+                - "pythia.fJetSplittings.fZ"
+                - "pythia.fJetSplittings.fParentIndex"
+                - "pythia.fSubjets.fPartOfIterativeSplitting"
+                - "pythia.fSubjets.fSplittingNodeIndex"
+                - "pythia.fSubjets.fConstituentIndices"
+                - "true.fJetPt"
+                - "true.fJetConstituents.fPt"
+                - "true.fJetConstituents.fEta"
+                - "true.fJetConstituents.fPhi"
+                - "true.fJetConstituents.fGlobalIndex"
+                - "true.fJetSplittings.fKt"
+                - "true.fJetSplittings.fDeltaR"
+                - "true.fJetSplittings.fZ"
+                - "true.fJetSplittings.fParentIndex"
+                - "true.fSubjets.fPartOfIterativeSplitting"
+                - "true.fSubjets.fSplittingNodeIndex"
+                - "true.fSubjets.fConstituentIndices"
+    toy_true_hybrid_splittings_iterative_allTrueSplittings_delta_R_040:
+        dataset:
+            name: "toy_true_hybrid_splittings_iterative_allTrueSplittings_delta_R_040"
+            branches:
+                - "data.fJetPt"
+                - "data.fJetConstituents.fPt"
+                - "data.fJetConstituents.fEta"
+                - "data.fJetConstituents.fPhi"
+                - "data.fJetConstituents.fGlobalIndex"
+                - "data.fJetSplittings.fKt"
+                - "data.fJetSplittings.fDeltaR"
+                - "data.fJetSplittings.fZ"
+                - "data.fJetSplittings.fParentIndex"
+                - "data.fSubjets.fPartOfIterativeSplitting"
+                - "data.fSubjets.fSplittingNodeIndex"
+                - "data.fSubjets.fConstituentIndices"
+                - "true.fJetPt"
+                - "true.fJetConstituents.fPt"
+                - "true.fJetConstituents.fEta"
+                - "true.fJetConstituents.fPhi"
+                - "true.fJetConstituents.fGlobalIndex"
+                - "true.fJetSplittings.fKt"
+                - "true.fJetSplittings.fDeltaR"
+                - "true.fJetSplittings.fZ"
+                - "true.fJetSplittings.fParentIndex"
+                - "true.fSubjets.fPartOfIterativeSplitting"
+                - "true.fSubjets.fSplittingNodeIndex"
+                - "true.fSubjets.fConstituentIndices"
+    toy_true_hybrid_splittings:
+        dataset:
+            name: "toy_true_hybrid_splittings"
+            branches:
+                - "data.fJetPt"
+                - "data.fJetConstituents.fPt"
+                - "data.fJetConstituents.fEta"
+                - "data.fJetConstituents.fPhi"
+                - "data.fJetConstituents.fGlobalIndex"
+                - "data.fJetSplittings.fKt"
+                - "data.fJetSplittings.fDeltaR"
+                - "data.fJetSplittings.fZ"
+                - "data.fJetSplittings.fParentIndex"
+                - "data.fSubjets.fPartOfIterativeSplitting"
+                - "data.fSubjets.fSplittingNodeIndex"
+                - "data.fSubjets.fConstituentIndices"
+                - "true.fJetPt"
+                - "true.fJetConstituents.fPt"
+                - "true.fJetConstituents.fEta"
+                - "true.fJetConstituents.fPhi"
+                - "true.fJetConstituents.fGlobalIndex"
+                - "true.fJetSplittings.fKt"
+                - "true.fJetSplittings.fDeltaR"
+                - "true.fJetSplittings.fZ"
+                - "true.fJetSplittings.fParentIndex"
+                - "true.fSubjets.fPartOfIterativeSplitting"
+                - "true.fSubjets.fSplittingNodeIndex"
+                - "true.fSubjets.fConstituentIndices"
+    runMacro:
+        dataset:
+            name: "runMacro"
+            branches:
+                - "data.fJetPt"
+                - "data.fJetConstituents.fPt"
+                - "data.fJetConstituents.fEta"
+                - "data.fJetConstituents.fPhi"
+                - "data.fJetConstituents.fGlobalIndex"
+                - "data.fJetSplittings.fKt"
+                - "data.fJetSplittings.fDeltaR"
+                - "data.fJetSplittings.fZ"
+                - "data.fJetSplittings.fParentIndex"
+                - "data.fSubjets.fPartOfIterativeSplitting"
+                - "data.fSubjets.fSplittingNodeIndex"
+                - "data.fSubjets.fConstituentIndices"
+                - "matched.fJetPt"
+                - "matched.fJetConstituents.fPt"
+                - "matched.fJetConstituents.fEta"
+                - "matched.fJetConstituents.fPhi"
+                - "matched.fJetConstituents.fGlobalIndex"
+                - "matched.fJetSplittings.fKt"
+                - "matched.fJetSplittings.fDeltaR"
+                - "matched.fJetSplittings.fZ"
+                - "matched.fJetSplittings.fParentIndex"
+                - "matched.fSubjets.fPartOfIterativeSplitting"
+                - "matched.fSubjets.fSplittingNodeIndex"
+                - "matched.fSubjets.fConstituentIndices"
 
 available_datasets:
     LHC18qr:
@@ -99,11 +239,9 @@ available_datasets:
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
         jet_R: 0.4
         files:
-            - "trains/PbPb/5537/AnalysisResults.18q.1.root"
-            - "trains/PbPb/5537/AnalysisResults.18q.2.root"
-            - "trains/PbPb/5537/AnalysisResults.18q.3.root"
-            - "trains/PbPb/5537/AnalysisResults.18r.1.root"
-            - "trains/PbPb/5537/AnalysisResults.18r.2.root"
+            #- "trains/PbPb/5537/AnalysisResults.18q.05.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.*.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.*.root"
     LHC19f4_embedded_into_LHC18qr:
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -151,26 +289,122 @@ available_datasets:
             5535: 19
             5536: 20
         files:
-            - "trains/embedPythia/5517/AnalysisResults.root"
-            - "trains/embedPythia/5518/AnalysisResults.root"
-            - "trains/embedPythia/5519/AnalysisResults.root"
-            - "trains/embedPythia/5520/AnalysisResults.root"
-            - "trains/embedPythia/5521/AnalysisResults.root"
-            - "trains/embedPythia/5522/AnalysisResults.root"
-            - "trains/embedPythia/5523/AnalysisResults.root"
-            - "trains/embedPythia/5524/AnalysisResults.root"
-            - "trains/embedPythia/5525/AnalysisResults.root"
-            - "trains/embedPythia/5526/AnalysisResults.root"
-            - "trains/embedPythia/5527/AnalysisResults.root"
-            - "trains/embedPythia/5528/AnalysisResults.root"
-            - "trains/embedPythia/5529/AnalysisResults.root"
-            - "trains/embedPythia/5530/AnalysisResults.root"
-            - "trains/embedPythia/5531/AnalysisResults.root"
-            - "trains/embedPythia/5532/AnalysisResults.root"
-            - "trains/embedPythia/5533/AnalysisResults.root"
-            - "trains/embedPythia/5534/AnalysisResults.root"
-            - "trains/embedPythia/5535/AnalysisResults.root"
-            - "trains/embedPythia/5536/AnalysisResults.root"
+            # Cached files on SSD
+            ## Group 1
+            - "temp_cache/embedPythia/5517/AnalysisResults.18q.repaired.root"
+            - "temp_cache/embedPythia/5517/AnalysisResults.18r.repaired.root"
+            - "temp_cache/embedPythia/5518/AnalysisResults.18q.repaired.root"
+            - "temp_cache/embedPythia/5518/AnalysisResults.18r.repaired.root"
+            - "temp_cache/embedPythia/5519/AnalysisResults.18q.repaired.root"
+            - "temp_cache/embedPythia/5519/AnalysisResults.18r.repaired.root"
+            - "temp_cache/embedPythia/5520/AnalysisResults.18q.repaired.root"
+            - "temp_cache/embedPythia/5520/AnalysisResults.18r.repaired.root"
+            - "temp_cache/embedPythia/5521/AnalysisResults.18q.repaired.root"
+            - "temp_cache/embedPythia/5521/AnalysisResults.18r.repaired.root"
+            - "temp_cache/embedPythia/5522/AnalysisResults.18q.repaired.root"
+            - "temp_cache/embedPythia/5522/AnalysisResults.18r.repaired.root"
+            ## Group 2
+            #- "temp_cache/embedPythia/5522/AnalysisResults.18q.root"
+            #- "temp_cache/embedPythia/5523/AnalysisResults.18q.1.root"
+            #- "temp_cache/embedPythia/5523/AnalysisResults.18q.2.root"
+            #- "temp_cache/embedPythia/5523/AnalysisResults.18q.3.root"
+            #- "temp_cache/embedPythia/5523/AnalysisResults.18q.4.root"
+            #- "temp_cache/embedPythia/5523/AnalysisResults.18r.1.root"
+            #- "temp_cache/embedPythia/5523/AnalysisResults.18r.2.root"
+            #- "temp_cache/embedPythia/5523/AnalysisResults.18r.3.root"
+            #- "temp_cache/embedPythia/5523/AnalysisResults.18r.4.root"
+            #- "temp_cache/embedPythia/5524/AnalysisResults.18q.1.root"
+            #- "temp_cache/embedPythia/5524/AnalysisResults.18q.2.root"
+            #- "temp_cache/embedPythia/5524/AnalysisResults.18q.3.root"
+            #- "temp_cache/embedPythia/5524/AnalysisResults.18q.4.root"
+            #- "temp_cache/embedPythia/5524/AnalysisResults.18r.1.root"
+            #- "temp_cache/embedPythia/5524/AnalysisResults.18r.2.root"
+            #- "temp_cache/embedPythia/5524/AnalysisResults.18r.3.root"
+            #- "temp_cache/embedPythia/5524/AnalysisResults.18r.4.root"
+            ## Group 3
+            #- "temp_cache/embedPythia/5525/AnalysisResults.18q.4.root"
+            #- "temp_cache/embedPythia/5526/AnalysisResults.18q.2.root"
+            #- "temp_cache/embedPythia/5527/AnalysisResults.18q.1.root"
+            #- "temp_cache/embedPythia/5528/AnalysisResults.18q.1.root"
+            #- "temp_cache/embedPythia/5529/AnalysisResults.18q.2.root"
+            ## Split into chunks to help with memory consumption...
+            #- "temp_cache/embedPythia/5530/AnalysisResults.18r.2.Chunk1.root"
+            #- "temp_cache/embedPythia/5530/AnalysisResults.18r.2.Chunk2.root"
+            #- "temp_cache/embedPythia/5530/AnalysisResults.18r.2.Chunk3.root"
+            #- "temp_cache/embedPythia/5530/AnalysisResults.18r.2.Chunk4.root"
+            ## Group 4
+            #- "temp_cache/embedPythia/5531/AnalysisResults.18q.8.root"
+            #- "temp_cache/embedPythia/5532/AnalysisResults.18q.1.root"
+            #- "temp_cache/embedPythia/5533/AnalysisResults.18q.3.root"
+            #- "temp_cache/embedPythia/5534/AnalysisResults.18q.4.root"
+            #- "temp_cache/embedPythia/5535/AnalysisResults.18q.1.root"
+            #- "temp_cache/embedPythia/5536/AnalysisResults.18q.7.root"
+            #
+            #
+            ## Attempt to recover corrupted files by splitting them
+            #- "trains/embedPythia/5523/AnalysisResults.18r.chunk2.root"
+            #- "trains/embedPythia/5536/AnalysisResults.18r.10.Chunk1.root"
+            #- "trains/embedPythia/5536/AnalysisResults.18r.10.Chunk2.root"
+            #- "trains/embedPythia/5536/AnalysisResults.18r.10.Chunk3.root"
+            #- "trains/embedPythia/5536/AnalysisResults.18r.10.Chunk4.root"
+            #- "trains/embedPythia/5536/AnalysisResults.18r.10.Chunk5.root"
+            #
+            #
+            ## Corrupted
+            #- "temp_cache/embedPythia/5527/AnalysisResults.18r.1.root"
+            ## Corrupted
+            #- "temp_cache/embedPythia/5527/AnalysisResults.18r.2.root"
+            ## Corrupted
+            #- "temp_cache/embedPythia/5527/AnalysisResults.18r.3.root"
+            ## Corrupted
+            #- "temp_cache/embedPythia/5527/AnalysisResults.18r.4.root"
+            ## Corrupted
+            #- "temp_cache/embedPythia/5527/AnalysisResults.18r.5.root"
+            #
+            #
+            ## There are more files, but reducing for faster processing.
+            #- "trains/embedPythia/5522/AnalysisResults.18q.root"
+            ## Transfered from Three Sisters, so the tree is faked.
+            #- "trains/embedPythia/5523/AnalysisResults.18q.root"
+            ## Transfered from Three Sisters, so the tree is faked
+            #- "trains/embedPythia/5524/AnalysisResults.18q.root"
+            #- "trains/embedPythia/5525/AnalysisResults.18q.4.root"
+            #- "trains/embedPythia/5526/AnalysisResults.18q.2.root"
+            #- "trains/embedPythia/5527/AnalysisResults.18q.root"
+            #- "trains/embedPythia/5528/AnalysisResults.18q.1.root"
+            #- "trains/embedPythia/5529/AnalysisResults.18q.2.root"
+            #- "trains/embedPythia/5530/AnalysisResults.18q.3.root"
+            #- "trains/embedPythia/5531/AnalysisResults.18r.7.root"
+            #- "trains/embedPythia/5532/AnalysisResults.18q.1.root"
+            #- "temp_cache/embedPythia/5533/AnalysisResults.18q.3.root"
+            #- "temp_cache/embedPythia/5534/AnalysisResults.18q.4.root"
+            #- "temp_cache/embedPythia/5535/AnalysisResults.18q.1.root"
+            #- "temp_cache/embedPythia/5536/AnalysisResults.18q.7.root"
+            #
+            # Corrupted
+            #- "trains/embedPythia/5527/AnalysisResults.18r.4.root"
+            #- "trains/embedPythia/5527/AnalysisResults.18r.5.root"
+            # Corrupted
+            #- "trains/embedPythia/5530/AnalysisResults.18q.2.root"
+            # Corrupted
+            #- "trains/embedPythia/5536/AnalysisResults.18q.6.root"
+            #- "temp_cache/embedPythia/5533/AnalysisResults.*.root"
+            #- "temp_cache/embedPythia/5534/AnalysisResults.*.root"
+            #- "temp_cache/embedPythia/5528/AnalysisResults.18q.1.root"
+            #- "temp_cache/embedPythia/5523/AnalysisResults.*.root"
+            #- "temp_cache/embedPythia/5524/AnalysisResults.*.root"
+            #- "trains/embedPythia/5525/AnalysisResults.*.root"
+            #- "trains/embedPythia/5526/AnalysisResults.*.root"
+            #- "trains/embedPythia/5527/AnalysisResults.*.root"
+            #- "trains/embedPythia/5528/AnalysisResults.*.root"
+            #- "trains/embedPythia/5529/AnalysisResults.*.root"
+            #- "trains/embedPythia/5530/AnalysisResults.*.root"
+            #- "trains/embedPythia/5531/AnalysisResults.*.root"
+            #- "trains/embedPythia/5532/AnalysisResults.*.root"
+            #- "trains/embedPythia/5533/AnalysisResults.*.root"
+            #- "trains/embedPythia/5534/AnalysisResults.*.root"
+            #- "trains/embedPythia/5535/AnalysisResults.*.root"
+            #- "trains/embedPythia/5536/AnalysisResults.*.root"
     LHC17pq:
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_RawTree_Data_NoSub_Incl"
         jet_R: 0.4
@@ -184,5 +418,54 @@ available_datasets:
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
         jet_R: 0.4
         files:
-            - "trains/pythia/2110/AnalysisResults.FAST.1.root"
-            - "trains/pythia/2110/AnalysisResults.FAST.2.root"
+            - "trains/pythia/2110/AnalysisResults.FAST.01.root"
+            - "trains/pythia/2110/AnalysisResults.FAST.02.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.01.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.02.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.03.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.04.root"
+            #- "trains/pythia/2110/AnalysisResults.*.root"
+    toy:
+        tree_name: "pythiaHybridTree"
+        jet_R: 0.4
+        files: &toyFiles
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_001_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_002_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_003_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_004_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_005_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_006_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_007_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_008_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_009_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_010_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_011_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_012_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_013_charged_underlyingEvent_ptHatMin_50.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_04_tune_5_seed_014_charged_underlyingEvent_ptHatMin_50.root"
+    toy_true_pythia_splittings:
+        tree_name: "truePythiaSplittingsTree"
+        jet_R: 0.4
+        files: *toyFiles
+    toy_true_hybrid_splittings:
+        tree_name: "trueHybridSplittingsTree"
+        jet_R: 0.4
+        files: *toyFiles
+    toy_true_pythia_splittings_iterative_allTrueSplittings_delta_R_040:
+        tree_name: "truePythiaSplittingsTree"
+        jet_R: 0.8
+        files: &toyFilesDeltaR040
+            - "toyInput/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_001_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_70.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_002_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_70.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_003_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_70.root"
+            - "toyInput/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_004_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_70.root"
+    toy_true_hybrid_splittings_iterative_allTrueSplittings_delta_R_040:
+        tree_name: "trueHybridSplittingsTree"
+        jet_R: 0.8
+        files: *toyFilesDeltaR040
+    runMacro:
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeTree_PythiaDef_NoSub_Incl"
+        jet_R: 0.4
+        files:
+            - "dynamicalGrooming/AnalysisResults.root"
+
