@@ -127,6 +127,20 @@ ArrayOrScalar = Union[UprootArray[T], T]
 UprootArrays = Mapping[str, UprootArray[Any]]
 
 
+def setup_logging() -> None:
+    # Delayed import since we may not want this as a hard dependency in such a base module.
+    import coloredlogs
+
+    # Basic setup
+    coloredlogs.install(level=logging.DEBUG, fmt="%(asctime)s %(name)s:%(lineno)d %(levelname)s %(message)s")
+    # Quiet down the matplotlib logging
+    logging.getLogger("matplotlib").setLevel(logging.INFO)
+    # For sanity when using IPython
+    logging.getLogger("parso").setLevel(logging.INFO)
+    # Quiet down BinndData copy warnings
+    logging.getLogger("pachyderm.binned_data").setLevel(logging.INFO)
+
+
 def pretty_print_tree(d: Mapping[int, Any], indent: int = 0) -> None:
     """ Convenience function for pretty printing the splitting tree.
 
@@ -227,7 +241,7 @@ def expand_wildcards_in_filenames(paths: Sequence[Path]) -> List[Path]:
 def split_tree(
     filenames: Sequence[Union[str, Path]],
     tree_name: str = "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
-    number_of_chunks: int = 4,
+    number_of_chunks: int = -1,
 ) -> Dict[Path, List[Path]]:
     """ Split tree into a given number of chunks.
 
@@ -243,61 +257,88 @@ def split_tree(
     Args:
         filenames: Name(s) of the file to split.
         tree_name: Name of the tree to split. Default: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
-        number_of_chunks: Number of chunks to split the file into. Default: 5.
+        number_of_chunks: Number of chunks to split the file into. Pass -1 to auto calculate the number of
+            chunks (ie keeping each file before 1.25 GB). Default: -1.
 
     Returns:
         Filenames of the chunked files.
     """
     # Validation
     validated_filenames = expand_wildcards_in_filenames([Path(f) for f in filenames])
+    # Skip files which were already repaired.
+    validated_filenames = [f for f in validated_filenames if "repaired" not in str(f) and "chunk" not in str(f)]
+    # Automatically calculate the number of chunks, with the intention of keeping all
+    # files below (approximately) 1.25 GB.
+    auto_calculate_number_of_chunks = False
+    if number_of_chunks < 0:
+        logger.info("Automatically calculating chunk size")
+        auto_calculate_number_of_chunks = True
 
     # Setup
+    # Delayed import since we may not want this as a hard dependency in such a base module.
+    import enlighten
+
     # Delayed import because we want to depend on ROOT as little as possible.
     import ROOT
 
+    # Just in case we enable multithreading later.
     ROOT.ROOT.EnableImplicitMT()
-    # TODO: MT?
+    # Finish setup
     output_filenames: Dict[Path, List[Path]] = {}
+    progress_manager = enlighten.get_manager()
 
-    for filename in validated_filenames:
-        # Setup input tree
-        input_file = ROOT.TFile(str(filename), "READ")
-        print(f"Keys in input_file: {list(input_file.GetListOfKeys())}")
-        input_tree = input_file.Get(tree_name)
+    with progress_manager.counter(total=len(validated_filenames), desc="Processing", unit="file") as file_counter:
+        for filename in file_counter(validated_filenames):
+            # Determine number of chunks if requested.
+            if auto_calculate_number_of_chunks:
+                size = Path(filename).stat().st_size
+                # Close enough to 1.25 GB
+                number_of_chunks = int(np.ceil(size / 1.25e9))
 
-        number_of_entires = input_tree.GetEntries()
-        print(f"File: {filename}: Total of {number_of_entires} in the tree. Splitting into {number_of_chunks} chunks.")
+            # Setup input tree
+            input_file = ROOT.TFile(str(filename), "READ")
+            logger.debug(f"Keys in input_file: {list(input_file.GetListOfKeys())}")
+            input_tree = input_file.Get(tree_name)
 
-        output_filenames[filename] = []
-        for n in range(number_of_chunks):
-            start = int((number_of_entires / number_of_chunks) * n)
-            end = int((number_of_entires / number_of_chunks) * (n + 1))
+            number_of_entires = input_tree.GetEntries()
+            logger.info(
+                f"File: {filename}: Total of {number_of_entires} in the tree. Splitting into {number_of_chunks} chunk(s)."
+            )
 
-            # If we have only 1 chunk, then we're just trying to repair the file.
-            if number_of_chunks == 1:
-                new_filename = filename.with_name(f"{filename.stem}.repaired.root")
-            else:
-                new_filename = filename.with_name(f"{filename.stem}.Chunk{n+1}.root")
-            output_filenames[filename].append(new_filename)
-            new_file = ROOT.TFile(str(new_filename), "RECREATE")
-            new_tree = input_tree.CloneTree(0)
-            ROOT.gROOT.cd()
+            output_filenames[filename] = []
+            for n in range(number_of_chunks):
+                start = int((number_of_entires / number_of_chunks) * n)
+                end = int((number_of_entires / number_of_chunks) * (n + 1))
 
-            print(f"Fill tree {new_filename} with entries {start}-{end}")
-            for i in range(start, end):
-                if i % 10000 == 0:
-                    print(f"Done: {(i-start)/(end-start) * 100:.03g}%")
-                ret_val = input_tree.GetEntry(i)
-                if ret_val < 0:
-                    # Skip this entry - something is wrong with it! (Probably a compression error).
-                    # This shouldn't happen _too_ often, so we may as well print out when it does.
-                    print(f"Skipping entry {i}, as it appears to be bad. GetEntry return value < 0: {ret_val}")
-                    continue
-                new_tree.Fill()
+                # If we have only 1 chunk, then we're just trying to repair the file.
+                if number_of_chunks == 1:
+                    new_filename = filename.with_name(f"{filename.stem}.repaired.root")
+                else:
+                    new_filename = filename.with_name(f"{filename.stem}.chunk{n+1}.root")
+                output_filenames[filename].append(new_filename)
+                new_file = ROOT.TFile(str(new_filename), "RECREATE")
+                new_tree = input_tree.CloneTree(0)
+                ROOT.gROOT.cd()
 
-            new_tree.AutoSave()
-            new_file.Close()
+                logger.info(f"Fill tree {new_filename} with entries {start}-{end}")
+                with progress_manager.counter(
+                    total=end - start, desc="Converting", unit="event", leave=False
+                ) as event_counter:
+                    for i in event_counter(range(start, end)):
+                        ret_val = input_tree.GetEntry(i)
+                        if ret_val < 0:
+                            # Skip this entry - something is wrong with it! (Probably a compression error).
+                            # This shouldn't happen _too_ often, so we may as well log when it does.
+                            logger.debug(
+                                f"Skipping entry {i}, as it appears to be bad. GetEntry return value < 0: {ret_val}"
+                            )
+                            continue
+                        new_tree.Fill()
 
+                new_tree.AutoSave()
+                new_file.Close()
+
+    progress_manager.stop()
     return output_filenames
 
 
@@ -310,6 +351,7 @@ def split_tree_entry_point() -> None:
     Returns:
         None.
     """
+    setup_logging()
     parser = argparse.ArgumentParser(description=f"Split tree into chunks.")
 
     parser.add_argument("-f", "--filenames", required=True, nargs="+", default=[])
@@ -319,7 +361,11 @@ def split_tree_entry_point() -> None:
         default="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
         type=str,
     )
-    parser.add_argument("-n", "--nChunks", default=5, type=int)
+    parser.add_argument("-n", "--nChunks", default=-1, type=int)
     args = parser.parse_args()
 
-    split_tree(filenames=args.filenames, tree_name=args.treeName, number_of_chunks=args.nChunks)
+    output_filenames = split_tree(filenames=args.filenames, tree_name=args.treeName, number_of_chunks=args.nChunks)
+
+    import pprint
+
+    logger.info(f"File output: {pprint.pformat(output_filenames)}")

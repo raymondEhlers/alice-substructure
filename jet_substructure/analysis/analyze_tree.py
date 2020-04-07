@@ -16,7 +16,6 @@ from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Uni
 
 import attr
 import awkward as ak
-import coloredlogs
 import enlighten
 import IPython
 import numpy as np
@@ -1150,17 +1149,6 @@ def run_embedding(  # noqa: C901 . Ignore for now until cleanup later.
 #    ...
 
 
-def setup_entry_point() -> None:
-    # Basic setup
-    coloredlogs.install(level=logging.DEBUG, fmt="%(asctime)s %(name)s:%(lineno)d %(levelname)s %(message)s")
-    # Quiet down the matplotlib logging
-    logging.getLogger("matplotlib").setLevel(logging.INFO)
-    # For sanity when using IPython
-    logging.getLogger("parso").setLevel(logging.INFO)
-    # Quiet down BinndData copy warnings
-    logging.getLogger("pachyderm.binned_data").setLevel(logging.INFO)
-
-
 def parse_arguments(name: str) -> List[Path]:
     parser = argparse.ArgumentParser(description=f"Run {name}")
 
@@ -1172,7 +1160,7 @@ def parse_arguments(name: str) -> List[Path]:
 
 
 def embed_pythia_entry_point() -> None:
-    setup_entry_point()
+    helpers.setup_logging()
     filenames = parse_arguments(name="embed pythia")
 
     collision_system = "embedPythia"
@@ -1199,7 +1187,7 @@ def embed_pythia_entry_point() -> None:
 
 
 if __name__ == "__main__":
-    setup_entry_point()
+    helpers.setup_logging()
 
     # Setup and run
     collision_system = "embedPythia"
