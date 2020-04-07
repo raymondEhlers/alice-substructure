@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import logging
 import pickle
 import zlib
@@ -238,11 +239,11 @@ def analyze_single_tree_toy(
     hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]] = {}
     # If the hists already exist, skip processing the tree and just return the hists instead (which is way faster!)
     train_number = tree.filename.parent.name
-    pkl_filename = output / f"{train_number}_{tree.filename.with_suffix('.pkl').name}"
+    pkl_filename = output / f"{train_number}_{tree.filename.with_suffix('.pgz').name}"
     if pkl_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
-        with open(pkl_filename, "rb") as f:
-            hists = pickle.load(f)
+        with gzip.GzipFile(pkl_filename, "r") as pkl_file:
+            hists = pickle.load(pkl_file)  # type: ignore
             return hists
 
     # Since we're actually processing, we setup the output hists
@@ -372,8 +373,8 @@ def analyze_single_tree_toy(
     IPython.start_ipython(user_ns=locals())
 
     # Store hists with pickle because it takes too longer otherwise.
-    with open(pkl_filename, "wb") as pkl_file:
-        pickle.dump(hists, pkl_file)
+    with gzip.GzipFile(pkl_filename, "w") as pkl_file:
+        pickle.dump(hists, pkl_file)  # type: ignore
 
     return hists
 
@@ -571,11 +572,11 @@ def analyze_single_tree_embedding(
     ] = {}
     # If the output file already exist, skip processing the tree and just return the hists instead (which is way faster!)
     train_number = tree.filename.parent.name
-    pkl_filename = output / f"{train_number}_{tree.filename.with_suffix('.pkl').name}"
+    pkl_filename = output / f"{train_number}_{tree.filename.with_suffix('.pgz').name}"
     if pkl_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
-        with open(pkl_filename, "rb") as f:
-            hists, matching_hists = pickle.load(f)
+        with gzip.GzipFile(pkl_filename, "r") as pkl_file:
+            hists, matching_hists = pickle.load(pkl_file)  # type: ignore
             return hists, matching_hists
     # Determine scale factor
     # NOTE: This relies on the train_number being up a directory!
@@ -725,8 +726,8 @@ def analyze_single_tree_embedding(
     # for h in hists.values():
     #    h.convert_boost_histograms_to_binned_data()
     # Store hists with pickle because it takes too longer otherwise.
-    with open(pkl_filename, "wb") as pkl_file:
-        pickle.dump((hists, matching_hists), pkl_file)
+    with gzip.GzipFile(pkl_filename, "w") as pkl_file:
+        pickle.dump((hists, matching_hists), pkl_file)  # type: ignore
 
     # Look at matched jets
     matching_hists = matching(
@@ -742,8 +743,8 @@ def analyze_single_tree_embedding(
     # Store hists with pickle because it takes too longer otherwise.
     # Write again here (despite the waste of writing twice) so we can keep the response hists even
     # if the matching fails
-    with open(pkl_filename, "wb") as pkl_file:
-        pickle.dump((hists, matching_hists), pkl_file)
+    with gzip.GzipFile(pkl_filename, "w") as pkl_file:
+        pickle.dump((hists, matching_hists), pkl_file)  # type: ignore
 
     return hists, matching_hists
 
@@ -1037,7 +1038,7 @@ def run_embedding(  # noqa: C901 . Ignore for now until cleanup later.
     # Finalize setup
     output = output / collision_system / dataset_name
     output.mkdir(parents=True, exist_ok=True)
-    embedding_hists_filename = output / "embedding_hists.pkl"
+    embedding_hists_filename = output / "embedding_hists.pgz"
 
     # Output variables
     full_hists: Dict[
@@ -1053,8 +1054,8 @@ def run_embedding(  # noqa: C901 . Ignore for now until cleanup later.
         if embedding_hists_filename.exists():
             # Read the stored hists.
             # We don't use YAML because it would be super slow!
-            with open(embedding_hists_filename, "rb") as f_pkl:
-                full_hists, full_matching_hists = pickle.load(f_pkl)
+            with gzip.GzipFile(embedding_hists_filename, "r") as pkl_file:
+                full_hists, full_matching_hists = pickle.load(pkl_file)  # type: ignore
 
             return full_hists, full_matching_hists, output
 
@@ -1131,8 +1132,8 @@ def run_embedding(  # noqa: C901 . Ignore for now until cleanup later.
 
     # Write out the merged hists
     # Write with pkl because yaml is super slow for hists that are this large.
-    with open(embedding_hists_filename, "wb") as f_pkl:
-        pickle.dump((full_hists, full_matching_hists), f_pkl)
+    # with gzip.GzipFile(embedding_hists_filename, "w") as pkl_file:
+    #    pickle.dump((full_hists, full_matching_hists), pkl_file)  # type: ignore
 
     progress_manager.stop()
 
