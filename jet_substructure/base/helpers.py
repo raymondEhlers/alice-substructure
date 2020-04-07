@@ -209,15 +209,39 @@ class RangeSelector:
         return fr"{self.min} < p_{{\text{{T,jet}}}}^{{\text{{{label}}}}} < {self.max}"
 
 
+def expand_wildcards_in_filenames(paths: Sequence[Path]) -> List[Path]:
+    return_paths: List[Path] = []
+    for path in paths:
+        p = str(path)
+        if "*" in str(p):
+            # Glob all associated filenames.
+            return_paths.extend(list(Path(path.parent).glob(path.name)))
+        else:
+            return_paths.append(path)
+
+    # Sort in the expected order.
+    # return_paths = sorted(return_paths, key=lambda p: int("".join(filter(str.isdigit, str(p)))))
+    return return_paths
+
+
 def split_tree(
-    filename: Union[str, Path],
+    filenames: Sequence[Union[str, Path]],
     tree_name: str = "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
     number_of_chunks: int = 4,
-) -> List[Path]:
+) -> Dict[Path, List[Path]]:
     """ Split tree into a given number of chunks.
 
+    It will also skip storing bad entries in the new files.
+
+    Note:
+        To only repair the file, use only one chunk.
+
+    Note:
+        Even if we are chunking the file, this method will still try to avoid storing bad entries
+        in the new files.
+
     Args:
-        filename: Name of the file to split.
+        filenames: Name(s) of the file to split.
         tree_name: Name of the tree to split. Default: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
         number_of_chunks: Number of chunks to split the file into. Default: 5.
 
@@ -225,38 +249,54 @@ def split_tree(
         Filenames of the chunked files.
     """
     # Validation
-    filename = Path(filename)
+    validated_filenames = expand_wildcards_in_filenames([Path(f) for f in filenames])
 
-    # Setup input tree
+    # Setup
     # Delayed import because we want to depend on ROOT as little as possible.
     import ROOT
 
-    input_file = ROOT.TFile(str(filename), "READ")
-    input_tree = input_file.Get(tree_name)
+    ROOT.ROOT.EnableImplicitMT()
+    # TODO: MT?
+    output_filenames: Dict[Path, List[Path]] = {}
 
-    number_of_entires = input_tree.GetEntries()
-    print(f"Total of {number_of_entires} in the tree. Splitting into {number_of_chunks} chunks.")
+    for filename in validated_filenames:
+        # Setup input tree
+        input_file = ROOT.TFile(str(filename), "READ")
+        print(f"Keys in input_file: {list(input_file.GetListOfKeys())}")
+        input_tree = input_file.Get(tree_name)
 
-    output_filenames = []
-    for n in range(number_of_chunks):
-        start = int((number_of_entires / number_of_chunks) * n)
-        end = int((number_of_entires / number_of_chunks) * (n + 1))
+        number_of_entires = input_tree.GetEntries()
+        print(f"File: {filename}: Total of {number_of_entires} in the tree. Splitting into {number_of_chunks} chunks.")
 
-        new_filename = filename.with_name(f"{filename.stem}.Chunk{n+1}.root")
-        output_filenames.append(new_filename)
-        new_file = ROOT.TFile(str(new_filename), "RECREATE")
-        new_tree = input_tree.CloneTree(0)
-        ROOT.gROOT.cd()
+        output_filenames[filename] = []
+        for n in range(number_of_chunks):
+            start = int((number_of_entires / number_of_chunks) * n)
+            end = int((number_of_entires / number_of_chunks) * (n + 1))
 
-        print(f"Fill tree {new_filename} with entries {start}-{end}")
-        for i in range(start, end):
-            if i % 10000 == 0:
-                print(f"Done: {(i-start)/(end-start) * 100:.03g}%")
-            input_tree.GetEntry(i)
-            new_tree.Fill()
+            # If we have only 1 chunk, then we're just trying to repair the file.
+            if number_of_chunks == 1:
+                new_filename = filename.with_name(f"{filename.stem}.repaired.root")
+            else:
+                new_filename = filename.with_name(f"{filename.stem}.Chunk{n+1}.root")
+            output_filenames[filename].append(new_filename)
+            new_file = ROOT.TFile(str(new_filename), "RECREATE")
+            new_tree = input_tree.CloneTree(0)
+            ROOT.gROOT.cd()
 
-        new_tree.AutoSave()
-        new_file.Close()
+            print(f"Fill tree {new_filename} with entries {start}-{end}")
+            for i in range(start, end):
+                if i % 10000 == 0:
+                    print(f"Done: {(i-start)/(end-start) * 100:.03g}%")
+                ret_val = input_tree.GetEntry(i)
+                if ret_val < 0:
+                    # Skip this entry - something is wrong with it! (Probably a compression error).
+                    # This shouldn't happen _too_ often, so we may as well print out when it does.
+                    print(f"Skipping entry {i}, as it appears to be bad. GetEntry return value < 0: {ret_val}")
+                    continue
+                new_tree.Fill()
+
+            new_tree.AutoSave()
+            new_file.Close()
 
     return output_filenames
 
@@ -272,7 +312,7 @@ def split_tree_entry_point() -> None:
     """
     parser = argparse.ArgumentParser(description=f"Split tree into chunks.")
 
-    parser.add_argument("-f", "--filename", required=True, type=str)
+    parser.add_argument("-f", "--filenames", required=True, nargs="+", default=[])
     parser.add_argument(
         "-t",
         "--treeName",
@@ -282,4 +322,4 @@ def split_tree_entry_point() -> None:
     parser.add_argument("-n", "--nChunks", default=5, type=int)
     args = parser.parse_args()
 
-    split_tree(filename=args.filename, tree_name=args.treeName, number_of_chunks=args.nChunks)
+    split_tree(filenames=args.filenames, tree_name=args.treeName, number_of_chunks=args.nChunks)

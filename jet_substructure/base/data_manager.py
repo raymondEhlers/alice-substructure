@@ -28,33 +28,18 @@ import awkward as ak
 import h5py
 import uproot
 
-from jet_substructure.base.helpers import UprootArray, UprootArrays
+from jet_substructure.base.helpers import UprootArray, UprootArrays, expand_wildcards_in_filenames
 
 
 logger = logging.getLogger(__name__)
 
 
-def _convert_wildcards(paths: Sequence[Path]) -> List[Path]:
-    return_paths: List[Path] = []
-    for path in paths:
-        p = str(path)
-        if "*" in str(p):
-            # Glob all associated filenames.
-            return_paths.extend(list(Path(path.parent).glob(path.name)))
-        else:
-            return_paths.append(path)
-
-    # Sort in the expected order.
-    # return_paths = sorted(return_paths, key=lambda p: int("".join(filter(str.isdigit, str(p)))))
-    return return_paths
-
-
 def _ensure_and_expand_paths(paths: Sequence[Union[str, Path]]) -> List[Path]:
-    return _convert_wildcards([Path(p) for p in paths])
+    return expand_wildcards_in_filenames([Path(p) for p in paths])
 
 
 def _ensure_and_expand_hdf5_paths(paths: Sequence[Union[str, Path]]) -> List[Path]:
-    return _convert_wildcards([Path(p).with_suffix(".h5") for p in paths])
+    return expand_wildcards_in_filenames([Path(p).with_suffix(".h5") for p in paths])
 
 
 def _ensure_hdf5_path(path: Union[str, Path]) -> Path:
