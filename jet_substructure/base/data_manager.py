@@ -3,6 +3,7 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+import functools
 import logging
 import typing
 from collections import ChainMap
@@ -10,6 +11,7 @@ from functools import partial, reduce
 from pathlib import Path
 from typing import (
     Any,
+    Callable,
     FrozenSet,
     Iterable,
     Iterator,
@@ -27,6 +29,7 @@ import attr
 import awkward as ak
 import h5py
 import uproot
+from typing_extensions import Literal
 
 from jet_substructure.base.helpers import UprootArray, UprootArrays, expand_wildcards_in_filenames
 
@@ -382,6 +385,55 @@ class IterateTrees:
             # Consequently, we can clear the cache because we don't need those values anymore.
             uproot_cache.clear()
             uproot_key_cache.clear()
+
+    def _fully_lazy_iteration(self) -> Iterator[Callable[[], Tree]]:
+        """ Fully lazy iterator over trees.
+
+        Requires the calling function to call the return value to actually generate the tree. This way,
+        we can pass the wrapper function via multiprocessing, and then instantiate it there.
+        """
+
+        def _wrap(filename: Path) -> Tree:
+            """ Wrap creation of the Tree.
+
+            Note:
+                We don't yet add this as a Tree classmethod because we only want to support a subset
+                of arguments for now. If we need more generality, we can refactor later.
+
+            Note:
+                We don't make this a full closure (including specifying the filename) because the closure
+                would always have the same name. So we would keep redefining a function with the same name,
+                but a different filename in the closure. Multiprocessing selects the function by name, so
+                this will cause multiprocessing to use the most recent function everywhere, thus calling the
+                same file over and over again. We can avoid this by defining this wrapping function once,
+                and then defining it for each filename with partial.
+
+            Args:
+                filename: Filename to be used with this tree.
+            """
+            return Tree(
+                UprootTreeWrapper.from_filename(filename=filename, tree_name=self.tree_name),
+                HDF5TreeWrapper.from_filename(filename=filename, tree_name=self.tree_name, file_mode="a"),
+            )
+
+        for filename in self._filenames:
+            # We can't really maintain the current tree. It's just not meaningful here, so we leave it as None.
+            self._current_tree = None
+            yield functools.partial(_wrap, filename=filename)
+
+    @typing.overload
+    def lazy_iteration(self, fully_lazy: Literal[False]) -> Iterator[Tree]:
+        ...
+
+    @typing.overload
+    def lazy_iteration(self, fully_lazy: Literal[True]) -> Iterator[Callable[[], Tree]]:
+        ...
+
+    def lazy_iteration(self, fully_lazy: bool = False) -> Union[Iterator[Tree], Iterator[Callable[[], Tree]]]:
+        if fully_lazy:
+            yield from self._fully_lazy_iteration()
+        else:
+            yield from self
 
     def active_iteration(self) -> Iterator[Tree]:
         """ Iterate over actively loaded trees.
