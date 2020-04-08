@@ -290,7 +290,7 @@ available_datasets:
             5536: 20
         files:
             # Cached files on SSD
-            ## Group 1
+            # Group 1
             - "temp_cache/embedPythia/5517/AnalysisResults.18q.repaired.root"
             - "temp_cache/embedPythia/5517/AnalysisResults.18r.repaired.root"
             - "temp_cache/embedPythia/5518/AnalysisResults.18q.repaired.root"
@@ -303,42 +303,69 @@ available_datasets:
             - "temp_cache/embedPythia/5521/AnalysisResults.18r.repaired.root"
             - "temp_cache/embedPythia/5522/AnalysisResults.18q.repaired.root"
             - "temp_cache/embedPythia/5522/AnalysisResults.18r.repaired.root"
-            ## Group 2
-            #- "temp_cache/embedPythia/5522/AnalysisResults.18q.root"
-            #- "temp_cache/embedPythia/5523/AnalysisResults.18q.1.root"
-            #- "temp_cache/embedPythia/5523/AnalysisResults.18q.2.root"
-            #- "temp_cache/embedPythia/5523/AnalysisResults.18q.3.root"
-            #- "temp_cache/embedPythia/5523/AnalysisResults.18q.4.root"
-            #- "temp_cache/embedPythia/5523/AnalysisResults.18r.1.root"
-            #- "temp_cache/embedPythia/5523/AnalysisResults.18r.2.root"
-            #- "temp_cache/embedPythia/5523/AnalysisResults.18r.3.root"
-            #- "temp_cache/embedPythia/5523/AnalysisResults.18r.4.root"
-            #- "temp_cache/embedPythia/5524/AnalysisResults.18q.1.root"
-            #- "temp_cache/embedPythia/5524/AnalysisResults.18q.2.root"
-            #- "temp_cache/embedPythia/5524/AnalysisResults.18q.3.root"
-            #- "temp_cache/embedPythia/5524/AnalysisResults.18q.4.root"
-            #- "temp_cache/embedPythia/5524/AnalysisResults.18r.1.root"
-            #- "temp_cache/embedPythia/5524/AnalysisResults.18r.2.root"
-            #- "temp_cache/embedPythia/5524/AnalysisResults.18r.3.root"
-            #- "temp_cache/embedPythia/5524/AnalysisResults.18r.4.root"
-            ## Group 3
-            #- "temp_cache/embedPythia/5525/AnalysisResults.18q.4.root"
-            #- "temp_cache/embedPythia/5526/AnalysisResults.18q.2.root"
-            #- "temp_cache/embedPythia/5527/AnalysisResults.18q.1.root"
-            #- "temp_cache/embedPythia/5528/AnalysisResults.18q.1.root"
-            #- "temp_cache/embedPythia/5529/AnalysisResults.18q.2.root"
-            ## Split into chunks to help with memory consumption...
-            #- "temp_cache/embedPythia/5530/AnalysisResults.18r.2.Chunk1.root"
-            #- "temp_cache/embedPythia/5530/AnalysisResults.18r.2.Chunk2.root"
-            #- "temp_cache/embedPythia/5530/AnalysisResults.18r.2.Chunk3.root"
-            #- "temp_cache/embedPythia/5530/AnalysisResults.18r.2.Chunk4.root"
+            # Group 2
+            - "temp_cache/embedPythia/5523/AnalysisResults.18q.chunk1.root"
+            - "temp_cache/embedPythia/5523/AnalysisResults.18q.chunk2.root"
+            - "temp_cache/embedPythia/5523/AnalysisResults.18r.chunk1.root"
+            - "temp_cache/embedPythia/5523/AnalysisResults.18r.chunk2.root"
+            - "temp_cache/embedPythia/5524/AnalysisResults.18q.chunk1.root"
+            - "temp_cache/embedPythia/5524/AnalysisResults.18q.chunk2.root"
+            - "temp_cache/embedPythia/5524/AnalysisResults.18q.chunk3.root"
+            - "temp_cache/embedPythia/5524/AnalysisResults.18r.chunk1.root"
+            - "temp_cache/embedPythia/5524/AnalysisResults.18r.chunk2.root"
+            - "temp_cache/embedPythia/5524/AnalysisResults.18r.chunk3.root"
+            - "temp_cache/embedPythia/5524/AnalysisResults.18r.chunk4.root"
+            # Group 3
+            # From here, we don't take all the data because it dones't fit on the SSD.
+            # Can always take the rest of it if desired, just not on the SSD.
+            - "temp_cache/embedPythia/5525/AnalysisResults.18q.2.chunk1.root"
+            - "temp_cache/embedPythia/5525/AnalysisResults.18q.2.chunk2.root"
+            - "temp_cache/embedPythia/5525/AnalysisResults.18r.1.chunk1.root"
+            - "temp_cache/embedPythia/5525/AnalysisResults.18r.1.chunk2.root"
+            - "temp_cache/embedPythia/5526/AnalysisResults.18q.1.chunk1.root"
+            - "temp_cache/embedPythia/5526/AnalysisResults.18q.1.chunk2.root"
+            - "temp_cache/embedPythia/5526/AnalysisResults.18q.2.repaired.root"
+            - "temp_cache/embedPythia/5526/AnalysisResults.18r.2.chunk1.root"
+            - "temp_cache/embedPythia/5526/AnalysisResults.18r.2.chunk2.root"
+            # Ran out of SSD storage, so move back to HDD
+            - "trains/embedPythia/5527/AnalysisResults.18q.chunk1.root"
+            - "trains/embedPythia/5527/AnalysisResults.18q.chunk2.root"
+            - "trains/embedPythia/5527/AnalysisResults.18r.3.chunk1.root"
+            - "trains/embedPythia/5527/AnalysisResults.18r.3.chunk2.root"
+            - "trains/embedPythia/5528/AnalysisResults.18q.1.repaired.root"
+            - "trains/embedPythia/5528/AnalysisResults.18q.3.repaired.root"
+            - "trains/embedPythia/5528/AnalysisResults.18r.1.repaired.root"
+            - "trains/embedPythia/5529/AnalysisResults.18q.1.repaired.root"
+            - "trains/embedPythia/5529/AnalysisResults.18r.1.chunk1.root"
+            - "trains/embedPythia/5529/AnalysisResults.18r.1.chunk2.root"
+            - "trains/embedPythia/5530/AnalysisResults.18q.2.chunk1.root"
+            - "trains/embedPythia/5530/AnalysisResults.18q.2.chunk2.root"
+            - "trains/embedPythia/5530/AnalysisResults.18r.2.chunk1.root"
+            - "trains/embedPythia/5530/AnalysisResults.18r.2.chunk2.root"
             ## Group 4
-            #- "temp_cache/embedPythia/5531/AnalysisResults.18q.8.root"
-            #- "temp_cache/embedPythia/5532/AnalysisResults.18q.1.root"
-            #- "temp_cache/embedPythia/5533/AnalysisResults.18q.3.root"
-            #- "temp_cache/embedPythia/5534/AnalysisResults.18q.4.root"
-            #- "temp_cache/embedPythia/5535/AnalysisResults.18q.1.root"
-            #- "temp_cache/embedPythia/5536/AnalysisResults.18q.7.root"
+            - "trains/embedPythia/5531/AnalysisResults.18q.1.chunk1.root"
+            - "trains/embedPythia/5531/AnalysisResults.18q.1.chunk2.root"
+            - "trains/embedPythia/5531/AnalysisResults.18r.2.chunk1.root"
+            - "trains/embedPythia/5531/AnalysisResults.18r.2.chunk2.root"
+            - "trains/embedPythia/5532/AnalysisResults.18q.1.repaired.root"
+            - "trains/embedPythia/5532/AnalysisResults.18r.3.chunk1.root"
+            - "trains/embedPythia/5532/AnalysisResults.18r.3.chunk2.root"
+            - "trains/embedPythia/5533/AnalysisResults.18q.3.chunk1.root"
+            - "trains/embedPythia/5533/AnalysisResults.18q.3.chunk2.root"
+            - "trains/embedPythia/5533/AnalysisResults.18r.2.chunk1.root"
+            - "trains/embedPythia/5533/AnalysisResults.18r.2.chunk2.root"
+            - "trains/embedPythia/5534/AnalysisResults.18q.1.chunk1.root"
+            - "trains/embedPythia/5534/AnalysisResults.18q.1.chunk2.root"
+            - "trains/embedPythia/5534/AnalysisResults.18r.1.chunk1.root"
+            - "trains/embedPythia/5534/AnalysisResults.18r.1.chunk2.root"
+            - "trains/embedPythia/5535/AnalysisResults.18q.1.chunk1.root"
+            - "trains/embedPythia/5535/AnalysisResults.18q.1.chunk2.root"
+            - "trains/embedPythia/5535/AnalysisResults.18r.2.chunk1.root"
+            - "trains/embedPythia/5535/AnalysisResults.18r.2.chunk2.root"
+            - "trains/embedPythia/5536/AnalysisResults.18q.1.chunk1.root"
+            - "trains/embedPythia/5536/AnalysisResults.18q.1.chunk2.root"
+            - "trains/embedPythia/5536/AnalysisResults.18r.1.chunk1.root"
+            - "trains/embedPythia/5536/AnalysisResults.18r.1.chunk1.root"
             #
             #
             ## Attempt to recover corrupted files by splitting them
@@ -468,4 +495,3 @@ available_datasets:
         jet_R: 0.4
         files:
             - "dynamicalGrooming/AnalysisResults.root"
-
