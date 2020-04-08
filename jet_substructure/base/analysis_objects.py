@@ -100,10 +100,8 @@ class Dataset:
     tree_name: str = attr.ib()
     branches: Sequence[str] = attr.ib()
     settings: AnalysisSettings = attr.ib()
-    _hists_filename_stem: str = attr.ib()
+    _hists_filename: str = attr.ib()
     _output_base: Path = attr.ib()
-    # "pgz" = pickled gz file.
-    _hists_file_extension: str = attr.ib(default="pgz")
 
     @property
     def output(self) -> Path:
@@ -111,7 +109,7 @@ class Dataset:
 
     @property
     def hists_filename(self) -> Path:
-        return (self.output / self._hists_filename_stem).with_suffix(self._hists_file_extension)
+        return self.output / self._hists_filename
 
     def setup(self) -> bool:
         self.output.mkdir(parents=True, exist_ok=True)
@@ -127,6 +125,7 @@ class Dataset:
         settings_class: Type[AnalysisSettings],
         z_cutoff: float,
         override_filenames: Optional[Sequence[Union[str, Path]]] = None,
+        # "pgz" = pickled gz file.
         hists_file_extension: str = "pgz",
     ) -> "Dataset":
         # Grab the configuration
@@ -149,9 +148,8 @@ class Dataset:
             tree_name=selected_dataset_config["tree_name"],
             branches=_dataset_config["branches"],
             settings=settings_class.from_config(config=selected_dataset_config, z_cutoff=z_cutoff),
-            hists_filename_stem=hists_filename_stem,
+            hists_filename=f"{hists_filename_stem}.{hists_file_extension}",
             output_base=output_base,
-            hists_file_extension=hists_file_extension,
         )
         # Complete setup
         obj.setup()
