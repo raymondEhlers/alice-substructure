@@ -1003,13 +1003,34 @@ def run_shared(  # noqa: C901
     plot_only: bool = False,
     use_multiprocessing: bool = False,
     override_filenames: Optional[Sequence[Union[str, Path]]] = None,
+    additional_kwargs_for_analysis: Optional[Dict[str, str]] = None,
 ) -> Tuple[
     List[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]],
     analysis_objects.Dataset,
 ]:
     """ Run the given analysis function.
 
+    Args:
+        collision_system: Name of the collision system.
+        analysis_function: Function to perform the desired analysis on a single tree.
+        merged_hists_filename: Filename to be used for the merged hists generated in this analysis.
+        jet_pt_bins: Jet pt bins to be selected in the analysis.
+        z_cutoff: Z cutoff. Default: 0.2.
+        output: Output directory. Default: `Path("output")`.
+        plot_only: Only plot using the stored, fully merged hists. Don't event try to access
+            the underlying files. Default: False.
+        use_multiprocessing: True if we should use multiprocessing. Careful of memory usage!! Default: False.
+        override_filenames: Filenames to be used during the analysis, overriding those specified in the
+            configuration. Default: None, in which cause the filenames in the configuration are used.
+        additional_kwargs_for_analysis: Additional keyword arguments to pass on to the single tree analysis
+            function. Default: {}
+    Returns:
+        ((hists returned from the analysis, merged over all of the inputs file), dataset configuration)
     """
+    # Validation
+    if additional_kwargs_for_analysis is None:
+        additional_kwargs_for_analysis = {}
+
     # Configuration
     # Only need to set options which vary from the default.
     settings_class_map: Mapping[str, Type[analysis_objects.AnalysisSettings]] = {
@@ -1057,7 +1078,11 @@ def run_shared(  # noqa: C901
     # Create the analysis functions
     # We bind them with partial so we can execute them using map (which enables multiprocessing).
     analyze_single_tree_func = functools.partial(
-        analysis_function, dataset=dataset, jet_pt_bins=jet_pt_bins, force_reprocessing=False,
+        analysis_function,
+        dataset=dataset,
+        jet_pt_bins=jet_pt_bins,
+        force_reprocessing=False,
+        **additional_kwargs_for_analysis,
     )
     analyze_single_tree_func_multiprocessing = functools.partial(
         _wrap_multiprocessing, analysis_function=analyze_single_tree_func,
