@@ -1115,6 +1115,7 @@ if __name__ == "__main__":
     # data_prefix = "hybrid"
     # collision_system = f"toy_true_{data_prefix}_splittings_iterative_allTrueSplittings_delta_R_040"
     collision_system = "PbPb"
+    plot_only = False
     jet_pt_bins = [
         # Broadest range
         helpers.RangeSelector(min=40, max=120),
@@ -1135,6 +1136,7 @@ if __name__ == "__main__":
         merged_hists_filename="data_hists",
         jet_pt_bins=jet_pt_bins,
         z_cutoff=z_cutoff,
+        plot_only=plot_only,
         number_of_cores=4,
     )
     plot_results.lund_plane(all_hists=data_hists, path=dataset.output)
@@ -1146,6 +1148,7 @@ if __name__ == "__main__":
     #    merged_hists_filename="toy_hists",
     #    jet_pt_bins=jet_pt_bins,
     #    z_cutoff=z_cutoff,
+    #    plot_only=plot_only,
     #    number_of_cores=2,
     #    additional_kwargs_for_analysis=dict(
     #        data_prefix=data_prefix,
@@ -1160,6 +1163,7 @@ if __name__ == "__main__":
     #    merged_hists_filename="embedding_hists",
     #    jet_pt_bins=jet_pt_bins,
     #    z_cutoff=z_cutoff,
+    #    plot_only=plot_only,
     #    number_of_cores=1,
     # )
     # plot_results.responses(all_response_hists=response_hists, path=dataset.output)
