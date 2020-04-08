@@ -131,31 +131,32 @@ def _construct_jets_from_tree(prefix: str, tree: data_manager.Tree,) -> substruc
 
 def analyze_single_tree(
     tree: data_manager.Tree,
-    z_cutoff: float,
-    R: float,
+    dataset: analysis_objects.Dataset,
     jet_pt_bins: Sequence[helpers.RangeSelector],
-    progress_manager: enlighten.Manager,
-    y: yaml.ruamel.yaml.YAML,
-    output: Path,
     force_reprocessing: bool = False,
-) -> Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]]:
+) -> Tuple[
+    Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
+]:
     # Setup
+    logger.info(f"Processing tree from file {tree.filename}")
     hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]] = {}
-    # If the hists already exist, skip processing the tree and just return the hists instead (which is way faster!)
+    # If the output file already exist, skip processing the tree and just return the hists instead (which is way faster!)
     train_number = tree.filename.parent.name
-    yaml_filename = output / f"{train_number}_{tree.filename.with_suffix('.yaml').name}"
-    if yaml_filename.exists() and not force_reprocessing:
+    pkl_filename = dataset.output / f"{train_number}_{tree.filename.with_suffix('.pgz').name}"
+    if pkl_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
-        with open(yaml_filename, "r") as f:
-            hists = y.load(f)
-            return hists
+        with gzip.GzipFile(pkl_filename, "r") as pkl_file:
+            hists = pickle.load(pkl_file)  # type: ignore
+            return (hists,)
 
     # Since we're actually processing, we setup the output hists
     for iterative_splittings in [False, True]:
         for jet_pt_bin in jet_pt_bins:
             hists[
                 analysis_objects.Identifier(iterative_splittings, jet_pt_bin)
-            ] = analysis_objects.create_substructure_hists(iterative_splittings=iterative_splittings, z_cutoff=z_cutoff)
+            ] = analysis_objects.create_substructure_hists(
+                iterative_splittings=iterative_splittings, z_cutoff=dataset.settings.z_cutoff
+            )
 
     # Add a convenient wrapper.
     logger.debug(f"Accessing data from the tree {tree.filename}.")
@@ -173,14 +174,15 @@ def analyze_single_tree(
 
     # Catch all failed cases.
     if not successfully_accessed_data:
-        # Convert, write, and return the empty hists. We can't process this data :-(
-        return _convert_and_write_hists(hists=hists, tree_filename=tree.filename, yaml_filename=yaml_filename, y=y)
+        # Return the empty hists. We can't process this data :-(
+        return (hists,)
 
     # Loop over iterations (jet pt ranges, iterative splitting)
+    progress_manager = enlighten.get_manager()
     with progress_manager.counter(
         total=len(hists), desc="Analyzing", unit="variation", leave=False
-    ) as variations_counter:
-        for identifier, h in variations_counter(hists.items()):
+    ) as selections_counter:
+        for identifier, h in selections_counter(hists.items()):
             restricted_jets, splittings = _select_and_retrieve_splittings(
                 jets,
                 jet_pt_mask=identifier.jet_pt_bin.mask_array(jets.jet_pt),
@@ -197,32 +199,40 @@ def analyze_single_tree(
                 splittings.kt.ones_like().flatten(),
                 splittings.localindex,
             )
-            hists[identifier].inclusive.fill(inputs, jet_R=R)
+            hists[identifier].inclusive.fill(inputs, jet_R=dataset.settings.jet_R)
             # Dynamical z
-            inputs = analysis_objects.FillHistogramInput(restricted_jets, splittings, *splittings.dynamical_z(R=R))
-            hists[identifier].dynamical_z.fill(inputs, jet_R=R)
+            inputs = analysis_objects.FillHistogramInput(
+                restricted_jets, splittings, *splittings.dynamical_z(R=dataset.settings.jet_R)
+            )
+            hists[identifier].dynamical_z.fill(inputs, jet_R=dataset.settings.jet_R)
             # Dynamical kt
-            inputs = analysis_objects.FillHistogramInput(restricted_jets, splittings, *splittings.dynamical_kt(R=R))
-            hists[identifier].dynamical_kt.fill(inputs, jet_R=R)
+            inputs = analysis_objects.FillHistogramInput(
+                restricted_jets, splittings, *splittings.dynamical_kt(R=dataset.settings.jet_R)
+            )
+            hists[identifier].dynamical_kt.fill(inputs, jet_R=dataset.settings.jet_R)
             # Dynamical time
-            inputs = analysis_objects.FillHistogramInput(restricted_jets, splittings, *splittings.dynamical_time(R=R))
-            hists[identifier].dynamical_time.fill(inputs, jet_R=R)
+            inputs = analysis_objects.FillHistogramInput(
+                restricted_jets, splittings, *splittings.dynamical_time(R=dataset.settings.jet_R)
+            )
+            hists[identifier].dynamical_time.fill(inputs, jet_R=dataset.settings.jet_R)
             # Leading kt
             inputs = analysis_objects.FillHistogramInput(restricted_jets, splittings, *splittings.leading_kt())
-            hists[identifier].leading_kt.fill(inputs, jet_R=R)
+            hists[identifier].leading_kt.fill(inputs, jet_R=dataset.settings.jet_R)
             # Leading kt with z cutoff
             inputs = analysis_objects.FillHistogramInput(
-                restricted_jets, splittings, *splittings.leading_kt(z_cutoff=z_cutoff)
+                restricted_jets, splittings, *splittings.leading_kt(z_cutoff=dataset.settings.z_cutoff)
             )
-            hists[identifier].leading_kt_hard_cutoff.fill(inputs, jet_R=R)
+            hists[identifier].leading_kt_hard_cutoff.fill(inputs, jet_R=dataset.settings.jet_R)
             # import numpy as np
             # if (np.log(1.0 / splittings[indices].delta_R.flatten()) < 2).any() and (np.log(splittings[indices].kt.flatten()) < -1).any():
             #    logger.warning("Maybe the z cut isn't working??")
             #    import IPython; IPython.embed()
 
-    # IPython.start_ipython(user_ns=locals())
+    # Store hists with pickle because it takes too longer otherwise (and for consistency).
+    with gzip.GzipFile(pkl_filename, "w") as pkl_file:
+        pickle.dump(hists, pkl_file)  # type: ignore
 
-    return _convert_and_write_hists(hists=hists, tree_filename=tree.filename, yaml_filename=yaml_filename, y=y)
+    return (hists,)
 
 
 def analyze_single_tree_toy(
@@ -886,66 +896,6 @@ def matching(
 
     ...
     return matching_hists
-
-
-def run(
-    collision_system: str, jet_pt_bins: Sequence[helpers.RangeSelector], dataset_config_filename: Path, output: Path
-) -> Tuple[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]], Path]:
-    # Setup
-    z_cutoff = 0.2
-    # Configuration
-    y = setup_yaml()
-    with open(dataset_config_filename, "r") as f:
-        config = y.load(f)
-    dataset_config = config["datasets"][collision_system]["dataset"]
-    dataset_name = dataset_config["name"]
-    # finalize setup
-    output = output / collision_system / dataset_name
-    output.mkdir(parents=True, exist_ok=True)
-
-    # Retrieve and setup data
-    selected_dataset_config = config["available_datasets"][dataset_name]
-    R = selected_dataset_config["jet_R"]
-    dm = data_manager.IterateTrees(
-        filenames=selected_dataset_config["files"],
-        tree_name=selected_dataset_config["tree_name"],
-        branches=dataset_config["branches"],
-    )
-    logger.info("Setup complete. Beginning processing of trees.")
-
-    # Iterate over trees.
-    progress_manager = enlighten.get_manager()
-    results: List[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]]] = []
-    with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
-        for tree in tree_counter(dm):
-            logger.info(f"Processing tree from file {tree.filename}")
-            tree_hists = analyze_single_tree(
-                tree,
-                z_cutoff=z_cutoff,
-                R=R,
-                jet_pt_bins=jet_pt_bins,
-                progress_manager=progress_manager,
-                y=y,
-                output=output,
-                force_reprocessing=True,
-            )
-            # hists[tree.filename] = tree_hists
-            results.append(tree_hists)
-
-    # Merge the hists
-    full_hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]] = {}
-    for k in results[0].keys():
-        full_hists[k] = cast(
-            analysis_objects.Hists[analysis_objects.SubstructureHists], sum([hists[k] for hists in results])
-        )
-
-    # Write out the merged hists
-    with open(output / "hists.yaml", "w") as f:
-        y.dump(full_hists, f)
-
-    progress_manager.stop()
-
-    return full_hists, output
 
 
 def run_toy(
