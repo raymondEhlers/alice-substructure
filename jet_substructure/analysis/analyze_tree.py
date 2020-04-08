@@ -1001,7 +1001,7 @@ def run_shared(  # noqa: C901
     z_cutoff: float = 0.2,
     output: Path = Path("output"),
     plot_only: bool = False,
-    use_multiprocessing: bool = False,
+    number_of_cores: int = 1,
     override_filenames: Optional[Sequence[Union[str, Path]]] = None,
     additional_kwargs_for_analysis: Optional[Dict[str, str]] = None,
 ) -> Tuple[
@@ -1019,11 +1019,12 @@ def run_shared(  # noqa: C901
         output: Output directory. Default: `Path("output")`.
         plot_only: Only plot using the stored, fully merged hists. Don't event try to access
             the underlying files. Default: False.
-        use_multiprocessing: True if we should use multiprocessing. Careful of memory usage!! Default: False.
+        number_of_cores: Number of cores to be used for processing. If more than 1, then use multiprocessing.
+            Careful of memory usage!! Default: 1.
         override_filenames: Filenames to be used during the analysis, overriding those specified in the
             configuration. Default: None, in which cause the filenames in the configuration are used.
         additional_kwargs_for_analysis: Additional keyword arguments to pass on to the single tree analysis
-            function. Default: {}
+            function. Default: {}.
     Returns:
         ((hists returned from the analysis, merged over all of the inputs file), dataset configuration)
     """
@@ -1090,14 +1091,16 @@ def run_shared(  # noqa: C901
 
     # Iterate over trees.
     progress_manager = enlighten.get_manager()
-    dm_iterator = dm.lazy_iteration(fully_lazy=use_multiprocessing)
+    # We need to use fully lazy iteration if we're using multiprocessing. Otherwise, we run into problems
+    # with pickling objects (which is necessary from them to be sent to the other processes).
+    dm_iterator = dm.lazy_iteration(fully_lazy=(number_of_cores > 1))
     results: List[
         Sequence[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]]
     ] = []
     with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
-        if use_multiprocessing:
+        if number_of_cores > 1:
             # Only use 2 nodes because memory usage may become too large...
-            with Pool(nodes=2) as pool:
+            with Pool(nodes=number_of_cores) as pool:
                 for r in tree_counter(pool.imap(analyze_single_tree_func_multiprocessing, dm_iterator)):
                     results.append(r)
         else:
