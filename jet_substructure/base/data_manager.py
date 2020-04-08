@@ -354,7 +354,7 @@ class Tree(MutableMapping[str, UprootArray[Any]]):
 class IterateTrees:
     _filenames: Sequence[Path] = attr.ib(converter=_ensure_and_expand_paths)
     tree_name: str = attr.ib()
-    branches: FrozenSet[str] = attr.ib(converter=set)
+    branches: FrozenSet[str] = attr.ib(converter=frozenset)
     _current_tree: Optional[Tree] = attr.ib(default=None)
 
     def __len__(self) -> int:

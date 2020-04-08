@@ -5,7 +5,22 @@
 
 import copy
 import logging
-from typing import TYPE_CHECKING, Generic, Iterator, List, Optional, Tuple, Type, TypeVar, Union
+from pathlib import Path
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Generic,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import attr
 import boost_histogram as bh
@@ -36,6 +51,112 @@ class Identifier:
 
     def display_str(self, jet_pt_label: str = "") -> str:
         return f"{self.iterative_splittings_label.capitalize()} splittings\n${self.jet_pt_bin.display_str(label=jet_pt_label)}$"
+
+
+@attr.s(frozen=True)
+class AnalysisSettings:
+    jet_R: float = attr.ib()
+    z_cutoff: float = attr.ib()
+
+    @classmethod
+    def _extract_values_from_dataset_config(cls: Type["AnalysisSettings"], config: Mapping[str, Any]) -> Dict[str, Any]:
+        return {
+            "jet_R": config["jet_R"],
+        }
+
+    @classmethod
+    def from_config(cls: Type["AnalysisSettings"], config: Mapping[str, Any], z_cutoff: float) -> "AnalysisSettings":
+        return cls(z_cutoff=z_cutoff, **cls._extract_values_from_dataset_config(config),)
+
+
+@attr.s(frozen=True)
+class PtHardAnalysisSettings(AnalysisSettings):
+    scale_factors: Mapping[int, float] = attr.ib()
+    train_number_to_pt_hard_bin: Mapping[int, int] = attr.ib()
+
+    def asdict(self) -> Dict[str, Any]:
+        return attr.asdict(self, recurse=False)
+
+    @classmethod
+    def _extract_values_from_dataset_config(
+        cls: Type["PtHardAnalysisSettings"], config: Mapping[str, Any]
+    ) -> Dict[str, Any]:
+        # Extract the base class values first, then add our additional values.
+        values = super(PtHardAnalysisSettings, cls)._extract_values_from_dataset_config(config)
+        values.update(
+            {
+                "scale_factors": config["scale_factors"],
+                "train_number_to_pt_hard_bin": config["train_number_to_pt_hard_bin"],
+            }
+        )
+        return values
+
+
+@attr.s(frozen=True)
+class Dataset:
+    collision_system: str = attr.ib()
+    name: str = attr.ib()
+    filenames: Sequence[str] = attr.ib()
+    tree_name: str = attr.ib()
+    branches: Sequence[str] = attr.ib()
+    settings: AnalysisSettings = attr.ib()
+    _hists_filename_stem: str = attr.ib()
+    _output_base: Path = attr.ib()
+    # "pgz" = pickled gz file.
+    _hists_file_extension: str = attr.ib(default="pgz")
+
+    @property
+    def output(self) -> Path:
+        return self._output_base / self.collision_system / self.name
+
+    @property
+    def hists_filename(self) -> Path:
+        return (self.output / self._hists_filename_stem).with_suffix(self._hists_file_extension)
+
+    def setup(self) -> bool:
+        self.output.mkdir(parents=True, exist_ok=True)
+        return True
+
+    @classmethod
+    def from_config_file(
+        cls: Type["Dataset"],
+        collision_system: str,
+        config_filename: Path,
+        hists_filename_stem: str,
+        output_base: Path,
+        settings_class: Type[AnalysisSettings],
+        z_cutoff: float,
+        override_filenames: Optional[Sequence[Union[str, Path]]] = None,
+        hists_file_extension: str = "pgz",
+    ) -> "Dataset":
+        # Grab the configuration
+        from pachyderm import yaml
+
+        y = yaml.yaml()
+        with open(config_filename, "r") as f:
+            config = y.load(f)
+
+        # Extract only the values from the config that we need to construct the object.
+        _dataset_config = config["datasets"][collision_system]["dataset"]
+        name = _dataset_config["name"]
+        selected_dataset_config = config["available_datasets"][name]
+        filenames = selected_dataset_config["files"] if override_filenames is None else override_filenames
+
+        obj = cls(
+            collision_system=collision_system,
+            name=name,
+            filenames=filenames,
+            tree_name=selected_dataset_config["tree_name"],
+            branches=_dataset_config["branches"],
+            settings=settings_class.from_config(config=selected_dataset_config, z_cutoff=z_cutoff),
+            hists_filename_stem=hists_filename_stem,
+            output_base=output_base,
+            hists_file_extension=hists_file_extension,
+        )
+        # Complete setup
+        obj.setup()
+
+        return obj
 
 
 @attr.s

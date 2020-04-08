@@ -25,6 +25,7 @@ h5py = "^2.10.0"
 coloredlogs = "^14.0"
 dask = {extras = ["array"], version = "^2.11.0"}
 enlighten = "^1.4.0"
+pathos = "^0.2.5"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.761"
@@ -44,7 +45,7 @@ networkx = "^2.4"
 
 [tool.isort]
 known_standard_library = ["setuptools"]
-known_third_party = ["IPython", "ROOT", "attr", "awkward", "boost_histogram", "enlighten", "h5py", "matplotlib", "numpy", "pachyderm", "typing_extensions", "uproot"]
+known_third_party = ["IPython", "ROOT", "attr", "awkward", "boost_histogram", "enlighten", "h5py", "matplotlib", "numpy", "pachyderm", "pathos", "typing_extensions", "uproot"]
 known_first_party = []
 line_length = 120
 # Meaning a grouped grid of imports

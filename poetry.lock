@@ -237,6 +237,17 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 version = "0.6.0"
 
 [[package]]
+category = "main"
+description = "serialize all of python"
+name = "dill"
+optional = false
+python-versions = ">=2.6, !=3.0.*"
+version = "0.3.1.1"
+
+[package.extras]
+graph = ["objgraph (>=1.7.2)"]
+
+[[package]]
 category = "dev"
 description = "Distribution utilities"
 name = "distlib"
@@ -685,6 +696,17 @@ python-versions = ">=3.5"
 version = "8.2.0"
 
 [[package]]
+category = "main"
+description = "better multiprocessing and multithreading in python"
+name = "multiprocess"
+optional = false
+python-versions = "*"
+version = "0.70.9"
+
+[package.dependencies]
+dill = ">=0.3.1"
+
+[[package]]
 category = "dev"
 description = "Optional static typing for Python"
 name = "mypy"
@@ -915,6 +937,20 @@ version = "0.6.2"
 testing = ["docopt", "pytest (>=3.0.7)"]
 
 [[package]]
+category = "main"
+description = "parallel graph management and execution in heterogeneous computing"
+name = "pathos"
+optional = false
+python-versions = "*"
+version = "0.2.5"
+
+[package.dependencies]
+dill = ">=0.3.1"
+multiprocess = ">=0.70.9"
+pox = ">=0.2.7"
+ppft = ">=1.6.6.1"
+
+[[package]]
 category = "dev"
 description = "Utility library for gitignore style pattern matching of file paths."
 name = "pathspec"
@@ -957,6 +993,25 @@ version = ">=0.12"
 
 [package.extras]
 dev = ["pre-commit", "tox"]
+
+[[package]]
+category = "main"
+description = "utilities for filesystem exploration and automated builds"
+name = "pox"
+optional = false
+python-versions = "*"
+version = "0.2.7"
+
+[[package]]
+category = "main"
+description = "distributed and parallel python"
+name = "ppft"
+optional = false
+python-versions = "*"
+version = "1.6.6.1"
+
+[package.extras]
+dill = ["dill (>=0.3.0)"]
 
 [[package]]
 category = "dev"
@@ -1044,14 +1099,6 @@ name = "pygments"
 optional = false
 python-versions = ">=3.5"
 version = "2.6.1"
-
-[[package]]
-category = "dev"
-description = "Python interface to Graphviz"
-name = "pygraphviz"
-optional = false
-python-versions = "*"
-version = "1.5"
 
 [[package]]
 category = "main"
@@ -1398,7 +1445,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [metadata]
-content-hash = "ccc6a53619d785987a6c6243999b55f4981eab414d55cadf10535f07e2795ac4"
+content-hash = "df863195b812aca109a171b7598c97fbddffbcda43d55d70f704badce3109c64"
 python-versions = "^3.6.1"
 
 [metadata.files]
@@ -1514,6 +1561,9 @@ decorator = [
 defusedxml = [
     {file = "defusedxml-0.6.0-py2.py3-none-any.whl", hash = "sha256:6687150770438374ab581bb7a1b327a847dd9c5749e396102de3fad4e8a3ef93"},
     {file = "defusedxml-0.6.0.tar.gz", hash = "sha256:f684034d135af4c6cbb949b8a4d2ed61634515257a67299e5f940fbaa34377f5"},
+]
+dill = [
+    {file = "dill-0.3.1.1.tar.gz", hash = "sha256:42d8ef819367516592a825746a18073ced42ca169ab1f5f4044134703e7a049c"},
 ]
 distlib = [
     {file = "distlib-0.3.0.zip", hash = "sha256:2e166e231a26b36d6dfe35a48c4464346620f8645ed0ace01ee31822b288de21"},
@@ -1773,6 +1823,11 @@ more-itertools = [
     {file = "more-itertools-8.2.0.tar.gz", hash = "sha256:b1ddb932186d8a6ac451e1d95844b382f55e12686d51ca0c68b6f61f2ab7a507"},
     {file = "more_itertools-8.2.0-py3-none-any.whl", hash = "sha256:5dd8bcf33e5f9513ffa06d5ad33d78f31e1931ac9a18f33d37e77a180d393a7c"},
 ]
+multiprocess = [
+    {file = "multiprocess-0.70.9-cp27-cp27m-win32.whl", hash = "sha256:0e4e65c2e74aa14fa0c9a1f838b5e9a5f8fe5b3a173925792260843c4a6157ec"},
+    {file = "multiprocess-0.70.9-cp27-cp27m-win_amd64.whl", hash = "sha256:1eb7dfe2d809d53be92e8a288ed1c01614fe5407bbc9d078ed451a749fb1bd34"},
+    {file = "multiprocess-0.70.9.tar.gz", hash = "sha256:9fd5bd990132da77e73dec6e9613408602a4612e1d73caf2e2b813d2b61508e5"},
+]
 mypy = [
     {file = "mypy-0.761-cp35-cp35m-macosx_10_6_x86_64.whl", hash = "sha256:7f672d02fffcbace4db2b05369142e0506cdcde20cea0e07c7c2171c4fd11dd6"},
     {file = "mypy-0.761-cp35-cp35m-manylinux1_x86_64.whl", hash = "sha256:87c556fb85d709dacd4b4cb6167eecc5bbb4f0a9864b69136a0d4640fdc76a36"},
@@ -1869,6 +1924,9 @@ parso = [
     {file = "parso-0.6.2-py2.py3-none-any.whl", hash = "sha256:8515fc12cfca6ee3aa59138741fc5624d62340c97e401c74875769948d4f2995"},
     {file = "parso-0.6.2.tar.gz", hash = "sha256:0c5659e0c6eba20636f99a04f469798dca8da279645ce5c387315b2c23912157"},
 ]
+pathos = [
+    {file = "pathos-0.2.5.tar.gz", hash = "sha256:21ae2cb1d5a76dcf57d5fe93ae8719c7339f467e246163650c08ccf35b87c846"},
+]
 pathspec = [
     {file = "pathspec-0.7.0-py2.py3-none-any.whl", hash = "sha256:163b0632d4e31cef212976cf57b43d9fd6b0bac6e67c26015d611a647d5e7424"},
     {file = "pathspec-0.7.0.tar.gz", hash = "sha256:562aa70af2e0d434367d9790ad37aed893de47f1693e4201fd1d3dca15d19b96"},
@@ -1884,6 +1942,12 @@ pickleshare = [
 pluggy = [
     {file = "pluggy-0.13.1-py2.py3-none-any.whl", hash = "sha256:966c145cd83c96502c3c3868f50408687b38434af77734af1e9ca461a4081d2d"},
     {file = "pluggy-0.13.1.tar.gz", hash = "sha256:15b2acde666561e1298d71b523007ed7364de07029219b604cf808bfa1c765b0"},
+]
+pox = [
+    {file = "pox-0.2.7.tar.gz", hash = "sha256:06afe1a4a1dbf8b47f7ad5a3c1d8ada9104c64933a1da11338269a2bd8642778"},
+]
+ppft = [
+    {file = "ppft-1.6.6.1.tar.gz", hash = "sha256:9e2173042edd5cc9c7bee0d7731873f17fcdce0e42e4b7ab68857d0de7b631fc"},
 ]
 pre-commit = [
     {file = "pre_commit-2.2.0-py2.py3-none-any.whl", hash = "sha256:487c675916e6f99d355ec5595ad77b325689d423ef4839db1ed2f02f639c9522"},
@@ -1915,9 +1979,6 @@ pyflakes = [
 pygments = [
     {file = "Pygments-2.6.1-py3-none-any.whl", hash = "sha256:ff7a40b4860b727ab48fad6360eb351cc1b33cbf9b15a0f689ca5353e9463324"},
     {file = "Pygments-2.6.1.tar.gz", hash = "sha256:647344a061c249a3b74e230c739f434d7ea4d8b1d5f3721bc0f3558049b38f44"},
-]
-pygraphviz = [
-    {file = "pygraphviz-1.5.zip", hash = "sha256:50a829a305dc5a0fd1f9590748b19fece756093b581ac91e00c2c27c651d319d"},
 ]
 pyparsing = [
     {file = "pyparsing-2.4.6-py2.py3-none-any.whl", hash = "sha256:c342dccb5250c08d45fd6f8b4a559613ca603b57498511740e65cd11a2e7dcec"},
