@@ -233,8 +233,9 @@ def expand_wildcards_in_filenames(paths: Sequence[Path]) -> List[Path]:
         else:
             return_paths.append(path)
 
-    # Sort in the expected order.
-    # return_paths = sorted(return_paths, key=lambda p: int("".join(filter(str.isdigit, str(p)))))
+    # Sort in the expected order (just according to alphabetical, which should handle numbers
+    # fine as long as they have leading 0s (ie. 03 instead of 3)).
+    return_paths = sorted(return_paths, key=lambda p: str(p))
     return return_paths
 
 
