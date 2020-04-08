@@ -429,6 +429,11 @@ class IterateTrees:
     def lazy_iteration(self, fully_lazy: Literal[True]) -> Iterator[Callable[[], Tree]]:
         ...
 
+    @typing.overload
+    def lazy_iteration(self, fully_lazy: bool = False) -> Union[Iterator[Tree], Iterator[Callable[[], Tree]]]:
+        """ In case the user provides a bool. """
+        ...
+
     def lazy_iteration(self, fully_lazy: bool = False) -> Union[Iterator[Tree], Iterator[Callable[[], Tree]]]:
         if fully_lazy:
             yield from self._fully_lazy_iteration()
