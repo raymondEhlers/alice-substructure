@@ -86,7 +86,7 @@ def _convert_and_write_hists(
 def _construct_jets_from_tree(prefix: str, tree: data_manager.Tree,) -> substructure_methods.SubstructureJetArray:
     """ Construct the subtructure jet objects for data stored under a given prefix in a tree.
 
-    Ideally, the object has alrady been created and stored. If not, it will be created and then
+    Ideally, the object has already been created and stored. If not, it will be created and then
     stored in the tree for the future (where retrieving the created object from a file is far faster).
 
     Args:
@@ -133,6 +133,7 @@ def analyze_single_tree(
     tree: data_manager.Tree,
     dataset: analysis_objects.Dataset,
     jet_pt_bins: Sequence[helpers.RangeSelector],
+    hists_filename_stem: str,
     force_reprocessing: bool = False,
 ) -> Tuple[
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
@@ -142,7 +143,7 @@ def analyze_single_tree(
     hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]] = {}
     # If the output file already exist, skip processing the tree and just return the hists instead (which is way faster!)
     train_number = tree.filename.parent.name
-    pkl_filename = dataset.output / f"{train_number}_{tree.filename.with_suffix('.pgz').name}"
+    pkl_filename = dataset.output / f"{train_number}_{tree.filename.stem}_{hists_filename_stem}.pgz"
     if pkl_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
         with gzip.GzipFile(pkl_filename, "r") as pkl_file:
@@ -239,11 +240,14 @@ def analyze_single_tree_toy(
     tree: data_manager.Tree,
     dataset: analysis_objects.Dataset,
     jet_pt_bins: Sequence[helpers.RangeSelector],
+    hists_filename_stem: str,
     force_reprocessing: bool,
     **kwargs: str,
 ) -> Tuple[
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]],
 ]:
+    logger.info(f"Processing tree from file {tree.filename}")
+
     data_prefix: str = kwargs["data_prefix"]
     # Validation
     if data_prefix == "hybrid":
@@ -252,7 +256,7 @@ def analyze_single_tree_toy(
     hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]] = {}
     # If the output file already exist, skip processing the tree and just return the hists instead (which is way faster!)
     train_number = tree.filename.parent.name
-    pkl_filename = dataset.output / f"{train_number}_{tree.filename.with_suffix('.pgz').name}"
+    pkl_filename = dataset.output / f"{train_number}_{tree.filename.stem}_{hists_filename_stem}.pgz"
     if pkl_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
         with gzip.GzipFile(pkl_filename, "r") as pkl_file:
@@ -561,6 +565,7 @@ def analyze_single_tree_embedding(
     tree: data_manager.Tree,
     dataset: analysis_objects.Dataset,
     jet_pt_bins: Sequence[helpers.RangeSelector],
+    hists_filename_stem: str,
     force_reprocessing: bool = False,
 ) -> Tuple[
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]],
@@ -583,7 +588,7 @@ def analyze_single_tree_embedding(
     ] = {}
     # If the output file already exist, skip processing the tree and just return the hists instead (which is way faster!)
     train_number = tree.filename.parent.name
-    pkl_filename = dataset.output / f"{train_number}_{tree.filename.with_suffix('.pgz').name}"
+    pkl_filename = dataset.output / f"{train_number}_{tree.filename.stem}_{hists_filename_stem}.pgz"
     if pkl_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
         with gzip.GzipFile(pkl_filename, "r") as pkl_file:
@@ -919,15 +924,16 @@ def _wrap_multiprocessing(
 def run_shared(  # noqa: C901
     collision_system: str,
     analysis_function: Callable[
-        [data_manager.Tree, analysis_objects.Dataset, Sequence[helpers.RangeSelector], bool],
+        [data_manager.Tree, analysis_objects.Dataset, Sequence[helpers.RangeSelector], str, bool],
         Sequence[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]],
     ],
     dataset_config_filename: Path,
-    merged_hists_filename: str,
+    hists_filename: str,
     jet_pt_bins: Sequence[helpers.RangeSelector],
     z_cutoff: float = 0.2,
     output: Path = Path("output"),
     plot_only: bool = False,
+    force_reprocessing: bool = False,
     number_of_cores: int = 1,
     override_filenames: Optional[Sequence[Union[str, Path]]] = None,
     additional_kwargs_for_analysis: Optional[Dict[str, str]] = None,
@@ -940,12 +946,14 @@ def run_shared(  # noqa: C901
     Args:
         collision_system: Name of the collision system.
         analysis_function: Function to perform the desired analysis on a single tree.
-        merged_hists_filename: Filename to be used for the merged hists generated in this analysis.
+        hists_filename: Filename to be used for the merged hists generated in this analysis.
         jet_pt_bins: Jet pt bins to be selected in the analysis.
         z_cutoff: Z cutoff. Default: 0.2.
         output: Output directory. Default: `Path("output")`.
         plot_only: Only plot using the stored, fully merged hists. Don't event try to access
             the underlying files. Default: False.
+        force_reprocessing: Force the trees to be reprocessed regardless of whether they already
+            have output histograms.
         number_of_cores: Number of cores to be used for processing. If more than 1, then use multiprocessing.
             Careful of memory usage!! Default: 1.
         override_filenames: Filenames to be used during the analysis, overriding those specified in the
@@ -968,7 +976,7 @@ def run_shared(  # noqa: C901
         collision_system=collision_system,
         config_filename=dataset_config_filename,
         override_filenames=override_filenames,
-        hists_filename_stem=merged_hists_filename,
+        hists_filename_stem=hists_filename,
         output_base=output,
         settings_class=settings_class_map.get(collision_system, analysis_objects.AnalysisSettings),
         z_cutoff=z_cutoff,
@@ -1009,7 +1017,8 @@ def run_shared(  # noqa: C901
         analysis_function,
         dataset=dataset,
         jet_pt_bins=jet_pt_bins,
-        force_reprocessing=False,
+        hists_filename_stem=dataset.hists_filename.stem,
+        force_reprocessing=force_reprocessing,
         **additional_kwargs_for_analysis,
     )
     analyze_single_tree_func_multiprocessing = functools.partial(
@@ -1099,7 +1108,7 @@ def embed_pythia_entry_point() -> None:
         collision_system=collision_system,
         analysis_function=analyze_single_tree_embedding,
         dataset_config_filename=Path("config") / "datasets.yaml",
-        merged_hists_filename="embedding_hists",
+        hists_filename="embedding_hists",
         jet_pt_bins=jet_pt_bins,
         z_cutoff=0.2,
         override_filenames=filenames,
@@ -1112,9 +1121,6 @@ if __name__ == "__main__":
 
     # Setup and run
     config_filename = Path("config") / "datasets.yaml"
-    # data_prefix = "hybrid"
-    # collision_system = f"toy_true_{data_prefix}_splittings_iterative_allTrueSplittings_delta_R_040"
-    collision_system = "PbPb"
     plot_only = False
     jet_pt_bins = [
         # Broadest range
@@ -1129,23 +1135,26 @@ if __name__ == "__main__":
     ]
     z_cutoff = 0.2
     # Standard analysis
-    (data_hists,), dataset = run_shared(
-        collision_system=collision_system,
-        analysis_function=analyze_single_tree,
-        dataset_config_filename=config_filename,
-        merged_hists_filename="data_hists",
-        jet_pt_bins=jet_pt_bins,
-        z_cutoff=z_cutoff,
-        plot_only=plot_only,
-        number_of_cores=4,
-    )
-    plot_results.lund_plane(all_hists=data_hists, path=dataset.output)
+    # (data_hists,), data_dataset = run_shared(
+    #    collision_system="PbPb",
+    #    analysis_function=analyze_single_tree,
+    #    dataset_config_filename=config_filename,
+    #    hists_filename="data_hists",
+    #    jet_pt_bins=jet_pt_bins,
+    #    z_cutoff=z_cutoff,
+    #    plot_only=plot_only,
+    #    force_reprocessing=False,
+    #    number_of_cores=1,
+    # )
+    # plot_results.lund_plane(all_hists=data_hists, path=data_dataset.output)
     # Toy
+    # data_prefix = "hybrid"
+    # collision_system = f"toy_true_{data_prefix}_splittings_iterative_allTrueSplittings_delta_R_040"
     # (toy_hists,), dataset = run_shared(
     #    collision_system=collision_system,
     #    analysis_function=analyze_single_tree_toy,
     #    dataset_config_filename=config_filename,
-    #    merged_hists_filename="toy_hists",
+    #    hists_filename="toy_hists",
     #    jet_pt_bins=jet_pt_bins,
     #    z_cutoff=z_cutoff,
     #    plot_only=plot_only,
@@ -1156,17 +1165,32 @@ if __name__ == "__main__":
     # )
     # plot_results.toy(all_toy_hists=toy_hists, data_prefix=data_prefix, path=dataset.output)
     # Embedding
-    # (response_hists, matching_hists), dataset = run_shared(  # type: ignore
-    #    collision_system=collision_system,
-    #    analysis_function=analyze_single_tree_embedding,
-    #    dataset_config_filename=config_filename,
-    #    merged_hists_filename="embedding_hists",
-    #    jet_pt_bins=jet_pt_bins,
-    #    z_cutoff=z_cutoff,
-    #    plot_only=plot_only,
-    #    number_of_cores=1,
-    # )
-    # plot_results.responses(all_response_hists=response_hists, path=dataset.output)
-    # plot_results.matching(all_matching_hists=matching_hists, path=dataset.output)
+    # Standard hists
+    (embedded_hists,), embedded_data_dataset = run_shared(
+        collision_system="embedPythia",
+        analysis_function=analyze_single_tree,
+        dataset_config_filename=config_filename,
+        hists_filename="embedded_data_hists",
+        jet_pt_bins=jet_pt_bins,
+        z_cutoff=z_cutoff,
+        plot_only=plot_only,
+        force_reprocessing=False,
+        number_of_cores=2,
+    )
+    plot_results.lund_plane(all_hists=embedded_hists, path=embedded_data_dataset.output)
+    # Response
+    (response_hists, matching_hists), embedded_response_dataset = run_shared(  # type: ignore
+        collision_system="embedPythia",
+        analysis_function=analyze_single_tree_embedding,
+        dataset_config_filename=config_filename,
+        hists_filename="embedding_hists",
+        jet_pt_bins=jet_pt_bins,
+        z_cutoff=z_cutoff,
+        plot_only=plot_only,
+        force_reprocessing=False,
+        number_of_cores=1,
+    )
+    # plot_results.responses(all_response_hists=response_hists, path=embedded_response_dataset.output)
+    # plot_results.matching(all_matching_hists=matching_hists, path=embedded_response_dataset.output)
 
     IPython.start_ipython(user_ns=locals())
