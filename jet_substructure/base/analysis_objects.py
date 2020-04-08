@@ -54,6 +54,22 @@ class Identifier:
 
 
 @attr.s(frozen=True)
+class MatchingIdentifier(Identifier):
+    hybrid_kt_cut: float = attr.ib()
+
+    def __str__(self) -> str:
+        if self.hybrid_kt_cut > 0:
+            return f"{str(super())}_hybridMinKt_{self.hybrid_kt_cut}"
+        return str(super())
+
+    def display_str(self, jet_pt_label: str = "") -> str:
+        base_str = f"{self.iterative_splittings_label.capitalize()} splittings\n${self.jet_pt_bin.display_str(label=jet_pt_label)}"
+        if self.hybrid_kt_cut > 0:
+            base_str += "\n" + fr"$k_{{\text{{T}}}}^{{\text{{hybrid}}}} > {self.hybrid_kt_cut}$"
+        return base_str
+
+
+@attr.s(frozen=True)
 class AnalysisSettings:
     jet_R: float = attr.ib()
     z_cutoff: float = attr.ib()
@@ -162,6 +178,9 @@ class MatchingResult:
     properly: UprootArray[bool] = attr.ib()
     mistag: UprootArray[bool] = attr.ib()
     failed: UprootArray[bool] = attr.ib()
+
+    def __getitem__(self, mask: UprootArray[bool]) -> "MatchingResult":
+        return type(self)(properly=self.properly[mask], mistag=self.mistag[mask], failed=self.failed[mask],)
 
 
 @attr.s
@@ -638,7 +657,6 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
     name: str = attr.ib()
     title: str = attr.ib()
     iterative_splittings: bool = attr.ib()
-    # n_jets: int = attr.ib()
     all: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     both_correct: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     leading_failed_subleading_correct: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
@@ -704,7 +722,12 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
         )
 
     def fill(
-        self, matched_inputs: FillHistogramInput, leading: MatchingResult, subleading: MatchingResult, weight: float
+        self,
+        matched_inputs: FillHistogramInput,
+        leading: MatchingResult,
+        subleading: MatchingResult,
+        mask: UprootArray[bool],
+        weight: float,
     ) -> None:
         # Validation
         # Give a useful error message
@@ -723,32 +746,37 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
             and isinstance(self.both_failed, bh.Histogram)
         )
 
+        # Mask the values once so we don't have to do it repeatedly.
+        jet_pt_masked = matched_inputs.jets[mask].jet_pt
+        leading_masked = leading[mask]
+        subleading_masked = subleading[mask]
+
         self.all.fill(
-            matched_inputs.jets.jet_pt[
-                leading.properly
-                | leading.mistag
-                | leading.failed
-                | subleading.properly
-                | subleading.mistag
-                | subleading.failed
+            jet_pt_masked[
+                leading_masked.properly
+                | leading_masked.mistag
+                | leading_masked.failed
+                | subleading_masked.properly
+                | subleading_masked.mistag
+                | subleading_masked.failed
             ],
             weight=weight,
         )
-        self.both_correct.fill(matched_inputs.jets.jet_pt[leading.properly & subleading.properly], weight=weight)
+        self.both_correct.fill(jet_pt_masked[leading_masked.properly & subleading_masked.properly], weight=weight)
         self.leading_failed_subleading_correct.fill(
-            matched_inputs.jets.jet_pt[leading.failed & subleading.properly], weight=weight
+            jet_pt_masked[leading_masked.failed & subleading_masked.properly], weight=weight
         )
         self.leading_correct_subleading_failed.fill(
-            matched_inputs.jets.jet_pt[leading.properly & subleading.failed], weight=weight
+            jet_pt_masked[leading_masked.properly & subleading_masked.failed], weight=weight
         )
         self.leading_failed_subleading_mistag.fill(
-            matched_inputs.jets.jet_pt[leading.failed & subleading.mistag], weight=weight
+            jet_pt_masked[leading_masked.failed & subleading_masked.mistag], weight=weight
         )
         self.leading_mistag_subleading_failed.fill(
-            matched_inputs.jets.jet_pt[leading.mistag & subleading.failed], weight=weight
+            jet_pt_masked[leading_masked.mistag & subleading_masked.failed], weight=weight
         )
-        self.reversed.fill(matched_inputs.jets.jet_pt[leading.mistag & subleading.mistag], weight=weight)
-        self.both_failed.fill(matched_inputs.jets.jet_pt[leading.failed & subleading.failed], weight=weight)
+        self.reversed.fill(jet_pt_masked[leading_masked.mistag & subleading_masked.mistag], weight=weight)
+        self.both_failed.fill(jet_pt_masked[leading_masked.failed & subleading_masked.failed], weight=weight)
 
 
 T_SubstructureHists = TypeVar(

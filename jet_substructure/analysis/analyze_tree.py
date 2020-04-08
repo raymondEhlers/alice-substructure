@@ -569,7 +569,7 @@ def analyze_single_tree_embedding(
     force_reprocessing: bool = False,
 ) -> Tuple[
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]],
-    Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]],
+    Dict[analysis_objects.MatchingIdentifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]],
 ]:
     """ Determine the response and prong matching for jets substructure techniques.
 
@@ -584,7 +584,7 @@ def analyze_single_tree_embedding(
     assert isinstance(dataset.settings, analysis_objects.PtHardAnalysisSettings)
     hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]] = {}
     matching_hists: Dict[
-        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
+        analysis_objects.MatchingIdentifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
     ] = {}
     # If the output file already exist, skip processing the tree and just return the hists instead (which is way faster!)
     train_number = tree.filename.parent.name
@@ -611,11 +611,14 @@ def analyze_single_tree_embedding(
             )
     # Matching
     for iterative_splittings in [False, True]:
-        matching_hists[
-            analysis_objects.Identifier(iterative_splittings, jet_pt_bin=helpers.RangeSelector(0, 200))
-        ] = analysis_objects.create_matching_hists(
-            iterative_splittings=iterative_splittings, z_cutoff=dataset.settings.z_cutoff
-        )
+        for hybrid_kt_cut in [0.0, 5.0, 7.0]:
+            matching_hists[
+                analysis_objects.MatchingIdentifier(
+                    iterative_splittings, jet_pt_bin=helpers.RangeSelector(0, 150), hybrid_kt_cut=hybrid_kt_cut
+                )
+            ] = analysis_objects.create_matching_hists(
+                iterative_splittings=iterative_splittings, z_cutoff=dataset.settings.z_cutoff
+            )
 
     # Add a convenient wrapper.
     logger.debug(f"Accessing data from the tree {tree.filename}.")
@@ -769,7 +772,7 @@ def analyze_single_tree_embedding(
 
 def matching(
     matching_hists: Dict[
-        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
+        analysis_objects.MatchingIdentifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
     ],
     matched_jets: substructure_methods.SubstructureJetArray,
     hybrid_jets: substructure_methods.SubstructureJetArray,
@@ -777,15 +780,32 @@ def matching(
     R: float,
     scale_factor: float,
     progress_manager: enlighten.Manager,
-) -> Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]]:
+) -> Dict[
+    analysis_objects.MatchingIdentifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
+]:
     """ Determine the prong matching for jets substructure techniques.
 
     """
+    # Determine our value ranges.
+    hybrid_kt_cut_values = list(set([i.hybrid_kt_cut for i in matching_hists]))
+    jet_pt_bins = list(set([i.jet_pt_bin for i in matching_hists]))
+    if len(jet_pt_bins) != 1:
+        raise ValueError(
+            "Expected only one jet pt bin in the matching, but received {len(jet_pt_bins)}. Check on this! Full set of bins: {jet_pt_bins}"
+        )
+    jet_pt_bin: helpers.RangeSelector = jet_pt_bins[0]
+
     logger.info("Starting matching")
+    number_of_grooming_methods = 4
     with progress_manager.counter(
-        total=len(matching_hists), desc="Analyzing", unit="variation", leave=False
-    ) as variations_counter:
-        for identifier, h in variations_counter(matching_hists.items()):
+        total=len(matching_hists) * number_of_grooming_methods, desc="Analyzing", unit="variation", leave=False
+    ) as selections_counter:
+        for iterative_splittings in [False, True]:
+            # Let's start with the hybrid_kt_cut = 0 case, as it's the most inclusive.
+            # We'll then modify it from here.
+            identifier = analysis_objects.MatchingIdentifier(
+                iterative_splittings=iterative_splittings, jet_pt_bin=jet_pt_bin, hybrid_kt_cut=0
+            )
             # Ensure that we don't have single track jets because the splitting won't be defined for that case.
             # No actual jet pt range restrictions.
             mask = (hybrid_jets.constituents.counts > 1) & (matched_jets.constituents.counts > 1)
@@ -816,9 +836,21 @@ def matching(
                 *restricted_matched_jets_splittings.dynamical_z(R=R),
             )
             leading_matching, subleading_matching = determine_matched_jets(hybrid_inputs, true_inputs)
-            matching_hists[identifier].dynamical_z.fill(
-                matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching, weight=weight,
-            )
+            for kt_value in hybrid_kt_cut_values:
+                temp_identifier = analysis_objects.MatchingIdentifier(
+                    iterative_splittings=identifier.iterative_splittings,
+                    jet_pt_bin=identifier.jet_pt_bin,
+                    hybrid_kt_cut=kt_value,
+                )
+                mask = hybrid_inputs.values > temp_identifier.hybrid_kt_cut
+                matching_hists[temp_identifier].dynamical_z.fill(
+                    matched_inputs=true_inputs,
+                    leading=leading_matching,
+                    subleading=subleading_matching,
+                    mask=mask,
+                    weight=weight,
+                )
+                selections_counter.update()
             # Dynamical kt
             hybrid_inputs = analysis_objects.FillHistogramInput(
                 restricted_hybrid_jets,
@@ -831,9 +863,21 @@ def matching(
                 *restricted_matched_jets_splittings.dynamical_kt(R=R),
             )
             leading_matching, subleading_matching = determine_matched_jets(hybrid_inputs, true_inputs)
-            matching_hists[identifier].dynamical_kt.fill(
-                matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching, weight=weight,
-            )
+            for kt_value in hybrid_kt_cut_values:
+                temp_identifier = analysis_objects.MatchingIdentifier(
+                    iterative_splittings=identifier.iterative_splittings,
+                    jet_pt_bin=identifier.jet_pt_bin,
+                    hybrid_kt_cut=kt_value,
+                )
+                mask = hybrid_inputs.values > temp_identifier.hybrid_kt_cut
+                matching_hists[temp_identifier].dynamical_kt.fill(
+                    matched_inputs=true_inputs,
+                    leading=leading_matching,
+                    subleading=subleading_matching,
+                    mask=mask,
+                    weight=weight,
+                )
+                selections_counter.update()
             # Dynamical time
             hybrid_inputs = analysis_objects.FillHistogramInput(
                 restricted_hybrid_jets,
@@ -846,9 +890,21 @@ def matching(
                 *restricted_matched_jets_splittings.dynamical_time(R=R),
             )
             leading_matching, subleading_matching = determine_matched_jets(hybrid_inputs, true_inputs)
-            matching_hists[identifier].dynamical_time.fill(
-                matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching, weight=weight,
-            )
+            for kt_value in hybrid_kt_cut_values:
+                temp_identifier = analysis_objects.MatchingIdentifier(
+                    iterative_splittings=identifier.iterative_splittings,
+                    jet_pt_bin=identifier.jet_pt_bin,
+                    hybrid_kt_cut=kt_value,
+                )
+                mask = hybrid_inputs.values > temp_identifier.hybrid_kt_cut
+                matching_hists[temp_identifier].dynamical_time.fill(
+                    matched_inputs=true_inputs,
+                    leading=leading_matching,
+                    subleading=subleading_matching,
+                    mask=mask,
+                    weight=weight,
+                )
+                selections_counter.update()
             # Leading kt
             hybrid_inputs = analysis_objects.FillHistogramInput(
                 restricted_hybrid_jets,
@@ -861,9 +917,21 @@ def matching(
                 *restricted_matched_jets_splittings.leading_kt(),
             )
             leading_matching, subleading_matching = determine_matched_jets(hybrid_inputs, true_inputs)
-            matching_hists[identifier].leading_kt.fill(
-                matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching, weight=weight,
-            )
+            for kt_value in hybrid_kt_cut_values:
+                temp_identifier = analysis_objects.MatchingIdentifier(
+                    iterative_splittings=identifier.iterative_splittings,
+                    jet_pt_bin=identifier.jet_pt_bin,
+                    hybrid_kt_cut=kt_value,
+                )
+                mask = hybrid_inputs.values > temp_identifier.hybrid_kt_cut
+                matching_hists[temp_identifier].leading_kt.fill(
+                    matched_inputs=true_inputs,
+                    leading=leading_matching,
+                    subleading=subleading_matching,
+                    mask=mask,
+                    weight=weight,
+                )
+                selections_counter.update()
             # Leading kt with z cutoff
             hybrid_inputs = analysis_objects.FillHistogramInput(
                 restricted_hybrid_jets,
@@ -897,7 +965,6 @@ def matching(
             #    matched_inputs=true_inputs, leading=leading_matching, subleading=subleading_matching,
             # )
 
-    ...
     return matching_hists
 
 
@@ -925,7 +992,12 @@ def run_shared(  # noqa: C901
     collision_system: str,
     analysis_function: Callable[
         [data_manager.Tree, analysis_objects.Dataset, Sequence[helpers.RangeSelector], str, bool],
-        Sequence[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]],
+        Sequence[
+            Mapping[
+                Union[analysis_objects.Identifier, analysis_objects.MatchingIdentifier],
+                analysis_objects.Hists[analysis_objects.T_SubstructureHists],
+            ]
+        ],
     ],
     dataset_config_filename: Path,
     hists_filename: str,
