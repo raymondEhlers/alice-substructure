@@ -237,28 +237,27 @@ def analyze_single_tree(
 
 def analyze_single_tree_toy(
     tree: data_manager.Tree,
-    data_prefix: str,
-    z_cutoff: float,
-    R: float,
+    dataset: analysis_objects.Dataset,
     jet_pt_bins: Sequence[helpers.RangeSelector],
-    progress_manager: enlighten.Manager,
-    y: yaml.ruamel.yaml.YAML,
-    output: Path,
-    force_reprocessing: bool = False,
-) -> Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]]:
+    force_reprocessing: bool,
+    **kwargs: str,
+) -> Tuple[
+    Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]],
+]:
+    data_prefix: str = kwargs["data_prefix"]
     # Validation
     if data_prefix == "hybrid":
         data_prefix = "data"
     # Setup
     hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]] = {}
-    # If the hists already exist, skip processing the tree and just return the hists instead (which is way faster!)
+    # If the output file already exist, skip processing the tree and just return the hists instead (which is way faster!)
     train_number = tree.filename.parent.name
-    pkl_filename = output / f"{train_number}_{tree.filename.with_suffix('.pgz').name}"
+    pkl_filename = dataset.output / f"{train_number}_{tree.filename.with_suffix('.pgz').name}"
     if pkl_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
         with gzip.GzipFile(pkl_filename, "r") as pkl_file:
             hists = pickle.load(pkl_file)  # type: ignore
-            return hists
+            return (hists,)
 
     # Since we're actually processing, we setup the output hists
     for iterative_splittings in [False, True]:
@@ -266,7 +265,7 @@ def analyze_single_tree_toy(
             hists[
                 analysis_objects.Identifier(iterative_splittings, jet_pt_bin)
             ] = analysis_objects.create_substructure_toy_hists(
-                iterative_splittings=iterative_splittings, z_cutoff=z_cutoff
+                iterative_splittings=iterative_splittings, z_cutoff=dataset.settings.z_cutoff
             )
 
     # Add a convenient wrapper.
@@ -288,13 +287,14 @@ def analyze_single_tree_toy(
     # Catch all failed cases.
     if not successfully_accessed_data:
         # Convert, write, and return the empty hists. We can't process this data :-(
-        return hists
+        return (hists,)
 
     # Loop over iterations (jet pt ranges, iterative splitting)
+    progress_manager = enlighten.get_manager()
     with progress_manager.counter(
         total=len(hists), desc="Analyzing", unit="variation", leave=False
-    ) as variations_counter:
-        for identifier, h in variations_counter(hists.items()):
+    ) as selections_counter:
+        for identifier, h in selections_counter(hists.items()):
             # We want to restrict a constant hybrid jet pt range for both true and hybrid.
             # This will allow us to compare to measured jet pt ranges.
             jet_pt_mask = identifier.jet_pt_bin.mask_array(data_jets.jet_pt)
@@ -317,44 +317,46 @@ def analyze_single_tree_toy(
             data_inputs = analysis_objects.FillHistogramInput(
                 restricted_data_jets,
                 restricted_data_jets_splittings,
-                *restricted_data_jets_splittings.dynamical_z(R=R),
+                *restricted_data_jets_splittings.dynamical_z(R=dataset.settings.jet_R),
             )
             # TODO: We absolutely shouldn't be calcuating the splitting properties here!
             # TODO: If we take the leading, we already know that it was only one splitting, and we already
             # TODO: know the values...
             true_inputs = analysis_objects.FillHistogramInput(
-                restricted_true_jets, restricted_true_jets_splittings, *restricted_true_jets_splittings.dynamical_z(R=R)
+                restricted_true_jets,
+                restricted_true_jets_splittings,
+                *restricted_true_jets_splittings.dynamical_z(R=dataset.settings.jet_R),
             )
             hists[identifier].dynamical_z.fill(
-                data_inputs=data_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
+                data_inputs=data_inputs, true_inputs=true_inputs, jet_R=dataset.settings.jet_R, weight=weight,
             )
             # Dynamical kt
             data_inputs = analysis_objects.FillHistogramInput(
                 restricted_data_jets,
                 restricted_data_jets_splittings,
-                *restricted_data_jets_splittings.dynamical_kt(R=R),
+                *restricted_data_jets_splittings.dynamical_kt(R=dataset.settings.jet_R),
             )
             true_inputs = analysis_objects.FillHistogramInput(
                 restricted_true_jets,
                 restricted_true_jets_splittings,
-                *restricted_true_jets_splittings.dynamical_kt(R=R),
+                *restricted_true_jets_splittings.dynamical_kt(R=dataset.settings.jet_R),
             )
             hists[identifier].dynamical_kt.fill(
-                data_inputs=data_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
+                data_inputs=data_inputs, true_inputs=true_inputs, jet_R=dataset.settings.jet_R, weight=weight,
             )
             # Dynamical time
             data_inputs = analysis_objects.FillHistogramInput(
                 restricted_data_jets,
                 restricted_data_jets_splittings,
-                *restricted_data_jets_splittings.dynamical_time(R=R),
+                *restricted_data_jets_splittings.dynamical_time(R=dataset.settings.jet_R),
             )
             true_inputs = analysis_objects.FillHistogramInput(
                 restricted_true_jets,
                 restricted_true_jets_splittings,
-                *restricted_true_jets_splittings.dynamical_time(R=R),
+                *restricted_true_jets_splittings.dynamical_time(R=dataset.settings.jet_R),
             )
             hists[identifier].dynamical_time.fill(
-                data_inputs=data_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
+                data_inputs=data_inputs, true_inputs=true_inputs, jet_R=dataset.settings.jet_R, weight=weight,
             )
             # Leading kt
             data_inputs = analysis_objects.FillHistogramInput(
@@ -364,18 +366,18 @@ def analyze_single_tree_toy(
                 restricted_true_jets, restricted_true_jets_splittings, *restricted_true_jets_splittings.leading_kt()
             )
             hists[identifier].leading_kt.fill(
-                data_inputs=data_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
+                data_inputs=data_inputs, true_inputs=true_inputs, jet_R=dataset.settings.jet_R, weight=weight,
             )
             # Leading kt with z cutoff
             data_inputs = analysis_objects.FillHistogramInput(
                 restricted_data_jets,
                 restricted_data_jets_splittings,
-                *restricted_data_jets_splittings.leading_kt(z_cutoff=z_cutoff),
+                *restricted_data_jets_splittings.leading_kt(z_cutoff=dataset.settings.z_cutoff),
             )
             true_inputs = analysis_objects.FillHistogramInput(
                 restricted_true_jets,
                 restricted_true_jets_splittings,
-                *restricted_true_jets_splittings.leading_kt(z_cutoff=z_cutoff),
+                *restricted_true_jets_splittings.leading_kt(z_cutoff=dataset.settings.z_cutoff),
             )
             # Ensure that there are sufficient values!
             # TODO: This doesn't work because the true frequently fails. They somehow need to be the same length...
@@ -384,13 +386,11 @@ def analyze_single_tree_toy(
             #    data_inputs=data_inputs, true_inputs=true_inputs, jet_R=R, weight=weight,
             # )
 
-    IPython.start_ipython(user_ns=locals())
-
     # Store hists with pickle because it takes too longer otherwise.
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
         pickle.dump(hists, pkl_file)  # type: ignore
 
-    return hists
+    return (hists,)
 
 
 def _select_and_retrieve_splittings(
@@ -632,7 +632,7 @@ def analyze_single_tree_embedding(
 
     # Catch all failed cases.
     if not successfully_accessed_data:
-        # Convert, write, and return the empty hists. We can't process this data :-(
+        # Return the empty hists. We can't process this data :-(
         return hists, matching_hists
 
     # Loop over iterations (jet pt ranges, iterative splitting)
@@ -737,9 +737,7 @@ def analyze_single_tree_embedding(
                 hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=dataset.settings.jet_R, weight=weight,
             )
 
-    # Convert to BinnedData and store the hists
-    # for h in hists.values():
-    #    h.convert_boost_histograms_to_binned_data()
+    # Store the hists
     # Store hists with pickle because it takes too longer otherwise.
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
         pickle.dump((hists, matching_hists), pkl_file)  # type: ignore
@@ -896,77 +894,6 @@ def matching(
 
     ...
     return matching_hists
-
-
-def run_toy(
-    collision_system: str,
-    data_prefix: str,
-    jet_pt_bins: Sequence[helpers.RangeSelector],
-    dataset_config_filename: Path,
-    output: Path,
-) -> Tuple[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]], Path]:
-    # Setup
-    z_cutoff = 0.2
-    # Configuration
-    y = setup_yaml()
-    with open(dataset_config_filename, "r") as f:
-        config = y.load(f)
-    dataset_config = config["datasets"][collision_system]["dataset"]
-    dataset_name = dataset_config["name"]
-    # finalize setup
-    output = output / collision_system / dataset_name
-    output.mkdir(parents=True, exist_ok=True)
-
-    # Retrieve and setup data
-    selected_dataset_config = config["available_datasets"][dataset_name]
-    R = selected_dataset_config["jet_R"]
-    dm = data_manager.IterateTrees(
-        filenames=selected_dataset_config["files"],
-        tree_name=selected_dataset_config["tree_name"],
-        branches=dataset_config["branches"],
-    )
-    logger.info("Setup complete. Beginning processing of trees.")
-
-    # Iterate over trees.
-    progress_manager = enlighten.get_manager()
-    results: List[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]]] = []
-    with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
-        for tree in tree_counter(dm):
-            logger.info(f"Processing toy tree from file {tree.filename}")
-            tree_hists = analyze_single_tree_toy(
-                tree,
-                data_prefix=data_prefix,
-                z_cutoff=z_cutoff,
-                R=R,
-                jet_pt_bins=jet_pt_bins,
-                progress_manager=progress_manager,
-                y=y,
-                output=output,
-                force_reprocessing=False,
-            )
-            # hists[tree.filename] = tree_hists
-            results.append(tree_hists)
-
-    # Convert hists from boost hist to pachyderm
-    # Still need to convert to BinnedData (because we stored data with pickle instead to speed up writing).
-    for hists in results:
-        for h in hists.values():
-            h.convert_boost_histograms_to_binned_data()
-
-    # Merge the hists
-    full_hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]] = {}
-    for k in results[0].keys():
-        full_hists[k] = cast(
-            analysis_objects.Hists[analysis_objects.SubstructureToyHists], sum([hists[k] for hists in results])
-        )
-
-    # Write out the merged hists
-    with open(output / "toy_hists.yaml", "w") as f:
-        y.dump(full_hists, f)
-
-    progress_manager.stop()
-
-    return full_hists, output
 
 
 def _wrap_multiprocessing(
@@ -1182,12 +1109,12 @@ def embed_pythia_entry_point() -> None:
 
 if __name__ == "__main__":
     helpers.setup_logging()
-    # multiprocessing.set_start_method("spawn")
 
     # Setup and run
-    collision_system = "embedPythia"
+    config_filename = Path("config") / "datasets.yaml"
     # data_prefix = "hybrid"
     # collision_system = f"toy_true_{data_prefix}_splittings_iterative_allTrueSplittings_delta_R_040"
+    collision_system = "PbPb"
     jet_pt_bins = [
         # Broadest range
         helpers.RangeSelector(min=40, max=120),
@@ -1199,39 +1126,43 @@ if __name__ == "__main__":
         helpers.RangeSelector(min=80, max=100),
         helpers.RangeSelector(min=100, max=120),
     ]
-    # hists, output = run(
-    #    collision_system=collision_system,
-    #    jet_pt_bins=jet_pt_bins,
-    #    dataset_config_filename=Path("config") / "datasets.yaml",
-    #    output=Path("output"),
-    # )
-    # plot_results.lund_plane(all_hists=hists, path=output)
-    # hists, output = run_toy(
-    #    collision_system=collision_system,
-    #    data_prefix=data_prefix,
-    #    jet_pt_bins=jet_pt_bins,
-    #    dataset_config_filename=Path("config") / "datasets.yaml",
-    #    output=Path("output"),
-    # )
-    # plot_results.toy(all_toy_hists=hists, data_prefix=data_prefix, path=output)
-    # response_hists, matching_hists, output = run_embedding(
-    #    collision_system=collision_system,
-    #    jet_pt_bins=jet_pt_bins,
-    #    dataset_config_filename=Path("config") / "datasets.yaml",
-    #    output=Path("output"),
-    #    # plot_only=True,
-    #    use_multiprocessing=True,
-    # )
-    (response_hists, matching_hists), dataset = run_shared(  # type: ignore
+    z_cutoff = 0.2
+    # Standard analysis
+    (data_hists,), dataset = run_shared(
         collision_system=collision_system,
-        analysis_function=analyze_single_tree_embedding,
-        dataset_config_filename=Path("config") / "datasets.yaml",
-        merged_hists_filename="embedding_hists",
+        analysis_function=analyze_single_tree,
+        dataset_config_filename=config_filename,
+        merged_hists_filename="data_hists",
         jet_pt_bins=jet_pt_bins,
-        z_cutoff=0.2,
-        # use_multiprocessing=True,
+        z_cutoff=z_cutoff,
+        number_of_cores=4,
     )
-    plot_results.responses(all_response_hists=response_hists, path=dataset.output)
-    plot_results.matching(all_matching_hists=matching_hists, path=dataset.output)
+    plot_results.lund_plane(all_hists=data_hists, path=dataset.output)
+    # Toy
+    # (toy_hists,), dataset = run_shared(
+    #    collision_system=collision_system,
+    #    analysis_function=analyze_single_tree_toy,
+    #    dataset_config_filename=config_filename,
+    #    merged_hists_filename="toy_hists",
+    #    jet_pt_bins=jet_pt_bins,
+    #    z_cutoff=z_cutoff,
+    #    number_of_cores=2,
+    #    additional_kwargs_for_analysis=dict(
+    #        data_prefix=data_prefix,
+    #    )
+    # )
+    # plot_results.toy(all_toy_hists=toy_hists, data_prefix=data_prefix, path=dataset.output)
+    # Embedding
+    # (response_hists, matching_hists), dataset = run_shared(  # type: ignore
+    #    collision_system=collision_system,
+    #    analysis_function=analyze_single_tree_embedding,
+    #    dataset_config_filename=config_filename,
+    #    merged_hists_filename="embedding_hists",
+    #    jet_pt_bins=jet_pt_bins,
+    #    z_cutoff=z_cutoff,
+    #    number_of_cores=1,
+    # )
+    # plot_results.responses(all_response_hists=response_hists, path=dataset.output)
+    # plot_results.matching(all_matching_hists=matching_hists, path=dataset.output)
 
     IPython.start_ipython(user_ns=locals())
