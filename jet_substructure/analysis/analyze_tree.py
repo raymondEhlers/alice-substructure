@@ -1121,7 +1121,8 @@ def run_shared(  # noqa: C901
     ] = []
     with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
         if use_multiprocessing:
-            with Pool(cores=2) as pool:
+            # Only use 2 nodes because memory usage may become too large...
+            with Pool(nodes=2) as pool:
                 for r in tree_counter(pool.imap(analyze_single_tree_func_multiprocessing, dm_iterator)):
                     results.append(r)
         else:
