@@ -65,6 +65,9 @@ class UprootArray(Collection[T]):
     def __truediv__(self, other):  # type: ignore
         raise NotImplementedError("Just typing information.")
 
+    def __pow__(self, p: float) -> UprootArray[T]:
+        raise NotImplementedError("Just typing information.")
+
     def argmax(self) -> UprootArray[int]:
         raise NotImplementedError("Just typing information.")
 
