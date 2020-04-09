@@ -63,7 +63,7 @@ class MatchingIdentifier(Identifier):
         return str(super())
 
     def display_str(self, jet_pt_label: str = "") -> str:
-        base_str = f"{self.iterative_splittings_label.capitalize()} splittings\n${self.jet_pt_bin.display_str(label=jet_pt_label)}"
+        base_str = super().display_str(jet_pt_label=jet_pt_label)
         if self.hybrid_kt_cut > 0:
             base_str += "\n" + fr"$k_{{\text{{T}}}}^{{\text{{hybrid}}}} > {self.hybrid_kt_cut}$"
         return base_str
