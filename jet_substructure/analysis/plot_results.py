@@ -17,6 +17,7 @@ import numpy as np
 import pachyderm.plot
 from pachyderm import binned_data
 
+from jet_substructure.analysis import analysis_methods
 from jet_substructure.base import analysis_objects, helpers
 
 
@@ -1164,3 +1165,127 @@ def responses(
                     ),
                     path=path,
                 )
+
+
+def _plot_compare_kt(
+    technique: str,
+    identifier: analysis_objects.Identifier,
+    data_hists: analysis_objects.SubstructureHists,
+    embedded_hists: analysis_objects.SubstructureHists,
+    plot_config: PlotConfig,
+    path: Path,
+) -> None:
+    # Setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+    logger.info(f"Plotting response kt spectra for {technique}, {identifier}, kt")
+
+    h_data: Union[bh.Histogram, binned_data.BinnedData] = data_hists.kt
+    h_embed: Union[bh.Histogram, binned_data.BinnedData] = embedded_hists.kt
+    if isinstance(h_data, bh.Histogram):
+        h_data = binned_data.BinnedData.from_existing_data(h_data)
+    if isinstance(h_embed, bh.Histogram):
+        h_embed = binned_data.BinnedData.from_existing_data(h_embed)
+
+    # Normalization
+    # Scale by bin widths and number of jets
+    h_data /= data_hists.n_jets
+    h_data /= h_data.axes[0].bin_widths
+    h_embed /= embedded_hists.n_jets
+    h_embed /= h_embed.axes[0].bin_widths
+
+    # Plot
+    for h, label in [(h_data, "Data"), (h_embed, "Hybrid")]:
+        ax.errorbar(
+            h.axes[0].bin_centers,
+            h.values,
+            yerr=h.errors,
+            xerr=h.axes[0].bin_widths / 2,
+            marker=".",
+            linestyle="",
+            label=label,
+        )
+
+        ## Fit to power law.
+        # fit = analysis_methods.fit_kt_spectrum(h)
+        # fit_hist = binned_data.BinnedData(
+        #    axes = h.axes[0].bin_edges,
+        #    values = fit(fit.fit_result.x),
+        #    variances = fit.fit_result.errors ** 2,
+        # )
+
+        ## Complete lael with fit info:
+        # label = label + fr": $kt^{{({fit.fit_result.values_at_minimum['p']:.02} \pm {fit.fit_result.errors_on_parameters['p']:.02})}}$"
+
+        # plot = ax.plot(fit_hist.axes[0].bin_centers, fit_hist.values, label = label)
+        ## Plot the fit errors.
+        ## We need to ensure that the errors are copied so we don't accidentally modify the fit result.
+        # ax.fill_between(
+        #    fit_hist.axes[0].bin_centers,
+        #    fit_hist.values - fit_hist.errors, fit_hist.values + fit_hist.errors,
+        #    facecolor = plot[0].get_color(), alpha = 0.8
+        # )
+
+    # Labeling
+    text = identifier.display_str(jet_pt_label="hybrid")
+    text += "\n" + data_hists.title
+    ax.text(
+        0.95,
+        0.95,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="right",
+        verticalalignment="top",
+        multialignment="right",
+    )
+
+    # Presentation
+    ax.set_xlabel(plot_config.x_label)
+    ax.set_ylabel(plot_config.y_label)
+    ax.legend(frameon=False, loc="lower left")
+    ax.set_yscale("log")
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.14,
+        bottom=0.11,
+        right=0.99,
+        top=0.98,
+    )
+
+    # Store and reset
+    fig.savefig(path / f"kt_spectra_comparison_{str(identifier)}_{technique}.pdf")
+    plt.close(fig)
+
+
+def compare_kt(
+    all_data_hists: Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
+    all_embedded_hists: Mapping[
+        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]
+    ],
+    data_dataset: analysis_objects.Dataset,
+    embedded_dataset: analysis_objects.Dataset,
+) -> None:
+    for (data_identifier, data_hists), (embedded_identifier, embedded_hists) in zip(
+        all_data_hists.items(), all_embedded_hists.items()
+    ):
+        for (technique, d_hists), (_, e_hists) in zip(data_hists, embedded_hists):
+            if d_hists.n_jets == 0 or e_hists.n_jets == 0:
+                logger.warning(f"No jets within {data_identifier}_{technique}. Skipping bin!")
+                logger.warning(f"data n_jets: {d_hists.n_jets}, hybrid n_jets: {e_hists.n_jets}")
+                continue
+
+            _plot_compare_kt(
+                technique=technique,
+                identifier=data_identifier,
+                data_hists=d_hists,
+                embedded_hists=e_hists,
+                plot_config=PlotConfig(
+                    name="kt_spectra",
+                    x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                    y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                ),
+                path=data_dataset.output,
+            )
