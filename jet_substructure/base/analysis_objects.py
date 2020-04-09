@@ -630,9 +630,9 @@ class SubstructureResponseHists(SubstructureHistsBase):
         )
         self.response_z.fill(
             hybrid_inputs.jets.jet_pt,
-            hybrid_inputs.splittings.kt.pad(1).fillna(0).flatten(),
+            hybrid_inputs.splittings.z.pad(1).fillna(0).flatten(),
             true_inputs.jets.jet_pt,
-            true_inputs.splittings.kt.pad(1).fillna(0).flatten(),
+            true_inputs.splittings.z.pad(1).fillna(0).flatten(),
             weight=weight,
         )
         self.response_delta_R.fill(
