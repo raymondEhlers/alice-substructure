@@ -59,7 +59,7 @@ class MatchingIdentifier(Identifier):
 
     def __str__(self) -> str:
         if self.hybrid_kt_cut > 0:
-            return f"{str(super())}_hybridMinKt_{self.hybrid_kt_cut}"
+            return f"{super().__str__()}_hybridMinKt_{self.hybrid_kt_cut}"
         return str(super())
 
     def display_str(self, jet_pt_label: str = "") -> str:
