@@ -620,6 +620,7 @@ def analyze_single_tree_embedding(  # noqa: C901
     jet_pt_bins: Sequence[helpers.RangeSelector],
     hists_filename_stem: str,
     force_reprocessing: bool = False,
+    scale_n_jets_when_loading_hists: bool = False,
 ) -> Tuple[
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
@@ -645,19 +646,31 @@ def analyze_single_tree_embedding(  # noqa: C901
     matching_hists: Dict[
         analysis_objects.MatchingIdentifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
     ] = {}
-    # If the output file already exist, skip processing the tree and just return the hists instead (which is way faster!)
+    # Determine scale factor
+    # NOTE: This relies on the train_number being up a directory!
     train_number = tree.filename.parent.name
+    pt_hard_bin = dataset.settings.train_number_to_pt_hard_bin[int(train_number)]
+    scale_factor = dataset.settings.scale_factors[pt_hard_bin]
+
+    # If the output file already exist, skip processing the tree and just return the hists instead (which is way faster!)
     pkl_filename = dataset.output / f"{train_number}_{tree.filename.stem}_{hists_filename_stem}.pgz"
     if pkl_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
         with gzip.GzipFile(pkl_filename, "r") as pkl_file:
             true_hists, hybrid_hists, response_hists, matching_hists = pickle.load(pkl_file)  # type: ignore
+            # NOTE: This is transient for loading files this way. However, it won't be transient if we load
+            #       for just plotting (as it will be saved in the merge hists)
+            if scale_n_jets_when_loading_hists:
+                logger.warning(
+                    "Rescaling n_jets by scale factor because it was forgotten during processing. This is transient for the individual files, but not for the merged!"
+                )
+                for hists in true_hists.values():
+                    for technique, technique_hists in hists:
+                        technique_hists.n_jets *= scale_factor
+                for hists in hybrid_hists.values():
+                    for technique, technique_hists in hists:
+                        technique_hists.n_jets *= scale_factor
             return true_hists, hybrid_hists, response_hists, matching_hists
-
-    # Determine scale factor
-    # NOTE: This relies on the train_number being up a directory!
-    pt_hard_bin = dataset.settings.train_number_to_pt_hard_bin[int(train_number)]
-    scale_factor = dataset.settings.scale_factors[pt_hard_bin]
 
     # Since we're actually processing, we setup the output hists
     for iterative_splittings in [False, True]:
@@ -1020,6 +1033,7 @@ def run_shared(  # noqa: C901
     # Have a special option if we're plotting only so we can just read the final files.
     # Even though merging isn't very hard, all of that I/O is still slow than reading them once.
     if plot_only:
+        logger.info(f"Loading system {collision_system} with dataset {dataset.name} for plotting only")
         if dataset.hists_filename.exists():
             # Read the stored hists.
             # We don't use YAML because it would be super slow!
@@ -1202,8 +1216,11 @@ if __name__ == "__main__":
         jet_pt_bins=jet_pt_bins,
         z_cutoff=z_cutoff,
         plot_only=plot_only,
-        force_reprocessing=True,
-        number_of_cores=1,
+        force_reprocessing=False,
+        number_of_cores=2,
+        # additional_kwargs_for_analysis=dict(
+        #    scale_n_jets_when_loading_hists=True,
+        # )
     )
     # TODO: Add some additional identifier for lund plane
     # True, hybrid hists
