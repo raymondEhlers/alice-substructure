@@ -343,7 +343,11 @@ class SubstructureHists(SubstructureHistsBase):
         )
 
     def fill(
-        self, inputs: FillHistogramInput, jet_R: float, splitting_number: Optional[UprootArray[int]] = None,
+        self,
+        inputs: FillHistogramInput,
+        jet_R: float,
+        splitting_number: Optional[UprootArray[int]] = None,
+        weight: float = 1.0,
     ) -> None:
         # Validation
         # Give a useful error message
@@ -364,22 +368,24 @@ class SubstructureHists(SubstructureHistsBase):
         )
         # Need to store the number of jets along the histograms.
         self.n_jets += inputs.n_jets
-        self.values.fill(inputs.values)
-        self.kt.fill(inputs.splittings.kt.flatten())
-        self.z.fill(inputs.splittings.z.flatten())
-        self.delta_R.fill(inputs.splittings.delta_R.flatten())
-        self.theta.fill(inputs.splittings.theta(jet_R).flatten())
+        self.values.fill(inputs.values, weight=weight)
+        self.kt.fill(inputs.splittings.kt.flatten(), weight=weight)
+        self.z.fill(inputs.splittings.z.flatten(), weight=weight)
+        self.delta_R.fill(inputs.splittings.delta_R.flatten(), weight=weight)
+        self.theta.fill(inputs.splittings.theta(jet_R).flatten(), weight=weight)
         if splitting_number is None:
             splitting_number = _calculate_splitting_number(inputs.indices)
-        self.splitting_number.fill(splitting_number)
+        self.splitting_number.fill(splitting_number, weight=weight)
         # Select only splittings with kt > 5.
         # +1 because splittings counts from 1, but indexing starts from 0.
         # NOTE: We aren't counting 0 here if it fails, so we aren't preserving counts!
         #       In this simpler case, we can just select directly on the indices.
         splitting_number_perturbative = (inputs.indices + 1)[inputs.splittings.kt > 5].flatten()
-        self.splitting_number_perturbative.fill(splitting_number_perturbative)
-        self.total_number_of_splittings.fill(inputs.splittings.counts)
-        self.lund_plane.fill(np.log(1.0 / inputs.splittings.delta_R.flatten()), np.log(inputs.splittings.kt.flatten()))
+        self.splitting_number_perturbative.fill(splitting_number_perturbative, weight=weight)
+        self.total_number_of_splittings.fill(inputs.splittings.counts, weight=weight)
+        self.lund_plane.fill(
+            np.log(1.0 / inputs.splittings.delta_R.flatten()), np.log(inputs.splittings.kt.flatten()), weight=weight
+        )
 
         # Check the second peak in the z_cutoff recursive Lund Plane.
         if (np.log(1.0 / inputs.splittings.delta_R.flatten()) < 2).any() and (
