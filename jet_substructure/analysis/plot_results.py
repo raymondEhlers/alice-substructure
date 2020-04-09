@@ -445,6 +445,7 @@ def _plot_matching(
     path: Path,
 ) -> None:
     fig, axes = plt.subplots(3, 3, figsize=(10, 10), sharex=True, sharey=True)
+    fig_single, ax = plt.subplots(figsize=(10, 8))
     logger.info(f"Plotting matching hist for {technique}, {identifier}")
 
     # NOTE: We convert the hists here to ensure that we're working with copies!
@@ -462,6 +463,15 @@ def _plot_matching(
         linestyle="",
         # label="",
     )
+    ax.errorbar(
+        both_correct.axes[0].bin_centers,
+        both_correct.values,
+        yerr=both_correct.errors,
+        xerr=both_correct.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Pure matches",
+    )
     # Skip this panel
     # axes[0, 1].set_visible(False)
     # Leading wasn't tagged, but subleading was correctly tagged as subleading.
@@ -478,6 +488,15 @@ def _plot_matching(
         linestyle="",
         # label="",
     )
+    ax.errorbar(
+        leading_failed_subleading_correct.axes[0].bin_centers,
+        leading_failed_subleading_correct.values,
+        yerr=leading_failed_subleading_correct.errors,
+        xerr=leading_failed_subleading_correct.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Leading unmatched, subleading matched",
+    )
     # Skip this panel
     # axes[1, 0].set_visible(False)
     # Swapped (ie. reversed)
@@ -492,6 +511,15 @@ def _plot_matching(
         linestyle="",
         # label="",
     )
+    ax.errorbar(
+        reversed.axes[0].bin_centers,
+        reversed.values,
+        yerr=reversed.errors,
+        xerr=reversed.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Swaps",
+    )
     # Leading failed, subleading mistag
     leading_failed_subleading_mistag = binned_data.BinnedData.from_existing_data(hists.leading_failed_subleading_mistag)
     leading_failed_subleading_mistag /= normalization
@@ -503,6 +531,15 @@ def _plot_matching(
         marker=".",
         linestyle="",
         # label="",
+    )
+    ax.errorbar(
+        leading_failed_subleading_mistag.axes[0].bin_centers,
+        leading_failed_subleading_mistag.values,
+        yerr=leading_failed_subleading_mistag.errors,
+        xerr=leading_failed_subleading_mistag.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Leading unmatched, subleading in leading",
     )
     # Leading correct, subleading failed
     leading_correct_subleading_failed = binned_data.BinnedData.from_existing_data(
@@ -518,6 +555,15 @@ def _plot_matching(
         linestyle="",
         # label="",
     )
+    ax.errorbar(
+        leading_correct_subleading_failed.axes[0].bin_centers,
+        leading_correct_subleading_failed.values,
+        yerr=leading_correct_subleading_failed.errors,
+        xerr=leading_correct_subleading_failed.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Leading matched, subleading unmatched",
+    )
     # Leading mistag, subleading failed
     leading_mistag_subleading_failed = binned_data.BinnedData.from_existing_data(hists.leading_mistag_subleading_failed)
     leading_mistag_subleading_failed /= normalization
@@ -529,6 +575,15 @@ def _plot_matching(
         marker=".",
         linestyle="",
         # label="",
+    )
+    ax.errorbar(
+        leading_mistag_subleading_failed.axes[0].bin_centers,
+        leading_mistag_subleading_failed.values,
+        yerr=leading_mistag_subleading_failed.errors,
+        xerr=leading_mistag_subleading_failed.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Leading in subleading, subleading unmatched",
     )
     # Both failed
     both_failed = binned_data.BinnedData.from_existing_data(hists.both_failed)
@@ -542,10 +597,19 @@ def _plot_matching(
         linestyle="",
         # label="",
     )
+    ax.errorbar(
+        both_failed.axes[0].bin_centers,
+        both_failed.values,
+        yerr=both_failed.errors,
+        xerr=both_failed.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+        label="Leading, subleading unmatched",
+    )
 
     # Set range
-    for ax in axes.flat:
-        ax.set_ylim([0, 1.2])
+    for ax_temp in axes.flat:
+        ax_temp.set_ylim([0, 1.2])
 
     # Labeling
     text = identifier.display_str()
@@ -571,8 +635,6 @@ def _plot_matching(
     axes[2, 0].set_xlabel(r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$")
     axes[2, 1].set_xlabel(r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$")
     axes[2, 2].set_xlabel(r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$")
-    # ax.set_xlabel(r"$\log{(1/\Delta R)}$")
-    # ax.set_ylabel(r"$\log{(k_{\text{T}})}$")
     fig.tight_layout()
     fig.subplots_adjust(
         # Reduce spacing between subplots
@@ -588,6 +650,42 @@ def _plot_matching(
     # Store and reset
     fig.savefig(path / f"subjet_matching_{technique}_{str(identifier)}.pdf")
     plt.close(fig)
+
+    # Labeling
+    text = identifier.display_str()
+    text += "\n" + hists.title
+    ax.text(
+        0.975,
+        0.55,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="right",
+        verticalalignment="center",
+        multialignment="right",
+    )
+
+    # Presentation
+    # Axis labels
+    ax.set_ylabel("Tagging fraction")
+    ax.set_xlabel(r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$")
+    ax.set_ylim([1e-3, 10])
+    ax.set_yscale("log")
+    ax.legend(frameon=False, loc="upper left", ncol=2, fontsize=14)
+    fig_single.tight_layout()
+    fig_single.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.10,
+        bottom=0.08,
+        right=0.99,
+        top=0.96,
+    )
+
+    # Store and reset
+    fig_single.savefig(path / f"subjet_matching_{technique}_{str(identifier)}_single_figure.pdf")
+    plt.close(fig_single)
 
 
 def matching(
