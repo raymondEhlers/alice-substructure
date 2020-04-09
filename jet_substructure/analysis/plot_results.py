@@ -7,7 +7,7 @@
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Mapping, Optional, Tuple, Union
 
 import attr
 import boost_histogram as bh
@@ -329,7 +329,8 @@ def _plot_lund_plane(
 
 
 def lund_plane(
-    all_hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]], path: Path
+    all_hists: Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
+    path: Path,
 ) -> None:
     # Validation
     path.mkdir(parents=True, exist_ok=True)
@@ -590,7 +591,7 @@ def _plot_matching(
 
 
 def matching(
-    all_matching_hists: Dict[
+    all_matching_hists: Mapping[
         analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
     ],
     path: Path,
@@ -680,7 +681,7 @@ def _plot_toy(
 
 
 def toy(
-    all_toy_hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]],
+    all_toy_hists: Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureToyHists]],
     data_prefix: str,
     path: Path,
 ) -> None:
@@ -990,7 +991,7 @@ def _plot_response_kt_distributions(
 
 
 def responses(
-    all_response_hists: Dict[
+    all_response_hists: Mapping[
         analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]
     ],
     path: Path,
