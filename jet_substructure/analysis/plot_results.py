@@ -749,9 +749,7 @@ def _plot_response(
     path: Path,
 ) -> None:
     # Setup
-    fig, ax = plt.subplots(figsize=(8, 6))
     logger.info(f"Plotting response hist for {technique}, {identifier}, {attribute_name}")
-
     h: Union[bh.Histogram, binned_data.BinnedData] = getattr(hists, f"response_{attribute_name}")
     if isinstance(h, bh.Histogram):
         h = binned_data.BinnedData.from_existing_data(h)
@@ -763,6 +761,9 @@ def _plot_response(
     if len(values[values > 0]) == 0:
         logger.warning(f"No values left for {technique}, {identifier}, {attribute_name}. Skipping")
         return
+
+    # Finish setup
+    fig, ax = plt.subplots(figsize=(8, 6))
 
     # Determine the normalization range
     z_axis_range = {
