@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import logging
 import typing
 from typing import Any, Tuple, Union
 
@@ -15,20 +16,23 @@ from pachyderm import binned_data, histogram
 from jet_substructure.base.helpers import UprootArray
 
 
+logger = logging.getLogger(__name__)
+
+
 @typing.overload
-def power_law(x: float, p: float) -> float:
+def power_law(x: float, a: float, n: float) -> float:
     ...
 
 
 @typing.overload
-def power_law(x: UprootArray[float], p: float) -> UprootArray[float]:
+def power_law(x: UprootArray[float], a: float, n: float) -> UprootArray[float]:
     ...
 
 
 def power_law(
-    x: Union[UprootArray[float], np.ndarray, float], p: float
+    x: Union[UprootArray[float], np.ndarray, float], a: float, n: float
 ) -> Union[UprootArray[float], np.ndarray, float]:
-    return x ** p
+    return (a * x) ** -n
 
 
 class PowerLaw(pachyderm.fit.Fit):  # type: ignore
@@ -44,7 +48,8 @@ class PowerLaw(pachyderm.fit.Fit):  # type: ignore
 
     def _setup(self, h: histogram.Histogram1D) -> Tuple[histogram.Histogram1D, pachyderm.fit.T_FitArguments]:
         """ Setup the histogram and arguments for the fit. """
-        return h, {"p": -1, "limit_p": (-10, 0), "error_pedestal": 0.1}
+        logger.debug(f"h.x: {h.x}")
+        return h, {"n": 1, "limit_n": (0.001, 10), "error_n": 0.1, "a": 1, "limit_a": (1e-4, 1e4), "error_a": 0.1}
 
 
 def fit_kt_spectrum(kt_spectra: binned_data.BinnedData) -> PowerLaw:
@@ -55,7 +60,7 @@ def fit_kt_spectrum(kt_spectra: binned_data.BinnedData) -> PowerLaw:
     Returns:
         Fit object (containing the fit result)
     """
-    power_law = PowerLaw(use_log_likelihood=False)
+    power_law = PowerLaw(use_log_likelihood=True)
     power_law.fit_result = power_law.fit(kt_spectra.to_histogram1D())
     print(
         fr"kt^({power_law.fit_result.values_at_minimum['p']:.02} \pm {power_law.fit_result.errors_on_parameters['p']:.02})"
