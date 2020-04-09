@@ -46,6 +46,7 @@ def _plot_distribution(
     attribute_name: str,
     hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
     identifier: analysis_objects.Identifier,
+    jet_type_label: str,
     plot_config: PlotConfig,
     path: Path,
     ratio_denominator_hists: Optional[analysis_objects.Hists[analysis_objects.SubstructureHists]] = None,
@@ -110,7 +111,7 @@ def _plot_distribution(
             )
 
     # Labeling
-    text = identifier.display_str()
+    text = identifier.display_str(jet_pt_label=jet_type_label)
     ax.text(
         0.95,
         0.95,
@@ -158,6 +159,7 @@ def _plot_total_number_of_splittings(
     masked_recursive_hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
     masked_iterative_hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
     identifier: analysis_objects.Identifier,
+    jet_type_label: str,
     plot_config: PlotConfig,
     path: Path,
 ) -> None:
@@ -221,7 +223,7 @@ def _plot_total_number_of_splittings(
     )
 
     # Labeling
-    text = identifier.display_str()
+    text = identifier.display_str(jet_pt_label=jet_type_label)
     ax.text(
         0.95,
         0.95,
@@ -258,8 +260,93 @@ def _plot_total_number_of_splittings(
     plt.close(fig)
 
 
+def _plot_distribution_in_different_pt_bins(
+    all_hists: Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
+    jet_type_label: str,
+    attribute_name: str,
+    selected_technique: str,
+    plot_config: PlotConfig,
+    path: Path,
+) -> None:
+    for iterative_splittings in [False, True]:
+        fig, ax = plt.subplots(figsize=(8, 6))
+        for identifier, selected_hists in all_hists.items():
+            if identifier.iterative_splittings != iterative_splittings:
+                continue
+            splittings_label = f"{identifier.iterative_splittings_label}_splittings"
+
+            technique_hists = getattr(selected_hists, selected_technique)
+            h: Union[bh.histogram, binned_data.BinnedData] = getattr(technique_hists, attribute_name)
+            if isinstance(h, bh.Histogram):
+                h = binned_data.BinnedData.from_existing_data(h)
+
+            if technique_hists.n_jets == 0:
+                logger.warning(f"No jets within {identifier}_{selected_technique}. Skipping bin!")
+                continue
+
+            # Scale by bin widths and number of jets
+            h /= h.axes[0].bin_widths
+            h /= technique_hists.n_jets
+
+            logger.debug(
+                f"Plotting {identifier}, {selected_technique}, {attribute_name}, n_jets: {technique_hists.n_jets}"
+            )
+            # Plot
+            ax.errorbar(
+                h.axis.bin_centers,
+                h.values,
+                yerr=h.errors,
+                xerr=h.axis.bin_widths / 2,
+                marker=".",
+                linestyle="",
+                label=f"${identifier.jet_pt_bin.display_str(label=jet_type_label)}$",
+            )
+
+        # Labeling
+        # Make it into (for example), Iterative splittings
+        text = " ".join(splittings_label.split("_")).capitalize()
+        text += "\n" + technique_hists.title
+        ax.text(
+            0.95,
+            0.95,
+            text,
+            transform=ax.transAxes,
+            horizontalalignment="right",
+            verticalalignment="top",
+            multialignment="right",
+        )
+
+        # Presentation
+        ax.legend(frameon=False, loc=plot_config.legend_location)
+        if plot_config.log_y:
+            ax.set_yscale("log")
+        ax.set_xlabel(plot_config.x_label)
+        ax.set_ylabel(plot_config.y_label)
+        fig.tight_layout()
+        fig.subplots_adjust(
+            # Reduce spacing between subplots
+            hspace=0,
+            wspace=0,
+            # Reduce external spacing
+            left=0.13,
+            bottom=0.11,
+            right=0.99,
+            top=0.98,
+        )
+
+        # Store and reset
+        filename = path / f"{attribute_name}_jet_pt_comparison_{selected_technique}_{splittings_label}.pdf"
+        logger.debug(f"Saving to filename {filename}")
+        fig.savefig(filename)
+        plt.close(fig)
+
+
 def _plot_lund_plane(
-    technique: str, identifier: analysis_objects.Identifier, hists: analysis_objects.SubstructureHists, path: Path,
+    technique: str,
+    identifier: analysis_objects.Identifier,
+    jet_type_label: str,
+    hists: analysis_objects.SubstructureHists,
+    path: Path,
 ) -> None:
     # Setup
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -297,7 +384,7 @@ def _plot_lund_plane(
     fig.colorbar(mesh, pad=0.02)
 
     # Labeling
-    text = identifier.display_str()
+    text = identifier.display_str(jet_pt_label=jet_type_label)
     text += "\n" + hists.title
     ax.text(
         0.95,
@@ -329,12 +416,15 @@ def _plot_lund_plane(
     plt.close(fig)
 
 
-def lund_plane(
+def lund_plane(  # noqa: C901
     all_hists: Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
+    jet_type_label: str,
     path: Path,
 ) -> None:
     # Validation
+    path = path / jet_type_label
     path.mkdir(parents=True, exist_ok=True)
+    logger.debug(f"Storing plots in {path}")
 
     # Plot labels
     kt_label = PlotConfig(
@@ -392,12 +482,15 @@ def lund_plane(
         # the inclusive case.
         # ("total_number_of_splittings", total_number_of_splittings_label),
     ]
+    # Keep track of this for the final plots
+    techniques = set()
     for identifier, masked_hists in all_hists.items():
         for attribute_name, plot_config in distributions:
             _plot_distribution(
                 attribute_name=attribute_name,
                 hists=masked_hists,
                 identifier=identifier,
+                jet_type_label=jet_type_label,
                 plot_config=plot_config,
                 path=path,
             )
@@ -407,6 +500,7 @@ def lund_plane(
                     attribute_name=attribute_name,
                     hists=masked_hists,
                     identifier=identifier,
+                    jet_type_label=jet_type_label,
                     plot_config=plot_config,
                     path=path,
                     ratio_denominator_hists=all_hists[
@@ -425,6 +519,7 @@ def lund_plane(
                         analysis_objects.Identifier(iterative_splittings=True, jet_pt_bin=identifier.jet_pt_bin)
                     ],
                     identifier=identifier,
+                    jet_type_label=jet_type_label,
                     plot_config=total_number_of_splittings_label,
                     path=path,
                 )
@@ -432,11 +527,30 @@ def lund_plane(
                 logger.warning(f"No jets within {identifier}_total_number_of_splittings. Skipping bin!")
 
         for technique, hists in masked_hists:
+            # Store each techinque
+            techniques.add(technique)
             if hists.n_jets == 0:
                 logger.warning(f"No jets within {identifier}_{technique}. Skipping bin!")
                 continue
             # Plot Lund Plane
-            _plot_lund_plane(technique=technique, identifier=identifier, hists=hists, path=path)
+            _plot_lund_plane(
+                technique=technique, identifier=identifier, jet_type_label=jet_type_label, hists=hists, path=path
+            )
+
+    # Plot the same parameter, for different jet pt bins parameters.
+    for attribute_name, plot_config in distributions:
+        for technique in techniques:
+            # Skip inclusive for now.
+            if technique == "inclusive":
+                continue
+            _plot_distribution_in_different_pt_bins(
+                all_hists=all_hists,
+                jet_type_label=jet_type_label,
+                attribute_name=attribute_name,
+                selected_technique=technique,
+                plot_config=plot_config,
+                path=path,
+            )
 
 
 def _plot_matching(
@@ -613,7 +727,7 @@ def _plot_matching(
         ax_temp.set_ylim([0, 1.2])
 
     # Labeling
-    text = identifier.display_str()
+    text = identifier.display_str(jet_pt_label="det")
     text += "\n" + hists.title
     axes[0, 1].text(
         0.5,
@@ -653,7 +767,7 @@ def _plot_matching(
     plt.close(fig)
 
     # Labeling
-    text = identifier.display_str()
+    text = identifier.display_str(jet_pt_label="det")
     text += "\n" + hists.title
     ax.text(
         0.975,
@@ -884,7 +998,7 @@ def _plot_response(
     fig.colorbar(mesh, pad=0.02)
 
     # Labeling
-    text = identifier.display_str()
+    text = identifier.display_str(jet_pt_label="hybrid")
     text += "\n" + hists.title
     ax.text(
         0.05,
