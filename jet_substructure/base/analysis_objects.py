@@ -257,7 +257,7 @@ class SubstructureHists(SubstructureHistsBase):
     name: str = attr.ib()
     title: str = attr.ib()
     iterative_splittings: bool = attr.ib()
-    n_jets: int = attr.ib()
+    n_jets: float = attr.ib()
     values: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     kt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     z: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
@@ -375,7 +375,7 @@ class SubstructureHists(SubstructureHistsBase):
             and isinstance(self.lund_plane, bh.Histogram)
         )
         # Need to store the number of jets along the histograms.
-        self.n_jets += inputs.n_jets
+        self.n_jets += inputs.n_jets * weight
         self.values.fill(inputs.values, weight=weight)
         self.kt.fill(inputs.splittings.kt.flatten(), weight=weight)
         self.z.fill(inputs.splittings.z.flatten(), weight=weight)
@@ -408,7 +408,7 @@ class SubstructureToyHists(SubstructureHistsBase):
     name: str = attr.ib()
     title: str = attr.ib()
     iterative_splittings: bool = attr.ib()
-    n_jets: int = attr.ib()
+    n_jets: float = attr.ib()
     values: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     kt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     z: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
@@ -523,8 +523,8 @@ class SubstructureResponseHists(SubstructureHistsBase):
     name: str = attr.ib()
     title: str = attr.ib()
     iterative_splittings: bool = attr.ib()
-    n_hybrid_jets: int = attr.ib()
-    n_true_jets: int = attr.ib()
+    n_hybrid_jets: float = attr.ib()
+    n_true_jets: float = attr.ib()
     response_kt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     response_z: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     response_delta_R: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
@@ -623,8 +623,8 @@ class SubstructureResponseHists(SubstructureHistsBase):
         )
 
         # Need to store the number of jets along the histograms.
-        self.n_hybrid_jets += hybrid_inputs.n_jets
-        self.n_true_jets += true_inputs.n_jets
+        self.n_hybrid_jets += hybrid_inputs.n_jets * weight
+        self.n_true_jets += true_inputs.n_jets * weight
         # Store the responses
         # TODO: Can we do better than this pad and fillna hack??
         #       The length of those values can be shorter than the jet pt length due to
