@@ -586,13 +586,13 @@ def _plot_matching(
     )
 
     # Store and reset
-    fig.savefig(path / f"subjet_matching_{identifier.iterative_splittings_label}_splittngs_{technique}.pdf")
+    fig.savefig(path / f"subjet_matching_{technique}_{str(identifier)}.pdf")
     plt.close(fig)
 
 
 def matching(
     all_matching_hists: Mapping[
-        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
+        analysis_objects.MatchingIdentifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
     ],
     path: Path,
 ) -> None:
@@ -601,6 +601,8 @@ def matching(
 
     for identifier, matching_hists in all_matching_hists.items():
         for technique, hists in matching_hists:
+            # Update identifier (because there were issues with the str methods when it was created)
+            identifier = analysis_objects.MatchingIdentifier.from_existing(identifier)
             # Plot matching distributions
             _plot_matching(technique=technique, identifier=identifier, hists=hists, path=path)
 

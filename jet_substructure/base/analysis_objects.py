@@ -60,13 +60,21 @@ class MatchingIdentifier(Identifier):
     def __str__(self) -> str:
         if self.hybrid_kt_cut > 0:
             return f"{super().__str__()}_hybridMinKt_{self.hybrid_kt_cut}"
-        return str(super())
+        return super().__str__()
 
     def display_str(self, jet_pt_label: str = "") -> str:
         base_str = super().display_str(jet_pt_label=jet_pt_label)
         if self.hybrid_kt_cut > 0:
             base_str += "\n" + fr"$k_{{\text{{T}}}}^{{\text{{hybrid}}}} > {self.hybrid_kt_cut}$"
         return base_str
+
+    @classmethod
+    def from_existing(cls: Type["MatchingIdentifier"], existing: "MatchingIdentifier") -> "MatchingIdentifier":
+        return cls(
+            iterative_splittings=existing.iterative_splittings,
+            jet_pt_bin=existing.jet_pt_bin,
+            hybrid_kt_cut=existing.hybrid_kt_cut,
+        )
 
 
 @attr.s(frozen=True)
