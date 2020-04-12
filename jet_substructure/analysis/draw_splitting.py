@@ -19,19 +19,24 @@ logger = logging.getLogger(__name__)
 
 
 def splittings_graph(  # noqa: C901
-    jet: substructure_methods.SubstructureJet, path: Path, filename: Optional[str] = None
+    jet: substructure_methods.SubstructureJet,
+    path: Path,
+    filename: Optional[str] = None,
+    show_sum_of_constituent_pts: bool = False,
 ) -> "networkx.DiGraph":
     """ Draw a splitting graph for a given jet.
 
     In the graph, inner nodes represent splittings, and lines represent subjets. Outer nodes (ie those with no
     nodes leaving them) represent particles. The iterative splitting nodes are shown in green, while the iterative
-    splitting subjets are shown in blue.  Each node is labeled with the constituents pt of the subjet which leads
-    to that node. Additional labels on the node are the kt of each splitting.
+    splitting subjets are shown in blue. Each node is labeled with the kt of the splitting. Each subjet can be labeled
+    with the constituents pt of the subjet which leads to that node (if `show_sum_of_constituent_pts` is enabled).
 
     Args:
         jet: Jet to be plotted.
         path: Path to where the plot should be stored.
         filename: Filename under which the plot should be stored.
+        show_sum_of_constituent_pts: If True, we will label the subjets with the sum of their constituent pts.
+            This can be used to very that we've following the hardest splitting. Default: False.
     Returns:
         The directed graph representing the splitting. A plot of the graph is also stored at the provided path and filename.
     """
@@ -53,6 +58,10 @@ def splittings_graph(  # noqa: C901
     path = Path(path)
     if filename is None:
         filename = f"splitting_graph_jetPt_{jet.jet_pt:.1f}GeV"
+
+    logger.info(
+        f"Drawing jet with pt={jet.jet_pt:g} GeV/c, and {len(jet.splittings)} splittings ({len(jet.splittings.iterative_splittings(jet.subjets))} iterative)"
+    )
 
     # We want a directed graph showing the splitting.
     graph = nx.DiGraph()
@@ -115,8 +124,6 @@ def splittings_graph(  # noqa: C901
             subjet_edges: List[Tuple[Tuple[Union[str, int], Union[str, int]], int, substructure_methods.Subjet]] = []
             splitting_edges: List[Tuple[Dict[str, Any], bool]] = []
             for e in edges_labels:
-                print(type(e))
-                print(type(e[0]), type(e[1]))
                 # "s" in the outgoing edge name indicates that it points to a splitting.
                 if "s" not in str(e[1]):
                     subjet_edges.append((e, int(e[1]), jet.subjets[int(e[1])].constituents.pt.sum()))
@@ -146,17 +153,38 @@ def splittings_graph(  # noqa: C901
         n["color"] = "/greens3/3"
 
     # Label the nodes and edges.
-    # Each node is labeled with the sum of the constituents pt of the subjet leading to that node.
-    # Each node also has a secondary label with the kt (via the `xlabel` parameter with graphviz).
+    # Each node is labeled with the kt of the splitting.
+    # Each edge is a subjet.
+    # Each node which is just a constituent (ie. it has no nodes leaving it) is made white so that it doesn't show up.
+    # This is because it's not a splitting, and we don't want to confuse it as such.
     # This information allows us to confirm that the harder branch was always identified.
     for name in graph.nodes:
         # Retrieve the node since it appears that we cannot directly iterate over the nodes.
         n = graph.nodes[name]
+
+        # First, general node styling
+        n["penwidth"] = 2.5
+        n["fontsize"] = 22
+
         # Skip the origin (which doesn't contain any incoming edges)
         if name == "s0":
             n["label"] = "Origin"
             continue
 
+        # First, remove the constituent labels. If it's just a constituent, we want it to be empty.
+        n["label"] = ""
+
+        # Add the kt as the main label of a node.
+        # NOTE: Not all nodes will have the splitting index because we also end all subjets with a node, which
+        #       is obviously not a splitting. In that case, we hide it by make the color white.
+        if "splitting_index" in n:
+            # logger.debug(f"splitting_index for {n}: {n['splitting_index']}")
+            splitting = jet.splittings[int(n["splitting_index"])]
+            n["label"] = f"{splitting.kt:.01f}"
+        else:
+            n["color"] = "white"
+
+        # Now deal with the edges (subjets)
         # in_edges are edges which are incoming into the node.
         edges_labels = graph.in_edges(name)
         # Each node should only have one incoming edge
@@ -165,20 +193,16 @@ def splittings_graph(  # noqa: C901
                 "Node {n} has too many edges: {len(edges_labels)}. This shouldn't ever happen, so you'll need to check it out!"
             )
         e = list(edges_labels)[0]
-        # Add the constituents pt label
         subjet = jet.subjets[int(graph.edges[e]["subjet_index"])]
-        n["label"] = f"{subjet.constituents.pt.sum():.01f}"
-        # Identify edges via the subjet properties.
+        # Increase the line with
+        graph.edges[e]["penwidth"] = 2
+        # If requested, add the constituents pt label to the subjet.
+        if show_sum_of_constituent_pts:
+            graph.edges[e]["fontsize"] = 22
+            graph.edges[e]["label"] = f"{subjet.constituents.pt.sum():.01f}"
+        # Identify iterative splitting edges via the subjet properties.
         if subjet.part_of_iterative_splitting:
             graph.edges[e]["color"] = "/blues3/3"
-
-        # Add the kt as a secondary label of the node.
-        # NOTE: Not all nodes will have the splitting index because we also end all subjets with a node, which
-        #       is obviously not a splitting.
-        if "splitting_index" in n:
-            # logger.debug(f"splitting_index for {n}: {n['splitting_index']}")
-            splitting = jet.splittings[int(n["splitting_index"])]
-            n["xlabel"] = f"{splitting.kt:.01f}"
 
     # Now we want to draw the graph.
     # We convert to graphviz for plotting because networkx requires too much plotting configuration for labels, etc.
@@ -188,5 +212,6 @@ def splittings_graph(  # noqa: C901
     # Determine and the layout and draw
     graphviz_graph.layout("dot")
     graphviz_graph.draw(str(path / f"{filename}.pdf"))
+    logger.info(f"Saved graph to {path / filename}.pdf")
 
     return graph
