@@ -92,6 +92,18 @@ datasets:
                 - "data.fSubjets.fPartOfIterativeSplitting"
                 - "data.fSubjets.fSplittingNodeIndex"
                 - "data.fSubjets.fConstituentIndices"
+                - "matched.fJetPt"
+                - "matched.fJetConstituents.fPt"
+                - "matched.fJetConstituents.fEta"
+                - "matched.fJetConstituents.fPhi"
+                - "matched.fJetConstituents.fGlobalIndex"
+                - "matched.fJetSplittings.fKt"
+                - "matched.fJetSplittings.fDeltaR"
+                - "matched.fJetSplittings.fZ"
+                - "matched.fJetSplittings.fParentIndex"
+                - "matched.fSubjets.fPartOfIterativeSplitting"
+                - "matched.fSubjets.fSplittingNodeIndex"
+                - "matched.fSubjets.fConstituentIndices"
     toy:
         dataset:
             name: "toy"
@@ -239,9 +251,43 @@ available_datasets:
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
         jet_R: 0.4
         files:
-            #- "trains/PbPb/5537/AnalysisResults.18q.05.root"
-            - "trains/PbPb/5537/AnalysisResults.18q.*.root"
-            - "trains/PbPb/5537/AnalysisResults.18r.*.root"
+            # NOTE: "AnalysisResults.18q.06.repaired.root" apparently contains 0 jets. Given the tiny size of the file, this
+            #       isn't so surprising. We just leave it so it doesn't look worrisome. It doesn't cost much time.
+            - "trains/PbPb/5537/AnalysisResults.18q.01.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.02.chunk1.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.02.chunk2.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.03.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.04.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.05.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.06.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.07.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.08.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.09.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.10.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.11.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.12.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.13.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.14.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.15.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.16.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.17.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18q.18.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.01.chunk1.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.01.chunk2.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.01.chunk3.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.02.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.03.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.04.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.05.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.06.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.07.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.08.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.09.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.10.repaired.root"
+            - "trains/PbPb/5537/AnalysisResults.18r.11.repaired.root"
+            #- "trains/PbPb/5537/AnalysisResults.18q.*.root"
+            #- "trains/PbPb/5537/AnalysisResults.18r.*.root"
+
     LHC19f4_embedded_into_LHC18qr:
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -289,7 +335,7 @@ available_datasets:
             5535: 19
             5536: 20
         files:
-            # Cached files on SSD
+            ## Cached files on SSD
             # Group 1
             - "temp_cache/embedPythia/5517/AnalysisResults.18q.repaired.root"
             - "temp_cache/embedPythia/5517/AnalysisResults.18r.repaired.root"
@@ -364,63 +410,24 @@ available_datasets:
             - "trains/embedPythia/5535/AnalysisResults.18r.2.chunk2.root"
             - "trains/embedPythia/5536/AnalysisResults.18q.1.chunk1.root"
             - "trains/embedPythia/5536/AnalysisResults.18q.1.chunk2.root"
+            - "trains/embedPythia/5536/AnalysisResults.18q.2.chunk1.root"
+            - "trains/embedPythia/5536/AnalysisResults.18q.2.chunk2.root"
             - "trains/embedPythia/5536/AnalysisResults.18r.1.chunk1.root"
-            - "trains/embedPythia/5536/AnalysisResults.18r.1.chunk1.root"
-            #
-            #
-            ## Attempt to recover corrupted files by splitting them
-            #- "trains/embedPythia/5523/AnalysisResults.18r.chunk2.root"
-            #- "trains/embedPythia/5536/AnalysisResults.18r.10.Chunk1.root"
-            #- "trains/embedPythia/5536/AnalysisResults.18r.10.Chunk2.root"
-            #- "trains/embedPythia/5536/AnalysisResults.18r.10.Chunk3.root"
-            #- "trains/embedPythia/5536/AnalysisResults.18r.10.Chunk4.root"
-            #- "trains/embedPythia/5536/AnalysisResults.18r.10.Chunk5.root"
-            #
-            #
-            ## Corrupted
-            #- "temp_cache/embedPythia/5527/AnalysisResults.18r.1.root"
-            ## Corrupted
-            #- "temp_cache/embedPythia/5527/AnalysisResults.18r.2.root"
-            ## Corrupted
-            #- "temp_cache/embedPythia/5527/AnalysisResults.18r.3.root"
-            ## Corrupted
-            #- "temp_cache/embedPythia/5527/AnalysisResults.18r.4.root"
-            ## Corrupted
-            #- "temp_cache/embedPythia/5527/AnalysisResults.18r.5.root"
+            - "trains/embedPythia/5536/AnalysisResults.18r.1.chunk2.root"
+            - "trains/embedPythia/5536/AnalysisResults.18r.1.chunk3.root"
             #
             #
             ## There are more files, but reducing for faster processing.
-            #- "trains/embedPythia/5522/AnalysisResults.18q.root"
-            ## Transfered from Three Sisters, so the tree is faked.
-            #- "trains/embedPythia/5523/AnalysisResults.18q.root"
-            ## Transfered from Three Sisters, so the tree is faked
-            #- "trains/embedPythia/5524/AnalysisResults.18q.root"
-            #- "trains/embedPythia/5525/AnalysisResults.18q.4.root"
-            #- "trains/embedPythia/5526/AnalysisResults.18q.2.root"
-            #- "trains/embedPythia/5527/AnalysisResults.18q.root"
-            #- "trains/embedPythia/5528/AnalysisResults.18q.1.root"
-            #- "trains/embedPythia/5529/AnalysisResults.18q.2.root"
-            #- "trains/embedPythia/5530/AnalysisResults.18q.3.root"
-            #- "trains/embedPythia/5531/AnalysisResults.18r.7.root"
-            #- "trains/embedPythia/5532/AnalysisResults.18q.1.root"
-            #- "temp_cache/embedPythia/5533/AnalysisResults.18q.3.root"
-            #- "temp_cache/embedPythia/5534/AnalysisResults.18q.4.root"
-            #- "temp_cache/embedPythia/5535/AnalysisResults.18q.1.root"
-            #- "temp_cache/embedPythia/5536/AnalysisResults.18q.7.root"
-            #
-            # Corrupted
-            #- "trains/embedPythia/5527/AnalysisResults.18r.4.root"
-            #- "trains/embedPythia/5527/AnalysisResults.18r.5.root"
-            # Corrupted
-            #- "trains/embedPythia/5530/AnalysisResults.18q.2.root"
-            # Corrupted
-            #- "trains/embedPythia/5536/AnalysisResults.18q.6.root"
-            #- "temp_cache/embedPythia/5533/AnalysisResults.*.root"
-            #- "temp_cache/embedPythia/5534/AnalysisResults.*.root"
-            #- "temp_cache/embedPythia/5528/AnalysisResults.18q.1.root"
-            #- "temp_cache/embedPythia/5523/AnalysisResults.*.root"
-            #- "temp_cache/embedPythia/5524/AnalysisResults.*.root"
-            #- "trains/embedPythia/5525/AnalysisResults.*.root"
+            #- "trains/embedPythia/5517/AnalysisResults.*.root"
+            #- "trains/embedPythia/5518/AnalysisResults.*.root"
+            #- "trains/embedPythia/5519/AnalysisResults.*.root"
+            #- "trains/embedPythia/5520/AnalysisResults.*.root"
+            #- "trains/embedPythia/5521/AnalysisResults.*.root"
+            #- "trains/embedPythia/5522/AnalysisResults.*.root"
+            #- "trains/embedPythia/5523/AnalysisResults.*.root"
+            #- "trains/embedPythia/5524/AnalysisResults.*.root"
+            #- "trains/embedPythia/5525/AnalysisResults.*repaired*.root"
+            #- "trains/embedPythia/5525/AnalysisResults.*chunk*.root"
             #- "trains/embedPythia/5526/AnalysisResults.*.root"
             #- "trains/embedPythia/5527/AnalysisResults.*.root"
             #- "trains/embedPythia/5528/AnalysisResults.*.root"
@@ -445,13 +452,19 @@ available_datasets:
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
         jet_R: 0.4
         files:
-            - "trains/pythia/2110/AnalysisResults.FAST.01.root"
-            - "trains/pythia/2110/AnalysisResults.FAST.02.root"
-            - "trains/pythia/2110/AnalysisResults.woSDD.01.root"
-            - "trains/pythia/2110/AnalysisResults.woSDD.02.root"
-            - "trains/pythia/2110/AnalysisResults.woSDD.03.root"
-            - "trains/pythia/2110/AnalysisResults.woSDD.04.root"
-            #- "trains/pythia/2110/AnalysisResults.*.root"
+            - "trains/pythia/2110/AnalysisResults.FAST.01.repaired.root"
+            - "trains/pythia/2110/AnalysisResults.FAST.02.repaired.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.01.chunk1.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.01.chunk2.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.01.chunk3.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.02.chunk1.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.02.chunk2.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.02.chunk3.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.03.repaired.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.04.chunk1.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.04.chunk2.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.04.chunk3.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.05.repaired.root"
     toy:
         tree_name: "pythiaHybridTree"
         jet_R: 0.4
