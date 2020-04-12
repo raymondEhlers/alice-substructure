@@ -553,21 +553,52 @@ def lund_plane(  # noqa: C901
             )
 
 
+def _project_matching(input_hist: binned_data.BinnedData, axis_to_sum: int) -> binned_data.BinnedData:
+    # Since it's a 2D hist, axis_to_sum can only be 0 or 1.
+    # In which case, 1 - axis_to_sum will give me the other axis.
+    # Valdiation
+    if axis_to_sum not in [0, 1]:
+        raise ValueError("Must select axis 0 or 1")
+
+    return_hist = binned_data.BinnedData(
+        axes=input_hist.axes[1 - axis_to_sum],
+        values=np.sum(input_hist.values, axis=axis_to_sum),
+        variances=np.sum(input_hist.variances, axis=axis_to_sum),
+    )
+
+    # Sanity check
+    if axis_to_sum == 1:
+        import boost_histogram as bh
+
+        bh_hist = input_hist.to_boost_histogram()
+        bh_return_hist = bh_hist[:, :: bh.sum]
+        assert np.allclose(return_hist.values, bh_return_hist.view().value)
+        assert np.allclose(return_hist.variances, bh_return_hist.view().variance)
+
+    return return_hist
+
+
 def _plot_matching(
     technique: str,
     identifier: analysis_objects.Identifier,
+    axis_parameter: str,
     hists: analysis_objects.SubstructureMatchingSubjetHists,
     path: Path,
 ) -> None:
+    # Setup
+    # Maps from the name that we want to keep to the number of the axis that we need to sum out.
+    axis_name_to_axis_to_sum_map = {"pt": 1, "kt": 0}
+    axis_to_sum = axis_name_to_axis_to_sum_map[axis_parameter]
+    # Figures
     fig, axes = plt.subplots(3, 3, figsize=(10, 10), sharex=True, sharey=True)
     fig_single, ax = plt.subplots(figsize=(10, 8))
     logger.info(f"Plotting matching hist for {technique}, {identifier}")
 
     # NOTE: We convert the hists here to ensure that we're working with copies!
-    normalization = binned_data.BinnedData.from_existing_data(hists.all)
+    normalization = _project_matching(hists.all, axis_to_sum=axis_to_sum)
 
     # Both correctly tagged goes in the upper left
-    both_correct = binned_data.BinnedData.from_existing_data(hists.both_correct)
+    both_correct = _project_matching(hists.both_correct, axis_to_sum=axis_to_sum)
     both_correct /= normalization
     axes[0, 0].errorbar(
         both_correct.axes[0].bin_centers,
@@ -590,8 +621,8 @@ def _plot_matching(
     # Skip this panel
     # axes[0, 1].set_visible(False)
     # Leading wasn't tagged, but subleading was correctly tagged as subleading.
-    leading_failed_subleading_correct = binned_data.BinnedData.from_existing_data(
-        hists.leading_failed_subleading_correct
+    leading_failed_subleading_correct = _project_matching(
+        hists.leading_failed_subleading_correct, axis_to_sum=axis_to_sum
     )
     leading_failed_subleading_correct /= normalization
     axes[0, 2].errorbar(
@@ -615,7 +646,7 @@ def _plot_matching(
     # Skip this panel
     # axes[1, 0].set_visible(False)
     # Swapped (ie. reversed)
-    reversed = binned_data.BinnedData.from_existing_data(hists.reversed)
+    reversed = _project_matching(hists.reversed, axis_to_sum=axis_to_sum)
     reversed /= normalization
     axes[1, 1].errorbar(
         reversed.axes[0].bin_centers,
@@ -636,7 +667,9 @@ def _plot_matching(
         label="Swaps",
     )
     # Leading failed, subleading mistag
-    leading_failed_subleading_mistag = binned_data.BinnedData.from_existing_data(hists.leading_failed_subleading_mistag)
+    leading_failed_subleading_mistag = _project_matching(
+        hists.leading_failed_subleading_mistag, axis_to_sum=axis_to_sum
+    )
     leading_failed_subleading_mistag /= normalization
     axes[1, 2].errorbar(
         leading_failed_subleading_mistag.axes[0].bin_centers,
@@ -657,8 +690,8 @@ def _plot_matching(
         label="Leading unmatched, subleading in leading",
     )
     # Leading correct, subleading failed
-    leading_correct_subleading_failed = binned_data.BinnedData.from_existing_data(
-        hists.leading_correct_subleading_failed
+    leading_correct_subleading_failed = _project_matching(
+        hists.leading_correct_subleading_failed, axis_to_sum=axis_to_sum
     )
     leading_correct_subleading_failed /= normalization
     axes[2, 0].errorbar(
@@ -680,7 +713,9 @@ def _plot_matching(
         label="Leading matched, subleading unmatched",
     )
     # Leading mistag, subleading failed
-    leading_mistag_subleading_failed = binned_data.BinnedData.from_existing_data(hists.leading_mistag_subleading_failed)
+    leading_mistag_subleading_failed = _project_matching(
+        hists.leading_mistag_subleading_failed, axis_to_sum=axis_to_sum
+    )
     leading_mistag_subleading_failed /= normalization
     axes[2, 1].errorbar(
         leading_mistag_subleading_failed.axes[0].bin_centers,
@@ -701,7 +736,7 @@ def _plot_matching(
         label="Leading in subleading, subleading unmatched",
     )
     # Both failed
-    both_failed = binned_data.BinnedData.from_existing_data(hists.both_failed)
+    both_failed = _project_matching(hists.both_failed, axis_to_sum=axis_to_sum)
     both_failed /= normalization
     axes[2, 2].errorbar(
         both_failed.axes[0].bin_centers,
@@ -741,15 +776,16 @@ def _plot_matching(
 
     # Presentation
     # Axis labels
+    x_axis_label = fr"${axis_parameter[0]}" + r"_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$"
     axes[0, 0].set_ylabel("Subleading correct")
     axes[1, 0].set_ylabel("Subleading in leading")
     axes[2, 0].set_ylabel("Subleading in no prong")
     axes[0, 0].set_title("Leading correct", size=18)
     axes[0, 1].set_title("Leading in subleading", size=18)
     axes[0, 2].set_title("Leading in no prong", size=18)
-    axes[2, 0].set_xlabel(r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$")
-    axes[2, 1].set_xlabel(r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$")
-    axes[2, 2].set_xlabel(r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$")
+    axes[2, 0].set_xlabel(x_axis_label)
+    axes[2, 1].set_xlabel(x_axis_label)
+    axes[2, 2].set_xlabel(x_axis_label)
     fig.tight_layout()
     fig.subplots_adjust(
         # Reduce spacing between subplots
@@ -763,7 +799,7 @@ def _plot_matching(
     )
 
     # Store and reset
-    fig.savefig(path / f"subjet_matching_{technique}_{str(identifier)}.pdf")
+    fig.savefig(path / f"subjet_matching_{axis_parameter}_{technique}_{str(identifier)}.pdf")
     plt.close(fig)
 
     # Labeling
@@ -782,7 +818,7 @@ def _plot_matching(
     # Presentation
     # Axis labels
     ax.set_ylabel("Tagging fraction")
-    ax.set_xlabel(r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$")
+    ax.set_xlabel(x_axis_label)
     ax.set_ylim([1e-3, 10])
     ax.set_yscale("log")
     ax.legend(frameon=False, loc="upper left", ncol=2, fontsize=14)
@@ -799,7 +835,7 @@ def _plot_matching(
     )
 
     # Store and reset
-    fig_single.savefig(path / f"subjet_matching_{technique}_{str(identifier)}_single_figure.pdf")
+    fig_single.savefig(path / f"subjet_matching_{axis_parameter}_{technique}_{str(identifier)}_single_figure.pdf")
     plt.close(fig_single)
 
 
@@ -812,12 +848,15 @@ def matching(
     # Validation
     path.mkdir(parents=True, exist_ok=True)
 
-    for identifier, matching_hists in all_matching_hists.items():
-        for technique, hists in matching_hists:
-            # Update identifier (because there were issues with the str methods when it was created)
-            identifier = analysis_objects.MatchingIdentifier.from_existing(identifier)
-            # Plot matching distributions
-            _plot_matching(technique=technique, identifier=identifier, hists=hists, path=path)
+    for axis_parameter in ["pt", "kt"]:
+        for identifier, matching_hists in all_matching_hists.items():
+            for technique, hists in matching_hists:
+                # Update identifier (because there were issues with the str methods when it was created)
+                identifier = analysis_objects.MatchingIdentifier.from_existing(identifier)
+                # Plot matching distributions
+                _plot_matching(
+                    technique=technique, identifier=identifier, axis_parameter=axis_parameter, hists=hists, path=path
+                )
 
 
 def _plot_toy(

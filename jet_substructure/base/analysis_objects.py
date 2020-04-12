@@ -720,19 +720,20 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
     def create_boost_histograms(
         cls: Type["SubstructureMatchingSubjetHists"], name: str, title: str, iterative_splittings: bool
     ) -> "SubstructureMatchingSubjetHists":
-        jet_pt_axis = bh.axis.Regular(150, 0, 150)
+        jet_pt_axis = bh.axis.Regular(75, 0, 150)
+        kt_axis = bh.axis.Regular(50, 0, 25)
         return cls(
             name=name,
             title=title,
             iterative_splittings=iterative_splittings,
-            all=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
-            both_correct=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
-            leading_failed_subleading_correct=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
-            leading_correct_subleading_failed=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
-            leading_failed_subleading_mistag=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
-            leading_mistag_subleading_failed=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
-            reversed=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
-            both_failed=bh.Histogram(jet_pt_axis, storage=bh.storage.Weight()),
+            all=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            both_correct=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            leading_failed_subleading_correct=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            leading_correct_subleading_failed=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            leading_failed_subleading_mistag=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            leading_mistag_subleading_failed=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            reversed=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            both_failed=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
         )
 
     def fill(
@@ -762,35 +763,35 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
 
         # Mask the values once so we don't have to do it repeatedly.
         jet_pt_masked = matched_inputs.jets[mask].jet_pt
+        kt_masked = matched_inputs.splittings.kt[mask]
         leading_masked = leading[mask]
         subleading_masked = subleading[mask]
 
+        selection = (
+            leading_masked.properly
+            | leading_masked.mistag
+            | leading_masked.failed
+            | subleading_masked.properly
+            | subleading_masked.mistag
+            | subleading_masked.failed
+        )
         self.all.fill(
-            jet_pt_masked[
-                leading_masked.properly
-                | leading_masked.mistag
-                | leading_masked.failed
-                | subleading_masked.properly
-                | subleading_masked.mistag
-                | subleading_masked.failed
-            ],
-            weight=weight,
+            jet_pt_masked[selection], kt_masked[selection], weight=weight,
         )
-        self.both_correct.fill(jet_pt_masked[leading_masked.properly & subleading_masked.properly], weight=weight)
-        self.leading_failed_subleading_correct.fill(
-            jet_pt_masked[leading_masked.failed & subleading_masked.properly], weight=weight
-        )
-        self.leading_correct_subleading_failed.fill(
-            jet_pt_masked[leading_masked.properly & subleading_masked.failed], weight=weight
-        )
-        self.leading_failed_subleading_mistag.fill(
-            jet_pt_masked[leading_masked.failed & subleading_masked.mistag], weight=weight
-        )
-        self.leading_mistag_subleading_failed.fill(
-            jet_pt_masked[leading_masked.mistag & subleading_masked.failed], weight=weight
-        )
-        self.reversed.fill(jet_pt_masked[leading_masked.mistag & subleading_masked.mistag], weight=weight)
-        self.both_failed.fill(jet_pt_masked[leading_masked.failed & subleading_masked.failed], weight=weight)
+        selection = leading_masked.properly & subleading_masked.properly
+        self.both_correct.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
+        selection = leading_masked.failed & subleading_masked.properly
+        self.leading_failed_subleading_correct.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
+        selection = leading_masked.properly & subleading_masked.failed
+        self.leading_correct_subleading_failed.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
+        selection = leading_masked.failed & subleading_masked.mistag
+        self.leading_failed_subleading_mistag.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
+        selection = leading_masked.mistag & subleading_masked.failed
+        self.leading_mistag_subleading_failed.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
+        selection = leading_masked.mistag & subleading_masked.mistag
+        self.reversed.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
+        selection = leading_masked.failed & subleading_masked.failed
+        self.both_failed.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
 
 
 T_SubstructureHists = TypeVar(
