@@ -52,29 +52,9 @@ class Identifier:
     def display_str(self, jet_pt_label: str = "") -> str:
         return f"{self.iterative_splittings_label.capitalize()} splittings\n${self.jet_pt_bin.display_str(label=jet_pt_label)}$"
 
-
-@attr.s(frozen=True)
-class MatchingIdentifier(Identifier):
-    hybrid_kt_cut: float = attr.ib()
-
-    def __str__(self) -> str:
-        if self.hybrid_kt_cut > 0:
-            return f"{super().__str__()}_hybridMinKt_{self.hybrid_kt_cut}"
-        return super().__str__()
-
-    def display_str(self, jet_pt_label: str = "") -> str:
-        base_str = super().display_str(jet_pt_label=jet_pt_label)
-        if self.hybrid_kt_cut > 0:
-            base_str += "\n" + fr"$k_{{\text{{T}}}}^{{\text{{hybrid}}}} > {self.hybrid_kt_cut}$"
-        return base_str
-
     @classmethod
-    def from_existing(cls: Type["MatchingIdentifier"], existing: "MatchingIdentifier") -> "MatchingIdentifier":
-        return cls(
-            iterative_splittings=existing.iterative_splittings,
-            jet_pt_bin=existing.jet_pt_bin,
-            hybrid_kt_cut=existing.hybrid_kt_cut,
-        )
+    def from_existing(cls: Type["Identifier"], existing: "Identifier") -> "Identifier":
+        return cls(iterative_splittings=existing.iterative_splittings, jet_pt_bin=existing.jet_pt_bin,)
 
 
 @attr.s(frozen=True)
@@ -721,27 +701,36 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
         cls: Type["SubstructureMatchingSubjetHists"], name: str, title: str, iterative_splittings: bool
     ) -> "SubstructureMatchingSubjetHists":
         jet_pt_axis = bh.axis.Regular(75, 0, 150)
-        kt_axis = bh.axis.Regular(50, 0, 25)
+        kt_axis = bh.axis.Regular(25, 0, 25)
+        hybrid_jet_pt_axis = bh.axis.Regular(8, 0, 160)
         return cls(
             name=name,
             title=title,
             iterative_splittings=iterative_splittings,
-            all=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
-            both_correct=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
-            leading_failed_subleading_correct=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
-            leading_correct_subleading_failed=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
-            leading_failed_subleading_mistag=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
-            leading_mistag_subleading_failed=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
-            reversed=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
-            both_failed=bh.Histogram(jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            all=bh.Histogram(jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            both_correct=bh.Histogram(jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            leading_failed_subleading_correct=bh.Histogram(
+                jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()
+            ),
+            leading_correct_subleading_failed=bh.Histogram(
+                jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()
+            ),
+            leading_failed_subleading_mistag=bh.Histogram(
+                jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()
+            ),
+            leading_mistag_subleading_failed=bh.Histogram(
+                jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()
+            ),
+            reversed=bh.Histogram(jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            both_failed=bh.Histogram(jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
         )
 
     def fill(
         self,
         matched_inputs: FillHistogramInput,
+        hybrid_inputs: FillHistogramInput,
         leading: MatchingResult,
         subleading: MatchingResult,
-        mask: UprootArray[bool],
         weight: float,
     ) -> None:
         # Validation
@@ -762,36 +751,82 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
         )
 
         # Mask the values once so we don't have to do it repeatedly.
-        jet_pt_masked = matched_inputs.jets[mask].jet_pt
-        kt_masked = matched_inputs.splittings.kt[mask]
-        leading_masked = leading[mask]
-        subleading_masked = subleading[mask]
+        matched_jet_pt = matched_inputs.jets.jet_pt
+        matched_kt = matched_inputs.splittings.kt
+        hybrid_jet_pt = hybrid_inputs.jets.jet_pt
+        hybrid_kt = hybrid_inputs.splittings.kt
 
         selection = (
-            leading_masked.properly
-            | leading_masked.mistag
-            | leading_masked.failed
-            | subleading_masked.properly
-            | subleading_masked.mistag
-            | subleading_masked.failed
+            leading.properly
+            | leading.mistag
+            | leading.failed
+            | subleading.properly
+            | subleading.mistag
+            | subleading.failed
         )
         self.all.fill(
-            jet_pt_masked[selection], kt_masked[selection], weight=weight,
+            matched_jet_pt[selection],
+            matched_kt[selection],
+            hybrid_jet_pt[selection],
+            hybrid_kt[selection],
+            weight=weight,
         )
-        selection = leading_masked.properly & subleading_masked.properly
-        self.both_correct.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
-        selection = leading_masked.failed & subleading_masked.properly
-        self.leading_failed_subleading_correct.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
-        selection = leading_masked.properly & subleading_masked.failed
-        self.leading_correct_subleading_failed.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
-        selection = leading_masked.failed & subleading_masked.mistag
-        self.leading_failed_subleading_mistag.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
-        selection = leading_masked.mistag & subleading_masked.failed
-        self.leading_mistag_subleading_failed.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
-        selection = leading_masked.mistag & subleading_masked.mistag
-        self.reversed.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
-        selection = leading_masked.failed & subleading_masked.failed
-        self.both_failed.fill(jet_pt_masked[selection], kt_masked[selection], weight=weight)
+        selection = leading.properly & subleading.properly
+        self.both_correct.fill(
+            matched_jet_pt[selection],
+            matched_kt[selection],
+            hybrid_jet_pt[selection],
+            hybrid_kt[selection],
+            weight=weight,
+        )
+        selection = leading.failed & subleading.properly
+        self.leading_failed_subleading_correct.fill(
+            matched_jet_pt[selection],
+            matched_kt[selection],
+            hybrid_jet_pt[selection],
+            hybrid_kt[selection],
+            weight=weight,
+        )
+        selection = leading.properly & subleading.failed
+        self.leading_correct_subleading_failed.fill(
+            matched_jet_pt[selection],
+            matched_kt[selection],
+            hybrid_jet_pt[selection],
+            hybrid_kt[selection],
+            weight=weight,
+        )
+        selection = leading.failed & subleading.mistag
+        self.leading_failed_subleading_mistag.fill(
+            matched_jet_pt[selection],
+            matched_kt[selection],
+            hybrid_jet_pt[selection],
+            hybrid_kt[selection],
+            weight=weight,
+        )
+        selection = leading.mistag & subleading.failed
+        self.leading_mistag_subleading_failed.fill(
+            matched_jet_pt[selection],
+            matched_kt[selection],
+            hybrid_jet_pt[selection],
+            hybrid_kt[selection],
+            weight=weight,
+        )
+        selection = leading.mistag & subleading.mistag
+        self.reversed.fill(
+            matched_jet_pt[selection],
+            matched_kt[selection],
+            hybrid_jet_pt[selection],
+            hybrid_kt[selection],
+            weight=weight,
+        )
+        selection = leading.failed & subleading.failed
+        self.both_failed.fill(
+            matched_jet_pt[selection],
+            matched_kt[selection],
+            hybrid_jet_pt[selection],
+            hybrid_kt[selection],
+            weight=weight,
+        )
 
 
 T_SubstructureHists = TypeVar(

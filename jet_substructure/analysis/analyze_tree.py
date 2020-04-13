@@ -643,7 +643,7 @@ def analyze_single_tree_embedding(  # noqa: C901
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
     Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]],
-    Dict[analysis_objects.MatchingIdentifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]],
+    Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]],
 ]:
     """ Determine the response and prong matching for jets substructure techniques.
 
@@ -662,7 +662,7 @@ def analyze_single_tree_embedding(  # noqa: C901
         analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureResponseHists]
     ] = {}
     matching_hists: Dict[
-        analysis_objects.MatchingIdentifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
+        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
     ] = {}
     # Determine scale factor
     # NOTE: This relies on the train_number being up a directory!
@@ -712,14 +712,11 @@ def analyze_single_tree_embedding(  # noqa: C901
                 iterative_splittings=iterative_splittings, z_cutoff=dataset.settings.z_cutoff
             )
         # Matching. We're going to plot again jet pt, so we don't want to select on jet pt bins here.
-        for hybrid_kt_cut in [0.0, 5.0]:
-            matching_hists[
-                analysis_objects.MatchingIdentifier(
-                    iterative_splittings, jet_pt_bin=helpers.RangeSelector(0, 150), hybrid_kt_cut=hybrid_kt_cut
-                )
-            ] = analysis_objects.create_matching_hists(
-                iterative_splittings=iterative_splittings, z_cutoff=dataset.settings.z_cutoff
-            )
+        matching_hists[
+            analysis_objects.Identifier(iterative_splittings, jet_pt_bin=helpers.RangeSelector(0, 150))
+        ] = analysis_objects.create_matching_hists(
+            iterative_splittings=iterative_splittings, z_cutoff=dataset.settings.z_cutoff
+        )
 
     # Add a convenient wrapper.
     logger.debug(f"Accessing data from the tree {tree.filename}.")
@@ -836,10 +833,9 @@ def _fill_matching_hists_with_calculation(
     restricted_matched_jets: substructure_methods.SubstructureJetArray,
     restricted_matched_jets_splittings: substructure_methods.JetSplittingArray,
     matching_hists: Dict[
-        analysis_objects.MatchingIdentifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
+        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
     ],
-    identifier: analysis_objects.MatchingIdentifier,
-    hybrid_kt_cut_values: List[float],
+    identifier: analysis_objects.Identifier,
     weight: float,
 ) -> None:
     # Calculate the inputs
@@ -851,34 +847,28 @@ def _fill_matching_hists_with_calculation(
     )
     leading_matching, subleading_matching = determine_matched_jets(hybrid_inputs, matched_inputs)
     # And fill the results.
-    for kt_value in hybrid_kt_cut_values:
-        temp_identifier = analysis_objects.MatchingIdentifier(
-            iterative_splittings=identifier.iterative_splittings,
-            jet_pt_bin=identifier.jet_pt_bin,
-            hybrid_kt_cut=kt_value,
-        )
-        mask = hybrid_inputs.values >= temp_identifier.hybrid_kt_cut
-        getattr(matching_hists[temp_identifier], fill_attr_name).fill(
-            matched_inputs=matched_inputs,
-            leading=leading_matching,
-            subleading=subleading_matching,
-            mask=mask,
-            weight=weight,
-        )
+    temp_identifier = analysis_objects.Identifier(
+        iterative_splittings=identifier.iterative_splittings, jet_pt_bin=identifier.jet_pt_bin,
+    )
+    getattr(matching_hists[temp_identifier], fill_attr_name).fill(
+        matched_inputs=matched_inputs,
+        hybrid_inputs=hybrid_inputs,
+        leading=leading_matching,
+        subleading=subleading_matching,
+        weight=weight,
+    )
 
 
 def matching(
     matching_hists: Dict[
-        analysis_objects.MatchingIdentifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
+        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
     ],
     matched_jets: substructure_methods.SubstructureJetArray,
     hybrid_jets: substructure_methods.SubstructureJetArray,
     dataset: analysis_objects.Dataset,
     scale_factor: float,
     progress_manager: enlighten.Manager,
-) -> Dict[
-    analysis_objects.MatchingIdentifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
-]:
+) -> Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]]:
     """ Determine the prong matching for jets substructure techniques.
 
     """
@@ -891,27 +881,14 @@ def matching(
         leading_kt_func,
         leading_kt_hard_cutoff_func,
     ) = _define_calculation_funcs(dataset)
-    # Determine our value ranges.
-    hybrid_kt_cut_values = list(set([i.hybrid_kt_cut for i in matching_hists]))
-    jet_pt_bins = list(set([i.jet_pt_bin for i in matching_hists]))
-    if len(jet_pt_bins) != 1:
-        raise ValueError(
-            "Expected only one jet pt bin in the matching, but received {len(jet_pt_bins)}. Check on this! Full set of bins: {jet_pt_bins}"
-        )
-    jet_pt_bin: helpers.RangeSelector = jet_pt_bins[0]
 
     # Actually perform the matching
     logger.info("Starting matching")
     number_of_grooming_methods = 4
     with progress_manager.counter(
-        total=(2 * number_of_grooming_methods), desc="Analyzing", unit="variation", leave=False
+        total=len(matching_hists) * number_of_grooming_methods, desc="Analyzing", unit="variation", leave=False
     ) as selections_counter:
-        for iterative_splittings in [False, True]:
-            # Let's start with the hybrid_kt_cut = 0 case, as it's the most inclusive.
-            # We'll then modify it from here.
-            identifier = analysis_objects.MatchingIdentifier(
-                iterative_splittings=iterative_splittings, jet_pt_bin=jet_pt_bin, hybrid_kt_cut=0
-            )
+        for identifier, h in selections_counter(matching_hists.items()):
             # Ensure that we don't have single track jets because the splitting won't be defined for that case.
             # No actual jet pt range restrictions.
             mask = (hybrid_jets.constituents.counts > 1) & (matched_jets.constituents.counts > 1)
@@ -948,7 +925,6 @@ def matching(
                     restricted_matched_jets_splittings=restricted_matched_jets_splittings,
                     matching_hists=matching_hists,
                     identifier=identifier,
-                    hybrid_kt_cut_values=hybrid_kt_cut_values,
                     weight=weight,
                 )
                 selections_counter.update()
@@ -980,12 +956,7 @@ def run_shared(  # noqa: C901
     collision_system: str,
     analysis_function: Callable[
         [data_manager.Tree, analysis_objects.Dataset, Sequence[helpers.RangeSelector], str, bool],
-        Sequence[
-            Mapping[
-                Union[analysis_objects.Identifier, analysis_objects.MatchingIdentifier],
-                analysis_objects.Hists[analysis_objects.T_SubstructureHists],
-            ]
-        ],
+        Sequence[Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]],
     ],
     dataset_config_filename: Path,
     hists_filename: str,
@@ -1167,7 +1138,7 @@ def embed_pythia_entry_point() -> None:
 
     (response_hists, matching_hists), dataset = run_shared(  # type: ignore
         collision_system=collision_system,
-        analysis_function=analyze_single_tree_embedding,  # type: ignore
+        analysis_function=analyze_single_tree_embedding,
         dataset_config_filename=Path("config") / "datasets.yaml",
         hists_filename="embedding_hists",
         jet_pt_bins=jet_pt_bins,
@@ -1197,17 +1168,17 @@ if __name__ == "__main__":
     z_cutoff = 0.4
     # Standard analysis
     # (data_hists,), data_dataset = run_shared(
-    #    collision_system="PbPb",
+    #    collision_system="pp",
     #    analysis_function=analyze_single_tree,
     #    dataset_config_filename=config_filename,
     #    hists_filename="data_hists",
     #    jet_pt_bins=jet_pt_bins,
     #    z_cutoff=z_cutoff,
     #    plot_only=plot_only,
-    #    force_reprocessing=False,
-    #    number_of_cores=1,
+    #    force_reprocessing=True,
+    #    number_of_cores=2,
     # )
-    # plot_results.lund_plane(all_hists=data_hists, path=data_dataset.output)
+    # plot_results.lund_plane(all_hists=data_hists, jet_type_label="det", path=data_dataset.output)
     # Toy
     # data_prefix = "hybrid"
     # collision_system = f"toy_true_{data_prefix}_splittings_iterative_allTrueSplittings_delta_R_040"
@@ -1228,25 +1199,27 @@ if __name__ == "__main__":
     # Embedding
     (embedded_true_hists, embedded_hybrid_hists, response_hists, matching_hists), embedded_dataset = run_shared(  # type: ignore
         collision_system="embedPythia",
-        analysis_function=analyze_single_tree_embedding,  # type: ignore
+        analysis_function=analyze_single_tree_embedding,
         dataset_config_filename=config_filename,
         hists_filename="embedding_hists",
         jet_pt_bins=jet_pt_bins,
         z_cutoff=z_cutoff,
         plot_only=plot_only,
-        force_reprocessing=False,
-        number_of_cores=2,
+        force_reprocessing=True,
+        number_of_cores=1,
         # additional_kwargs_for_analysis=dict(
         #    scale_n_jets_when_loading_hists=True,
         # )
     )
-    # TODO: Add some additional identifier for lund plane
-    # True, hybrid hists
-    plot_results.lund_plane(all_hists=embedded_true_hists, path=embedded_dataset.output)
-    plot_results.lund_plane(all_hists=embedded_hybrid_hists, path=embedded_dataset.output)
-    # Responses
-    plot_results.responses(all_response_hists=response_hists, path=embedded_dataset.output)
-    # Matching
-    plot_results.matching(all_matching_hists=matching_hists, path=embedded_dataset.output)
+    ## True, hybrid hists
+    # plot_results.lund_plane(all_hists=embedded_true_hists, jet_type_label="true", path=embedded_dataset.output)
+    # plot_results.lund_plane(all_hists=embedded_hybrid_hists, jet_type_label="hybrid", path=embedded_dataset.output)
+    ## Responses
+    # plot_results.responses(all_response_hists=response_hists, path=embedded_dataset.output)
+    ## Matching
+    # plot_results.matching(all_matching_hists=matching_hists, path=embedded_dataset.output)
+
+    # Comparison
+    # plot_results.compare_kt(all_data_hists=data_hists, all_embedded_hists=embedded_hybrid_hists, data_dataset=data_dataset, embedded_dataset=embedded_dataset)
 
     IPython.start_ipython(user_ns=locals())

@@ -841,7 +841,7 @@ def _plot_matching(
 
 def matching(
     all_matching_hists: Mapping[
-        analysis_objects.MatchingIdentifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
+        analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
     ],
     path: Path,
 ) -> None:
@@ -852,7 +852,7 @@ def matching(
         for identifier, matching_hists in all_matching_hists.items():
             for technique, hists in matching_hists:
                 # Update identifier (because there were issues with the str methods when it was created)
-                identifier = analysis_objects.MatchingIdentifier.from_existing(identifier)
+                identifier = analysis_objects.Identifier.from_existing(identifier)
                 # Plot matching distributions
                 _plot_matching(
                     technique=technique, identifier=identifier, axis_parameter=axis_parameter, hists=hists, path=path
