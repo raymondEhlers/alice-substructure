@@ -166,11 +166,6 @@ def splittings_graph(  # noqa: C901
         n["penwidth"] = 2.5
         n["fontsize"] = 22
 
-        # Skip the origin (which doesn't contain any incoming edges)
-        if name == "s0":
-            n["label"] = "Origin"
-            continue
-
         # First, remove the constituent labels. If it's just a constituent, we want it to be empty.
         n["label"] = ""
 
@@ -183,6 +178,10 @@ def splittings_graph(  # noqa: C901
             n["label"] = f"{splitting.kt:.01f}"
         else:
             n["color"] = "white"
+
+        # Skip the next steps for the origin because it doesn't contain any incoming edges
+        if name == "s0":
+            continue
 
         # Now deal with the edges (subjets)
         # in_edges are edges which are incoming into the node.
