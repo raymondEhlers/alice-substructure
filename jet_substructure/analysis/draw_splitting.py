@@ -7,7 +7,9 @@
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+
+import attr
 
 from jet_substructure.base import substructure_methods
 
@@ -18,25 +20,36 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@attr.s
+class EdgeFromSubjet:
+    edge: Tuple[Union[str, int], Union[str, int]] = attr.ib()
+    subjet_index: int = attr.ib()
+    subjet_pt: float = attr.ib()
+    part_of_iterative_splitting: bool = attr.ib()
+
+
+@attr.s
+class EdgeFromSplitting:
+    edge: Tuple[Union[str, int], Union[str, int]] = attr.ib()
+    part_of_iterative_splitting: bool = attr.ib()
+
+
 def splittings_graph(  # noqa: C901
-    jet: substructure_methods.SubstructureJet,
-    path: Path,
-    filename: Optional[str] = None,
-    show_sum_of_constituent_pts: bool = False,
+    jet: substructure_methods.SubstructureJet, path: Path, filename: Optional[str] = None, show_subjet_pt: bool = False,
 ) -> "networkx.DiGraph":
     """ Draw a splitting graph for a given jet.
 
     In the graph, inner nodes represent splittings, and lines represent subjets. Outer nodes (ie those with no
     nodes leaving them) represent particles. The iterative splitting nodes are shown in green, while the iterative
     splitting subjets are shown in blue. Each node is labeled with the kt of the splitting. Each subjet can be labeled
-    with the constituents pt of the subjet which leads to that node (if `show_sum_of_constituent_pts` is enabled).
+    with the subjet pt based on a four vector sum of the constituents (if `show_sum_of_constituent_pts` is enabled).
 
     Args:
         jet: Jet to be plotted.
         path: Path to where the plot should be stored.
         filename: Filename under which the plot should be stored.
-        show_sum_of_constituent_pts: If True, we will label the subjets with the sum of their constituent pts.
-            This can be used to very that we've following the hardest splitting. Default: False.
+        show_subjet_pt: If True, we will label the subjets their pt calculated via their constituents.
+            This can be used to very that we've properly following the hardest splitting. Default: False.
     Returns:
         The directed graph representing the splitting. A plot of the graph is also stored at the provided path and filename.
     """
@@ -116,32 +129,46 @@ def splittings_graph(  # noqa: C901
             raise ValueError(f"Too many edges for node {n} (len: {len(edges_labels)}). Something has gone wrong!")
         # Only remove edges if necessary.
         if len(edges_labels) > 2:
-            # There should always only be two edges leaving a given node.
-            number_of_subjets_to_remove = len(edges_labels) - 2
             # To determine which edges to remove, we need to identify which edges correspond to subjets
             # and which edges are from the splittings. We want to effectively merge the subjet edges into
             # the splitting edges.
-            subjet_edges: List[Tuple[Tuple[Union[str, int], Union[str, int]], int, substructure_methods.Subjet]] = []
-            splitting_edges: List[Tuple[Dict[str, Any], bool]] = []
+            subjet_edges: List[EdgeFromSubjet] = []
+            splitting_edges: List[EdgeFromSplitting] = []
             for e in edges_labels:
                 # "s" in the outgoing edge name indicates that it points to a splitting.
                 if "s" not in str(e[1]):
-                    subjet_edges.append((e, int(e[1]), jet.subjets[int(e[1])].constituents.four_vectors().sum().pt))
+                    subjet_edges.append(
+                        EdgeFromSubjet(
+                            e,
+                            int(e[1]),
+                            jet.subjets[int(e[1])].constituents.four_vectors().sum().pt,
+                            jet.subjets[int(e[1])].part_of_iterative_splitting,
+                        )
+                    )
                 else:
                     n = graph.nodes[e[1]]
-                    splitting_edges.append((e, f"s{n['splitting_index']}" in iterative_splitting_indices_with_prefix))
-            # We want to match up the subjets with the iterative splittings.
-            # To do so, we sort such that the hardest subjet is first, and that the iterative splitting is first.
-            # If there are no iterative splittings, then the order isn't meaningful, so the ordering might be off.
-            # But in that case, we don't care so much - it's just going to be included in the recursive case.
-            subjet_edges = sorted(subjet_edges, key=lambda x: x[2], reverse=True)
-            splitting_edges = sorted(splitting_edges, key=lambda x: x[1], reverse=True)
-            # logger.debug(subjet_edges)
-            # logger.debug(splitting_edges)
-            for subjet_edge, splitting_edge in zip(subjet_edges[:number_of_subjets_to_remove], splitting_edges):
-                graph.edges[splitting_edge[0]]["subjet_index"] = graph.edges[subjet_edge[0]]["subjet_index"]
-                # logger.debug(f"subjet_edge: {subjet_edge}, splitting_edge: {splitting_edge}")
-                nodes_to_remove.append(subjet_edge[0][1])
+                    splitting_edges.append(
+                        EdgeFromSplitting(e, f"s{n['splitting_index']}" in iterative_splitting_indices_with_prefix)
+                    )
+
+            # We need to match up the subjets with the iterative splittings.
+            # To do so, we search over the splitting edges, looking for a subjet edge which match the iterative splitting status
+            # of the splitting edge. Since we only expect at most one splitting edge to have a true iterative splitting status (because
+            # it looks at the next splitting in the graph), this will select the proper subjet. If both splitting edges have a false iterative
+            # splitting status, then we'll assign the first splitting edge to the hardest subjet, and so on.
+            subjet_edges_sorted_by_pt = sorted(subjet_edges, key=lambda x: x.subjet_pt, reverse=True)
+            for splitting_edge in splitting_edges:
+                for i, subjet_edge in enumerate(subjet_edges_sorted_by_pt):
+                    # Look for the subjet edge matching iterative splitting
+                    # Once we found one, we're done.
+                    if splitting_edge.part_of_iterative_splitting == subjet_edge.part_of_iterative_splitting:
+                        subjet_edge_to_remove = subjet_edges_sorted_by_pt.pop(i)
+                        break
+
+                graph.edges[splitting_edge.edge]["subjet_index"] = graph.edges[subjet_edge_to_remove.edge][
+                    "subjet_index"
+                ]
+                nodes_to_remove.append(subjet_edge_to_remove.edge[1])
 
     # Actually remove the nodes. We can't do it above because it will invalidate the iterator.
     for node in nodes_to_remove:
@@ -196,7 +223,7 @@ def splittings_graph(  # noqa: C901
         # Increase the line with
         graph.edges[e]["penwidth"] = 2
         # If requested, add the constituents pt label to the subjet.
-        if show_sum_of_constituent_pts:
+        if show_subjet_pt:
             graph.edges[e]["fontsize"] = 22
             graph.edges[e]["label"] = f"{subjet.constituents.four_vectors().sum().pt:.01f}"
         # Identify iterative splitting edges via the subjet properties.
