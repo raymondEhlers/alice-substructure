@@ -362,7 +362,7 @@ def analyze_single_tree_toy(
                 restricted_data_jets_splittings,
                 *restricted_data_jets_splittings.dynamical_z(R=dataset.settings.jet_R),
             )
-            # TODO: We absolutely shouldn't be calcuating the splitting properties here!
+            # TODO: We absolutely shouldn't be calculating the splitting properties here!
             # TODO: If we take the leading, we already know that it was only one splitting, and we already
             # TODO: know the values...
             true_inputs = analysis_objects.FillHistogramInput(
