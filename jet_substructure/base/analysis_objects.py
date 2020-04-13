@@ -333,7 +333,7 @@ class SubstructureHists(SubstructureHistsBase):
         theta_axis = bh.axis.Regular(20, 0, 1)
         splitting_number_axis = bh.axis.Regular(10, 0, 10)
         total_number_of_splittings_axis = bh.axis.Regular(50, 0, 50)
-        lund_plane_axes = [bh.axis.Regular(25, 0, 5), bh.axis.Regular(25, -5.0, 5.0)]
+        lund_plane_axes = [bh.axis.Regular(100, 0, 5), bh.axis.Regular(100, -5.0, 5.0)]
         return cls(
             name=name,
             title=title,
