@@ -1329,15 +1329,11 @@ def _plot_compare_kt(
     path: Path,
 ) -> None:
     # Setup
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, (ax, ax_ratio) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
     logger.info(f"Plotting response kt spectra for {technique}, {identifier}, kt")
 
-    h_data: Union[bh.Histogram, binned_data.BinnedData] = data_hists.kt
-    h_embed: Union[bh.Histogram, binned_data.BinnedData] = embedded_hists.kt
-    if isinstance(h_data, bh.Histogram):
-        h_data = binned_data.BinnedData.from_existing_data(h_data)
-    if isinstance(h_embed, bh.Histogram):
-        h_embed = binned_data.BinnedData.from_existing_data(h_embed)
+    h_data = binned_data.BinnedData.from_existing_data(data_hists.kt)
+    h_embed = binned_data.BinnedData.from_existing_data(embedded_hists.kt)
 
     # Normalization
     # Scale by bin widths and number of jets
@@ -1378,6 +1374,23 @@ def _plot_compare_kt(
         #    facecolor = plot[0].get_color(), alpha = 0.8
         # )
 
+    h_ratio = h_data / h_embed
+    # If we get 0, we don't want to show that point.
+    h_ratio.values[h_ratio.values == 0] = np.nan
+
+    # Plot the ratio
+    ax_ratio.errorbar(
+        h_ratio.axes[0].bin_centers,
+        h_ratio.values,
+        yerr=h_ratio.errors,
+        xerr=h_ratio.axes[0].bin_widths / 2,
+        marker=".",
+        linestyle="",
+    )
+
+    # Reference value
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+
     # Labeling
     text = identifier.display_str(jet_pt_label="hybrid")
     text += "\n" + data_hists.title
@@ -1392,8 +1405,12 @@ def _plot_compare_kt(
     )
 
     # Presentation
-    ax.set_xlabel(plot_config.x_label)
+    ax_ratio.set_xlabel(plot_config.x_label)
     ax.set_ylabel(plot_config.y_label)
+    ax_ratio.set_ylabel("PbPb/Embed")
+    # As standard for a ratio.
+    ax_ratio.set_ylim([0, 5])
+    # Rest of labeling.
     ax.legend(frameon=False, loc="lower left")
     ax.set_yscale("log")
     fig.tight_layout()
@@ -1407,6 +1424,7 @@ def _plot_compare_kt(
         right=0.99,
         top=0.98,
     )
+    fig.align_ylabels()
 
     # Store and reset
     fig.savefig(path / f"kt_spectra_comparison_{str(identifier)}_{technique}.pdf")
