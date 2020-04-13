@@ -551,12 +551,14 @@ def _determine_matching_types(
         shared_constituents_pts[selected_range] = matched_subset[matched_leading_indices][index_matching].pt.sum()
 
     # Sanity check
-    if (shared_constituents_pts > matched_subjets.constituents.four_vectors().sum().pt).any():
+    # NOTE: We use the sum of the constituents pt here because this is the convention.
+    #       This is handled differently than for finding the leading subjet.
+    if (shared_constituents_pts > matched_subjets.constituents.pt.sum()).any():
         logger.warning("Constituent pts are greater than the subjet pts...")
         IPython.embed()
         raise ValueError("Constituent pts are greater than the subjet pts...")
 
-    matched = (shared_constituents_pts / matched_subjets.constituents.four_vectors().sum().pt) > 0.5
+    matched = (shared_constituents_pts / matched_subjets.constituents.pt.sum()) > 0.5
     return cast(UprootArray[bool], matched)
 
 
