@@ -1190,7 +1190,7 @@ if __name__ == "__main__":
         helpers.RangeSelector(min=80, max=100),
         helpers.RangeSelector(min=100, max=120),
     ]
-    z_cutoff = 0.2
+    z_cutoff = 0.4
     # Standard analysis
     # (data_hists,), data_dataset = run_shared(
     #    collision_system="PbPb",
