@@ -159,8 +159,12 @@ class JetConstituentArrayMethods(ArrayMethods):
         return cast(UprootArray[float], np.sqrt((self["phi"] - other["phi"]) ** 2 + (self["eta"] - other["eta"]) ** 2))
 
     def four_vectors(self, mass_hypothesis: float = 0.139) -> uproot_methods.TLorentzVectorArray:
+        if isinstance(self.pt, np.ndarray):
+            ones_like = np.ones_like(self.pt)
+        else:
+            ones_like = self.pt.ones_like()
         return uproot_methods.TLorentzVectorArray.from_ptetaphim(
-            self.pt, self.eta, self.phi, self.pt.ones_like() * mass_hypothesis,
+            self.pt, self.eta, self.phi, ones_like * mass_hypothesis,
         )
 
 
