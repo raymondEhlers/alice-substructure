@@ -882,7 +882,7 @@ def create_substructure_hists(iterative_splittings: bool, z_cutoff: float) -> Hi
     )
     leading_kt_hard_cutoff = SubstructureHists.create_boost_histograms(
         name="leading_kt_hard_cutoff",
-        title=fr"SD $z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
+        title=fr"$z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
         iterative_splittings=iterative_splittings,
         values_axis=kt_axis,
     )
@@ -930,7 +930,7 @@ def create_substructure_toy_hists(iterative_splittings: bool, z_cutoff: float) -
     )
     leading_kt_hard_cutoff = SubstructureToyHists.create_boost_histograms(
         name="leading_kt_hard_cutoff",
-        title=fr"SD $z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
+        title=fr"$z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
         iterative_splittings=iterative_splittings,
         values_axis=kt_axis,
     )
@@ -964,7 +964,7 @@ def create_substructure_response_hists(iterative_splittings: bool, z_cutoff: flo
     )
     leading_kt_hard_cutoff = SubstructureResponseHists.create_boost_histograms(
         name="leading_kt_hard_cutoff_response",
-        title=fr"SD $z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
+        title=fr"$z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
         iterative_splittings=iterative_splittings,
     )
 
@@ -1000,7 +1000,7 @@ def create_matching_hists(iterative_splittings: bool, z_cutoff: float) -> Hists[
     )
     leading_kt_hard_cutoff = SubstructureMatchingSubjetHists.create_boost_histograms(
         name="leading_kt_hard_cutoff_response",
-        title=fr"SD $z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
+        title=fr"$z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
         iterative_splittings=iterative_splittings,
     )
 
