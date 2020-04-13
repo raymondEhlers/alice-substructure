@@ -54,15 +54,16 @@ class UprootArray(Collection[T]):
     def __getitem__(self, key):  # type: ignore
         raise NotImplementedError("Just typing information.")
 
-    @typing.overload
-    def __truediv__(self, other: float) -> UprootArray[T]:
-        ...
+    def __add__(self, other: int) -> UprootArray[int]:
+        raise NotImplementedError("Just typing information.")
 
-    @typing.overload
-    def __truediv__(self, other: UprootArray[T]) -> UprootArray[T]:
-        ...
+    def __mul__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
+        raise NotImplementedError("Just typing information.")
 
-    def __truediv__(self, other):  # type: ignore
+    def __rmul__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
+        raise NotImplementedError("Just typing information.")
+
+    def __truediv__(self, other: Union[float, UprootArray[T]]) -> UprootArray[T]:
         raise NotImplementedError("Just typing information.")
 
     def __pow__(self, p: float) -> UprootArray[T]:
@@ -97,10 +98,7 @@ class UprootArray(Collection[T]):
         raise NotImplementedError("Just typing information.")
 
     def __and__(self, other: UprootArray[bool]) -> UprootArray[bool]:
-        raise NotImplementedError("Just typing information.")
-
-    def __add__(self, other: int) -> UprootArray[int]:
-        raise NotImplementedError("Just typing information.")
+        ...
 
     def __or__(self, other: UprootArray[bool]) -> UprootArray[bool]:
         raise NotImplementedError("Just typing information.")
