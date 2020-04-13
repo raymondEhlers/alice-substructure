@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Tuple, Type, TypeVar, cast
 import attr
 import awkward as ak
 import numpy as np
+import uproot_methods
 
 from jet_substructure.base.helpers import ArrayOrScalar, UprootArray
 
@@ -104,6 +105,9 @@ class JetConstituent:
     def delta_R(self, other: "JetConstituent") -> float:
         return cast(float, np.sqrt((self.phi - other.phi) ** 2 + (self.eta - other.eta) ** 2))
 
+    def four_vector(self, mass_hypothesis: float = 0.139) -> uproot_methods.TLorentzVector:
+        return uproot_methods.TLorentzVector(self.pt, self.eta, self.phi, mass_hypothesis,)
+
 
 class JetConstituentArrayMethods(ArrayMethods):
     """ Methods for operating on jet constituents arrays.
@@ -153,6 +157,11 @@ class JetConstituentArrayMethods(ArrayMethods):
     def delta_R(self, other: "JetConstituentArray") -> UprootArray[float]:
         """ Delta R between one set of constituents and the others. """
         return cast(UprootArray[float], np.sqrt((self["phi"] - other["phi"]) ** 2 + (self["eta"] - other["eta"]) ** 2))
+
+    def four_vectors(self, mass_hypothesis: float = 0.139) -> uproot_methods.TLorentzVectorArray:
+        return uproot_methods.TLorentzVectorArray.from_ptetaphim(
+            self.pt, self.eta, self.phi, self.pt.ones_like() * mass_hypothesis,
+        )
 
 
 # Adds in JaggedArray methods for constructing objects with jagged structure.
@@ -1043,7 +1052,15 @@ class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):  # type
                 jet_constituents.pt, jet_constituents.eta, jet_constituents.phi, jet_constituents.global_index,
             ),
             subjets=SubjetArray._from_jagged_impl(
-                subjets.part_of_iterative_splitting, subjets.parent_splitting_index, subjets.constituents,
+                subjets.part_of_iterative_splitting,
+                subjets.parent_splitting_index,
+                # Ensure that the constituents are also constructed correctly.
+                JetConstituentArray.from_jagged(
+                    subjets.constituents.pt,
+                    subjets.constituents.eta,
+                    subjets.constituents.phi,
+                    subjets.constituents.global_index,
+                ),
             ),
             jet_splittings=JetSplittingArray.from_jagged(
                 jet_splittings.kt, jet_splittings.delta_R, jet_splittings.z, jet_splittings.parent_index,

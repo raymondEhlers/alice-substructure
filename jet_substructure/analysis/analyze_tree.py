@@ -487,9 +487,10 @@ def _get_leading_and_subleading_subjets(
     # Sort the subjets such that 0 is always the leading subjet.
     # Coerces the bool into an integer by taking 1 - array.
     # The leading subjet will be have a 0, while the subleading will have a 1.
-    subjets_pt_comparison = 1 - (
-        subjets_unsorted[:, 0].constituents.pt.sum() > subjets_unsorted[:, 1].constituents.pt.sum()
-    )
+    # NOTE: We actually want to add the four vectors rather than just summing the constituent pt. It doesn't
+    #       have a huge impact, but it's the right way to do it.
+    unsorted_subjet_pt = subjets_unsorted.constituents.four_vectors().sum().pt
+    subjets_pt_comparison = 1 - (unsorted_subjet_pt[:, 0] > unsorted_subjet_pt[:, 1])
     # For each subjet_pt_comparison, we want to take the index of the leading subjet and use that to extract the leading subjet.
     leading_indices = ak.JaggedArray.fromoffsets(range(len(subjets_pt_comparison) + 1), subjets_pt_comparison)
     subjets_leading = subjets_unsorted[leading_indices].flatten()
@@ -550,12 +551,12 @@ def _determine_matching_types(
         shared_constituents_pts[selected_range] = matched_subset[matched_leading_indices][index_matching].pt.sum()
 
     # Sanity check
-    if (shared_constituents_pts > matched_subjets.constituents.pt.sum()).any():
+    if (shared_constituents_pts > matched_subjets.constituents.four_vectors().sum().pt).any():
         logger.warning("Constituent pts are greater than the subjet pts...")
         IPython.embed()
         raise ValueError("Constituent pts are greater than the subjet pts...")
 
-    matched = (shared_constituents_pts / matched_subjets.constituents.pt.sum()) > 0.5
+    matched = (shared_constituents_pts / matched_subjets.constituents.four_vectors().sum().pt) > 0.5
     return cast(UprootArray[bool], matched)
 
 

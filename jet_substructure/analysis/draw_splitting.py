@@ -126,7 +126,7 @@ def splittings_graph(  # noqa: C901
             for e in edges_labels:
                 # "s" in the outgoing edge name indicates that it points to a splitting.
                 if "s" not in str(e[1]):
-                    subjet_edges.append((e, int(e[1]), jet.subjets[int(e[1])].constituents.pt.sum()))
+                    subjet_edges.append((e, int(e[1]), jet.subjets[int(e[1])].constituents.four_vectors().sum().pt))
                 else:
                     n = graph.nodes[e[1]]
                     splitting_edges.append((e, f"s{n['splitting_index']}" in iterative_splitting_indices_with_prefix))
@@ -198,7 +198,7 @@ def splittings_graph(  # noqa: C901
         # If requested, add the constituents pt label to the subjet.
         if show_sum_of_constituent_pts:
             graph.edges[e]["fontsize"] = 22
-            graph.edges[e]["label"] = f"{subjet.constituents.pt.sum():.01f}"
+            graph.edges[e]["label"] = f"{subjet.constituents.four_vectors().sum().pt:.01f}"
         # Identify iterative splitting edges via the subjet properties.
         if subjet.part_of_iterative_splitting:
             graph.edges[e]["color"] = "/blues3/3"
