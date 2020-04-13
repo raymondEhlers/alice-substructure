@@ -230,6 +230,13 @@ class HDF5TreeWrapper(TreeMixin, MutableMapping[str, UprootArray[Any]]):
             tree=ak.hdf5(f.require_group(tree_name), whitelist=whitelist),
         )
 
+    def flush(self) -> None:
+        """ Flush the HDF5 to ensure that everything is written out.
+
+        Otherwise, the file may not close safely. See: https://github.com/h5py/h5py/issues/714.
+        """
+        self._file.flush()
+
 
 @attr.s
 class UprootTreeIterator:
@@ -381,6 +388,9 @@ class IterateTrees:
 
             yield self._current_tree
 
+            # Flush the HDF5 to ensure that the data is written.
+            self._current_tree._hdf5_tree.flush()
+
             # Once we're returned from the yield, we're done with the tree in file.
             # Consequently, we can clear the cache because we don't need those values anymore.
             uproot_cache.clear()
@@ -391,6 +401,11 @@ class IterateTrees:
 
         Requires the calling function to call the return value to actually generate the tree. This way,
         we can pass the wrapper function via multiprocessing, and then instantiate it there.
+
+        Note:
+            Since we generate the objects it is the callers responsibility to ensure that the hdf5 is flushed!
+            Otherwise, the hdf5 may not be written correctly, leading to possible corruption. This isn't ideal,
+            but the usual approach (using a generator) doesn't work with multiprocessing.
         """
 
         def _wrap(filename: Path) -> Tree:

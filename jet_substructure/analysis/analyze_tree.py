@@ -126,6 +126,10 @@ def _construct_jets_from_tree(prefix: str, tree: data_manager.Tree,) -> substruc
         if constructed_name not in tree:
             tree[constructed_name] = jets
 
+    # Flush the hdf5 portion of the tree to ensure that it's been written properly.
+    # Otherwise, the file may end up corrupted.
+    tree._hdf5_tree.flush()
+
     return jets
 
 
