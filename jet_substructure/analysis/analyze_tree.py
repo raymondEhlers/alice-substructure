@@ -199,6 +199,20 @@ def analyze_single_tree(
         # Return the empty hists. We can't process this data :-(
         return (hists,)
 
+    # Sanity check using iterative splittings information stored with the splittings
+    # This is used as a local testing cross check. We don't want to include it with the standard output
+    # because it will increase the output size with redundant information
+    try:
+        iterative_splittings_mask = tree["data.fJetSplittings.fIterativeSplitting"]
+        logger.debug("Checking iteartive splittings are calculated correctly.")
+        # The jet_pt_mask is just a hack for selecting everything.
+        _, temp_iterative_splittings = _select_and_retrieve_splittings(
+            jets, jet_pt_mask=np.ones_like(jets) > 0, iterative_splittings=True,
+        )
+        assert (jets.splittings[iterative_splittings_mask] == temp_iterative_splittings).all().all()
+    except KeyError:
+        ...
+
     # Loop over iterations (jet pt ranges, iterative splitting)
     progress_manager = enlighten.get_manager()
     with progress_manager.counter(
@@ -426,14 +440,14 @@ def _select_and_retrieve_splittings(
     if iterative_splittings:
         # Only keep iterative splittings.
         splittings = restricted_jets.splittings.iterative_splittings(restricted_jets.subjets)
+
+        # Enable this test to determine if we've selected different sets of splittings with the
+        # recursive vs iterative selections.
+        # if (splittings.counts != restricted_jets.splittings.counts).any():
+        #    logger.warning("Disagreement between number of inclusive and recursive splittings (as expected!)")
+        #    IPython.embed()
     else:
         splittings = restricted_jets.splittings
-
-        # TODO: Test this more extensively.
-        # comparison = restricted_jets.splittings.iterative_splittings(restricted_jets.subjets)
-        # if (comparison != splittings).any().any():
-        #    logger.warning("An actual disagreement in pythia!!")
-        #    IPython.embed()
 
     return restricted_jets, splittings
 
