@@ -1009,20 +1009,29 @@ def _plot_response(
         h = binned_data.BinnedData.from_existing_data(h)
 
     # Project into our axes of interest (namely, the attribute at hybrid and true level).
-    values = np.sum(h.values, axis=(0, 2))
+    h_proj = binned_data.BinnedData(
+        axes=[h.axes[1], h.axes[3]], values=np.sum(h.values, axis=(0, 2)), variances=np.sum(h.variances, axis=(0, 2)),
+    )
 
     # If there aren't counts, we  need to stop here.
-    if len(values[values > 0]) == 0:
+    if len(h_proj.values[h_proj.values > 0]) == 0:
         logger.warning(f"No values left for {technique}, {identifier}, {attribute_name}. Skipping")
         return
+
+    # Normalize the response.
+    normalization_values = h_proj.values.sum(axis=0, keepdims=True)
+    h_proj.values = np.divide(
+        h_proj.values, normalization_values, out=np.zeros_like(h_proj.values), where=normalization_values != 0
+    )
 
     # Finish setup
     fig, ax = plt.subplots(figsize=(8, 6))
 
     # Determine the normalization range
     z_axis_range = {
-        "vmin": values[values > 0].min(),
-        "vmax": values.max(),
+        # "vmin": h_proj.values[h_proj.values > 0].min(),
+        "vmin": 1e-4,
+        "vmax": h_proj.values.max(),
     }
     if technique == "inclusive":
         z_axis_range = {
@@ -1032,7 +1041,7 @@ def _plot_response(
 
     # Make the plot
     mesh = ax.pcolormesh(
-        h.axes[1].bin_edges.T, h.axes[3].bin_edges.T, values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+        h.axes[1].bin_edges.T, h.axes[3].bin_edges.T, h_proj.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
