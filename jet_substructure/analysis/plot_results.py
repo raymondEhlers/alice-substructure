@@ -1334,6 +1334,7 @@ def _plot_compare_kt(
     identifier: analysis_objects.Identifier,
     data_hists: analysis_objects.SubstructureHists,
     embedded_hists: analysis_objects.SubstructureHists,
+    true_hists: analysis_objects.SubstructureHists,
     plot_config: PlotConfig,
     path: Path,
 ) -> None:
@@ -1343,6 +1344,22 @@ def _plot_compare_kt(
 
     h_data = binned_data.BinnedData.from_existing_data(data_hists.kt)
     h_embed = binned_data.BinnedData.from_existing_data(embedded_hists.kt)
+    h_true = binned_data.BinnedData.from_existing_data(true_hists.kt)
+
+    # Convert to boost_histogram and rebin (and scale by rebin factor to maintain the normalization).
+    rebin_factor = 2
+    bh_data = h_data.to_boost_histogram()
+    bh_data = bh_data[:: bh.rebin(rebin_factor)]
+    h_data = binned_data.BinnedData.from_existing_data(bh_data)
+    h_data /= rebin_factor
+    bh_embed = h_embed.to_boost_histogram()
+    bh_embed = bh_embed[:: bh.rebin(rebin_factor)]
+    h_embed = binned_data.BinnedData.from_existing_data(bh_embed)
+    h_embed /= rebin_factor
+    bh_true = h_true.to_boost_histogram()
+    bh_true = bh_true[:: bh.rebin(rebin_factor)]
+    h_true = binned_data.BinnedData.from_existing_data(bh_true)
+    h_true /= rebin_factor
 
     # Normalization
     # Scale by bin widths and number of jets
@@ -1350,10 +1367,12 @@ def _plot_compare_kt(
     h_data /= h_data.axes[0].bin_widths
     h_embed /= embedded_hists.n_jets
     h_embed /= h_embed.axes[0].bin_widths
+    h_true /= true_hists.n_jets
+    h_true /= h_true.axes[0].bin_widths
 
     # Plot
-    for h, label in [(h_data, "Data"), (h_embed, "Hybrid")]:
-        ax.errorbar(
+    for h, label in [(h_data, "Data"), (h_embed, "Hybrid"), (h_true, "True")]:
+        p = ax.errorbar(
             h.axes[0].bin_centers,
             h.values,
             yerr=h.errors,
@@ -1383,19 +1402,21 @@ def _plot_compare_kt(
         #    facecolor = plot[0].get_color(), alpha = 0.8
         # )
 
-    h_ratio = h_data / h_embed
-    # If we get 0, we don't want to show that point.
-    h_ratio.values[h_ratio.values == 0] = np.nan
+        if label != "Data":
+            h_ratio = h_data / h
+            # If we get 0, we don't want to show that point.
+            h_ratio.values[h_ratio.values == 0] = np.nan
 
-    # Plot the ratio
-    ax_ratio.errorbar(
-        h_ratio.axes[0].bin_centers,
-        h_ratio.values,
-        yerr=h_ratio.errors,
-        xerr=h_ratio.axes[0].bin_widths / 2,
-        marker=".",
-        linestyle="",
-    )
+            # Plot the ratio
+            ax_ratio.errorbar(
+                h_ratio.axes[0].bin_centers,
+                h_ratio.values,
+                yerr=h_ratio.errors,
+                xerr=h_ratio.axes[0].bin_widths / 2,
+                marker=".",
+                linestyle="",
+                color=p[0].get_color(),
+            )
 
     # Reference value
     ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
@@ -1416,7 +1437,7 @@ def _plot_compare_kt(
     # Presentation
     ax_ratio.set_xlabel(plot_config.x_label)
     ax.set_ylabel(plot_config.y_label)
-    ax_ratio.set_ylabel("PbPb/Embed")
+    ax_ratio.set_ylabel("PbPb/Ref")
     # As standard for a ratio.
     ax_ratio.set_ylim([0, 5])
     # Rest of labeling.
@@ -1445,16 +1466,19 @@ def compare_kt(
     all_embedded_hists: Mapping[
         analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]
     ],
+    all_true_hists: Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
     data_dataset: analysis_objects.Dataset,
     embedded_dataset: analysis_objects.Dataset,
 ) -> None:
-    for (data_identifier, data_hists), (embedded_identifier, embedded_hists) in zip(
-        all_data_hists.items(), all_embedded_hists.items()
+    for (data_identifier, data_hists), (embedded_identifier, embedded_hists), (true_identifier, true_hists) in zip(
+        all_data_hists.items(), all_embedded_hists.items(), all_true_hists.items()
     ):
-        for (technique, d_hists), (_, e_hists) in zip(data_hists, embedded_hists):
-            if d_hists.n_jets == 0 or e_hists.n_jets == 0:
+        for (technique, d_hists), (_, e_hists), (_, t_hists) in zip(data_hists, embedded_hists, true_hists):
+            if d_hists.n_jets == 0 or e_hists.n_jets == 0 or t_hists.n_jets == 0:
                 logger.warning(f"No jets within {data_identifier}_{technique}. Skipping bin!")
-                logger.warning(f"data n_jets: {d_hists.n_jets}, hybrid n_jets: {e_hists.n_jets}")
+                logger.warning(
+                    f"data n_jets: {d_hists.n_jets}, hybrid n_jets: {e_hists.n_jets}, true n_jets: {t_hists.n_jets}"
+                )
                 continue
 
             _plot_compare_kt(
@@ -1462,6 +1486,7 @@ def compare_kt(
                 identifier=data_identifier,
                 data_hists=d_hists,
                 embedded_hists=e_hists,
+                true_hists=t_hists,
                 plot_config=PlotConfig(
                     name="kt_spectra",
                     x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
