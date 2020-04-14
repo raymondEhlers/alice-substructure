@@ -612,9 +612,9 @@ def _fill_embedded_hists_with_calculation(
     restricted_true_jets_splittings: substructure_methods.JetSplittingArray,
     true_hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
     hybrid_hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
-    response_hists: analysis_objects.Hists[analysis_objects.SubstructureResponseHists],
     jet_R: float,
     weight: float,
+    response_hists: Optional[analysis_objects.Hists[analysis_objects.SubstructureResponseHists]] = None,
 ) -> None:
     # Calculate the inputs
     hybrid_inputs = analysis_objects.FillHistogramInput(
@@ -630,9 +630,10 @@ def _fill_embedded_hists_with_calculation(
     getattr(hybrid_hists, fill_attr_name).fill(
         inputs=hybrid_inputs, jet_R=jet_R, weight=weight,
     )
-    getattr(response_hists, fill_attr_name).fill(
-        hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=jet_R, weight=weight,
-    )
+    if response_hists is not None:
+        getattr(response_hists, fill_attr_name).fill(
+            hybrid_inputs=hybrid_inputs, true_inputs=true_inputs, jet_R=jet_R, weight=weight,
+        )
 
 
 def analyze_single_tree_embedding(  # noqa: C901
@@ -708,13 +709,20 @@ def analyze_single_tree_embedding(  # noqa: C901
             ] = analysis_objects.create_substructure_hists(
                 iterative_splittings=iterative_splittings, z_cutoff=dataset.settings.z_cutoff
             )
-            # Responses
-            response_hists[
-                analysis_objects.Identifier(iterative_splittings, jet_pt_bin)
-            ] = analysis_objects.create_substructure_response_hists(
-                iterative_splittings=iterative_splittings, z_cutoff=dataset.settings.z_cutoff
+        # Responses.
+        # We bin as a function of true and hybrid jet pt, so there's no point in trying to make the jet pt selections now.
+        response_jet_pt_bin = helpers.RangeSelector(40, 120)
+        if response_jet_pt_bin not in jet_pt_bins:
+            raise ValueError(
+                f"The response jet pt bin {response_jet_pt_bin} is not in the list of single jet pt bins. Check that the jet pt bins: {jet_pt_bins}."
             )
-        # Matching. We're going to plot again jet pt, so we don't want to select on jet pt bins here.
+        response_hists[
+            analysis_objects.Identifier(iterative_splittings, jet_pt_bin=response_jet_pt_bin)
+        ] = analysis_objects.create_substructure_response_hists(
+            iterative_splittings=iterative_splittings, z_cutoff=dataset.settings.z_cutoff
+        )
+        # Matching.
+        # We're going to plot as a function of jet pt, so we don't want to select on jet pt bins here.
         matching_hists[
             analysis_objects.Identifier(iterative_splittings, jet_pt_bin=helpers.RangeSelector(0, 150))
         ] = analysis_objects.create_matching_hists(
@@ -799,7 +807,9 @@ def analyze_single_tree_embedding(  # noqa: C901
                     restricted_true_jets_splittings=restricted_true_jets_splittings,
                     true_hists=true_hists[identifier],
                     hybrid_hists=hybrid_hists[identifier],
-                    response_hists=response_hists[identifier],
+                    # We only fill the response for the widest jet pt selection so we don't store redundant information.
+                    # If it is retrieved, we use it. If not, we'll skip filling it.
+                    response_hists=response_hists.get(identifier, None),
                     jet_R=dataset.settings.jet_R,
                     weight=weight,
                 )
