@@ -1036,6 +1036,9 @@ def run_shared(  # noqa: C901
     if additional_kwargs_for_analysis is None:
         additional_kwargs_for_analysis = {}
 
+    # TODO: make this an option
+    merge_mode = False
+
     # Configuration
     # Only need to set options which vary from the default.
     settings_class_map: Mapping[str, Type[analysis_objects.AnalysisSettings]] = {
@@ -1060,7 +1063,7 @@ def run_shared(  # noqa: C901
     # Have a special option if we're plotting only so we can just read the final files.
     # Even though merging isn't very hard, all of that I/O is still slow than reading them once.
     if plot_only:
-        logger.info(f"Loading system {collision_system} with dataset {dataset.name} for plotting only")
+        logger.info(f"Loading system {collision_system} with dataset {dataset.name}, hists: {hists_filename} for plotting only")
         if dataset.hists_filename.exists():
             # Read the stored hists.
             # We don't use YAML because it would be super slow!
@@ -1108,26 +1111,47 @@ def run_shared(  # noqa: C901
             # Only use 2 nodes because memory usage may become too large...
             with Pool(nodes=number_of_cores) as pool:
                 for r in tree_counter(pool.imap(analyze_single_tree_func_multiprocessing, dm_iterator)):
-                    results.append(r)
+                    # TODO: Finish up...
+                    if merge_mode:
+                        ...
+                    else:
+                        results.append(r)
         else:
             for r in tree_counter(map(analyze_single_tree_func, dm_iterator)):
-                results.append(r)
+                if merge_mode:
+                    for hist_result in r:
+                        for h in hist_result.values():
+                            h.convert_boost_histograms_to_binned_data()
+                    if len(output_hists) == 0:
+                        output_hists = r
+                    else:
+                        # TODO: Requires further testing!!
+                        for i, hist_result in enumerate(output_hists):
+                            for k in hist_result.keys():
+                                output_hists[i][k] = output_hists[i][k] + r[i][k]
+                                #output_hists[k] = output_hists[k] + cast(
+                                #    analysis_objects.Hists[analysis_objects.T_SubstructureHists],
+                                #    sum([per_file_result[i][k] for per_file_result in results]),
+                                #)
+                else:
+                    results.append(r)
 
-    # Convert and merge all of the result hists.
-    for result in results:
-        for hist_result in result:
-            for h in hist_result.values():
-                h.convert_boost_histograms_to_binned_data()
+    if merge_mode is False:
+        # Convert and merge all of the result hists.
+        for result in results:
+            for hist_result in result:
+                for h in hist_result.values():
+                    h.convert_boost_histograms_to_binned_data()
 
-    # For each hist result, we want to merge the output from all of the files.
-    for i, hist_result in enumerate(results[0]):
-        hist_output = {}
-        for k in hist_result.keys():
-            hist_output[k] = cast(
-                analysis_objects.Hists[analysis_objects.T_SubstructureHists],
-                sum([per_file_result[i][k] for per_file_result in results]),
-            )
-        output_hists.append(hist_output)
+        # For each hist result, we want to merge the output from all of the files.
+        for i, hist_result in enumerate(results[0]):
+            hist_output = {}
+            for k in hist_result.keys():
+                hist_output[k] = cast(
+                    analysis_objects.Hists[analysis_objects.T_SubstructureHists],
+                    sum([per_file_result[i][k] for per_file_result in results]),
+                )
+            output_hists.append(hist_output)
 
     # Write out the merged hists
     # Write with pkl because yaml is super slow for hists that are this large.
