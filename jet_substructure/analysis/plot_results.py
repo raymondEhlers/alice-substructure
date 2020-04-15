@@ -1128,6 +1128,90 @@ def _plot_response(
     plt.close(fig)
 
 
+def _plot_response_pt(
+    technique: str,
+    identifier: analysis_objects.Identifier,
+    attribute_name: str,
+    hists: analysis_objects.SubstructureResponseHists,
+    plot_config: PlotConfig,
+    path: Path,
+) -> None:
+    # Setup
+    logger.info(f"Plotting jet pt response hist for {technique}, {identifier}, {attribute_name}")
+    h: Union[bh.Histogram, binned_data.BinnedData] = getattr(hists, f"response_{attribute_name}")
+    if isinstance(h, bh.Histogram):
+        h = binned_data.BinnedData.from_existing_data(h)
+
+    # Project into our axes of interest (namely, the attribute at hybrid and true level).
+    h_proj = binned_data.BinnedData(
+        axes=[h.axes[0], h.axes[2]], values=np.sum(h.values, axis=(1, 3)), variances=np.sum(h.variances, axis=(1, 3)),
+    )
+
+    # If there aren't counts, we  need to stop here.
+    if len(h_proj.values[h_proj.values > 0]) == 0:
+        logger.warning(f"No values left for {technique}, {identifier}, {attribute_name}. Skipping")
+        return
+
+    # Normalize the response.
+    normalization_values = h_proj.values.sum(axis=0, keepdims=True)
+    h_proj.values = np.divide(
+        h_proj.values, normalization_values, out=np.zeros_like(h_proj.values), where=normalization_values != 0
+    )
+
+    # Finish setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Determine the normalization range
+    z_axis_range = {
+        # "vmin": h_proj.values[h_proj.values > 0].min(),
+        "vmin": 1e-4,
+        "vmax": h_proj.values.max(),
+    }
+    if technique == "inclusive":
+        z_axis_range = {
+            "vmin": 10e-3,
+            "vmax": 5,
+        }
+
+    # Make the plot
+    mesh = ax.pcolormesh(
+        h.axes[0].bin_edges.T, h.axes[2].bin_edges.T, h_proj.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+    )
+    fig.colorbar(mesh, pad=0.02)
+
+    # Labeling
+    text = identifier.display_str(jet_pt_label="hybrid")
+    text += "\n" + hists.title
+    ax.text(
+        0.05,
+        0.95,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="left",
+        verticalalignment="top",
+        multialignment="left",
+    )
+
+    # Presentation
+    ax.set_xlabel(plot_config.x_label)
+    ax.set_ylabel(plot_config.y_label)
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.10,
+        bottom=0.11,
+        right=0.99,
+        top=0.98,
+    )
+
+    # Store and reset
+    fig.savefig(path / f"response_pt_{attribute_name}_{str(identifier)}_{technique}.pdf")
+    plt.close(fig)
+
+
 def _plot_response_jet_spectra(
     technique: str,
     identifier: analysis_objects.Identifier,
@@ -1374,6 +1458,18 @@ def responses(
                         name="response_spectra",
                         x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
                         y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                    ),
+                    path=path,
+                )
+                _plot_response_pt(
+                    technique=technique,
+                    identifier=identifier,
+                    attribute_name="kt",
+                    hists=hists,
+                    plot_config=PlotConfig(
+                        name="response_pt",
+                        x_label=r"$p_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$",
+                        y_label=r"$p_{\text{T}}^{\text{part}}\:(\text{GeV}/c)$",
                     ),
                     path=path,
                 )
