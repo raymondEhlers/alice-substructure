@@ -7,7 +7,7 @@
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Tuple, Union
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import attr
 import boost_histogram as bh
@@ -553,25 +553,45 @@ def lund_plane(  # noqa: C901
             )
 
 
-def _project_matching(input_hist: binned_data.BinnedData, axis_to_sum: int) -> binned_data.BinnedData:
-    # Since it's a 2D hist, axis_to_sum can only be 0 or 1.
-    # In which case, 1 - axis_to_sum will give me the other axis.
-    # Valdiation
-    if axis_to_sum not in [0, 1]:
-        raise ValueError("Must select axis 0 or 1")
+def _project_matching(
+    input_hist: binned_data.BinnedData, axis_to_keep: int, identifier: analysis_objects.MatchingHybridIdentifier
+) -> binned_data.BinnedData:
+    # Setup
+    # Axes: 0 = matched_jet_pt, 1 = matched_kt, 2 = hybrid_jet_pt, 3 = hybrid_kt
+    # Determine the range for hybrid jet pt.
+    epsilon = 0.00001
+    # NOTE: We don't have an epsilon on the upper range because slices aren't inclusive on the upper edge (unlike ROOT projections)
+    hybrid_jet_pt_range = slice(
+        input_hist.axes[2].find_bin(identifier.jet_pt_bin.min + epsilon),
+        input_hist.axes[2].find_bin(identifier.jet_pt_bin.max),
+    )
+    # We only want to select on the minimum value.
+    hybrid_kt_range = slice(input_hist.axes[3].find_bin(identifier.min_kt + epsilon), None)
+    slices = (slice(None, None), slice(None, None), hybrid_jet_pt_range, hybrid_kt_range)
+    axes_to_sum = tuple([i for i in range(len(input_hist.axes)) if i != axis_to_keep])
+
+    # logger.debug(f"axis_to_keep: {axis_to_keep}, axes_to_sum: {axes_to_sum}, hybrid jet pt range: {hybrid_jet_pt_range}, hybrid kt range: {hybrid_kt_range}")
 
     return_hist = binned_data.BinnedData(
-        axes=input_hist.axes[1 - axis_to_sum],
-        values=np.sum(input_hist.values, axis=axis_to_sum),
-        variances=np.sum(input_hist.variances, axis=axis_to_sum),
+        axes=input_hist.axes[axis_to_keep],
+        values=np.sum(input_hist.values[slices], axis=axes_to_sum),
+        variances=np.sum(input_hist.variances[slices], axis=axes_to_sum),
     )
 
     # Sanity check
-    if axis_to_sum == 1:
+    if axis_to_keep == 0:
         import boost_histogram as bh
 
         bh_hist = input_hist.to_boost_histogram()
-        bh_return_hist = bh_hist[:, :: bh.sum]
+        logger.debug(f"bh_hist shape: {bh_hist.view().value.shape}")
+        bh_slices = (
+            slice(None, None),
+            slice(slices[1].start, slices[1].stop, bh.sum),
+            slice(slices[2].start, slices[2].stop, bh.sum),
+            slice(slices[3].start, slices[3].stop, bh.sum),
+        )
+        logger.debug(bh_slices)
+        bh_return_hist = bh_hist[tuple(bh_slices)]
         assert np.allclose(return_hist.values, bh_return_hist.view().value)
         assert np.allclose(return_hist.variances, bh_return_hist.view().variance)
 
@@ -580,25 +600,25 @@ def _project_matching(input_hist: binned_data.BinnedData, axis_to_sum: int) -> b
 
 def _plot_matching(
     technique: str,
-    identifier: analysis_objects.Identifier,
+    identifier: analysis_objects.MatchingHybridIdentifier,
     axis_parameter: str,
     hists: analysis_objects.SubstructureMatchingSubjetHists,
     path: Path,
 ) -> None:
     # Setup
     # Maps from the name that we want to keep to the number of the axis that we need to sum out.
-    axis_name_to_axis_to_sum_map = {"pt": 1, "kt": 0}
-    axis_to_sum = axis_name_to_axis_to_sum_map[axis_parameter]
+    axis_name_to_axis_to_keep_map = {"pt": 0, "kt": 1}
+    axis_to_keep = axis_name_to_axis_to_keep_map[axis_parameter]
     # Figures
     fig, axes = plt.subplots(3, 3, figsize=(10, 10), sharex=True, sharey=True)
     fig_single, ax = plt.subplots(figsize=(10, 8))
     logger.info(f"Plotting matching hist for {technique}, {identifier}")
 
     # NOTE: We convert the hists here to ensure that we're working with copies!
-    normalization = _project_matching(hists.all, axis_to_sum=axis_to_sum)
+    normalization = _project_matching(hists.all, axis_to_keep=axis_to_keep, identifier=identifier)
 
     # Both correctly tagged goes in the upper left
-    both_correct = _project_matching(hists.both_correct, axis_to_sum=axis_to_sum)
+    both_correct = _project_matching(hists.both_correct, axis_to_keep=axis_to_keep, identifier=identifier)
     both_correct /= normalization
     axes[0, 0].errorbar(
         both_correct.axes[0].bin_centers,
@@ -622,7 +642,7 @@ def _plot_matching(
     # axes[0, 1].set_visible(False)
     # Leading wasn't tagged, but subleading was correctly tagged as subleading.
     leading_failed_subleading_correct = _project_matching(
-        hists.leading_failed_subleading_correct, axis_to_sum=axis_to_sum
+        hists.leading_failed_subleading_correct, axis_to_keep=axis_to_keep, identifier=identifier,
     )
     leading_failed_subleading_correct /= normalization
     axes[0, 2].errorbar(
@@ -646,7 +666,7 @@ def _plot_matching(
     # Skip this panel
     # axes[1, 0].set_visible(False)
     # Swapped (ie. reversed)
-    reversed = _project_matching(hists.reversed, axis_to_sum=axis_to_sum)
+    reversed = _project_matching(hists.reversed, axis_to_keep=axis_to_keep, identifier=identifier)
     reversed /= normalization
     axes[1, 1].errorbar(
         reversed.axes[0].bin_centers,
@@ -668,7 +688,7 @@ def _plot_matching(
     )
     # Leading failed, subleading mistag
     leading_failed_subleading_mistag = _project_matching(
-        hists.leading_failed_subleading_mistag, axis_to_sum=axis_to_sum
+        hists.leading_failed_subleading_mistag, axis_to_keep=axis_to_keep, identifier=identifier
     )
     leading_failed_subleading_mistag /= normalization
     axes[1, 2].errorbar(
@@ -691,7 +711,7 @@ def _plot_matching(
     )
     # Leading correct, subleading failed
     leading_correct_subleading_failed = _project_matching(
-        hists.leading_correct_subleading_failed, axis_to_sum=axis_to_sum
+        hists.leading_correct_subleading_failed, axis_to_keep=axis_to_keep, identifier=identifier
     )
     leading_correct_subleading_failed /= normalization
     axes[2, 0].errorbar(
@@ -714,7 +734,7 @@ def _plot_matching(
     )
     # Leading mistag, subleading failed
     leading_mistag_subleading_failed = _project_matching(
-        hists.leading_mistag_subleading_failed, axis_to_sum=axis_to_sum
+        hists.leading_mistag_subleading_failed, axis_to_keep=axis_to_keep, identifier=identifier
     )
     leading_mistag_subleading_failed /= normalization
     axes[2, 1].errorbar(
@@ -736,7 +756,7 @@ def _plot_matching(
         label="Leading in subleading, subleading unmatched",
     )
     # Both failed
-    both_failed = _project_matching(hists.both_failed, axis_to_sum=axis_to_sum)
+    both_failed = _project_matching(hists.both_failed, axis_to_keep=axis_to_keep, identifier=identifier)
     both_failed /= normalization
     axes[2, 2].errorbar(
         both_failed.axes[0].bin_centers,
@@ -762,7 +782,7 @@ def _plot_matching(
         ax_temp.set_ylim([0, 1.2])
 
     # Labeling
-    text = identifier.display_str(jet_pt_label="det")
+    text = identifier.display_str()
     text += "\n" + hists.title
     axes[0, 1].text(
         0.5,
@@ -803,7 +823,7 @@ def _plot_matching(
     plt.close(fig)
 
     # Labeling
-    text = identifier.display_str(jet_pt_label="det")
+    text = identifier.display_str()
     text += "\n" + hists.title
     ax.text(
         0.975,
@@ -843,20 +863,34 @@ def matching(
     all_matching_hists: Mapping[
         analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]
     ],
+    hybrid_min_kt_values: Sequence[float],
     path: Path,
 ) -> None:
     # Validation
     path.mkdir(parents=True, exist_ok=True)
+    # Setup
+    # We only care about this set of bins...
+    hybrid_jet_pt_bins = [
+        helpers.RangeSelector(min=40, max=120),
+    ]
 
     for axis_parameter in ["pt", "kt"]:
         for identifier, matching_hists in all_matching_hists.items():
             for technique, hists in matching_hists:
-                # Update identifier (because there were issues with the str methods when it was created)
-                identifier = analysis_objects.Identifier.from_existing(identifier)
-                # Plot matching distributions
-                _plot_matching(
-                    technique=technique, identifier=identifier, axis_parameter=axis_parameter, hists=hists, path=path
-                )
+                for hybrid_jet_pt_bin in hybrid_jet_pt_bins:
+                    for hybrid_min_kt in hybrid_min_kt_values:
+                        # Use the matching identifier to fully specify our values of interest.
+                        matching_identifier = analysis_objects.MatchingHybridIdentifier.from_existing_identifier(
+                            identifier, hybrid_jet_pt_bin=hybrid_jet_pt_bin, min_kt=hybrid_min_kt
+                        )
+                        # Plot matching distributions
+                        _plot_matching(
+                            technique=technique,
+                            identifier=matching_identifier,
+                            axis_parameter=axis_parameter,
+                            hists=hists,
+                            path=path,
+                        )
 
 
 def _plot_toy(

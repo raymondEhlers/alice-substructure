@@ -58,6 +58,48 @@ class Identifier:
 
 
 @attr.s(frozen=True)
+class MatchingHybridIdentifier(Identifier):
+    """ Identify hybrid cuts on the matching hists.
+
+    Note:
+        We only use this class for plotting! Not for identify the hists during processing!
+    """
+
+    min_kt: float = attr.ib(default=0)
+
+    def __str__(self) -> str:
+        base_str = super().__str__()
+        if self.min_kt > 0:
+            base_str = f"{base_str}_hybridMinKt_{self.min_kt}"
+        return base_str
+
+    def display_str(self, jet_pt_label: str = "") -> str:
+        if jet_pt_label:
+            logger.warning(f"We're ignoring the jet pt label {jet_pt_label}. Using 'hybrid'.")
+        base_str = super().display_str(jet_pt_label="hybrid")
+        if self.min_kt > 0:
+            base_str += "\n" + fr"$k_{{\text{{T}}}}^{{\text{{hybrid}}}} > {self.min_kt}$"
+        return base_str
+
+    @classmethod
+    def from_existing(
+        cls: Type["MatchingHybridIdentifier"], existing: "MatchingHybridIdentifier"
+    ) -> "MatchingHybridIdentifier":
+        return cls(
+            iterative_splittings=existing.iterative_splittings, jet_pt_bin=existing.jet_pt_bin, min_kt=existing.min_kt
+        )
+
+    @classmethod
+    def from_existing_identifier(
+        cls: Type["MatchingHybridIdentifier"],
+        existing: Identifier,
+        hybrid_jet_pt_bin: helpers.RangeSelector,
+        min_kt: float,
+    ) -> "MatchingHybridIdentifier":
+        return cls(iterative_splittings=existing.iterative_splittings, jet_pt_bin=hybrid_jet_pt_bin, min_kt=min_kt,)
+
+
+@attr.s(frozen=True)
 class AnalysisSettings:
     jet_R: float = attr.ib()
     z_cutoff: float = attr.ib()
