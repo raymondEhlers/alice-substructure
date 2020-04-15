@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Dict,
     Generic,
     Iterator,
@@ -270,7 +271,12 @@ class SubstructureHistsBase:
         )
 
     def convert_boost_histograms_to_binned_data(self) -> None:
-        # Sanity check
+        # Check if we can return immediately.
+        if all(isinstance(hist, binned_data.BinnedData) for _, hist in self):
+            return
+
+        # Sanity check.
+        # Ensure that we're not somehow half converted. If so, something rather odd has occurred.
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
             types = {k: type(v) for k, v in self}
             raise ValueError(f"Not all hists are boost histograms! Cannot convert to binned data! Types: {types}")
@@ -285,6 +291,7 @@ class SubstructureHists(SubstructureHistsBase):
     title: str = attr.ib()
     iterative_splittings: bool = attr.ib()
     n_jets: float = attr.ib()
+    jet_pt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     values: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     kt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     z: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
@@ -366,6 +373,7 @@ class SubstructureHists(SubstructureHistsBase):
             title=title,
             iterative_splittings=iterative_splittings,
             n_jets=0,
+            jet_pt=bh.Histogram(bh.axis.Regular(150, 0, 150), storage=bh.storage.Weight()),
             values=bh.Histogram(values_axis, storage=bh.storage.Weight()),
             kt=bh.Histogram(kt_axis, storage=bh.storage.Weight()),
             z=bh.Histogram(z_axis, storage=bh.storage.Weight()),
@@ -392,6 +400,7 @@ class SubstructureHists(SubstructureHistsBase):
         # And then help out mypy...
         assert (
             isinstance(self.values, bh.Histogram)
+            and isinstance(self.jet_pt, bh.Histogram)
             and isinstance(self.kt, bh.Histogram)
             and isinstance(self.z, bh.Histogram)
             and isinstance(self.delta_R, bh.Histogram)
@@ -403,6 +412,7 @@ class SubstructureHists(SubstructureHistsBase):
         )
         # Need to store the number of jets along the histograms.
         self.n_jets += inputs.n_jets * weight
+        self.jet_pt.fill(inputs.jets.jet_pt, weight=weight)
         self.values.fill(inputs.values, weight=weight)
         self.kt.fill(inputs.splittings.kt.flatten(), weight=weight)
         self.z.fill(inputs.splittings.z.flatten(), weight=weight)
@@ -546,6 +556,55 @@ class SubstructureToyHists(SubstructureHistsBase):
 
 
 @attr.s
+class MatchingSelections:
+    leading: MatchingResult = attr.ib()
+    subleading: MatchingResult = attr.ib()
+
+    def __getitem__(self, name: str) -> np.ndarray:
+        """ Helper to retrieve the masks. """
+        return getattr(self, name)
+
+    @property
+    def all(self) -> np.ndarray:
+        return (
+            self.leading.properly
+            | self.leading.mistag
+            | self.leading.failed
+            | self.subleading.properly
+            | self.subleading.mistag
+            | self.subleading.failed
+        )
+
+    @property
+    def pure(self) -> np.ndarray:
+        return self.leading.properly & self.subleading.properly
+
+    @property
+    def leading_untagged_subleading_correct(self) -> np.ndarray:
+        return self.leading.failed & self.subleading.properly
+
+    @property
+    def leading_correct_subleading_untagged(self) -> np.ndarray:
+        return self.leading.properly & self.subleading.failed
+
+    @property
+    def leading_untagged_subleading_mistag(self) -> np.ndarray:
+        return self.leading.failed & self.subleading.mistag
+
+    @property
+    def leading_mistag_subleading_untagged(self) -> np.ndarray:
+        return self.leading.mistag & self.subleading.failed
+
+    @property
+    def swap(self) -> np.ndarray:
+        return self.leading.mistag & self.subleading.mistag
+
+    @property
+    def both_untagged(self) -> np.ndarray:
+        return self.leading.failed & self.subleading.failed
+
+
+@attr.s
 class SubstructureResponseHists(SubstructureHistsBase):
     name: str = attr.ib()
     title: str = attr.ib()
@@ -557,6 +616,16 @@ class SubstructureResponseHists(SubstructureHistsBase):
     response_delta_R: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     response_theta: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
     response_splitting_number: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    matching_name_to_axis_value: ClassVar[Dict[str, int]] = {
+        "all": 0,
+        "pure": 1,
+        "leading_untagged_subleading_correct": 2,
+        "leading_correct_subleading_untagged": 3,
+        "leading_untagged_subleading_mistag": 4,
+        "leading_mistag_subleading_untagged": 5,
+        "swap": 6,
+        "both_untagged": 7,
+    }
 
     @property
     def attributes_to_skip(self) -> List[str]:
@@ -599,14 +668,14 @@ class SubstructureResponseHists(SubstructureHistsBase):
     def create_boost_histograms(
         cls: Type["SubstructureResponseHists"], name: str, title: str, iterative_splittings: bool
     ) -> "SubstructureResponseHists":
-        # TODO: Probably need different binning at true and particle level for variables.
-        hybrid_jet_pt_axis = bh.axis.Regular(4, 40, 120)
-        true_jet_pt_axis = bh.axis.Regular(8, 0, 160)
-        kt_axis = bh.axis.Regular(50, 0, 25)
+        hybrid_jet_pt_axis = bh.axis.Regular(8, 40, 120)
+        true_jet_pt_axis = bh.axis.Regular(16, 0, 160)
+        kt_axis = bh.axis.Regular(25, 0, 25)
         z_axis = bh.axis.Regular(20, 0, 0.5)
         delta_R_axis = bh.axis.Regular(20, 0, 0.4)
         theta_axis = bh.axis.Regular(20, 0, 1)
         splitting_number_axis = bh.axis.Regular(10, 0, 10)
+        matching_axis = bh.axis.Regular(8, 0, 8)
         return cls(
             name=name,
             title=title,
@@ -614,26 +683,39 @@ class SubstructureResponseHists(SubstructureHistsBase):
             n_hybrid_jets=0,
             n_true_jets=0,
             response_kt=bh.Histogram(
-                hybrid_jet_pt_axis, kt_axis, true_jet_pt_axis, kt_axis, storage=bh.storage.Weight()
+                hybrid_jet_pt_axis, kt_axis, true_jet_pt_axis, kt_axis, matching_axis, storage=bh.storage.Weight()
             ),
-            response_z=bh.Histogram(hybrid_jet_pt_axis, z_axis, true_jet_pt_axis, z_axis, storage=bh.storage.Weight()),
+            response_z=bh.Histogram(
+                hybrid_jet_pt_axis, z_axis, true_jet_pt_axis, z_axis, matching_axis, storage=bh.storage.Weight()
+            ),
             response_delta_R=bh.Histogram(
-                hybrid_jet_pt_axis, delta_R_axis, true_jet_pt_axis, delta_R_axis, storage=bh.storage.Weight()
+                hybrid_jet_pt_axis,
+                delta_R_axis,
+                true_jet_pt_axis,
+                delta_R_axis,
+                matching_axis,
+                storage=bh.storage.Weight(),
             ),
             response_theta=bh.Histogram(
-                hybrid_jet_pt_axis, theta_axis, true_jet_pt_axis, theta_axis, storage=bh.storage.Weight()
+                hybrid_jet_pt_axis, theta_axis, true_jet_pt_axis, theta_axis, matching_axis, storage=bh.storage.Weight()
             ),
             response_splitting_number=bh.Histogram(
                 hybrid_jet_pt_axis,
                 splitting_number_axis,
                 true_jet_pt_axis,
                 splitting_number_axis,
+                matching_axis,
                 storage=bh.storage.Weight(),
             ),
         )
 
     def fill(
-        self, hybrid_inputs: FillHistogramInput, true_inputs: FillHistogramInput, weight: float, jet_R: float,
+        self,
+        hybrid_inputs: FillHistogramInput,
+        true_inputs: FillHistogramInput,
+        matching_selections: MatchingSelections,
+        weight: float,
+        jet_R: float,
     ) -> None:
         # Validation
         # Give a useful error message
@@ -648,49 +730,57 @@ class SubstructureResponseHists(SubstructureHistsBase):
             and isinstance(self.response_theta, bh.Histogram)
             and isinstance(self.response_splitting_number, bh.Histogram)
         )
-
         # Need to store the number of jets along the histograms.
         self.n_hybrid_jets += hybrid_inputs.n_jets * weight
         self.n_true_jets += true_inputs.n_jets * weight
-        # Store the responses
-        # TODO: Can we do better than this pad and fillna hack??
-        #       The length of those values can be shorter than the jet pt length due to
-        #       the z_cutoff. Otherwise, they have no effect.
-        self.response_kt.fill(
-            hybrid_inputs.jets.jet_pt,
-            hybrid_inputs.splittings.kt.pad(1).fillna(0).flatten(),
-            true_inputs.jets.jet_pt,
-            true_inputs.splittings.kt.pad(1).fillna(0).flatten(),
-            weight=weight,
-        )
-        self.response_z.fill(
-            hybrid_inputs.jets.jet_pt,
-            hybrid_inputs.splittings.z.pad(1).fillna(0).flatten(),
-            true_inputs.jets.jet_pt,
-            true_inputs.splittings.z.pad(1).fillna(0).flatten(),
-            weight=weight,
-        )
-        self.response_delta_R.fill(
-            hybrid_inputs.jets.jet_pt,
-            hybrid_inputs.splittings.delta_R.pad(1).fillna(0).flatten(),
-            true_inputs.jets.jet_pt,
-            true_inputs.splittings.delta_R.pad(1).fillna(0).flatten(),
-            weight=weight,
-        )
-        self.response_theta.fill(
-            hybrid_inputs.jets.jet_pt,
-            hybrid_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten(),
-            true_inputs.jets.jet_pt,
-            true_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten(),
-            weight=weight,
-        )
-        self.response_splitting_number.fill(
-            hybrid_inputs.jets.jet_pt,
-            _calculate_splitting_number(hybrid_inputs.indices),
-            true_inputs.jets.jet_pt,
-            _calculate_splitting_number(true_inputs.indices),
-            weight=weight,
-        )
+
+        for matching_type, matching_axis_value in self.matching_name_to_axis_value.items():
+            mask = matching_selections[matching_type]
+
+            # Store the responses
+            # TODO: Can we do better than this pad and fillna hack??
+            #       The length of those values can be shorter than the jet pt length due to
+            #       the z_cutoff. Otherwise, they have no effect.
+            self.response_kt.fill(
+                hybrid_inputs.jets.jet_pt[mask],
+                hybrid_inputs.splittings.kt.pad(1).fillna(0).flatten()[mask],
+                true_inputs.jets.jet_pt[mask],
+                true_inputs.splittings.kt.pad(1).fillna(0).flatten()[mask],
+                matching_axis_value,
+                weight=weight,
+            )
+            self.response_z.fill(
+                hybrid_inputs.jets.jet_pt[mask],
+                hybrid_inputs.splittings.z.pad(1).fillna(0).flatten()[mask],
+                true_inputs.jets.jet_pt[mask],
+                true_inputs.splittings.z.pad(1).fillna(0).flatten()[mask],
+                matching_axis_value,
+                weight=weight,
+            )
+            self.response_delta_R.fill(
+                hybrid_inputs.jets.jet_pt[mask],
+                hybrid_inputs.splittings.delta_R.pad(1).fillna(0).flatten()[mask],
+                true_inputs.jets.jet_pt[mask],
+                true_inputs.splittings.delta_R.pad(1).fillna(0).flatten()[mask],
+                matching_axis_value,
+                weight=weight,
+            )
+            self.response_theta.fill(
+                hybrid_inputs.jets.jet_pt[mask],
+                hybrid_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten()[mask],
+                true_inputs.jets.jet_pt[mask],
+                true_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten()[mask],
+                matching_axis_value,
+                weight=weight,
+            )
+            self.response_splitting_number.fill(
+                hybrid_inputs.jets.jet_pt[mask],
+                _calculate_splitting_number(hybrid_inputs.indices)[mask],
+                true_inputs.jets.jet_pt[mask],
+                _calculate_splitting_number(true_inputs.indices)[mask],
+                matching_axis_value,
+                weight=weight,
+            )
 
 
 @attr.s
@@ -699,13 +789,13 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
     title: str = attr.ib()
     iterative_splittings: bool = attr.ib()
     all: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    both_correct: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    leading_failed_subleading_correct: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    leading_correct_subleading_failed: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    leading_failed_subleading_mistag: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    leading_mistag_subleading_failed: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    reversed: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    both_failed: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    pure: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    leading_untagged_subleading_correct: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    leading_correct_subleading_untagged: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    leading_untagged_subleading_mistag: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    leading_mistag_subleading_untagged: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    swap: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    both_untagged: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
 
     # @property
     # def attributes_to_skip(self) -> List[str]:
@@ -755,29 +845,28 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
             title=title,
             iterative_splittings=iterative_splittings,
             all=bh.Histogram(jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
-            both_correct=bh.Histogram(jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
-            leading_failed_subleading_correct=bh.Histogram(
+            pure=bh.Histogram(jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            leading_untagged_subleading_correct=bh.Histogram(
                 jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()
             ),
-            leading_correct_subleading_failed=bh.Histogram(
+            leading_correct_subleading_untagged=bh.Histogram(
                 jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()
             ),
-            leading_failed_subleading_mistag=bh.Histogram(
+            leading_untagged_subleading_mistag=bh.Histogram(
                 jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()
             ),
-            leading_mistag_subleading_failed=bh.Histogram(
+            leading_mistag_subleading_untagged=bh.Histogram(
                 jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()
             ),
-            reversed=bh.Histogram(jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
-            both_failed=bh.Histogram(jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            swap=bh.Histogram(jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
+            both_untagged=bh.Histogram(jet_pt_axis, kt_axis, hybrid_jet_pt_axis, kt_axis, storage=bh.storage.Weight()),
         )
 
     def fill(
         self,
         matched_inputs: FillHistogramInput,
         hybrid_inputs: FillHistogramInput,
-        leading: MatchingResult,
-        subleading: MatchingResult,
+        matching_selections: MatchingSelections,
         weight: float,
     ) -> None:
         # Validation
@@ -785,95 +874,20 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
             raise ValueError("Not all hists are boost histograms! Cannot fill!")
 
-        # And then help out mypy...
-        assert (
-            isinstance(self.all, bh.Histogram)
-            and isinstance(self.both_correct, bh.Histogram)
-            and isinstance(self.leading_failed_subleading_correct, bh.Histogram)
-            and isinstance(self.leading_correct_subleading_failed, bh.Histogram)
-            and isinstance(self.leading_failed_subleading_mistag, bh.Histogram)
-            and isinstance(self.leading_mistag_subleading_failed, bh.Histogram)
-            and isinstance(self.reversed, bh.Histogram)
-            and isinstance(self.both_failed, bh.Histogram)
-        )
+        # Fill the matching hists.
+        for matching_type, matching_hist in self:
+            # Help out mypy
+            assert isinstance(matching_hist, bh.Histogram)
 
-        # Mask the values once so we don't have to do it repeatedly.
-        matched_jet_pt = matched_inputs.jets.jet_pt
-        matched_kt = matched_inputs.splittings.kt
-        hybrid_jet_pt = hybrid_inputs.jets.jet_pt
-        hybrid_kt = hybrid_inputs.splittings.kt
-
-        selection = (
-            leading.properly
-            | leading.mistag
-            | leading.failed
-            | subleading.properly
-            | subleading.mistag
-            | subleading.failed
-        )
-        self.all.fill(
-            matched_jet_pt[selection],
-            matched_kt[selection],
-            hybrid_jet_pt[selection],
-            hybrid_kt[selection],
-            weight=weight,
-        )
-        selection = leading.properly & subleading.properly
-        self.both_correct.fill(
-            matched_jet_pt[selection],
-            matched_kt[selection],
-            hybrid_jet_pt[selection],
-            hybrid_kt[selection],
-            weight=weight,
-        )
-        selection = leading.failed & subleading.properly
-        self.leading_failed_subleading_correct.fill(
-            matched_jet_pt[selection],
-            matched_kt[selection],
-            hybrid_jet_pt[selection],
-            hybrid_kt[selection],
-            weight=weight,
-        )
-        selection = leading.properly & subleading.failed
-        self.leading_correct_subleading_failed.fill(
-            matched_jet_pt[selection],
-            matched_kt[selection],
-            hybrid_jet_pt[selection],
-            hybrid_kt[selection],
-            weight=weight,
-        )
-        selection = leading.failed & subleading.mistag
-        self.leading_failed_subleading_mistag.fill(
-            matched_jet_pt[selection],
-            matched_kt[selection],
-            hybrid_jet_pt[selection],
-            hybrid_kt[selection],
-            weight=weight,
-        )
-        selection = leading.mistag & subleading.failed
-        self.leading_mistag_subleading_failed.fill(
-            matched_jet_pt[selection],
-            matched_kt[selection],
-            hybrid_jet_pt[selection],
-            hybrid_kt[selection],
-            weight=weight,
-        )
-        selection = leading.mistag & subleading.mistag
-        self.reversed.fill(
-            matched_jet_pt[selection],
-            matched_kt[selection],
-            hybrid_jet_pt[selection],
-            hybrid_kt[selection],
-            weight=weight,
-        )
-        selection = leading.failed & subleading.failed
-        self.both_failed.fill(
-            matched_jet_pt[selection],
-            matched_kt[selection],
-            hybrid_jet_pt[selection],
-            hybrid_kt[selection],
-            weight=weight,
-        )
+            # Then make our selections and fill.
+            selection = matching_selections[matching_type]
+            matching_hist.fill(
+                matched_inputs.jets.jet_pt[selection],
+                matched_inputs.splittings.kt[selection],
+                hybrid_inputs.jets.jet_pt[selection],
+                hybrid_inputs.splittings.kt[selection],
+                weight=weight,
+            )
 
 
 T_SubstructureHists = TypeVar(
@@ -1095,3 +1109,89 @@ def create_matching_hists(iterative_splittings: bool, z_cutoff: float) -> Hists[
         leading_kt=leading_kt,
         leading_kt_hard_cutoff=leading_kt_hard_cutoff,
     )
+
+
+@attr.s
+class SingleTreeResultBase:
+    def items(self) -> Iterator[Tuple[str, Dict[Identifier, Hists[T_SubstructureHists]]]]:
+        return iter(attr.asdict(self, recurse=False).items())
+
+    def values(self) -> Iterator[Dict[Identifier, Hists[T_SubstructureHists]]]:
+        return iter(attr.astuple(self, recurse=False))
+
+    def create_hists(self, dataset: Dataset, **selections: Any) -> bool:
+        raise NotImplementedError("Needs to be implemented by the daughter class")
+
+
+@attr.s
+class SingleTreeResult(SingleTreeResultBase):
+    hists: Dict[Identifier, Hists[SubstructureHists]] = attr.ib(factory=dict)
+
+    def create_hists(self, dataset: Dataset, **selections: Any) -> bool:
+        for kwargs in helpers.dict_product(selections):
+            # We don't care about the jet pt bin for creating the hists - just the identifier. So we drop it here.
+            create_hists_args = {k: v for k, v in kwargs.items() if k != "jet_pt_bin"}
+            # And also add the z_cutoff from the dataset settings.
+            create_hists_args["z_cutoff"] = dataset.settings.z_cutoff
+            self.hists[Identifier(**kwargs)] = create_substructure_hists(**create_hists_args)
+
+        return True
+
+
+@attr.s
+class SingleTreeToyResult(SingleTreeResultBase):
+    hists: Dict[Identifier, Hists[SubstructureToyHists]] = attr.ib(factory=dict)
+
+    def create_hists(self, dataset: Dataset, **selections: Any) -> bool:
+        for kwargs in helpers.dict_product(selections):
+            # We don't care about the jet pt bin for creating the hists - just the identifier. So we drop it here.
+            create_hists_args = {k: v for k, v in kwargs.items() if k != "jet_pt_bin"}
+            # And also add the z_cutoff from the dataset settings.
+            create_hists_args["z_cutoff"] = dataset.settings.z_cutoff
+            self.hists[Identifier(**kwargs)] = create_substructure_toy_hists(**create_hists_args)
+
+        return True
+
+
+@attr.s
+class SingleTreeEmbeddingResult(SingleTreeResultBase):
+    true_hists: Dict[Identifier, Hists[SubstructureHists]] = attr.ib(factory=dict)
+    det_level_hists: Dict[Identifier, Hists[SubstructureHists]] = attr.ib(factory=dict)
+    hybrid_hists: Dict[Identifier, Hists[SubstructureHists]] = attr.ib(factory=dict)
+    response_hists: Dict[Identifier, Hists[SubstructureResponseHists]] = attr.ib(factory=dict)
+    matching_hists: Dict[Identifier, Hists[SubstructureMatchingSubjetHists]] = attr.ib(factory=dict)
+
+    def create_hists(self, dataset: Dataset, **selections: Any) -> bool:
+        for kwargs in helpers.dict_product(selections):
+            # We don't care about the jet pt bin for creating the hists - just the identifier. So we drop it here.
+            create_hists_args = {k: v for k, v in kwargs.items() if k != "jet_pt_bin"}
+            # And also add the z_cutoff from the dataset settings.
+            create_hists_args["z_cutoff"] = dataset.settings.z_cutoff
+            self.true_hists[Identifier(**kwargs)] = create_substructure_hists(**create_hists_args)
+            self.det_level_hists[Identifier(**kwargs)] = create_substructure_hists(**create_hists_args)
+            # Hybrid hists
+            self.hybrid_hists[Identifier(**kwargs)] = create_substructure_hists(**create_hists_args)
+
+        # Matching and response are binned in hybrid jet pt, so we don't have to make a selection now.
+        # Instead, we'll use the maximal jet pt bin.
+        maximal_jet_pt_bin = helpers.RangeSelector.full_range_over_selections(selections["jet_pt_bin"])
+        selections_with_maximal_jet_pt = selections.copy()
+        selections_with_maximal_jet_pt["jet_pt_bin"] = [maximal_jet_pt_bin]
+        for kwargs in helpers.dict_product(selections_with_maximal_jet_pt):
+            # We don't care about the jet pt bin for creating the hists - just the identifier. So we drop it here.
+            create_hists_args = {k: v for k, v in kwargs.items() if k != "jet_pt_bin"}
+            # And also add the z_cutoff from the dataset settings.
+            create_hists_args["z_cutoff"] = dataset.settings.z_cutoff
+            # Responses.
+            self.response_hists[Identifier(**kwargs)] = create_substructure_response_hists(**create_hists_args)
+            # Matching.
+            self.matching_hists[Identifier(**kwargs)] = create_matching_hists(**create_hists_args)
+
+            # Cross check that we have a reasonable jet_pt_bin
+            true_hists_jet_pt_bins = [identifier.jet_pt_bin for identifier in self.true_hists.keys()]
+            if kwargs["jet_pt_bin"] not in true_hists_jet_pt_bins:
+                raise ValueError(
+                    "Expected jet pt bin {kwargs['jet_pt_bin']} used for the response and matching to be in the true hists. However, the true_hists only contain: {true_hists_jet_pt_bins}"
+                )
+
+        return True

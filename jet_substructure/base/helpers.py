@@ -6,10 +6,11 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import logging
 import typing
 from pathlib import Path
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union
+from typing import Any, Collection, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 import attr
 import numpy as np
@@ -177,6 +178,26 @@ def convert_flat_to_tree(parent_label: int, relationships: Sequence[Tuple[int, i
         p: convert_flat_to_tree(p, relationships)
         for p in [index for index, parent in relationships if parent == parent_label]
     }
+
+
+def dict_product(input_dict: Dict[str, List[Any]]) -> Iterable[Dict[str, Any]]:
+    """ Like `itertools.product`, but with a dictionary containing lists.
+
+    By way of example:
+
+    >>> list(product_dict({"a": [1, 2], "b": [3], "c": [4, 5]}))
+    [{'a': 1, 'b': 3, 'c': 4}, {'a': 1, 'b': 3, 'c': 5}, {'a': 2, 'b': 3, 'c': 4}, {'a': 2, 'b': 3, 'c': 5}]
+
+    It will give us all possible combinations of the list values with their associated keys.
+
+    From: https://stackoverflow.com/a/40623158/12907985
+
+    Args:
+        kwargs: Dictionary for the product.
+    Returns:
+        Product of the dict keys and values.
+    """
+    return (dict(zip(input_dict.keys(), values)) for values in itertools.product(*input_dict.values()))
 
 
 @attr.s(frozen=True)

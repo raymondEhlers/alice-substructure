@@ -634,22 +634,22 @@ def _plot_matching(
     normalization = _project_matching(hists.all, axis_to_keep=axis_to_keep, identifier=identifier)
 
     # Both correctly tagged goes in the upper left
-    both_correct = _project_matching(hists.both_correct, axis_to_keep=axis_to_keep, identifier=identifier)
-    both_correct /= normalization
+    pure = _project_matching(hists.pure, axis_to_keep=axis_to_keep, identifier=identifier)
+    pure /= normalization
     axes[0, 0].errorbar(
-        both_correct.axes[0].bin_centers,
-        both_correct.values,
-        yerr=both_correct.errors,
-        xerr=both_correct.axes[0].bin_widths / 2,
+        pure.axes[0].bin_centers,
+        pure.values,
+        yerr=pure.errors,
+        xerr=pure.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         # label="",
     )
     ax.errorbar(
-        both_correct.axes[0].bin_centers,
-        both_correct.values,
-        yerr=both_correct.errors,
-        xerr=both_correct.axes[0].bin_widths / 2,
+        pure.axes[0].bin_centers,
+        pure.values,
+        yerr=pure.errors,
+        xerr=pure.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         label="Pure matches",
@@ -657,137 +657,137 @@ def _plot_matching(
     # Skip this panel
     # axes[0, 1].set_visible(False)
     # Leading wasn't tagged, but subleading was correctly tagged as subleading.
-    leading_failed_subleading_correct = _project_matching(
-        hists.leading_failed_subleading_correct, axis_to_keep=axis_to_keep, identifier=identifier,
+    leading_untagged_subleading_correct = _project_matching(
+        hists.leading_untagged_subleading_correct, axis_to_keep=axis_to_keep, identifier=identifier,
     )
-    leading_failed_subleading_correct /= normalization
+    leading_untagged_subleading_correct /= normalization
     axes[0, 2].errorbar(
-        leading_failed_subleading_correct.axes[0].bin_centers,
-        leading_failed_subleading_correct.values,
-        yerr=leading_failed_subleading_correct.errors,
-        xerr=leading_failed_subleading_correct.axes[0].bin_widths / 2,
+        leading_untagged_subleading_correct.axes[0].bin_centers,
+        leading_untagged_subleading_correct.values,
+        yerr=leading_untagged_subleading_correct.errors,
+        xerr=leading_untagged_subleading_correct.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         # label="",
     )
     ax.errorbar(
-        leading_failed_subleading_correct.axes[0].bin_centers,
-        leading_failed_subleading_correct.values,
-        yerr=leading_failed_subleading_correct.errors,
-        xerr=leading_failed_subleading_correct.axes[0].bin_widths / 2,
+        leading_untagged_subleading_correct.axes[0].bin_centers,
+        leading_untagged_subleading_correct.values,
+        yerr=leading_untagged_subleading_correct.errors,
+        xerr=leading_untagged_subleading_correct.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         label="Leading unmatched, subleading matched",
     )
     # Skip this panel
     # axes[1, 0].set_visible(False)
-    # Swapped (ie. reversed)
-    reversed = _project_matching(hists.reversed, axis_to_keep=axis_to_keep, identifier=identifier)
-    reversed /= normalization
+    # Swapped (ie. swap)
+    swap = _project_matching(hists.swap, axis_to_keep=axis_to_keep, identifier=identifier)
+    swap /= normalization
     axes[1, 1].errorbar(
-        reversed.axes[0].bin_centers,
-        reversed.values,
-        yerr=reversed.errors,
-        xerr=reversed.axes[0].bin_widths / 2,
+        swap.axes[0].bin_centers,
+        swap.values,
+        yerr=swap.errors,
+        xerr=swap.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         # label="",
     )
     ax.errorbar(
-        reversed.axes[0].bin_centers,
-        reversed.values,
-        yerr=reversed.errors,
-        xerr=reversed.axes[0].bin_widths / 2,
+        swap.axes[0].bin_centers,
+        swap.values,
+        yerr=swap.errors,
+        xerr=swap.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         label="Swaps",
     )
-    # Leading failed, subleading mistag
-    leading_failed_subleading_mistag = _project_matching(
-        hists.leading_failed_subleading_mistag, axis_to_keep=axis_to_keep, identifier=identifier
+    # Leading untagged, subleading mistag
+    leading_untagged_subleading_mistag = _project_matching(
+        hists.leading_untagged_subleading_mistag, axis_to_keep=axis_to_keep, identifier=identifier
     )
-    leading_failed_subleading_mistag /= normalization
+    leading_untagged_subleading_mistag /= normalization
     axes[1, 2].errorbar(
-        leading_failed_subleading_mistag.axes[0].bin_centers,
-        leading_failed_subleading_mistag.values,
-        yerr=leading_failed_subleading_mistag.errors,
-        xerr=leading_failed_subleading_mistag.axes[0].bin_widths / 2,
+        leading_untagged_subleading_mistag.axes[0].bin_centers,
+        leading_untagged_subleading_mistag.values,
+        yerr=leading_untagged_subleading_mistag.errors,
+        xerr=leading_untagged_subleading_mistag.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         # label="",
     )
     ax.errorbar(
-        leading_failed_subleading_mistag.axes[0].bin_centers,
-        leading_failed_subleading_mistag.values,
-        yerr=leading_failed_subleading_mistag.errors,
-        xerr=leading_failed_subleading_mistag.axes[0].bin_widths / 2,
+        leading_untagged_subleading_mistag.axes[0].bin_centers,
+        leading_untagged_subleading_mistag.values,
+        yerr=leading_untagged_subleading_mistag.errors,
+        xerr=leading_untagged_subleading_mistag.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         label="Leading unmatched, subleading in leading",
     )
-    # Leading correct, subleading failed
-    leading_correct_subleading_failed = _project_matching(
-        hists.leading_correct_subleading_failed, axis_to_keep=axis_to_keep, identifier=identifier
+    # Leading correct, subleading untagged
+    leading_correct_subleading_untagged = _project_matching(
+        hists.leading_correct_subleading_untagged, axis_to_keep=axis_to_keep, identifier=identifier
     )
-    leading_correct_subleading_failed /= normalization
+    leading_correct_subleading_untagged /= normalization
     axes[2, 0].errorbar(
-        leading_correct_subleading_failed.axes[0].bin_centers,
-        leading_correct_subleading_failed.values,
-        yerr=leading_correct_subleading_failed.errors,
-        xerr=leading_correct_subleading_failed.axes[0].bin_widths / 2,
+        leading_correct_subleading_untagged.axes[0].bin_centers,
+        leading_correct_subleading_untagged.values,
+        yerr=leading_correct_subleading_untagged.errors,
+        xerr=leading_correct_subleading_untagged.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         # label="",
     )
     ax.errorbar(
-        leading_correct_subleading_failed.axes[0].bin_centers,
-        leading_correct_subleading_failed.values,
-        yerr=leading_correct_subleading_failed.errors,
-        xerr=leading_correct_subleading_failed.axes[0].bin_widths / 2,
+        leading_correct_subleading_untagged.axes[0].bin_centers,
+        leading_correct_subleading_untagged.values,
+        yerr=leading_correct_subleading_untagged.errors,
+        xerr=leading_correct_subleading_untagged.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         label="Leading matched, subleading unmatched",
     )
-    # Leading mistag, subleading failed
-    leading_mistag_subleading_failed = _project_matching(
-        hists.leading_mistag_subleading_failed, axis_to_keep=axis_to_keep, identifier=identifier
+    # Leading mistag, subleading untagged
+    leading_mistag_subleading_untagged = _project_matching(
+        hists.leading_mistag_subleading_untagged, axis_to_keep=axis_to_keep, identifier=identifier
     )
-    leading_mistag_subleading_failed /= normalization
+    leading_mistag_subleading_untagged /= normalization
     axes[2, 1].errorbar(
-        leading_mistag_subleading_failed.axes[0].bin_centers,
-        leading_mistag_subleading_failed.values,
-        yerr=leading_mistag_subleading_failed.errors,
-        xerr=leading_mistag_subleading_failed.axes[0].bin_widths / 2,
+        leading_mistag_subleading_untagged.axes[0].bin_centers,
+        leading_mistag_subleading_untagged.values,
+        yerr=leading_mistag_subleading_untagged.errors,
+        xerr=leading_mistag_subleading_untagged.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         # label="",
     )
     ax.errorbar(
-        leading_mistag_subleading_failed.axes[0].bin_centers,
-        leading_mistag_subleading_failed.values,
-        yerr=leading_mistag_subleading_failed.errors,
-        xerr=leading_mistag_subleading_failed.axes[0].bin_widths / 2,
+        leading_mistag_subleading_untagged.axes[0].bin_centers,
+        leading_mistag_subleading_untagged.values,
+        yerr=leading_mistag_subleading_untagged.errors,
+        xerr=leading_mistag_subleading_untagged.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         label="Leading in subleading, subleading unmatched",
     )
-    # Both failed
-    both_failed = _project_matching(hists.both_failed, axis_to_keep=axis_to_keep, identifier=identifier)
-    both_failed /= normalization
+    # Both untagged
+    both_untagged = _project_matching(hists.both_untagged, axis_to_keep=axis_to_keep, identifier=identifier)
+    both_untagged /= normalization
     axes[2, 2].errorbar(
-        both_failed.axes[0].bin_centers,
-        both_failed.values,
-        yerr=both_failed.errors,
-        xerr=both_failed.axes[0].bin_widths / 2,
+        both_untagged.axes[0].bin_centers,
+        both_untagged.values,
+        yerr=both_untagged.errors,
+        xerr=both_untagged.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         # label="",
     )
     ax.errorbar(
-        both_failed.axes[0].bin_centers,
-        both_failed.values,
-        yerr=both_failed.errors,
-        xerr=both_failed.axes[0].bin_widths / 2,
+        both_untagged.axes[0].bin_centers,
+        both_untagged.values,
+        yerr=both_untagged.errors,
+        xerr=both_untagged.axes[0].bin_widths / 2,
         marker=".",
         linestyle="",
         label="Leading, subleading unmatched",
