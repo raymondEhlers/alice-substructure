@@ -71,6 +71,14 @@ def _plot_distribution(
         h: Union[bh.Histogram, binned_data.BinnedData] = getattr(technique_hists, attribute_name)
         h = binned_data.BinnedData.from_existing_data(h)
 
+        # Rebin by a factor of 2 for the kt.
+        if attribute_name == "kt":
+            rebin_factor = 2
+            bh_hist = h.to_boost_histogram()
+            bh_hist = bh_hist[:: bh.rebin(rebin_factor)]
+            h = binned_data.BinnedData.from_existing_data(bh_hist)
+            h /= rebin_factor
+
         # Scale by bin widths and number of jets
         h /= h.axis.bin_widths
         h /= technique_hists.n_jets
@@ -90,6 +98,14 @@ def _plot_distribution(
 
             h_denominator: Union[bh.Histogram, binned_data.BinnedData] = getattr(ratio_denominator, attribute_name)
             h_denominator = binned_data.BinnedData.from_existing_data(h_denominator)
+
+            # Rebin by a factor of 2 for the kt.
+            if attribute_name == "kt":
+                rebin_factor = 2
+                bh_hist_denominator = h_denominator.to_boost_histogram()
+                bh_hist_denominator = bh_hist_denominator[:: bh.rebin(rebin_factor)]
+                h_denominator = binned_data.BinnedData.from_existing_data(bh_hist_denominator)
+                h_denominator /= rebin_factor
 
             h_denominator /= ratio_denominator.n_jets
             h_denominator /= h_denominator.axis.bin_widths
@@ -1368,6 +1384,7 @@ def _plot_compare_kt(
     identifier: analysis_objects.Identifier,
     data_hists: analysis_objects.SubstructureHists,
     embedded_hists: analysis_objects.SubstructureHists,
+    det_hists: analysis_objects.SubstructureHists,
     true_hists: analysis_objects.SubstructureHists,
     plot_config: PlotConfig,
     path: Path,
@@ -1378,18 +1395,27 @@ def _plot_compare_kt(
 
     h_data = binned_data.BinnedData.from_existing_data(data_hists.kt)
     h_embed = binned_data.BinnedData.from_existing_data(embedded_hists.kt)
+    h_det = binned_data.BinnedData.from_existing_data(det_hists.kt)
     h_true = binned_data.BinnedData.from_existing_data(true_hists.kt)
 
     # Convert to boost_histogram and rebin (and scale by rebin factor to maintain the normalization).
     rebin_factor = 2
+    # Data
     bh_data = h_data.to_boost_histogram()
     bh_data = bh_data[:: bh.rebin(rebin_factor)]
     h_data = binned_data.BinnedData.from_existing_data(bh_data)
     h_data /= rebin_factor
+    # Embed
     bh_embed = h_embed.to_boost_histogram()
     bh_embed = bh_embed[:: bh.rebin(rebin_factor)]
     h_embed = binned_data.BinnedData.from_existing_data(bh_embed)
     h_embed /= rebin_factor
+    # Det
+    bh_det = h_det.to_boost_histogram()
+    bh_det = bh_det[:: bh.rebin(rebin_factor)]
+    h_det = binned_data.BinnedData.from_existing_data(bh_det)
+    h_det /= rebin_factor
+    # True
     bh_true = h_true.to_boost_histogram()
     bh_true = bh_true[:: bh.rebin(rebin_factor)]
     h_true = binned_data.BinnedData.from_existing_data(bh_true)
@@ -1397,15 +1423,22 @@ def _plot_compare_kt(
 
     # Normalization
     # Scale by bin widths and number of jets
+    # Data
     h_data /= data_hists.n_jets
     h_data /= h_data.axes[0].bin_widths
+    # Embed
     h_embed /= embedded_hists.n_jets
     h_embed /= h_embed.axes[0].bin_widths
+    # Det
+    h_det /= det_hists.n_jets
+    h_det /= h_det.axes[0].bin_widths
+    # True
     h_true /= true_hists.n_jets
     h_true /= h_true.axes[0].bin_widths
 
     # Plot
-    for h, label in [(h_data, "Data"), (h_embed, "Hybrid"), (h_true, "True")]:
+    # for h, label in [(h_data, "Data"), (h_embed, "Hybrid"), (h_det, "Det"), (h_true, "True")]:
+    for h, label in [(h_data, "Data"), (h_embed, "Hybrid")]:
         p = ax.errorbar(
             h.axes[0].bin_centers,
             h.values,
@@ -1500,18 +1533,24 @@ def compare_kt(
     all_embedded_hists: Mapping[
         analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]
     ],
+    all_det_hists: Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
     all_true_hists: Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
     data_dataset: analysis_objects.Dataset,
     embedded_dataset: analysis_objects.Dataset,
 ) -> None:
-    for (data_identifier, data_hists), (embedded_identifier, embedded_hists), (true_identifier, true_hists) in zip(
-        all_data_hists.items(), all_embedded_hists.items(), all_true_hists.items()
-    ):
-        for (technique, d_hists), (_, e_hists), (_, t_hists) in zip(data_hists, embedded_hists, true_hists):
-            if d_hists.n_jets == 0 or e_hists.n_jets == 0 or t_hists.n_jets == 0:
+    for (
+        (data_identifier, data_hists),
+        (embedded_identifier, embedded_hists),
+        (det_identifier, det_hists),
+        (true_identifier, true_hists),
+    ) in zip(all_data_hists.items(), all_embedded_hists.items(), all_det_hists.items(), all_true_hists.items()):
+        for (technique, d_hists), (_, e_hists), (_, pythia_d_hists), (_, t_hists) in zip(
+            data_hists, embedded_hists, det_hists, true_hists
+        ):
+            if d_hists.n_jets == 0 or e_hists.n_jets == 0 or pythia_d_hists.n_jets == 0 or t_hists.n_jets == 0:
                 logger.warning(f"No jets within {data_identifier}_{technique}. Skipping bin!")
                 logger.warning(
-                    f"data n_jets: {d_hists.n_jets}, hybrid n_jets: {e_hists.n_jets}, true n_jets: {t_hists.n_jets}"
+                    f"data n_jets: {d_hists.n_jets}, hybrid n_jets: {e_hists.n_jets}, det n_jets: {pythia_d_hists.n_jets}, true n_jets: {t_hists.n_jets}"
                 )
                 continue
 
@@ -1520,6 +1559,7 @@ def compare_kt(
                 identifier=data_identifier,
                 data_hists=d_hists,
                 embedded_hists=e_hists,
+                det_hists=pythia_d_hists,
                 true_hists=t_hists,
                 plot_config=PlotConfig(
                     name="kt_spectra",
