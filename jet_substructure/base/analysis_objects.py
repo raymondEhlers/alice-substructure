@@ -3,6 +3,8 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+from __future__ import annotations
+
 import copy
 import logging
 from pathlib import Path
@@ -36,6 +38,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_T_Identifier = TypeVar("_T_Identifier", bound="Identifier")
+_T_MatchingHybridIdentifier = TypeVar("_T_MatchingHybridIdentifier", bound="MatchingHybridIdentifier")
+
 
 @attr.s(frozen=True)
 class Identifier:
@@ -53,7 +58,7 @@ class Identifier:
         return f"{self.iterative_splittings_label.capitalize()} splittings\n${self.jet_pt_bin.display_str(label=jet_pt_label)}$"
 
     @classmethod
-    def from_existing(cls: Type["Identifier"], existing: "Identifier") -> "Identifier":
+    def from_existing(cls: Type[_T_Identifier], existing: _T_Identifier) -> _T_Identifier:
         return cls(iterative_splittings=existing.iterative_splittings, jet_pt_bin=existing.jet_pt_bin,)
 
 
@@ -83,8 +88,8 @@ class MatchingHybridIdentifier(Identifier):
 
     @classmethod
     def from_existing(
-        cls: Type["MatchingHybridIdentifier"], existing: "MatchingHybridIdentifier"
-    ) -> "MatchingHybridIdentifier":
+        cls: Type[_T_MatchingHybridIdentifier], existing: _T_MatchingHybridIdentifier
+    ) -> _T_MatchingHybridIdentifier:
         return cls(
             iterative_splittings=existing.iterative_splittings, jet_pt_bin=existing.jet_pt_bin, min_kt=existing.min_kt
         )
