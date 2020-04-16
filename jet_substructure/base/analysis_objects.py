@@ -527,7 +527,7 @@ class SubstructureToyHists(SubstructureHistsBase):
         )
 
     def fill(
-        self, data_inputs: FillHistogramInput, true_inputs: FillHistogramInput, weight: float, jet_R: float,
+        self, data_inputs: FillHistogramInput, true_inputs: FillHistogramInput, jet_R: float, weight: float,
     ) -> None:
         # Validation
         # Give a useful error message
@@ -543,12 +543,18 @@ class SubstructureToyHists(SubstructureHistsBase):
             and isinstance(self.theta, bh.Histogram)
         )
         # Need to store the number of jets along the histograms.
-        self.n_jets += data_inputs.n_jets
-        self.values.fill(true_inputs.values, data_inputs.values)
-        self.kt.fill(np.log(true_inputs.splittings.kt.flatten()), np.log(data_inputs.splittings.kt.flatten()))
-        self.z.fill(true_inputs.splittings.z.flatten(), data_inputs.splittings.z.flatten())
-        self.delta_R.fill(true_inputs.splittings.delta_R.flatten(), data_inputs.splittings.delta_R.flatten())
-        self.theta.fill(true_inputs.splittings.theta(jet_R).flatten(), data_inputs.splittings.theta(jet_R).flatten())
+        self.n_jets += data_inputs.n_jets * weight
+        self.values.fill(true_inputs.values, data_inputs.values, weight=weight)
+        self.kt.fill(
+            np.log(true_inputs.splittings.kt.flatten()), np.log(data_inputs.splittings.kt.flatten()), weight=weight
+        )
+        self.z.fill(true_inputs.splittings.z.flatten(), data_inputs.splittings.z.flatten(), weight=weight)
+        self.delta_R.fill(
+            true_inputs.splittings.delta_R.flatten(), data_inputs.splittings.delta_R.flatten(), weight=weight
+        )
+        self.theta.fill(
+            true_inputs.splittings.theta(jet_R).flatten(), data_inputs.splittings.theta(jet_R).flatten(), weight=weight
+        )
         # self.kt.fill(data_inputs.splittings.kt.pad(1).fillna(0).flatten(), true_inputs.splittings.kt.pad(1).fillna(0).flatten())
         # self.z.fill(data_inputs.splittings.z.pad(1).fillna(0).flatten(), true_inputs.splittings.z.pad(1).fillna(0).flatten())
         # self.delta_R.fill(data_inputs.splittings.delta_R.pad(1).fillna(0).flatten(), true_inputs.splittings.delta_R.pad(1).fillna(0).flatten())
@@ -1113,6 +1119,9 @@ def create_matching_hists(iterative_splittings: bool, z_cutoff: float) -> Hists[
 
 @attr.s
 class SingleTreeResultBase:
+    def keys(self) -> Iterator[str]:
+        return iter(attr.fields_dict(type(self)).keys())
+
     def items(self) -> Iterator[Tuple[str, Dict[Identifier, Hists[T_SubstructureHists]]]]:
         return iter(attr.asdict(self, recurse=False).items())
 
