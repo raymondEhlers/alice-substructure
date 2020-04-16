@@ -1029,9 +1029,7 @@ def _wrap_multiprocessing(
 #    return existing
 
 
-def merge_results(
-    existing: analysis_objects.SingleTreeResultBase, new_result: analysis_objects.SingleTreeResultBase
-) -> analysis_objects.SingleTreeResultBase:
+def merge_results(existing: _T_Result, new_result: _T_Result) -> _T_Result:
     for temp_result in [existing, new_result]:
         for hist_result in temp_result.values():
             for h in hist_result.values():
