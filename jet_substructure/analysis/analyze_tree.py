@@ -651,8 +651,13 @@ def _fill_embedded_hists_with_calculation(
     hybrid_hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
     jet_R: float,
     weight: float,
-    response_hists: Optional[analysis_objects.Hists[analysis_objects.SubstructureResponseHists]] = None,
-    matching_hists: Optional[analysis_objects.Hists[analysis_objects.SubstructureMatchingSubjetHists]] = None,
+    detector_particle_response_hists: Optional[
+        analysis_objects.Hists[analysis_objects.SubstructureResponseHists]
+    ] = None,
+    hybrid_detector_response_hists: Optional[analysis_objects.Hists[analysis_objects.SubstructureResponseHists]] = None,
+    hybrid_particle_response_hists: Optional[
+        analysis_objects.Hists[analysis_objects.SubstructureResponseExtendedHists]
+    ] = None,
 ) -> None:
     # Calculate the inputs
     true_inputs = analysis_objects.FillHistogramInput(
@@ -682,17 +687,21 @@ def _fill_embedded_hists_with_calculation(
     )
 
     # Validation
-    if (response_hists is not None) != (matching_hists is not None):
+    if (
+        (detector_particle_response_hists is not None)
+        != (hybrid_detector_response_hists is not None)
+        != (hybrid_particle_response_hists is not None)
+    ):
         # These should always be paired together, so something has gone wrong. Raise to notify.
         raise ValueError(
-            f"Passed one of matching and response hists, but not the other. Matching: {matching_hists}, response: {response_hists}"
+            f"Passed one of detector-particle, hybrid-detector, or hybrid-particle response hists, but not the other. Detector-particle: {detector_particle_response_hists}, hybrid-detector: {hybrid_detector_response_hists}, hybrid_particle: {hybrid_particle_response_hists}"
         )
 
     # Because of the validation, the time for filling the matching is equivalent to when we should fill the response hists.
-    if response_hists is not None:
+    if hybrid_particle_response_hists is not None:
         logger.debug(f"Performing matching and filling response for {identifier}, {fill_attr_name}.")
         # Perform the matching
-        # TODO: Does this work with the leading cutoff??
+        # TODO: Does this work with the leading cutoff?? Not yet.
         try:
             leading_matching, subleading_matching = determine_matched_jets(hybrid_inputs, det_level_inputs)
             matching_selections = analysis_objects.MatchingSelections(
@@ -702,25 +711,39 @@ def _fill_embedded_hists_with_calculation(
             logger.warning(e)
             IPython.start_ipython(user_ns=locals())
 
-        # Fill the response (with matching dependence)
-        # NOTE: cast is to help out mypy.
-        selected_response_hists: analysis_objects.SubstructureResponseHists = getattr(response_hists, fill_attr_name)
-        selected_response_hists.fill(
-            hybrid_inputs=hybrid_inputs,
-            true_inputs=true_inputs,
+        # Fill the responses (with matching dependence)
+        # detector-particle
+        # NOTE: casts are to help out mypy.
+        selected_detector_particle_response_hists = cast(
+            analysis_objects.SubstructureResponseHists, getattr(detector_particle_response_hists, fill_attr_name)
+        )
+        selected_detector_particle_response_hists.fill(
+            measured_like_inputs=det_level_inputs,
+            generator_like_inputs=true_inputs,
             matching_selections=matching_selections,
             jet_R=jet_R,
             weight=weight,
         )
-        # Fill the matching results.
-        # NOTE: cast is to help out mypy.
-        selected_matching_hists = cast(
-            analysis_objects.SubstructureMatchingSubjetHists, getattr(matching_hists, fill_attr_name)
+        # Hybrid-detector
+        selected_hybrid_detector_response_hists = cast(
+            analysis_objects.SubstructureResponseHists, getattr(hybrid_detector_response_hists, fill_attr_name)
         )
-        selected_matching_hists.fill(
-            matched_inputs=det_level_inputs,
-            hybrid_inputs=hybrid_inputs,
+        selected_hybrid_detector_response_hists.fill(
+            measured_like_inputs=hybrid_inputs,
+            generator_like_inputs=det_level_inputs,
             matching_selections=matching_selections,
+            jet_R=jet_R,
+            weight=weight,
+        )
+        # Hybrid-particle
+        selected_hybrid_particle_response_hists = cast(
+            analysis_objects.SubstructureResponseExtendedHists, getattr(hybrid_particle_response_hists, fill_attr_name)
+        )
+        selected_hybrid_particle_response_hists.fill(
+            measured_like_inputs=hybrid_inputs,
+            generator_like_inputs=true_inputs,
+            matching_selections=matching_selections,
+            jet_R=jet_R,
             weight=weight,
         )
 
@@ -856,23 +879,12 @@ def analyze_single_tree_embedding(  # noqa: C901
                     hybrid_hists=results.hybrid_hists[identifier],
                     # We only fill the response for the widest jet pt selection so we don't store redundant information.
                     # If it is retrieved, we use it. If not, we'll skip filling it.
-                    response_hists=results.response_hists.get(identifier, None),
-                    # We only fill the response for the widest jet pt selection so we don't store redundant information.
-                    # If it is retrieved, we use it. If not, we'll skip filling it.
-                    matching_hists=results.matching_hists.get(identifier, None),
+                    detector_particle_response_hists=results.detector_particle_response.get(identifier, None),
+                    hybrid_detector_response_hists=results.hybrid_detector_response.get(identifier, None),
+                    hybrid_particle_response_hists=results.hybrid_particle_response.get(identifier, None),
                     jet_R=dataset.settings.jet_R,
                     weight=scale_factor,
                 )
-
-    # Look at matched jets
-    # matching_hists = matching(
-    #    matching_hists=results.matching_hists,
-    #    matched_jets=det_level_jets,
-    #    hybrid_jets=hybrid_jets,
-    #    dataset=dataset,
-    #    scale_factor=scale_factor,
-    #    progress_manager=progress_manager,
-    # )
 
     # Store the hists
     # Store hists with pickle because it takes too longer otherwise.
@@ -1035,7 +1047,7 @@ def merge_results(existing: _T_Result, new_result: _T_Result) -> _T_Result:
             for h in hist_result.values():
                 h.convert_boost_histograms_to_binned_data()
 
-    # TODO: Does this actually modify the object contained within??
+    # TODO: ****Check****: Does this actually modify the object contained within??
     for (name, hist_result), (new_name, new_hist_result) in zip(existing.items(), new_result.items()):
         for k in hist_result.keys():
             hist_result[k] += new_hist_result[k]
@@ -1217,10 +1229,10 @@ if __name__ == "__main__":
 
     # Setup and run
     config_filename = Path("config") / "datasets.yaml"
-    plot_only = False
+    plot_only = True
     jet_pt_bins = [
         # Broadest range
-        helpers.RangeSelector(min=20, max=140),
+        helpers.RangeSelector(min=0, max=140),
         # Main range of interest.
         helpers.RangeSelector(min=40, max=120),
         # Most likely where we will actually measure.
@@ -1276,7 +1288,7 @@ if __name__ == "__main__":
         jet_pt_bins=jet_pt_bins,
         z_cutoff=z_cutoff,
         plot_only=plot_only,
-        force_reprocessing=True,
+        force_reprocessing=False,
         number_of_cores=1,
         # additional_kwargs_for_analysis=dict(
         #    scale_n_jets_when_loading_hists=True,

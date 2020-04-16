@@ -1733,18 +1733,18 @@ def responses(
                 helpers.RangeSelector(min=20, max=140),
                 helpers.RangeSelector(min=80, max=120),
             ]:
-                #_plot_response_jet_spectra(
-                #    technique=technique,
-                #    identifier=identifier,
-                #    attribute_name="kt",
-                #    hists=hists,
-                #    plot_config=PlotConfig(
-                #        name="response_spectra",
-                #        x_label=r"$p_{\text{T}}\:(\text{GeV}/c)$",
-                #        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$",
-                #    ),
-                #    path=path,
-                #)
+                _plot_response_jet_spectra(
+                    technique=technique,
+                    identifier=identifier,
+                    attribute_name="kt",
+                    hists=hists,
+                    plot_config=PlotConfig(
+                        name="response_spectra",
+                        x_label=r"$p_{\text{T}}\:(\text{GeV}/c)$",
+                        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                    ),
+                    path=path,
+                )
                 _plot_response_kt_distributions(
                     technique=technique,
                     identifier=identifier,
