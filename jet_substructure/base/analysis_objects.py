@@ -261,6 +261,22 @@ class SubstructureHistsBase:
     title: str = attr.ib()
     iterative_splittings: bool = attr.ib()
 
+    def __add__(self, other: "SubstructureHistsBase") -> "SubstructureHistsBase":
+        """ Handles a = b + c """
+        new = copy.deepcopy(self)
+        new += other
+        return new
+
+    def __radd__(self, other: SubstructureHistsBase) -> SubstructureHistsBase:
+        """ For use with sum(...). """
+        if other == 0:
+            return self
+        else:
+            return self + other
+
+    def __iadd__(self, other: SubstructureHistsBase) -> SubstructureHistsBase:
+        raise NotImplementedError("Daughter classes must implement.")
+
     @property
     def attributes_to_skip(self) -> List[str]:
         return ["name", "title", "iterative_splittings"]
@@ -308,15 +324,11 @@ class SubstructureHists(SubstructureHistsBase):
         attrs.extend(["n_jets"])
         return attrs
 
-    def __add__(self, other: "SubstructureHists") -> "SubstructureHists":
-        """ Handles a = b + c """
-        new = copy.deepcopy(self)
-        new += other
-        return new
-
-    def __iadd__(self, other: "SubstructureHists") -> "SubstructureHists":
+    def __iadd__(self, other: SubstructureHistsBase) -> "SubstructureHists":
         """ Handles a += b """
         # Validation
+        if not isinstance(other, type(self)):
+            raise TypeError(f"Must pass type {type(self)}. Passed: {type(other)}.")
         if self.iterative_splittings != other.iterative_splittings:
             raise TypeError(
                 f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
@@ -330,13 +342,6 @@ class SubstructureHists(SubstructureHistsBase):
             v += v_other
 
         return self
-
-    def __radd__(self, other: "SubstructureHists") -> "SubstructureHists":
-        """ For use with sum(...). """
-        if other == 0:
-            return self
-        else:
-            return self + other
 
     def __truediv__(self, other: "SubstructureHists") -> "SubstructureHists":
         data = []
@@ -458,15 +463,11 @@ class SubstructureToyHists(SubstructureHistsBase):
         attrs.extend(["n_jets"])
         return attrs
 
-    def __add__(self, other: "SubstructureToyHists") -> "SubstructureToyHists":
-        """ Handles a = b + c """
-        new = copy.deepcopy(self)
-        new += other
-        return new
-
-    def __iadd__(self, other: "SubstructureToyHists") -> "SubstructureToyHists":
+    def __iadd__(self, other: SubstructureHistsBase) -> "SubstructureToyHists":
         """ Handles a += b """
         # Validation
+        if not isinstance(other, type(self)):
+            raise TypeError(f"Must pass type {type(self)}. Passed: {type(other)}.")
         if self.iterative_splittings != other.iterative_splittings:
             raise TypeError(
                 f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
@@ -480,13 +481,6 @@ class SubstructureToyHists(SubstructureHistsBase):
             v += v_other
 
         return self
-
-    def __radd__(self, other: "SubstructureToyHists") -> "SubstructureToyHists":
-        """ For use with sum(...). """
-        if other == 0:
-            return self
-        else:
-            return self + other
 
     def __truediv__(self, other: "SubstructureToyHists") -> "SubstructureToyHists":
         data = []
@@ -647,15 +641,11 @@ class SubstructureResponseHists(SubstructureHistsBase):
         attrs.extend(["axis_map", "measured_like_n_jets", "generator_like_n_jets"])
         return attrs
 
-    def __add__(self, other: "SubstructureResponseHists") -> "SubstructureResponseHists":
-        """ Handles a = b + c """
-        new = copy.deepcopy(self)
-        new += other
-        return new
-
-    def __iadd__(self, other: "SubstructureResponseHists") -> "SubstructureResponseHists":
+    def __iadd__(self, other: SubstructureHistsBase) -> "SubstructureResponseHists":
         """ Handles a += b """
         # Validation
+        if not isinstance(other, type(self)):
+            raise TypeError(f"Must pass type {type(self)}. Passed: {type(other)}.")
         if self.iterative_splittings != other.iterative_splittings:
             raise TypeError(
                 f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
@@ -670,13 +660,6 @@ class SubstructureResponseHists(SubstructureHistsBase):
             v += v_other
 
         return self
-
-    def __radd__(self, other: "SubstructureResponseHists") -> "SubstructureResponseHists":
-        """ For use with sum(...). """
-        if other == 0:
-            return self
-        else:
-            return self + other
 
     @classmethod
     def create_boost_histograms(
@@ -959,15 +942,11 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
     #    attrs.extend(["n_jets"])
     #    return attrs
 
-    def __add__(self, other: "SubstructureMatchingSubjetHists") -> "SubstructureMatchingSubjetHists":
-        """ Handles a = b + c """
-        new = copy.deepcopy(self)
-        new += other
-        return new
-
-    def __iadd__(self, other: "SubstructureMatchingSubjetHists") -> "SubstructureMatchingSubjetHists":
+    def __iadd__(self, other: SubstructureHistsBase) -> "SubstructureMatchingSubjetHists":
         """ Handles a += b """
         # Validation
+        if not isinstance(other, type(self)):
+            raise TypeError(f"Must pass type {type(self)}. Passed: {type(other)}.")
         if self.iterative_splittings != other.iterative_splittings:
             raise TypeError(
                 f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
@@ -981,13 +960,6 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
             v += v_other
 
         return self
-
-    def __radd__(self, other: "SubstructureMatchingSubjetHists") -> "SubstructureMatchingSubjetHists":
-        """ For use with sum(...). """
-        if other == 0:
-            return self
-        else:
-            return self + other
 
     @classmethod
     def create_boost_histograms(
@@ -1046,6 +1018,10 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
             )
 
 
+# NOTE: Typing here is super sketchy. I must be misunderstanding something about the mypy typing model,
+#       because I can't seem to possibly find the right variations to make any sense.
+#       I would have thought that binding to the base class would have been reasonable, but apparently not.
+#       If I do, it just seems to cause more problems...
 T_SubstructureHists = TypeVar(
     "T_SubstructureHists",
     SubstructureHists,
@@ -1054,11 +1030,6 @@ T_SubstructureHists = TypeVar(
     SubstructureResponseExtendedHists,
     SubstructureMatchingSubjetHists,
 )
-
-# T_SubstructureHists = TypeVar(
-#    "T_SubstructureHists",
-#    bound=SubstructureHistsBase,
-# )
 
 
 @attr.s
@@ -1081,7 +1052,9 @@ class Hists(Generic[T_SubstructureHists]):
         new += other
         return new
 
-    def __iadd__(self, other: "Hists[T_SubstructureHists]") -> "Hists[T_SubstructureHists]":
+    def __iadd__(
+        self: "Hists[T_SubstructureHists]", other: "Hists[T_SubstructureHists]"
+    ) -> "Hists[T_SubstructureHists]":
         """ Handles a += b. """
         # Add the stored values together.
         for (k, v), (k_other, v_other) in zip(self, other):
@@ -1090,7 +1063,7 @@ class Hists(Generic[T_SubstructureHists]):
                 raise ValueError(f"Somehow keys mismatch. self key: {k}, other key: {k_other}")
 
             # Assumes that they are passed by reference.
-            v += v_other
+            v += v_other  # type: ignore
 
         return self
 
@@ -1204,7 +1177,7 @@ def create_substructure_toy_hists(iterative_splittings: bool, z_cutoff: float) -
     )
 
 
-_T_ResponseHists = TypeVar("_T_ResponseHists", bound="SubstructureResponseHists", covariant=True)
+_T_ResponseHists = TypeVar("_T_ResponseHists", SubstructureResponseHists, SubstructureResponseExtendedHists)
 
 
 def _create_substructure_response_hists(
