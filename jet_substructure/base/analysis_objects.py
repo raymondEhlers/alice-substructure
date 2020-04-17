@@ -244,6 +244,24 @@ class FillHistogramInput:
         """
         return len(self.jets)
 
+    def __getitem__(self, mask: np.ndarray) -> FillHistogramInput:
+        """ Mask the stored values, returning a new object. """
+        # Validation
+        if len(self.jets) != len(mask):
+            raise ValueError(
+                f"Mask length is different than array lengths. mask length: {len(mask)}, array lengths: {len(self.jets)}"
+            )
+
+        # Return the masked arrays in a new object.
+        return type(self)(
+            jets=self.jets[mask],
+            # NOTE: It's super important to use the internal splittings. Otherwise, we'll try to apply the indices twice
+            #       (which won't work for the masked object).
+            splittings=self._splittings[mask],
+            values=self.values[mask],
+            indices=self.indices[mask],
+        )
+
 
 def _calculate_splitting_number(indices: UprootArray[int]) -> UprootArray[int]:
     # +1 because splittings counts from 1, but indexing starts from 0.
@@ -627,6 +645,7 @@ class SubstructureResponseHists(SubstructureHistsBase):
     """
 
     axis_map: Mapping[str, str] = attr.ib()
+    use_matching_axis: bool = attr.ib()
     measured_like_n_jets: float = attr.ib()
     generator_like_n_jets: float = attr.ib()
     residuals_jet_pt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
@@ -638,7 +657,7 @@ class SubstructureResponseHists(SubstructureHistsBase):
     @property
     def attributes_to_skip(self) -> List[str]:
         attrs = super().attributes_to_skip
-        attrs.extend(["axis_map", "measured_like_n_jets", "generator_like_n_jets"])
+        attrs.extend(["axis_map", "use_matching_axis", "measured_like_n_jets", "generator_like_n_jets"])
         return attrs
 
     def __iadd__(self, other: SubstructureHistsBase) -> "SubstructureResponseHists":
@@ -668,17 +687,22 @@ class SubstructureResponseHists(SubstructureHistsBase):
         title: str,
         iterative_splittings: bool,
         axis_map: Mapping[str, str],
+        use_matching_axis: bool,
         measured_like_jet_pt_axis: bh.axis.Regular,
         generator_like_jet_pt_axis: bh.axis.Regular,
     ) -> "SubstructureResponseHists":
         kt_axis = bh.axis.Regular(25, 0, 25)
-        number_of_matching_axes = len(cls.matching_name_to_axis_value)
-        matching_axis = bh.axis.Regular(number_of_matching_axes, 0, number_of_matching_axes)
+        if use_matching_axis:
+            number_of_matching_axes = len(cls.matching_name_to_axis_value)
+            matching_axis = bh.axis.Regular(number_of_matching_axes, 0, number_of_matching_axes)
+        else:
+            matching_axis = bh.axis.Regular(1, 0, 1)
         return cls(
             name=name,
             title=title,
             iterative_splittings=iterative_splittings,
             axis_map=axis_map,
+            use_matching_axis=use_matching_axis,
             measured_like_n_jets=0,
             generator_like_n_jets=0,
             residuals_jet_pt=bh.Histogram(
@@ -719,7 +743,6 @@ class SubstructureResponseHists(SubstructureHistsBase):
         # Give a useful error message
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
             raise ValueError("Not all hists are boost histograms! Cannot fill!")
-
         # And then help out mypy...
         assert (
             isinstance(self.residuals_jet_pt, bh.Histogram)
@@ -732,7 +755,16 @@ class SubstructureResponseHists(SubstructureHistsBase):
 
         for matching_type, matching_axis_value in self.matching_name_to_axis_value.items():
             # Setup
-            mask = matching_selections[matching_type]
+            if not self.use_matching_axis:
+                # We didn't provide the matching selections, so we just want to fill the 'all' bin,
+                # and then stop filling.
+                # So we skip if it's not all.
+                if matching_type != "all":
+                    continue
+                # Create a true mask in the right shape.
+                mask = np.ones(len(measured_like_inputs.jets.jet_pt), dtype=bool)
+            else:
+                mask = matching_selections[matching_type]
             measured_like_jet_pt = measured_like_inputs.jets.jet_pt[mask]
             generator_like_jet_pt = generator_like_inputs.jets.jet_pt[mask]
 
@@ -789,15 +821,20 @@ class SubstructureResponseExtendedHists(SubstructureResponseHists):
         title: str,
         iterative_splittings: bool,
         axis_map: Mapping[str, str],
+        use_matching_axis: bool,
         measured_like_jet_pt_axis: bh.axis.Regular,
         generator_like_jet_pt_axis: bh.axis.Regular,
     ) -> "SubstructureResponseExtendedHists":
         # Create a temporary object to handle create the hists that it already knows. We'll then assign those.
-        temp_response_hists_base = super(SubstructureResponseExtendedHists, cls).create_boost_histograms(
+        # NOTE: Can't use super here because it will pass this object in the place of the super class.
+        #       Usually this is what someone would want, but not here - we literally want to construct the
+        #       parent object. So we just do it by hand (although it's not ideal).
+        temp_response_hists_base = SubstructureResponseHists.create_boost_histograms(
             name=name,
             title=title,
             iterative_splittings=iterative_splittings,
             axis_map=axis_map,
+            use_matching_axis=use_matching_axis,
             measured_like_jet_pt_axis=measured_like_jet_pt_axis,
             generator_like_jet_pt_axis=generator_like_jet_pt_axis,
         )
@@ -806,13 +843,17 @@ class SubstructureResponseExtendedHists(SubstructureResponseHists):
         delta_R_axis = bh.axis.Regular(20, 0, 0.4)
         theta_axis = bh.axis.Regular(20, 0, 1)
         splitting_number_axis = bh.axis.Regular(10, 0, 10)
-        number_of_matching_axes = len(cls.matching_name_to_axis_value)
-        matching_axis = bh.axis.Regular(number_of_matching_axes, 0, number_of_matching_axes)
+        if use_matching_axis:
+            number_of_matching_axes = len(cls.matching_name_to_axis_value)
+            matching_axis = bh.axis.Regular(number_of_matching_axes, 0, number_of_matching_axes)
+        else:
+            use_matching_axis = bh.axis.Regular(1, 0, 1)
         return cls(
             name=name,
             title=title,
             iterative_splittings=iterative_splittings,
             axis_map=axis_map,
+            use_matching_axis=use_matching_axis,
             measured_like_n_jets=0,
             generator_like_n_jets=0,
             residuals_jet_pt=temp_response_hists_base.residuals_jet_pt,
@@ -883,7 +924,16 @@ class SubstructureResponseExtendedHists(SubstructureResponseHists):
 
         for matching_type, matching_axis_value in self.matching_name_to_axis_value.items():
             # Setup
-            mask = matching_selections[matching_type]
+            if not self.use_matching_axis:
+                # We didn't provide the matching selections, so we just want to fill the 'all' bin,
+                # and then stop filling.
+                # So we skip if it's not all.
+                if matching_type != "all":
+                    continue
+                # Create a true mask in the right shape.
+                mask = np.ones(len(measured_like_inputs.jets.jet_pt), dtype=bool)
+            else:
+                mask = matching_selections[matching_type]
             measured_like_jet_pt = measured_like_inputs.jets.jet_pt[mask]
             generator_like_jet_pt = generator_like_inputs.jets.jet_pt[mask]
 
@@ -1185,6 +1235,7 @@ def _create_substructure_response_hists(
     iterative_splittings: bool,
     z_cutoff: float,
     axis_map: Mapping[str, str],
+    use_matching_axis: bool,
     measured_like_jet_pt_axis: bh.axis.Regular,
     generator_like_jet_pt_axis: bh.axis.Regular,
 ) -> Hists[_T_ResponseHists]:
@@ -1193,6 +1244,7 @@ def _create_substructure_response_hists(
         title="Inclusive",
         iterative_splittings=iterative_splittings,
         axis_map=axis_map,
+        use_matching_axis=use_matching_axis,
         measured_like_jet_pt_axis=measured_like_jet_pt_axis,
         generator_like_jet_pt_axis=generator_like_jet_pt_axis,
     )
@@ -1201,6 +1253,7 @@ def _create_substructure_response_hists(
         title="zDrop",
         iterative_splittings=iterative_splittings,
         axis_map=axis_map,
+        use_matching_axis=use_matching_axis,
         measured_like_jet_pt_axis=measured_like_jet_pt_axis,
         generator_like_jet_pt_axis=generator_like_jet_pt_axis,
     )
@@ -1209,6 +1262,7 @@ def _create_substructure_response_hists(
         title="ktDrop",
         iterative_splittings=iterative_splittings,
         axis_map=axis_map,
+        use_matching_axis=use_matching_axis,
         measured_like_jet_pt_axis=measured_like_jet_pt_axis,
         generator_like_jet_pt_axis=generator_like_jet_pt_axis,
     )
@@ -1217,6 +1271,7 @@ def _create_substructure_response_hists(
         title="timeDrop",
         iterative_splittings=iterative_splittings,
         axis_map=axis_map,
+        use_matching_axis=use_matching_axis,
         measured_like_jet_pt_axis=measured_like_jet_pt_axis,
         generator_like_jet_pt_axis=generator_like_jet_pt_axis,
     )
@@ -1225,6 +1280,7 @@ def _create_substructure_response_hists(
         title=r"Leading $k_{\text{T}}$",
         iterative_splittings=iterative_splittings,
         axis_map=axis_map,
+        use_matching_axis=use_matching_axis,
         measured_like_jet_pt_axis=measured_like_jet_pt_axis,
         generator_like_jet_pt_axis=generator_like_jet_pt_axis,
     )
@@ -1233,6 +1289,7 @@ def _create_substructure_response_hists(
         title=fr"$z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
         iterative_splittings=iterative_splittings,
         axis_map=axis_map,
+        use_matching_axis=use_matching_axis,
         measured_like_jet_pt_axis=measured_like_jet_pt_axis,
         generator_like_jet_pt_axis=generator_like_jet_pt_axis,
     )
@@ -1252,6 +1309,7 @@ def create_substructure_response_hists(
     iterative_splittings: bool,
     z_cutoff: float,
     axis_map: Mapping[str, str],
+    use_matching_axis: bool,
     measured_like_jet_pt_axis: bh.axis.Regular,
     generator_like_jet_pt_axis: bh.axis.Regular,
 ) -> Hists[SubstructureResponseHists]:
@@ -1260,6 +1318,7 @@ def create_substructure_response_hists(
         iterative_splittings=iterative_splittings,
         z_cutoff=z_cutoff,
         axis_map=axis_map,
+        use_matching_axis=use_matching_axis,
         measured_like_jet_pt_axis=measured_like_jet_pt_axis,
         generator_like_jet_pt_axis=generator_like_jet_pt_axis,
     )
@@ -1269,6 +1328,7 @@ def create_substructure_response_hists_extended(
     iterative_splittings: bool,
     z_cutoff: float,
     axis_map: Mapping[str, str],
+    use_matching_axis: bool,
     measured_like_jet_pt_axis: bh.axis.Regular,
     generator_like_jet_pt_axis: bh.axis.Regular,
 ) -> Hists[SubstructureResponseExtendedHists]:
@@ -1277,6 +1337,7 @@ def create_substructure_response_hists_extended(
         iterative_splittings=iterative_splittings,
         z_cutoff=z_cutoff,
         axis_map=axis_map,
+        use_matching_axis=use_matching_axis,
         measured_like_jet_pt_axis=measured_like_jet_pt_axis,
         generator_like_jet_pt_axis=generator_like_jet_pt_axis,
     )
@@ -1391,19 +1452,32 @@ class SingleTreeEmbeddingResult(SingleTreeResultBase):
         for kwargs in helpers.dict_product(selections_with_maximal_jet_pt):
             # We don't care about the jet pt bin for creating the hists - just the identifier. So we drop it here.
             create_hists_args = {k: v for k, v in kwargs.items() if k != "jet_pt_bin"}
-            # And also add the z_cutoff from the dataset settings.
-            create_hists_args["z_cutoff"] = dataset.settings.z_cutoff
             # Detector-particle response.
             self.detector_particle_response[Identifier(**kwargs)] = create_substructure_response_hists(
-                **create_hists_args
+                z_cutoff=dataset.settings.z_cutoff,
+                axis_map={"measured_like": "detector", "generator_like": "particle"},
+                use_matching_axis=False,
+                measured_like_jet_pt_axis=bh.axis.Regular(16, 0, 160),
+                generator_like_jet_pt_axis=bh.axis.Regular(16, 0, 160),
+                **create_hists_args,
             )
             # Hybrid-detector response.
             self.hybrid_detector_response[Identifier(**kwargs)] = create_substructure_response_hists(
-                **create_hists_args
+                z_cutoff=dataset.settings.z_cutoff,
+                axis_map={"measured_like": "hybrid", "generator_like": "detector"},
+                use_matching_axis=True,
+                measured_like_jet_pt_axis=bh.axis.Regular(16, 0, 160),
+                generator_like_jet_pt_axis=bh.axis.Regular(16, 0, 160),
+                **create_hists_args,
             )
             # Hybrid-particle response.
             self.hybrid_particle_response[Identifier(**kwargs)] = create_substructure_response_hists_extended(
-                **create_hists_args
+                z_cutoff=dataset.settings.z_cutoff,
+                axis_map={"measured_like": "hybrid", "generator_like": "particle"},
+                use_matching_axis=True,
+                measured_like_jet_pt_axis=bh.axis.Regular(16, 0, 160),
+                generator_like_jet_pt_axis=bh.axis.Regular(16, 0, 160),
+                **create_hists_args,
             )
 
             # Cross check that we have a reasonable jet_pt_bin

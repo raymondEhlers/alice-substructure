@@ -52,11 +52,17 @@ def find_leading(values: UprootArray[T]) -> Tuple[np.ndarray, UprootArray[int]]:
 
     Used for dynamical grooming, hardest kt, etc.
 
+    In the case that we don't find a viable max (ie. because there was no splitting), we pad
+    to one entry and fill -0.05 before flattening. The corresponding index will be empty for
+    that event. This way, we can just fill all values, regardless of whether the splittings
+    were selected, and we automatically get the right normalization (as long as those values
+    are included in the hist...).
+
     Returns:
         Leading value, index of value.
     """
     arg_max = values.argmax()
-    return values[arg_max].flatten(), arg_max
+    return values[arg_max].pad(1).fillna(-0.05).flatten(), arg_max
 
 
 class ArrayMethods(ak.Methods):  # type: ignore

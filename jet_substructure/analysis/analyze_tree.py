@@ -610,10 +610,18 @@ def determine_matched_jets(
         Leading subjet matching results, subleading subjet matching results.
     """
     # Setup
-    # delta = 0.001
+    # Mask if one of the inputs doesn't have a selected splitting (appears to only matter at detector level if we have a z_cut)
+    mask = (matched_inputs.indices.counts != 0) & (hybrid_inputs.indices.counts != 0)
+    # try:
+    restricted_matched_inputs = matched_inputs[mask]
+    restricted_hybrid_inputs = hybrid_inputs[mask]
+    # except IndexError as e:
+    #    logger.warning(e)
+    #    IPython.start_ipython(user_ns=locals())
+
     # Determine which subjets contribute to the selected splitting.
-    matched_subjets_unsorted = _subjets_contributing_to_splittings(inputs=matched_inputs)
-    hybrid_subjets_unsorted = _subjets_contributing_to_splittings(inputs=hybrid_inputs)
+    matched_subjets_unsorted = _subjets_contributing_to_splittings(inputs=restricted_matched_inputs)
+    hybrid_subjets_unsorted = _subjets_contributing_to_splittings(inputs=restricted_hybrid_inputs)
 
     # Sort the subjets such that 0 is always the leading subjet.
     matched_subjets_leading, matched_subjets_subleading = _get_leading_and_subleading_subjets(matched_subjets_unsorted)
@@ -700,16 +708,37 @@ def _fill_embedded_hists_with_calculation(
     # Because of the validation, the time for filling the matching is equivalent to when we should fill the response hists.
     if hybrid_particle_response_hists is not None:
         logger.debug(f"Performing matching and filling response for {identifier}, {fill_attr_name}.")
+        # Setup
+        # Mask to ensure that there are selected splittings before we proceed to matching and filling.
+        # We have to mask here (rather than at filling) because the matching will be masked, and we need
+        # the inputs to be the right length to work the output from the matching.
+        # Mask if one of the inputs doesn't have a selected splitting (that appears to only matter at detector
+        # level if we have a z_cut).
+        mask = (det_level_inputs.indices.counts != 0) & (hybrid_inputs.indices.counts != 0)
+        try:
+            restricted_det_level_inputs = det_level_inputs[mask]
+            restricted_hybrid_inputs = hybrid_inputs[mask]
+            # True inputs aren't necessarily appropriate here because we're matching between hybrid-det level,
+            # but include it so we can include the matching in the hybrid-particle response.
+            restricted_true_inputs = true_inputs[mask]
+        except IndexError as e:
+            logger.warning(e)
+            IPython.start_ipython(user_ns=locals())
+
         # Perform the matching
         # TODO: Does this work with the leading cutoff?? Not yet.
         try:
-            leading_matching, subleading_matching = determine_matched_jets(hybrid_inputs, det_level_inputs)
+            leading_matching, subleading_matching = determine_matched_jets(
+                restricted_hybrid_inputs, restricted_det_level_inputs
+            )
             matching_selections = analysis_objects.MatchingSelections(
                 leading=leading_matching, subleading=subleading_matching
             )
         except ValueError as e:
             logger.warning(e)
             IPython.start_ipython(user_ns=locals())
+
+        # TODO: These matching selections are wrong for particle-detector. Should be okay for hybrid-particle (because we're most interested in hybrid-det matching there).
 
         # Fill the responses (with matching dependence)
         # detector-particle
@@ -729,8 +758,8 @@ def _fill_embedded_hists_with_calculation(
             analysis_objects.SubstructureResponseHists, getattr(hybrid_detector_response_hists, fill_attr_name)
         )
         selected_hybrid_detector_response_hists.fill(
-            measured_like_inputs=hybrid_inputs,
-            generator_like_inputs=det_level_inputs,
+            measured_like_inputs=restricted_hybrid_inputs,
+            generator_like_inputs=restricted_det_level_inputs,
             matching_selections=matching_selections,
             jet_R=jet_R,
             weight=weight,
@@ -740,8 +769,8 @@ def _fill_embedded_hists_with_calculation(
             analysis_objects.SubstructureResponseExtendedHists, getattr(hybrid_particle_response_hists, fill_attr_name)
         )
         selected_hybrid_particle_response_hists.fill(
-            measured_like_inputs=hybrid_inputs,
-            generator_like_inputs=true_inputs,
+            measured_like_inputs=restricted_hybrid_inputs,
+            generator_like_inputs=restricted_true_inputs,
             matching_selections=matching_selections,
             jet_R=jet_R,
             weight=weight,
@@ -862,7 +891,7 @@ def analyze_single_tree_embedding(  # noqa: C901
                 (dynamical_kt_func, "dynamical_kt"),
                 (dynamical_time_func, "dynamical_time"),
                 (leading_kt_func, "leading_kt"),
-                # (leading_kt_hard_cutoff_func, "leading_kt_hard_cutoff"),
+                (leading_kt_hard_cutoff_func, "leading_kt_hard_cutoff"),
             ]:
                 _fill_embedded_hists_with_calculation(
                     calculation=func,
@@ -889,6 +918,7 @@ def analyze_single_tree_embedding(  # noqa: C901
     # Store the hists
     # Store hists with pickle because it takes too longer otherwise.
     # NOTE: We expand out the values when pickling in case the object changes.
+    logger.debug("Done processing. Writing out results.")
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
         pickle.dump(dict(results.items()), pkl_file)  # type: ignore
 
@@ -1229,7 +1259,7 @@ if __name__ == "__main__":
 
     # Setup and run
     config_filename = Path("config") / "datasets.yaml"
-    plot_only = True
+    plot_only = False
     jet_pt_bins = [
         # Broadest range
         helpers.RangeSelector(min=0, max=140),
@@ -1288,7 +1318,7 @@ if __name__ == "__main__":
         jet_pt_bins=jet_pt_bins,
         z_cutoff=z_cutoff,
         plot_only=plot_only,
-        force_reprocessing=False,
+        force_reprocessing=True,
         number_of_cores=1,
         # additional_kwargs_for_analysis=dict(
         #    scale_n_jets_when_loading_hists=True,
