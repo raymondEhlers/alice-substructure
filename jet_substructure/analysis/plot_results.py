@@ -904,7 +904,7 @@ def _plot_matching_response_pt(
 
         # Project into our axes of interest (namely, the attribute at hybrid and true level).
         h_proj = binned_data.BinnedData(
-            axes=[h.axes[0], h.axes[2].bin_edges[hybrid_jet_pt_axis_range],],
+            axes=[h.axes[0], h.axes[2].bin_edges[hybrid_jet_pt_axis_range]],
             values=np.sum(h.values[:, :, hybrid_jet_pt_range, :], axis=(1, 3)),
             variances=np.sum(h.variances[:, :, hybrid_jet_pt_range, :], axis=(1, 3)),
         )
@@ -1012,9 +1012,9 @@ def _plot_matching_response_kt(
         hybrid_jet_pt_range = slice(
             h.axes[2].find_bin(identifier.jet_pt_bin.min + epsilon), h.axes[2].find_bin(identifier.jet_pt_bin.max),
         )
-        hybrid_jet_pt_axis_range = slice(
-            h.axes[2].find_bin(identifier.jet_pt_bin.min + epsilon), h.axes[2].find_bin(identifier.jet_pt_bin.max) + 1,
-        )
+        # hybrid_jet_pt_axis_range = slice(
+        #    h.axes[2].find_bin(identifier.jet_pt_bin.min + epsilon), h.axes[2].find_bin(identifier.jet_pt_bin.max) + 1,
+        # )
 
         # Project into our axes of interest (namely, the attribute at hybrid and true level).
         h_proj = binned_data.BinnedData(
@@ -1309,7 +1309,7 @@ def _plot_response(
         iterative_splittings=identifier.iterative_splittings, jet_pt_bin=helpers.RangeSelector(min=40, max=120)
     )
     # Use this to select the right hybrid range.
-    epsilon = 0.00001
+    # epsilon = 0.00001
     # hybrid_jet_pt_range = slice(
     #    h.axes[0].find_bin(identifier.jet_pt_bin.min + epsilon),
     #    h.axes[0].find_bin(identifier.jet_pt_bin.max),
@@ -1534,9 +1534,9 @@ def _plot_response_jet_spectra(
 
     # Normalization
     # Scale by bin widths and number of jets
-    h_part /= hists.n_true_jets
+    h_part /= hists.generator_like_n_jets
     h_part /= h_part.axes[0].bin_widths
-    h_hybrid /= hists.n_hybrid_jets
+    h_hybrid /= hists.measured_like_n_jets
     h_hybrid /= h_hybrid.axes[0].bin_widths
 
     # Plot
@@ -1622,9 +1622,9 @@ def _plot_response_kt_distributions(
 
     # Normalization
     # Scale by bin widths and number of jets
-    h_part /= hists.n_true_jets
+    h_part /= hists.generator_like_n_jets
     h_part /= h_part.axes[0].bin_widths
-    h_hybrid /= hists.n_hybrid_jets
+    h_hybrid /= hists.measured_like_n_jets
     h_hybrid /= h_hybrid.axes[0].bin_widths
 
     # Plot
@@ -1714,7 +1714,7 @@ def responses(
 
     for identifier, response_hists in all_response_hists.items():
         for technique, hists in response_hists:
-            if hists.n_hybrid_jets == 0 or hists.n_true_jets == 0:
+            if hists.measured_like_n_jets == 0 or hists.generator_like_n_jets == 0:
                 logger.warning(f"No jets within {identifier}_{technique}. Skipping bin!")
                 continue
             for attribute_name, plot_config in distributions:
