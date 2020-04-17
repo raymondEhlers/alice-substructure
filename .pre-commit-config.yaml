@@ -6,7 +6,7 @@ repos:
           - id: flake8
             additional_dependencies: ["flake8-colors"]
     - repo: https://github.com/adrienverge/yamllint.git
-      rev: v1.21.0
+      rev: v1.23.0
       hooks:
           - id: yamllint
     - repo: https://github.com/pre-commit/mirrors-mypy
@@ -31,7 +31,7 @@ repos:
           - id: mixed-line-ending
           - id: trailing-whitespace
     - repo: https://github.com/asottile/seed-isort-config
-      rev: v2.1.0
+      rev: v2.1.1
       hooks:
           - id: seed-isort-config
     - repo: https://github.com/pre-commit/mirrors-isort
