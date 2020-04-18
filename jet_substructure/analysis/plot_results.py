@@ -543,7 +543,7 @@ def lund_plane(  # noqa: C901
                 logger.warning(f"No jets within {identifier}_total_number_of_splittings. Skipping bin!")
 
         for technique, hists in masked_hists:
-            # Store each techinque
+            # Store each technique
             techniques.add(technique)
             if hists.n_jets == 0:
                 logger.warning(f"No jets within {identifier}_{technique}. Skipping bin!")

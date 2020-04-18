@@ -482,7 +482,6 @@ if __name__ == "__main__":
 
     # Setup dataset
     dm = data_manager.IterateTrees(
-        # filenames=[Path("trains/embedPythia/5536/AnalysisResults.18q.1.chunk1.root")],
         filenames=dataset.filenames,
         tree_name=dataset.tree_name,
         # Mypy is getting confused by Sequence[str] because str is an iterable, so we ignore the type...
