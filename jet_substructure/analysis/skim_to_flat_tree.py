@@ -15,6 +15,7 @@ import uproot
 
 from jet_substructure.analysis import analyze_tree
 from jet_substructure.base import analysis_objects, data_manager, helpers, substructure_methods
+from jet_substructure.base.helpers import UprootArray
 
 
 logger = logging.getLogger(__name__)
@@ -54,11 +55,74 @@ class GroomingResultForTree:
 #    return branches
 
 
+def _select_and_retrieve_splittings(
+    jets: substructure_methods.SubstructureJetArray, mask: UprootArray[bool], iterative_splittings: bool
+) -> Tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray, UprootArray[int]]:
+    """ Generalization of the function in analyze_tree to add the splitting index.
+
+    """
+    restricted_jets, restricted_splittings = analyze_tree._select_and_retrieve_splittings(
+        jets, mask, iterative_splittings
+    )
+    # Add the indices.
+    if iterative_splittings:
+        restricted_splittings_indices = restricted_jets.subjets.iterative_splitting_index
+    else:
+        restricted_splittings_indices = restricted_jets.splittings.kt.localindex
+    return restricted_jets, restricted_splittings, restricted_splittings_indices
+
+
+def calculate_splitting_number(
+    all_splittings: substructure_methods.JetSplittingArray,
+    selected_splittings: substructure_methods.JetSplittingArray,
+    restricted_splittings_indices: UprootArray[int],
+) -> np.ndarray:
+    logger.debug("Calculating splitting number")
+    # Setup
+    # We need the parent index of all of the splittings and of those which we have selected.
+    # The restricted splittings aren't enough on their own because they may not contain all of
+    # the necessary splitting history to reconstruct the splitting.
+    all_splittings_parent_index = all_splittings.parent_index
+    parent_index = selected_splittings.parent_index
+    counts = np.zeros_like(all_splittings_parent_index)
+
+    # The general procedure is that we will mask as true all parent_index != -1
+    # If those pass all of the cuts (including that it is in the restricted splittings)
+    # then we increment the count. Once a parent index gets to -1, then we stop selecting it
+    # in our mask, so it stops being updated.
+    # NOTE: In general, we don't want to iterative with these type of arrays, but it's
+    #       unavoidable here. And I don't think it should loop more than 30-40 times in the
+    #       worst case (and often much less).
+    while True:
+        # First, we need to access if we're done. If so, all parent_index values will be -1.
+        mask = parent_index != -1
+        # Need two all() calls because the mask is jagged (with dim one of the jagged axis).
+        if (mask != True).all().all():  # noqa: E712
+            break
+        # Need to repeat the parent_index to be the same shape as the restricted splittings so we can
+        # check if any are equal. If any are equal, then that splitting is in the restricted group.
+        # NOTE: We fill padded values with -2 because that can't possibly be a splitting index.
+        parent_repeated_to_be_same_shape = (
+            restricted_splittings_indices.ones_like() * parent_index.pad(1).fillna(-2).flatten()
+        )
+        accept_mask = (parent_repeated_to_be_same_shape == restricted_splittings_indices).any()
+        # In the case that the parent_index of our splitting is in the selected splittings,
+        # and it hasn't gotten to the origin, we can finally increment our count.
+        # NOTE: Need to pad, fill, and flatten to match the shape of the accept_mask (which is just an ndarray mask)
+        counts[mask.pad(1).fillna(False).flatten() & accept_mask] += 1
+        # We retrieve the parents, and then assign them for those which are not yet at the origin.
+        parent_index[mask] = all_splittings_parent_index[parent_index][mask]
+
+    logger.debug("Finished splitting number calculation")
+    return counts
+
+
 def calculate_grooming_methods(
     dataset: analysis_objects.Dataset,
     prefix: str,
     jets: substructure_methods.SubstructureJetArray,
     splittings: substructure_methods.JetSplittingArray,
+    splittings_indices: UprootArray[int],
 ) -> Dict[str, np.ndarray]:
     # Setup
     # TODO: Do this more cleanly.
@@ -85,14 +149,19 @@ def calculate_grooming_methods(
     for name, func in func_map.items():
         values, indices = func(splittings)
         groomed_splittings = splittings[indices]
+        splitting_number = calculate_splitting_number(
+            all_splittings=jets.splittings,
+            selected_splittings=groomed_splittings,
+            restricted_splittings_indices=splittings_indices,
+        )
 
-        # TODO: Properly extract the number of splittings...
         grooming_result = GroomingResultForTree(
             grooming_method=name,
             delta_R=groomed_splittings.delta_R.pad(1).fillna(-0.05).flatten(),
             z=groomed_splittings.z.pad(1).fillna(-0.05).flatten(),
             kt=groomed_splittings.kt.pad(1).fillna(-0.05).flatten(),
-            n=(groomed_splittings.kt.pad(1).fillna(-0.05).ones_like() * 1).flatten(),
+            # Splitting number is already flattened.
+            n=splitting_number,
         )
 
         results.update(grooming_result.asdict(prefix=prefix))
@@ -144,14 +213,16 @@ def calculate_and_skim_embedding(tree: data_manager.Tree, dataset: analysis_obje
 
     # Then restrict our jets.
     for prefix, jets in zip(prefixes, all_jets):
-        restricted_jets, restricted_splittings = analyze_tree._select_and_retrieve_splittings(
+        restricted_jets, restricted_splittings, restricted_splittings_indices = _select_and_retrieve_splittings(
             jets, mask, iterative_splittings
         )
         res = calculate_grooming_methods(
-            dataset=dataset, prefix=prefix, jets=restricted_jets, splittings=restricted_splittings
+            dataset=dataset,
+            prefix=prefix,
+            jets=restricted_jets,
+            splittings=restricted_splittings,
+            splittings_indices=restricted_splittings_indices,
         )
-        # import IPython;
-        # IPython.start_ipython(user_ns=locals())
         grooming_results.update(res)
 
     branches = {k: v.dtype for k, v in grooming_results.items()}
