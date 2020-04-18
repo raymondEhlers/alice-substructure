@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import operator
 from pathlib import Path
 from typing import Dict, Iterable, Mapping, Tuple, Type, cast
 
@@ -17,6 +18,7 @@ import enlighten
 import IPython
 import numpy as np
 import uproot
+from pathos.multiprocessing import ProcessingPool as Pool
 
 from jet_substructure.analysis import analyze_tree
 from jet_substructure.base import analysis_objects, data_manager, helpers, substructure_methods
@@ -303,7 +305,9 @@ def calculate_grooming_methods(
     return results
 
 
-def calculate_and_skim_embedding(tree: data_manager.Tree, dataset: analysis_objects.Dataset,) -> bool:
+def calculate_and_skim_embedding(
+    tree: data_manager.Tree, dataset: analysis_objects.Dataset, iterative_splittings: bool
+) -> bool:
     """ Determine the response and prong matching for jets substructure techniques.
 
     Why combine them together? Because then we only have to open and process a tree once.
@@ -314,8 +318,6 @@ def calculate_and_skim_embedding(tree: data_manager.Tree, dataset: analysis_obje
     # Setup
     # Perhaps make these into arguments?
     prefixes = ["matched", "detLevel", "data"]
-    # grooming_methods = ["dynamical_z", "dynamical_kt", "dynamical_time", "leading_kt", "leading_kt_z_cut_02", "leading_kt_z_cut_04"]
-    iterative_splittings = True
     iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
     # TODO: Maybe convert to hdf5? But maybe not because of compression?
     output_filename = f"{tree.filename.with_suffix('')}_{iterative_splittings_label}_splittings.root"
@@ -460,6 +462,11 @@ def calculate_and_skim_embedding(tree: data_manager.Tree, dataset: analysis_obje
 
 if __name__ == "__main__":
     helpers.setup_logging()
+    # Options
+    iterative_splittings = True
+    number_of_cores = 2
+
+    # Setup
     settings_class_map: Mapping[str, Type[analysis_objects.AnalysisSettings]] = {
         "embedPythia": analysis_objects.PtHardAnalysisSettings,
     }
@@ -484,9 +491,26 @@ if __name__ == "__main__":
     logger.info("Setup complete. Beginning processing of trees.")
 
     progress_manager = enlighten.get_manager()
+    # with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
+    #    for tree in tree_counter(dm):
+    #        calculate_and_skim_embedding(tree=tree, dataset=dataset)
+
+    number_of_trees_processed = 0
+    dm_iterator = dm.lazy_iteration(fully_lazy=(number_of_cores > 1))
+    wrapper = functools.partial(
+        calculate_and_skim_embedding, dataset=dataset, iterative_splittings=iterative_splittings,
+    )
+    wrapper_multiprocessing = functools.partial(analyze_tree._wrap_multiprocessing, analysis_function=wrapper,)
     with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
-        for tree in tree_counter(dm):
-            calculate_and_skim_embedding(tree=tree, dataset=dataset)
+        if number_of_cores > 1:
+            with Pool(nodes=number_of_cores) as pool:
+                number_of_trees_processed = functools.reduce(
+                    operator.add, tree_counter(pool.imap(wrapper_multiprocessing, dm_iterator)),
+                )
+        else:
+            number_of_trees_processed = functools.reduce(operator.add, tree_counter(map(wrapper, dm_iterator)),)
+
+    logger.info(f"Processed {number_of_trees_processed} out of {len(dm)} trees!")
 
     # Cleanup
     progress_manager.stop()
