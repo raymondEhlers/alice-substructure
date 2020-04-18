@@ -5,11 +5,15 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>
 """
 
+from __future__ import annotations
+
+import functools
 import logging
 from pathlib import Path
-from typing import Dict, Iterable, Mapping, Tuple, Type
+from typing import Dict, Iterable, Mapping, Tuple, Type, cast
 
 import attr
+import enlighten
 import numpy as np
 import uproot
 
@@ -55,6 +59,41 @@ class GroomingResultForTree:
 #    return branches
 
 
+def _define_calculation_funcs(
+    dataset: analysis_objects.Dataset,
+) -> Dict[str, functools.partial[Tuple[UprootArray[float], UprootArray[int]]]]:
+    """ Define the calculation functions of interest.
+
+    Note:
+        The type of the inclusive is different, but it takes and returns the same sets of arguments
+        as the other functions.
+
+    Args:
+        dataset: Dataset properties necessary to fully specify the calculations.
+    Returns:
+        dynamical_z, dynamical_kt, dynamical_time, leading_kt, leading_kt z>0.2, leading_kt z>0.4, SD z>0.2, SD z>0.4,
+    """
+    functions = {
+        "dynamical_z": functools.partial(substructure_methods.JetSplittingArray.dynamical_z, R=dataset.settings.jet_R),
+        "dynamical_kt": functools.partial(
+            substructure_methods.JetSplittingArray.dynamical_kt, R=dataset.settings.jet_R
+        ),
+        "dynamical_time": functools.partial(
+            substructure_methods.JetSplittingArray.dynamical_time, R=dataset.settings.jet_R
+        ),
+        "leading_kt": functools.partial(substructure_methods.JetSplittingArray.leading_kt,),
+        "leading_kt_z_cut_02": functools.partial(substructure_methods.JetSplittingArray.leading_kt, z_cutoff=0.2),
+        "leading_kt_z_cut_04": functools.partial(substructure_methods.JetSplittingArray.leading_kt, z_cutoff=0.4),
+        # "soft_drop_z_cut_02": functools.partial(
+        #    substructure_methods.JetSplittingArray.soft_drop, z_cutoff=0.2
+        # ),
+        # "soft_drop_z_cut_04": functools.partial(
+        #    substructure_methods.JetSplittingArray.soft_drop, z_cutoff=0.4
+        # ),
+    }
+    return functions
+
+
 def _select_and_retrieve_splittings(
     jets: substructure_methods.SubstructureJetArray, mask: UprootArray[bool], iterative_splittings: bool
 ) -> Tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray, UprootArray[int]]:
@@ -77,14 +116,14 @@ def calculate_splitting_number(
     selected_splittings: substructure_methods.JetSplittingArray,
     restricted_splittings_indices: UprootArray[int],
 ) -> np.ndarray:
-    logger.debug("Calculating splitting number")
+    # logger.debug("Calculating splitting number")
     # Setup
     # We need the parent index of all of the splittings and of those which we have selected.
     # The restricted splittings aren't enough on their own because they may not contain all of
     # the necessary splitting history to reconstruct the splitting.
     all_splittings_parent_index = all_splittings.parent_index
     parent_index = selected_splittings.parent_index
-    counts = np.zeros_like(all_splittings_parent_index)
+    counts = np.zeros_like(all_splittings_parent_index, dtype=np.int)
 
     # The general procedure is that we will mask as true all parent_index != -1
     # If those pass all of the cuts (including that it is in the restricted splittings)
@@ -113,8 +152,36 @@ def calculate_splitting_number(
         # We retrieve the parents, and then assign them for those which are not yet at the origin.
         parent_index[mask] = all_splittings_parent_index[parent_index][mask]
 
-    logger.debug("Finished splitting number calculation")
+    # logger.debug("Finished splitting number calculation")
     return counts
+
+
+def calculate_soft_drop(
+    all_splittings: substructure_methods.JetSplittingArray,
+    restricted_splittings_indices: UprootArray[int],
+    z_cutoff: float,
+) -> Tuple[np.ndarray, UprootArray[int]]:
+    """
+
+    """
+    # TODO: Move to the splittings object.
+    # Start with the origin (NOTE: the relevant origin is 0 because -1 is a dummy node to start the splittings)
+    parent_index = all_splittings.localindex.zeros_like()
+    # Initial value should be outside of the standard range.
+    values = np.ones(len(all_splittings)) * -0.05
+    indices = all_splittings.localindex.ones_like() * -1
+    while True:
+        splittings_from_parent_mask = all_splittings.parent_index == parent_index
+        splittings = all_splittings[splittings_from_parent_mask]
+        pass_cutoff_mask = splittings.kt > z_cutoff
+        splittings_indices = all_splittings.localindex[splittings_from_parent_mask]
+        splittings_indices_needed_to_be_the_same_shape = restricted_splittings_indices.ones_like() * splittings_indices
+        restricted_mask = splittings_indices_needed_to_be_the_same_shape == restricted_splittings_indices
+        values[pass_cutoff_mask & restricted_mask] = splittings.z
+
+        parent_index = all_splittings.localindex[splittings.splittings_from_parent_mask].parent_index
+
+    return values, indices
 
 
 def calculate_grooming_methods(
@@ -126,27 +193,28 @@ def calculate_grooming_methods(
 ) -> Dict[str, np.ndarray]:
     # Setup
     # TODO: Do this more cleanly.
-    (
-        inclusive_func,
-        dynamical_z_func,
-        dynamical_kt_func,
-        dynamical_time_func,
-        leading_kt_func,
-        leading_kt_hard_cutoff_func,
-    ) = analyze_tree._define_calculation_funcs(dataset)
+    # (
+    #    inclusive_func,
+    #    dynamical_z_func,
+    #    dynamical_kt_func,
+    #    dynamical_time_func,
+    #    leading_kt_func,
+    #    leading_kt_hard_cutoff_func,
+    # ) = analyze_tree._define_calculation_funcs(dataset)
+    functions = _define_calculation_funcs(dataset)
 
-    func_map = {
-        "dynamical_z": dynamical_z_func,
-        "dynamical_kt": dynamical_kt_func,
-        "dynamical_time": dynamical_time_func,
-        "leading_kt": leading_kt_func,
-        "leading_kt_z_cut_02": leading_kt_hard_cutoff_func,
-    }
+    # func_map = {
+    #    "dynamical_z": dynamical_z_func,
+    #    "dynamical_kt": dynamical_kt_func,
+    #    "dynamical_time": dynamical_time_func,
+    #    "leading_kt": leading_kt_func,
+    #    "leading_kt_z_cut_02": leading_kt_hard_cutoff_func,
+    # }
 
     # Extract the relevant branches.
     results = {}
     results[f"{prefix}_jet_pt"] = jets.jet_pt
-    for name, func in func_map.items():
+    for name, func in functions.items():
         values, indices = func(splittings)
         groomed_splittings = splittings[indices]
         splitting_number = calculate_splitting_number(
@@ -155,6 +223,9 @@ def calculate_grooming_methods(
             restricted_splittings_indices=splittings_indices,
         )
 
+        # import IPython; IPython.embed()
+
+        # TODO: Subjet matching ***per grooming method***.
         grooming_result = GroomingResultForTree(
             grooming_method=name,
             delta_R=groomed_splittings.delta_R.pad(1).fillna(-0.05).flatten(),
@@ -184,7 +255,12 @@ def calculate_and_skim_embedding(tree: data_manager.Tree, dataset: analysis_obje
     iterative_splittings = True
     iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
     # TODO: Maybe convert to hdf5? But maybe not because of compression?
-    output_filename = f"{tree.filename}_{iterative_splittings_label}_splittings.root"
+    output_filename = f"{tree.filename.with_suffix('')}_{iterative_splittings_label}_splittings.root"
+
+    train_number = tree.filename.parent.name
+    analysis_settings = cast(analysis_objects.PtHardAnalysisSettings, dataset.settings)
+    pt_hard_bin = analysis_settings.train_number_to_pt_hard_bin[int(train_number)]
+    scale_factor = analysis_settings.scale_factors[pt_hard_bin]
 
     # Actual setup.
     logger.info(f"Skimming tree from file {tree.filename}")
@@ -204,12 +280,8 @@ def calculate_and_skim_embedding(tree: data_manager.Tree, dataset: analysis_obje
     # as the leading jet in the true (which would be good - we've probably found the right jet).
     mask = mask & (true_jets.constituents.max_pt >= hybrid_jets.constituents.max_pt)
 
-    # TODO: Scale factor!!
-
     grooming_results = {}
-    # branches = {}
-    # for prefix in prefixes:
-    #    branches_for_prefix(prefix=prefix, grooming_methods=grooming_methods)
+    grooming_results["scale_factor"] = np.ones_like(true_jets.jet_pt[mask]) * scale_factor
 
     # Then restrict our jets.
     for prefix, jets in zip(prefixes, all_jets):
@@ -252,12 +324,15 @@ if __name__ == "__main__":
 
     # Setup dataset
     dm = data_manager.IterateTrees(
-        filenames=[Path("trains/embedPythia/5536/AnalysisResults.18q.1.chunk1.root")],
+        # filenames=[Path("trains/embedPythia/5536/AnalysisResults.18q.1.chunk1.root")],
+        filenames=dataset.filenames,
         tree_name=dataset.tree_name,
         # Mypy is getting confused by Sequence[str] because str is an iterable, so we ignore the type...
         branches=dataset.branches,  # type: ignore
     )
     logger.info("Setup complete. Beginning processing of trees.")
 
-    for tree in dm:
-        calculate_and_skim_embedding(tree=tree, dataset=dataset)
+    progress_manager = enlighten.get_manager()
+    with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
+        for tree in tree_counter(dm):
+            calculate_and_skim_embedding(tree=tree, dataset=dataset)
