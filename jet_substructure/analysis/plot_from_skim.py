@@ -48,21 +48,39 @@ def _plot_residual(
     matching_types: Sequence[str],
     plot_config: PlotConfig,
     output_dir: Path,
+    min_hybrid_kt: float = 0,
 ) -> None:
+    """
+
+    Note:
+        The min_hybrid_kt is only meaningful for the kt residual because it has the kt axis...
+
+    """
     fig, ax = plt.subplots(figsize=(8, 6))
     fig_simplified, ax_simplified = plt.subplots(figsize=(8, 6))
 
     for matching_type in matching_types:
-        logger.debug(f"Plotting {label} residual for {grooming_method}, {matching_type}")
+        logger.debug(
+            f"Plotting {label} residual for {grooming_method}, {matching_type}, min_hybrid_kt: {min_hybrid_kt}"
+        )
 
         matches_label = " ".join(matching_type.split("_")).capitalize()
         bh_hist = hists[f"{grooming_method}_hybrid_det_{label}_residuals_matching_type_{matching_type}"]
         h = binned_data.BinnedData.from_existing_data(bh_hist)
 
+        selection_list = [slice(None), slice(None), slice(None)]
+        if min_hybrid_kt:
+            # Apply a hybrid kt cut.
+            selection_list[0] = slice(h.axes[0].find_bin(min_hybrid_kt), None,)
+        # Must be a tuple to be used for indexing, but need a list for reassignment.
+        selection = tuple(selection_list)
+
         # Axes: hybrid, det, residual
         # For example, for jet pt, it's: Axes: hybrid_level_jet_pt, det_level_jet_pt, residual
         h_residual = binned_data.BinnedData(
-            axes=[h.axes[2]], values=np.sum(h.values, axis=(0, 1)), variances=np.sum(h.variances, axis=(0, 1)),
+            axes=[h.axes[2]],
+            values=np.sum(h.values[selection], axis=(0, 1)),
+            variances=np.sum(h.variances[selection], axis=(0, 1)),
         )
 
         # Normalize
@@ -99,6 +117,8 @@ def _plot_residual(
         text = "Iterative splittings"
         text += "\n" + f"${helpers.RangeSelector(40, 120).display_str(label='hybrid')}$"
         text += "\n" + " ".join(grooming_method.split("_")).capitalize()
+        if min_hybrid_kt:
+            text += "\n" + fr"$k_{{\text{{T}}}}^{{\text{{hybrid}}}} > {min_hybrid_kt}\:\text{{GeV}}/c$"
         a.text(
             0.97,
             0.97,
@@ -126,11 +146,12 @@ def _plot_residual(
         )
 
     # Store and cleanup
-    fig.savefig(output_dir / f"{plot_config.name}_iterative_splittings_{grooming_method}_matching.pdf")
+    filename = f"{plot_config.name}_iterative_splittings_{grooming_method}"
+    if min_hybrid_kt:
+        filename += f"_min_hybrid_kt_{min_hybrid_kt}"
+    fig.savefig(output_dir / f"{filename}_matching.pdf")
     plt.close(fig)
-    fig_simplified.savefig(
-        output_dir / f"{plot_config.name}_iterative_splittings_{grooming_method}_matching_simplified.pdf"
-    )
+    fig_simplified.savefig(output_dir / f"{filename}_matching_simplified.pdf")
     plt.close(fig_simplified)
 
 
@@ -161,4 +182,17 @@ def plot_residuals(
                 y_label="",
             ),
             output_dir=output_dir,
+        )
+        _plot_residual(
+            hists=hists,
+            label="kt",
+            grooming_method=grooming_method,
+            matching_types=matching_types,
+            plot_config=PlotConfig(
+                name="kt_residual_hybrid_detector",
+                x_label=r"$(k_{\text{T}}^{\text{hybrid}} - k_{\text{T}}^{\text{det}}) / k_{\text{T}}^{\text{det}}$",
+                y_label="",
+            ),
+            output_dir=output_dir,
+            min_hybrid_kt=5,
         )
