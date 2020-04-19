@@ -11,6 +11,7 @@ import functools
 import logging
 import typing
 from typing import TYPE_CHECKING, Callable, Optional, Tuple, Type, TypeVar, cast
+from typing_extensions import Final
 
 import attr
 import awkward as ak
@@ -24,6 +25,10 @@ logger = logging.getLogger(__name__)
 
 # Typing helpers
 T = TypeVar("T")
+
+
+# Constants
+UNFILLED_VALUE: Final[float] = -0.005
 
 
 @typing.overload
@@ -53,16 +58,16 @@ def find_leading(values: UprootArray[T]) -> Tuple[np.ndarray, UprootArray[int]]:
     Used for dynamical grooming, hardest kt, etc.
 
     In the case that we don't find a viable max (ie. because there was no splitting), we pad
-    to one entry and fill -0.05 before flattening. The corresponding index will be empty for
-    that event. This way, we can just fill all values, regardless of whether the splittings
-    were selected, and we automatically get the right normalization (as long as those values
-    are included in the hist...).
+    to one entry and fill -0.01 (our UNFILLED_VALUE) before flattening. The corresponding index
+    will be empty for that event. This way, we can just fill all values, regardless of whether
+    the splittings were selected, and we automatically get the right normalization (as long as
+    those values are included in the hist...).
 
     Returns:
         Leading value, index of value.
     """
     arg_max = values.argmax()
-    return values[arg_max].pad(1).fillna(-0.05).flatten(), arg_max
+    return values[arg_max].pad(1).fillna(UNFILLED_VALUE).flatten(), arg_max
 
 
 class ArrayMethods(ak.Methods):  # type: ignore
@@ -749,6 +754,10 @@ class JetSplittingArrayMethods(ArrayMethods):
     def soft_drop(self, z_cutoff: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
         """ Calculate soft drop of the splittings.
 
+        Note:
+            z_g is filled with the `UNFILLED_VALUE` if a splitting wasn't selected. In that case, there is
+            no index (ie. an emptry JaggedArray entry), and n_sd = 0.
+
         Args:
             z_cutoff: Minimum z for Soft Drop.
         Returns:
@@ -757,7 +766,7 @@ class JetSplittingArrayMethods(ArrayMethods):
         z_cutoff_mask = self.z > z_cutoff
         # We use :1 because this maintains the jagged structure. That way, we can apply it to initial arrays.
         z_index = self.z.localindex[z_cutoff_mask][:, :1]
-        z_g = self.z[z_index].pad(1).fillna(-0.05).flatten()
+        z_g = self.z[z_index].pad(1).fillna(UNFILLED_VALUE).flatten()
         n_sd = self.z[z_cutoff_mask].count_nonzero()
 
         return z_g, n_sd, z_index

@@ -403,12 +403,13 @@ def calculate_and_skim_embedding(
                 restricted_splittings_indices=calculation.input_splittings_indices,
             )
 
-            # We pad -0.05 if any calculations that don't find a splitting.
+            # We pad with the UNFILLED_VALUE constant if any calculations that don't
+            # find a splitting.
             grooming_result = GroomingResultForTree(
                 grooming_method=func_name,
-                delta_R=groomed_splittings.delta_R.pad(1).fillna(-0.05).flatten(),
-                z=groomed_splittings.z.pad(1).fillna(-0.05).flatten(),
-                kt=groomed_splittings.kt.pad(1).fillna(-0.05).flatten(),
+                delta_R=groomed_splittings.delta_R.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
+                z=groomed_splittings.z.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
+                kt=groomed_splittings.kt.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
                 # Splitting number is already flattened.
                 n=splitting_number,
             )
