@@ -252,9 +252,11 @@ def expand_wildcards_in_filenames(paths: Sequence[Path]) -> List[Path]:
     return_paths: List[Path] = []
     for path in paths:
         p = str(path)
-        if "*" in str(p):
+        if "*" in p:
             # Glob all associated filenames.
-            return_paths.extend(list(Path(path.parent).glob(path.name)))
+            # NOTE: This assumes that the paths are relative to the execution directory. But that's
+            #       almost always the case.
+            return_paths.extend(list(Path(".").glob(p)))
         else:
             return_paths.append(path)
 
