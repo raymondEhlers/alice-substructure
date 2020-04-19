@@ -320,7 +320,9 @@ def calculate_and_skim_embedding(
     prefixes = ["matched", "detLevel", "data"]
     iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
     # TODO: Maybe convert to hdf5? But maybe not because of compression?
-    output_filename = f"{tree.filename.with_suffix('')}_{iterative_splittings_label}_splittings.root"
+    output_dir = tree.filename.parent / "skim"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_filename = output_dir / f"{tree.filename.stem}_{iterative_splittings_label}_splittings.root"
 
     train_number = tree.filename.parent.name
     analysis_settings = cast(analysis_objects.PtHardAnalysisSettings, dataset.settings)
@@ -451,6 +453,7 @@ def calculate_and_skim_embedding(
             grooming_results[f"{func_name}_hybrid_detector_matching_{label}"] = output
 
     branches = {k: v.dtype for k, v in grooming_results.items()}
+    logger.info(f"Writing skim to {output_filename}")
     with uproot.recreate(output_filename) as output_file:
         output_file["tree"] = uproot.newtree(branches)
         # Write all of the calculations
@@ -463,7 +466,7 @@ def calculate_and_skim_embedding(
 if __name__ == "__main__":
     helpers.setup_logging()
     # Options
-    iterative_splittings = True
+    iterative_splittings = False
     number_of_cores = 2
 
     # Setup
