@@ -124,8 +124,16 @@ class GroomingResultForTree:
 #    return branches
 
 
+def _soft_drop_wrapper(
+    splittings: substructure_methods.JetSplittingArray, z_cutoff: float
+) -> Tuple[UprootArray[float], UprootArray[int]]:
+    """ Wrap SD calculation to drop n_sd so it fits in the same ouput as the other calculations. """
+    values, n_sd, indices = splittings.soft_drop(z_cutoff=z_cutoff)
+    return values, indices
+
+
 def _define_calculation_funcs(
-    dataset: analysis_objects.Dataset,
+    dataset: analysis_objects.Dataset, iterative_splittings: bool,
 ) -> Dict[str, functools.partial[Tuple[UprootArray[float], UprootArray[int]]]]:
     """ Define the calculation functions of interest.
 
@@ -149,13 +157,12 @@ def _define_calculation_funcs(
         "leading_kt": functools.partial(substructure_methods.JetSplittingArray.leading_kt,),
         "leading_kt_z_cut_02": functools.partial(substructure_methods.JetSplittingArray.leading_kt, z_cutoff=0.2),
         "leading_kt_z_cut_04": functools.partial(substructure_methods.JetSplittingArray.leading_kt, z_cutoff=0.4),
-        # "soft_drop_z_cut_02": functools.partial(
-        #    substructure_methods.JetSplittingArray.soft_drop, z_cutoff=0.2
-        # ),
-        # "soft_drop_z_cut_04": functools.partial(
-        #    substructure_methods.JetSplittingArray.soft_drop, z_cutoff=0.4
-        # ),
     }
+    # TODO: This currently only works for iterative splittings...
+    #       Calculating recursive is way harder in any array-like manner.
+    if iterative_splittings:
+        functions["soft_drop_z_cut_02"] = functools.partial(_soft_drop_wrapper, z_cutoff=0.2)
+        functions["soft_drop_z_cut_04"] = functools.partial(_soft_drop_wrapper, z_cutoff=0.4)
     return functions
 
 
@@ -221,88 +228,50 @@ def calculate_splitting_number(
     return counts
 
 
-def calculate_soft_drop(
-    all_splittings: substructure_methods.JetSplittingArray,
-    restricted_splittings_indices: UprootArray[int],
-    z_cutoff: float,
-) -> Tuple[np.ndarray, UprootArray[int]]:
-    """
+# def calculate_soft_drop(
+#    all_splittings: substructure_methods.JetSplittingArray,
+#    restricted_splittings_indices: UprootArray[int],
+#    z_cutoff: float,
+# ) -> Tuple[np.ndarray, UprootArray[int]]:
+#    """
+#
+#    """
+#    # TODO: Move to the splittings object.
+#    # Start with the origin (NOTE: the relevant origin is 0 because -1 is a dummy node to start the splittings)
+#    parent_index = all_splittings.localindex.zeros_like()
+#    # Initial value should be outside of the standard range.
+#    values = np.ones(len(all_splittings)) * substructure_methods.UNFILLED_VALUE
+#    indices = all_splittings.localindex.ones_like() * -1
+#    # The idea here is to iterate over the generations, starting at the origin.
+#    while True:
+#        # Select splittings that we ca
+#        splittings_from_parent_mask = (all_splittings.parent_index == parent_index)
+#        splittings = all_splittings[splittings_from_parent_mask]
+#        pass_cutoff_mask = splittings.kt > z_cutoff
+#
+#        splittings_indices = all_splittings.localindex[splittings_from_parent_mask]
+#        splittings_indices_needed_to_be_the_same_shape = restricted_splittings_indices.ones_like() * splittings_indices
+#        restricted_mask = splittings_indices_needed_to_be_the_same_shape == restricted_splittings_indices
+#        values[pass_cutoff_mask & restricted_mask] = splittings.z
+#
+#        parent_index = all_splittings.localindex[splittings.splittings_from_parent_mask].parent_index
+#
+#    return values, indices
 
-    """
-    # TODO: Move to the splittings object.
-    # Start with the origin (NOTE: the relevant origin is 0 because -1 is a dummy node to start the splittings)
-    parent_index = all_splittings.localindex.zeros_like()
-    # Initial value should be outside of the standard range.
-    values = np.ones(len(all_splittings)) * -0.05
-    indices = all_splittings.localindex.ones_like() * -1
-    while True:
-        splittings_from_parent_mask = all_splittings.parent_index == parent_index
-        splittings = all_splittings[splittings_from_parent_mask]
-        pass_cutoff_mask = splittings.kt > z_cutoff
-        splittings_indices = all_splittings.localindex[splittings_from_parent_mask]
-        splittings_indices_needed_to_be_the_same_shape = restricted_splittings_indices.ones_like() * splittings_indices
-        restricted_mask = splittings_indices_needed_to_be_the_same_shape == restricted_splittings_indices
-        values[pass_cutoff_mask & restricted_mask] = splittings.z
-
-        parent_index = all_splittings.localindex[splittings.splittings_from_parent_mask].parent_index
-
-    return values, indices
-
-
-def calculate_grooming_methods(
-    dataset: analysis_objects.Dataset,
-    prefix: str,
-    jets: substructure_methods.SubstructureJetArray,
-    splittings: substructure_methods.JetSplittingArray,
-    splittings_indices: UprootArray[int],
-) -> Dict[str, np.ndarray]:
-    # Setup
-    # TODO: Do this more cleanly.
-    # (
-    #    inclusive_func,
-    #    dynamical_z_func,
-    #    dynamical_kt_func,
-    #    dynamical_time_func,
-    #    leading_kt_func,
-    #    leading_kt_hard_cutoff_func,
-    # ) = analyze_tree._define_calculation_funcs(dataset)
-    functions = _define_calculation_funcs(dataset)
-
-    # func_map = {
-    #    "dynamical_z": dynamical_z_func,
-    #    "dynamical_kt": dynamical_kt_func,
-    #    "dynamical_time": dynamical_time_func,
-    #    "leading_kt": leading_kt_func,
-    #    "leading_kt_z_cut_02": leading_kt_hard_cutoff_func,
-    # }
-
-    # Extract the relevant branches.
-    results = {}
-    results[f"{prefix}_jet_pt"] = jets.jet_pt
-    for name, func in functions.items():
-        values, indices = func(splittings)
-        groomed_splittings = splittings[indices]
-        splitting_number = calculate_splitting_number(
-            all_splittings=jets.splittings,
-            selected_splittings=groomed_splittings,
-            restricted_splittings_indices=splittings_indices,
-        )
-
-        # import IPython; IPython.embed()
-
-        # TODO: Subjet matching ***per grooming method***.
-        grooming_result = GroomingResultForTree(
-            grooming_method=name,
-            delta_R=groomed_splittings.delta_R.pad(1).fillna(-0.05).flatten(),
-            z=groomed_splittings.z.pad(1).fillna(-0.05).flatten(),
-            kt=groomed_splittings.kt.pad(1).fillna(-0.05).flatten(),
-            # Splitting number is already flattened.
-            n=splitting_number,
-        )
-
-        results.update(grooming_result.asdict(prefix=prefix))
-
-    return results
+# def calculate_soft_drop(
+#    all_splittings: substructure_methods.JetSplittingArray,
+#    restricted_splittings_indices: UprootArray[int],
+#    z_cutoff: float,
+# ) -> Tuple[np.ndarray, UprootArray[int]]:
+#    # Start with the origin (NOTE: the relevant origin is 0 because -1 is a dummy node to start the splittings)
+#    parent_index = all_splittings.localindex.zeros_like()
+#    # Initial value should be outside of the standard range.
+#    values = np.ones(len(all_splittings)) * substructure_methods.UNFILLED_VALUE
+#    indices = all_splittings.localindex.ones_like() * -2
+#    # The idea is to step through the generations of splittings.
+#    #while True:
+#    #    splittings_contributing_to_parent =
+#    #    ...
 
 
 def calculate_and_skim_embedding(
@@ -370,7 +339,7 @@ def calculate_and_skim_embedding(
     grooming_results["jet_pt_hybrid"] = masked_hybrid_jets.jet_pt
 
     # Perform our calculations.
-    functions = _define_calculation_funcs(dataset)
+    functions = _define_calculation_funcs(dataset, iterative_splittings=iterative_splittings)
     for func_name, func in functions.items():
         true_jets_calculation = Calculation(
             masked_true_jets,
@@ -467,7 +436,7 @@ def calculate_and_skim_embedding(
 if __name__ == "__main__":
     helpers.setup_logging()
     # Options
-    iterative_splittings = False
+    iterative_splittings = True
     number_of_cores = 2
 
     # Setup
