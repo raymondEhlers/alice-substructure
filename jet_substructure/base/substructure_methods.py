@@ -757,7 +757,7 @@ class JetSplittingArrayMethods(ArrayMethods):
         z_cutoff_mask = self.z > z_cutoff
         # We use :1 because this maintains the jagged structure. That way, we can apply it to initial arrays.
         z_index = self.z.localindex[z_cutoff_mask][:, :1]
-        z_g = self.z[z_index].flatten()
+        z_g = self.z[z_index].pad(1).fillna(-0.05).flatten()
         n_sd = self.z[z_cutoff_mask].count_nonzero()
 
         return z_g, n_sd, z_index
