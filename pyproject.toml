@@ -23,7 +23,7 @@ boost_histogram = "^0.6.2"
 pachyderm = {path = "../pachyderm"}
 h5py = "^2.10.0"
 coloredlogs = "^14.0"
-dask = {extras = ["array"], version = "^2.11.0"}
+dask = {extras = ["dataframe"], version = "^2.14.0"}
 enlighten = "^1.4.0"
 pathos = "^0.2.5"
 
@@ -45,7 +45,7 @@ networkx = "^2.4"
 
 [tool.isort]
 known_standard_library = ["setuptools", "typing_extensions"]
-known_third_party = ["IPython", "ROOT", "attr", "awkward", "boost_histogram", "enlighten", "h5py", "matplotlib", "numpy", "pachyderm", "pathos", "uproot", "uproot_methods"]
+known_third_party = ["IPython", "ROOT", "attr", "awkward", "boost_histogram", "enlighten", "h5py", "matplotlib", "numpy", "pachyderm", "pandas", "pathos", "uproot", "uproot_methods"]
 known_first_party = []
 line_length = 120
 # Meaning a grouped grid of imports
