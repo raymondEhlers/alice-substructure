@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Sequence
 
+import attr
 import boost_histogram as bh
 import enlighten
 import IPython
@@ -59,8 +60,17 @@ def dask_df_from_delayed() -> None:
     IPython.start_ipython(user_ns=locals())
 
 
+@attr.s
+class ResponseType:
+    measured_like: str = attr.ib()
+    generator_like: str = attr.ib()
+
+    def __str__(self) -> str:
+        return f"{self.measured_like}_{self.generator_like}"
+
+
 # def df_from_file(filenames: Sequence[Path], branches: Sequence[str]):
-def df_from_file() -> None:
+def df_from_file() -> None:  # noqa: 901
     # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
     from pathlib import Path  # noqa: F401
 
@@ -96,6 +106,11 @@ def df_from_file() -> None:
     ]
 
     # Define hists.
+    response_types = [
+        ResponseType(measured_like="hybrid", generator_like="det_level"),
+        ResponseType(measured_like="hybrid", generator_like="true"),
+        ResponseType(measured_like="det_level", generator_like="true"),
+    ]
     _matching_name_to_axis_value: Dict[str, int] = {
         "all": 0,
         "pure": 1,
@@ -123,22 +138,28 @@ def df_from_file() -> None:
                 bh.axis.Regular(80, -2, 2),
                 storage=bh.storage.Weight(),
             )
-            # Axes: hybrid_pt, hybrid_kt, det_level_pt, det_level_kt, residual
-            hists[f"{grooming_method}_hybrid_det_kt_response_matching_type_{matching_type}"] = bh.Histogram(
-                bh.axis.Regular(28, 0, 140),
-                bh.axis.Regular(25, 0, 25),
-                bh.axis.Regular(28, 0, 140),
-                bh.axis.Regular(25, 0, 25),
-                storage=bh.storage.Weight(),
-            )
-            # Axes: hybrid_pt, hybrid_R, det_level_pt, det_level_R, residual
-            hists[f"{grooming_method}_hybrid_det_delta_R_response_matching_type_{matching_type}"] = bh.Histogram(
-                bh.axis.Regular(28, 0, 140),
-                bh.axis.Regular(20, 0, 0.4),
-                bh.axis.Regular(28, 0, 140),
-                bh.axis.Regular(20, 0, 0.4),
-                storage=bh.storage.Weight(),
-            )
+            # Example axes: hybrid_pt, hybrid_kt, det_level_pt, det_level_kt
+            # Generally: measured_pt, measured_kt, generator_pt, generator_kt
+            for response_type in response_types:
+                hists[
+                    f"{grooming_method}_{str(response_type)}_kt_response_matching_type_{matching_type}"
+                ] = bh.Histogram(
+                    bh.axis.Regular(28, 0, 140),
+                    bh.axis.Regular(25, 0, 25),
+                    bh.axis.Regular(28, 0, 140),
+                    bh.axis.Regular(25, 0, 25),
+                    storage=bh.storage.Weight(),
+                )
+                # Axes: measured_pt, measured_R, generator_pt, generator_R
+                hists[
+                    f"{grooming_method}_{str(response_type)}_delta_R_response_matching_type_{matching_type}"
+                ] = bh.Histogram(
+                    bh.axis.Regular(28, 0, 140),
+                    bh.axis.Regular(20, 0, 0.4),
+                    bh.axis.Regular(28, 0, 140),
+                    bh.axis.Regular(20, 0, 0.4),
+                    storage=bh.storage.Weight(),
+                )
 
         # Residual mean
         # We normalize the width by the true jet pt afterwards, so we have to collect it separately.
@@ -265,22 +286,25 @@ def df_from_file() -> None:
                         ).to_numpy(),
                         weight=masked_df["scale_factor"].to_numpy(),
                     )
-                    # Axes: hybrid_pt, hybrid_kt, det_level_pt, det_level_kt
-                    hists[f"{grooming_method}_hybrid_det_kt_response_matching_type_{matching_type}"].fill(
-                        masked_df["jet_pt_hybrid"].to_numpy(),
-                        masked_df[f"{grooming_method}_hybrid_kt"].to_numpy(),
-                        masked_df["jet_pt_det_level"].to_numpy(),
-                        masked_df[f"{grooming_method}_det_level_kt"].to_numpy(),
-                        weight=masked_df["scale_factor"].to_numpy(),
-                    )
-                    # Axes: hybrid_pt, hybrid_R, det_level_pt, det_level_R, residual
-                    hists[f"{grooming_method}_hybrid_det_delta_R_response_matching_type_{matching_type}"].fill(
-                        masked_df["jet_pt_hybrid"].to_numpy(),
-                        masked_df[f"{grooming_method}_hybrid_delta_R"].to_numpy(),
-                        masked_df["jet_pt_det_level"].to_numpy(),
-                        masked_df[f"{grooming_method}_det_level_delta_R"].to_numpy(),
-                        weight=masked_df["scale_factor"].to_numpy(),
-                    )
+                    for response_type in response_types:
+                        # Axes: measured_like_pt, measured_like_kt, generator_like_pt, generator_like_kt
+                        hists[f"{grooming_method}_{str(response_type)}_kt_response_matching_type_{matching_type}"].fill(
+                            masked_df[f"jet_pt_{response_type.measured_like}"].to_numpy(),
+                            masked_df[f"{grooming_method}_{response_type.measured_like}_kt"].to_numpy(),
+                            masked_df[f"jet_pt_{response_type.generator_like}"].to_numpy(),
+                            masked_df[f"{grooming_method}_{response_type.generator_like}_kt"].to_numpy(),
+                            weight=masked_df["scale_factor"].to_numpy(),
+                        )
+                        # Axes: measured_like_pt, measured_like_R, generator_like_pt, generator_like_R
+                        hists[
+                            f"{grooming_method}_{str(response_type)}_delta_R_response_matching_type_{matching_type}"
+                        ].fill(
+                            masked_df[f"jet_pt_{response_type.measured_like}"].to_numpy(),
+                            masked_df[f"{grooming_method}_{response_type.measured_like}_delta_R"].to_numpy(),
+                            masked_df[f"jet_pt_{response_type.generator_like}"].to_numpy(),
+                            masked_df[f"{grooming_method}_{response_type.generator_like}_delta_R"].to_numpy(),
+                            weight=masked_df["scale_factor"].to_numpy(),
+                        )
 
     progress_manager.stop()
 
