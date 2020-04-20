@@ -1367,8 +1367,8 @@ def _plot_response(
 
         # Make the plot
         mesh = ax.pcolormesh(
-            h.axes[1].bin_edges.T,
-            h.axes[3].bin_edges.T,
+            h_proj.axes[0].bin_edges.T,
+            h_proj.axes[1].bin_edges.T,
             h_proj.values.T,
             norm=matplotlib.colors.LogNorm(**z_axis_range),
         )
