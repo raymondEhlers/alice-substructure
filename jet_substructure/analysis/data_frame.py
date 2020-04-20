@@ -61,6 +61,9 @@ def dask_df_from_delayed() -> None:
 
 # def df_from_file(filenames: Sequence[Path], branches: Sequence[str]):
 def df_from_file() -> None:
+    # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
+    from pathlib import Path  # noqa: F401
+
     path_list = data_manager._ensure_and_expand_paths(
         [
             Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings.root"),
@@ -138,33 +141,29 @@ def df_from_file() -> None:
             )
 
         # Residual mean
-        hists[f"{grooming_method}_hybrid_det_jet_pt_residual_mean"] = bh.Histogram(
-            bh.axis.Regular(25, 0, 250), bh.axis.Regular(15, 0, 150), storage=bh.storage.WeightedMean(),
-        )
-        hists[f"{grooming_method}_hybrid_true_jet_pt_residual_mean"] = bh.Histogram(
-            bh.axis.Regular(25, 0, 250), bh.axis.Regular(15, 0, 150), storage=bh.storage.WeightedMean(),
-        )
-        hists[f"{grooming_method}_det_true_jet_pt_residual_mean"] = bh.Histogram(
-            bh.axis.Regular(25, 0, 250), bh.axis.Regular(15, 0, 150), storage=bh.storage.WeightedMean(),
-        )
-        # Residual mean width
-        hists[f"{grooming_method}_hybrid_det_jet_pt_residual_width"] = bh.Histogram(
-            bh.axis.Regular(25, 0, 250), bh.axis.Regular(15, 0, 150), storage=bh.storage.WeightedMean(),
-        )
-        hists[f"{grooming_method}_hybrid_true_jet_pt_residual_width"] = bh.Histogram(
-            bh.axis.Regular(25, 0, 250), bh.axis.Regular(15, 0, 150), storage=bh.storage.WeightedMean(),
-        )
-        hists[f"{grooming_method}_det_true_jet_pt_residual_width"] = bh.Histogram(
-            bh.axis.Regular(25, 0, 250), bh.axis.Regular(15, 0, 150), storage=bh.storage.WeightedMean(),
-        )
+        # We normalize the width by the true jet pt afterwards, so we have to collect it separately.
+        # NOTE: Ideally, we'd extract both values from one profile histogram which is binned in true and
+        #       hybrid jet pt, but projecting profiles doesn't seem to work quite as expected with bh, and
+        #       it's not worth investigating further at the moment.
+        for hybrid_jet_pt_bin in [helpers.RangeSelector(40, 120), helpers.RangeSelector(20, 200)]:
+            hists[f"{grooming_method}_hybrid_det_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"] = bh.Histogram(
+                bh.axis.Regular(25, 0, 250), storage=bh.storage.WeightedMean(),
+            )
+            hists[f"{grooming_method}_hybrid_true_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"] = bh.Histogram(
+                bh.axis.Regular(25, 0, 250), storage=bh.storage.WeightedMean(),
+            )
+            hists[f"{grooming_method}_det_true_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"] = bh.Histogram(
+                bh.axis.Regular(25, 0, 250), storage=bh.storage.WeightedMean(),
+            )
         # Residual
-        hists[f"{grooming_method}_hybrid_det_jet_pt_residual"] = bh.Histogram(
+        # We intentionally don't select the hybrid jet pt range here.
+        hists[f"{grooming_method}_hybrid_det_jet_pt_residual_distribution"] = bh.Histogram(
             bh.axis.Regular(15, 0, 150), bh.axis.Regular(150, -1.5, 1.5), storage=bh.storage.Weight(),
         )
-        hists[f"{grooming_method}_hybrid_true_jet_pt_residual"] = bh.Histogram(
+        hists[f"{grooming_method}_hybrid_true_jet_pt_residual_distribution"] = bh.Histogram(
             bh.axis.Regular(15, 0, 150), bh.axis.Regular(150, -1.5, 1.5), storage=bh.storage.Weight(),
         )
-        hists[f"{grooming_method}_det_true_jet_pt_residual"] = bh.Histogram(
+        hists[f"{grooming_method}_det_true_jet_pt_residual_distribution"] = bh.Histogram(
             bh.axis.Regular(15, 0, 150), bh.axis.Regular(150, -1.5, 1.5), storage=bh.storage.Weight(),
         )
 
@@ -194,67 +193,51 @@ def df_from_file() -> None:
 
                 # Residuals (without caring about matching types, so we just take all)
                 mask = matching_selections["all"]
-                masked_df = df[mask]
-                # Residual mean
-                hists[f"{grooming_method}_hybrid_det_jet_pt_residual_mean"].fill(
-                    masked_df["jet_pt_true"].to_numpy(),
-                    masked_df["jet_pt_hybrid"].to_numpy(),
-                    sample=(
-                        (masked_df["jet_pt_hybrid"] - masked_df["jet_pt_det_level"]) / masked_df["jet_pt_det_level"]
-                    ).to_numpy(),
-                    weight=masked_df["scale_factor"].to_numpy(),
-                )
-                hists[f"{grooming_method}_hybrid_true_jet_pt_residual_mean"].fill(
-                    masked_df["jet_pt_true"].to_numpy(),
-                    masked_df["jet_pt_hybrid"].to_numpy(),
-                    sample=(
-                        (masked_df["jet_pt_hybrid"] - masked_df["jet_pt_true"]) / masked_df["jet_pt_true"]
-                    ).to_numpy(),
-                    weight=masked_df["scale_factor"].to_numpy(),
-                )
-                hists[f"{grooming_method}_det_true_jet_pt_residual_mean"].fill(
-                    masked_df["jet_pt_true"].to_numpy(),
-                    masked_df["jet_pt_hybrid"].to_numpy(),
-                    sample=(
-                        (masked_df["jet_pt_det_level"] - masked_df["jet_pt_true"]) / masked_df["jet_pt_true"]
-                    ).to_numpy(),
-                    weight=masked_df["scale_factor"].to_numpy(),
-                )
-                # Residual width
-                hists[f"{grooming_method}_hybrid_det_jet_pt_residual_width"].fill(
-                    masked_df["jet_pt_true"].to_numpy(),
-                    masked_df["jet_pt_hybrid"].to_numpy(),
-                    sample=(masked_df["jet_pt_hybrid"] - masked_df["jet_pt_det_level"]).to_numpy(),
-                    weight=masked_df["scale_factor"].to_numpy(),
-                )
-                hists[f"{grooming_method}_hybrid_true_jet_pt_residual_width"].fill(
-                    masked_df["jet_pt_true"].to_numpy(),
-                    masked_df["jet_pt_hybrid"].to_numpy(),
-                    sample=(masked_df["jet_pt_hybrid"] - masked_df["jet_pt_true"]).to_numpy(),
-                    weight=masked_df["scale_factor"].to_numpy(),
-                )
-                hists[f"{grooming_method}_det_true_jet_pt_residual_width"].fill(
-                    masked_df["jet_pt_true"].to_numpy(),
-                    masked_df["jet_pt_hybrid"].to_numpy(),
-                    sample=(masked_df["jet_pt_det_level"] - masked_df["jet_pt_true"]).to_numpy(),
-                    weight=masked_df["scale_factor"].to_numpy(),
-                )
+                for temp_hybrid_jet_pt_bin in [helpers.RangeSelector(40, 120), helpers.RangeSelector(20, 200)]:
+                    # NOTE: Add temp_ onto the names to avoid interfering with the general hybrid jet pt mask
+                    #       which is used all over the place.
+                    temp_hybrid_jet_pt_mask = temp_hybrid_jet_pt_bin.mask_array(df["jet_pt_hybrid"])
+                    masked_df = df[mask & temp_hybrid_jet_pt_mask]
+                    # Residual mean and width
+                    # We store the unnnormalized residual so we can use this profile hist to extract both the
+                    # mean and the width. Note that it's slightly less accurate because then normalize by the bin center
+                    # rather than the exact true jet pt per fill, but it's close enough for our purposes.
+                    hists[
+                        f"{grooming_method}_hybrid_det_jet_pt_residual_mean_hybrid_{str(temp_hybrid_jet_pt_bin)}"
+                    ].fill(
+                        masked_df["jet_pt_true"].to_numpy(),
+                        sample=(masked_df["jet_pt_hybrid"] - masked_df["jet_pt_det_level"]).to_numpy(),
+                        weight=masked_df["scale_factor"].to_numpy(),
+                    )
+                    hists[
+                        f"{grooming_method}_hybrid_true_jet_pt_residual_mean_hybrid_{str(temp_hybrid_jet_pt_bin)}"
+                    ].fill(
+                        masked_df["jet_pt_true"].to_numpy(),
+                        sample=(masked_df["jet_pt_hybrid"] - masked_df["jet_pt_true"]).to_numpy(),
+                        weight=masked_df["scale_factor"].to_numpy(),
+                    )
+                    hists[f"{grooming_method}_det_true_jet_pt_residual_mean_hybrid_{str(temp_hybrid_jet_pt_bin)}"].fill(
+                        masked_df["jet_pt_true"].to_numpy(),
+                        sample=(masked_df["jet_pt_det_level"] - masked_df["jet_pt_true"]).to_numpy(),
+                        weight=masked_df["scale_factor"].to_numpy(),
+                    )
                 # Full residual as a function of true pt. We can select the true jet pt range when plotting.
-                # NOTE: We intentionally didn't apply a hybrid jet pt cut.
+                # NOTE: We intentionally didn't apply a hybrid jet pt cut. And our true jet pt selection will
+                #       be applied when plotting.
                 masked_df = df[mask]
-                hists[f"{grooming_method}_hybrid_det_jet_pt_residual"].fill(
+                hists[f"{grooming_method}_hybrid_det_jet_pt_residual_distribution"].fill(
                     masked_df["jet_pt_true"].to_numpy(),
                     (
                         (masked_df["jet_pt_hybrid"] - masked_df["jet_pt_det_level"]) / masked_df["jet_pt_det_level"]
                     ).to_numpy(),
                     weight=masked_df["scale_factor"].to_numpy(),
                 )
-                hists[f"{grooming_method}_hybrid_true_jet_pt_residual"].fill(
+                hists[f"{grooming_method}_hybrid_true_jet_pt_residual_distribution"].fill(
                     masked_df["jet_pt_true"].to_numpy(),
                     ((masked_df["jet_pt_hybrid"] - masked_df["jet_pt_true"]) / masked_df["jet_pt_true"]).to_numpy(),
                     weight=masked_df["scale_factor"].to_numpy(),
                 )
-                hists[f"{grooming_method}_det_true_jet_pt_residual"].fill(
+                hists[f"{grooming_method}_det_true_jet_pt_residual_distribution"].fill(
                     masked_df["jet_pt_true"].to_numpy(),
                     ((masked_df["jet_pt_det_level"] - masked_df["jet_pt_true"]) / masked_df["jet_pt_true"]).to_numpy(),
                     weight=masked_df["scale_factor"].to_numpy(),

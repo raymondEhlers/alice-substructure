@@ -76,7 +76,7 @@ def _plot_residual_by_matching_type(
         selection = tuple(selection_list)
 
         # Axes: hybrid, det, residual
-        # For example, for jet pt, it's: Axes: hybrid_level_jet_pt, det_level_jet_pt, residual
+        # For example, for jet pt, it's: Axes: hybrid_jet_pt, det_level_jet_pt, residual
         h_residual = binned_data.BinnedData(
             axes=[h.axes[2]],
             values=np.sum(h.values[selection], axis=(0, 1)),
@@ -199,25 +199,36 @@ def plot_residuals_by_matching_type(
 
 
 def _plot_residual_mean_and_width(
-    hists: Dict[str, bh.Histogram], grooming_method: str, plot_config: PlotConfig, output_dir: Path,
+    hists: Dict[str, bh.Histogram],
+    grooming_method: str,
+    hybrid_jet_pt_bin: helpers.RangeSelector,
+    plot_config: PlotConfig,
+    output_dir: Path,
 ) -> None:
-    logger.debug(f"Plotting jet pt residual mean and width for {grooming_method}")
+    logger.debug(
+        f"Plotting jet pt residual mean and width for {grooming_method} with hybrid jet pt: {hybrid_jet_pt_bin}"
+    )
 
     fig_mean, ax_mean = plt.subplots(figsize=(8, 6))
     fig_width, ax_width = plt.subplots(figsize=(8, 6))
 
     for jet_types, label, color in [
-        ("hybrid_det", "Flucutations", "red"),
+        ("hybrid_det", "Fluctuations", "red"),
         ("hybrid_true", "Combined", "black"),
         ("det_true", "Detector", "blue"),
     ]:
-        bh_hist = hists[f"{grooming_method}_{jet_types}_jet_pt_residual_mean"]
+        bh_hist = hists[f"{grooming_method}_{jet_types}_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"]
+        # Select in hybrid jet pt during conversion.
+        # NOTE: We need to use bh to do the sum and projection because it's a profile hist, which requires extra care.
         h = binned_data.BinnedData.from_existing_data(bh_hist)
 
         # Plot.
+        # The values are scaled by the bin centers as a proxy for the true jet pt. Since it's a steeply falling spectra,
+        # the bin centers are a bit too large, but it's close enough.
+        # Mean is just the values
         ax_mean.errorbar(
             h.axes[0].bin_centers,
-            h.values,
+            h.values / h.axes[0].bin_centers,
             xerr=h.axes[0].bin_widths / 2,
             marker=".",
             linestyle="",
@@ -225,16 +236,11 @@ def _plot_residual_mean_and_width(
             alpha=0.8,
             color=color,
         )
-        # We want to plot the width (via the errors) of the width distribution
-        # We then normalize by the jet pt bin centers.
-        bh_hist_width = hists[f"{grooming_method}_{jet_types}_jet_pt_residual_width"]
-        h_width = binned_data.BinnedData.from_existing_data(bh_hist_width)
-        # Scale by the jet pt values
-        values = h_width.errors / h_width.axes[0].bin_centers
+        # Width is the errors.
         ax_width.errorbar(
-            h_width.axes[0].bin_centers,
-            values,
-            xerr=h_width.axes[0].bin_widths / 2,
+            h.axes[0].bin_centers,
+            h.errors / h.axes[0].bin_centers,
+            xerr=h.axes[0].bin_widths / 2,
             marker=".",
             linestyle="",
             label=label,
@@ -247,13 +253,13 @@ def _plot_residual_mean_and_width(
     ax_mean.set_ylabel(r"$(p_{\text{T}}^{\text{rec}} - p_{\text{T}}^{\text{part}}) / p_{\text{T}}^{\text{part}}$")
     ax_mean.set_ylim([-1, 2])
     ax_width.set_ylabel(
-        r"$\sigma((p_{\text{T}}^{\text{rec}} - p_{\text{T}}^{\text{part}})) / p_{\text{T}}^{\text{part}}$"
+        r"$\sigma(p_{\text{T}}^{\text{rec}} - p_{\text{T}}^{\text{part}}) / p_{\text{T}}^{\text{part}}$"
     )
     ax_width.set_ylim([0, 0.5])
     # Shared
     for a, f in [(ax_mean, fig_mean), (ax_width, fig_width)]:
         text = "Iterative splittings"
-        text += "\n" + f"${helpers.RangeSelector(40, 120).display_str(label='hybrid')}$"
+        text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
         text += "\n" + " ".join(grooming_method.split("_")).capitalize()
         a.text(
             0.97,
@@ -292,22 +298,26 @@ def _plot_residual_mean_and_width(
     )
 
     # Store and cleanup
-    filename = f"{plot_config.name}_iterative_splittings_{grooming_method}"
+    filename = f"{plot_config.name}_hybrid_{str(hybrid_jet_pt_bin)}_iterative_splittings_{grooming_method}"
     fig_mean.savefig(output_dir / f"{filename}_mean.pdf")
     plt.close(fig_mean)
     fig_width.savefig(output_dir / f"{filename}_width.pdf")
     plt.close(fig_width)
 
 
-def _plot_jet_pt_residual_with_pt_true_selection(
-    hists: Dict[str, bh.Histogram], grooming_method: str, plot_config: PlotConfig, output_dir: Path,
+def _plot_jet_pt_residual_distribution(
+    hists: Dict[str, bh.Histogram],
+    grooming_method: str,
+    true_jet_pt_bin: helpers.RangeSelector,
+    plot_config: PlotConfig,
+    output_dir: Path,
 ) -> None:
     """ Plot the full jet pt residual for a pt true selection.
 
     Note:
         The pt true selections was applied when filling. This just plots the values.
     """
-    logger.debug(f"Plotting jet pt residual with pt true selection for {grooming_method}")
+    logger.debug(f"Plotting jet pt residual distribution for {grooming_method} with true jet pt {true_jet_pt_bin}")
 
     # Setup
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -318,8 +328,10 @@ def _plot_jet_pt_residual_with_pt_true_selection(
         ("hybrid_true", "Combined", "black"),
         ("det_true", "Detector", "blue"),
     ]:
-        bh_hist = hists[f"{grooming_method}_{jet_types}_jet_pt_residual"]
-        h = binned_data.BinnedData.from_existing_data(bh_hist)
+        bh_hist = hists[f"{grooming_method}_{jet_types}_jet_pt_residual_distribution"]
+        # NOTE: We need to use bh to do the sum and projection because it's a profile hist, which requires extra care.
+        selection = slice(bh.loc(true_jet_pt_bin.min + 0.0001), bh.loc(true_jet_pt_bin.max), bh.sum)
+        h = binned_data.BinnedData.from_existing_data(bh_hist[selection, :])
 
         # Normalize
         h /= np.sum(h.values)
@@ -337,8 +349,7 @@ def _plot_jet_pt_residual_with_pt_true_selection(
 
     # Labeling
     text = "Iterative splittings"
-    text += "\n" + f"${helpers.RangeSelector(40, 120).display_str(label='hybrid')}$"
-    text += "\n" + f"${helpers.RangeSelector(40, 60).display_str(label='part')}$"
+    text += "\n" + f"${true_jet_pt_bin.display_str(label='part')}$"
     text += "\n" + " ".join(grooming_method.split("_")).capitalize()
     ax.text(
         0.97,
@@ -368,30 +379,35 @@ def _plot_jet_pt_residual_with_pt_true_selection(
     )
 
     # Store and cleanup
-    filename = f"{plot_config.name}_iterative_splittings_{grooming_method}"
+    filename = f"{plot_config.name}_true_{str(true_jet_pt_bin)}_iterative_splittings_{grooming_method}"
     fig.savefig(output_dir / f"{filename}.pdf")
     plt.close(fig)
 
 
 def plot_residuals(hists: Dict[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path) -> None:
+    hybrid_jet_pt_bins = [helpers.RangeSelector(40, 120), helpers.RangeSelector(20, 200)]
+    true_jet_pt_bin = helpers.RangeSelector(40, 60)
     for grooming_method in grooming_methods:
-        _plot_residual_mean_and_width(
-            hists=hists,
-            grooming_method=grooming_method,
-            plot_config=PlotConfig(
-                name="jet_pt_residual",
-                x_label=r"$p_{\text{T}}^{\text{part}}\:(\text{GeV}/c)$",
-                # Will be set individually during plotting of mean, width
-                y_label="IGNORE",
-            ),
-            output_dir=output_dir,
-        )
+        for hybrid_jet_pt_bin in hybrid_jet_pt_bins:
+            _plot_residual_mean_and_width(
+                hists=hists,
+                grooming_method=grooming_method,
+                hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                plot_config=PlotConfig(
+                    name="jet_pt_residual",
+                    x_label=r"$p_{\text{T}}^{\text{part}}\:(\text{GeV}/c)$",
+                    # Will be set individually during plotting of mean, width
+                    y_label="IGNORE",
+                ),
+                output_dir=output_dir,
+            )
 
-        _plot_jet_pt_residual_with_pt_true_selection(
+        _plot_jet_pt_residual_distribution(
             hists=hists,
             grooming_method=grooming_method,
+            true_jet_pt_bin=true_jet_pt_bin,
             plot_config=PlotConfig(
-                name="jet_pt_residual_true_selection",
+                name="jet_pt_residual_distribution",
                 x_label=r"$(p_{\text{T}}^{\text{hybrid}} - p_{\text{T}}^{\text{det}}) / p_{\text{T}}^{\text{det}}$",
                 y_label="",
             ),
