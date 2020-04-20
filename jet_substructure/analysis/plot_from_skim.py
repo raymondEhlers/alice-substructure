@@ -7,7 +7,7 @@
 
 import logging
 from pathlib import Path
-from typing import Dict, Sequence
+from typing import Mapping, Sequence
 
 import attr
 import boost_histogram as bh
@@ -17,7 +17,7 @@ import numpy as np
 import pachyderm.plot
 from pachyderm import binned_data
 
-from jet_substructure.base import helpers
+from jet_substructure.base import analysis_objects, helpers, skim_analysis_objects
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class PlotConfig:
 
 
 def _plot_residual_by_matching_type(
-    hists: Dict[str, bh.Histogram],
+    hists: Mapping[str, bh.Histogram],
     label: str,
     grooming_method: str,
     matching_types: Sequence[str],
@@ -156,7 +156,7 @@ def _plot_residual_by_matching_type(
 
 
 def plot_residuals_by_matching_type(
-    hists: Dict[str, bh.Histogram], grooming_methods: Sequence[str], matching_types: Sequence[str], output_dir: Path
+    hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], matching_types: Sequence[str], output_dir: Path
 ) -> None:
     for grooming_method in grooming_methods:
         _plot_residual_by_matching_type(
@@ -199,7 +199,7 @@ def plot_residuals_by_matching_type(
 
 
 def _plot_residual_mean_and_width(
-    hists: Dict[str, bh.Histogram],
+    hists: Mapping[str, bh.Histogram],
     grooming_method: str,
     hybrid_jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
@@ -306,7 +306,7 @@ def _plot_residual_mean_and_width(
 
 
 def _plot_jet_pt_residual_distribution(
-    hists: Dict[str, bh.Histogram],
+    hists: Mapping[str, bh.Histogram],
     grooming_method: str,
     true_jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
@@ -384,7 +384,7 @@ def _plot_jet_pt_residual_distribution(
     plt.close(fig)
 
 
-def plot_residuals(hists: Dict[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path) -> None:
+def plot_residuals(hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path) -> None:
     hybrid_jet_pt_bins = [helpers.RangeSelector(40, 120), helpers.RangeSelector(20, 200)]
     true_jet_pt_bin = helpers.RangeSelector(40, 60)
     for grooming_method in grooming_methods:
@@ -416,19 +416,22 @@ def plot_residuals(hists: Dict[str, bh.Histogram], grooming_methods: Sequence[st
 
 
 def _plot_response_by_matching_type(
-    hists: Dict[str, bh.Histogram],
+    hists: Mapping[str, bh.Histogram],
     label: str,
     grooming_method: str,
+    response_type: skim_analysis_objects.ResponseType,
     matching_types: Sequence[str],
+    hybrid_jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
     output_dir: Path,
 ) -> None:
-
     for matching_type in matching_types:
-        logger.debug(f"Plotting {label} response for {grooming_method}, {matching_type}")
+        logger.debug(
+            f"Plotting {label} {response_type} response for {grooming_method}, {matching_type}, hybrid: {hybrid_jet_pt_bin}"
+        )
 
         matches_label = " ".join(matching_type.split("_")).capitalize()
-        bh_input_hist = hists[f"{grooming_method}_hybrid_det_{label}_response_matching_type_{matching_type}"]
+        bh_input_hist = hists[f"{grooming_method}_{response_type}_{label}_response_matching_type_{matching_type}"]
         h_input = binned_data.BinnedData.from_existing_data(bh_input_hist)
 
         # Select the variables (for the example of kt)
@@ -464,7 +467,7 @@ def _plot_response_by_matching_type(
 
         # Labeling
         text = "Iterative splittings"
-        text += "\n" + f"${helpers.RangeSelector(40, 120).display_str(label='hybrid')}$"
+        text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
         text += "\n" + " ".join(grooming_method.split("_")).capitalize()
         text += "\n" + matches_label + " matches"
         ax.text(
@@ -499,28 +502,195 @@ def _plot_response_by_matching_type(
 
 
 def plot_response_by_matching_type(
-    hists: Dict[str, bh.Histogram], grooming_methods: Sequence[str], matching_types: Sequence[str], output_dir: Path
+    hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    response_types: Sequence[skim_analysis_objects.ResponseType],
+    matching_types: Sequence[str],
+    output_dir: Path,
 ) -> None:
+    hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
     for grooming_method in grooming_methods:
-        _plot_response_by_matching_type(
-            hists=hists,
-            label="kt",
-            grooming_method=grooming_method,
-            matching_types=matching_types,
-            plot_config=PlotConfig(
-                name="response_kt_hybrid_detector",
-                x_label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{{GeV}}/c)$",
-                y_label=r"$k_{\text{T}}^{\text{det}}\:(\text{{GeV}}/c)$",
-            ),
-            output_dir=output_dir,
+        for response_type in response_types:
+            # Improve the display of labels (such as "det_level" -> "det"
+            measured_like_label = response_type.measured_like.replace("_level", "")
+            generator_like_label = response_type.generator_like.replace("_level", "")
+            _plot_response_by_matching_type(
+                hists=hists,
+                label="kt",
+                grooming_method=grooming_method,
+                response_type=response_type,
+                matching_types=matching_types,
+                hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                plot_config=PlotConfig(
+                    name=f"response_kt_{response_type}",
+                    x_label=fr"$k_{{\text{{T}}}}^{{\text{{{measured_like_label}}}}}\:(\text{{GeV}}/c)$",
+                    y_label=fr"$k_{{\text{{T}}}}^{{\text{{{generator_like_label}}}}}\:(\text{{GeV}}/c)$",
+                ),
+                output_dir=output_dir,
+            )
+            _plot_response_by_matching_type(
+                hists=hists,
+                label="delta_R",
+                grooming_method=grooming_method,
+                response_type=response_type,
+                matching_types=matching_types,
+                hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                plot_config=PlotConfig(
+                    name=f"response_delta_R_{response_type}",
+                    x_label=fr"$R^{{\text{{ {measured_like_label} }}}}$",
+                    y_label=fr"$R^{{\text{{ {generator_like_label} }}}}$",
+                ),
+                output_dir=output_dir,
+            )
+
+
+def _plot_kt_comparison(
+    hists: Mapping[str, bh.Histogram],
+    data_hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
+    grooming_method: str,
+    hybrid_jet_pt_bin: helpers.RangeSelector,
+    plot_config: PlotConfig,
+    output_dir: Path,
+) -> None:
+    logger.info(f"Plotting kt comparison for {grooming_method} with hybrid {hybrid_jet_pt_bin}")
+    fig, (ax, ax_ratio) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+
+    # Data
+    rebin_factor = 2
+    bh_data = getattr(data_hists, grooming_method).kt.to_boost_histogram()
+    bh_data = bh_data[:: bh.rebin(rebin_factor)]
+    h_data = binned_data.BinnedData.from_existing_data(bh_data)
+    h_data /= rebin_factor
+
+    # Embedded
+    h_embed_response = binned_data.BinnedData.from_existing_data(
+        hists[f"{grooming_method}_hybrid_true_kt_response_matching_type_all"]
+    )
+    # Select the variables (for the example of kt)
+    # Axes: hybrid_pt, hybrid_kt, det_level_pt, det_level_kt
+    # NOTE: We already applied the 40 < hybrid jet pt < 120 cut, so it doesn't need an additional selection.
+    h_hybrid = binned_data.BinnedData(
+        axes=[h_embed_response.axes[1]],
+        values=np.sum(h_embed_response.values, axis=(0, 2, 3)),
+        variances=np.sum(h_embed_response.variances, axis=(0, 2, 3)),
+    )
+    h_det = binned_data.BinnedData(
+        axes=[h_embed_response.axes[3]],
+        values=np.sum(h_embed_response.values, axis=(0, 1, 2)),
+        variances=np.sum(h_embed_response.variances, axis=(0, 1, 2)),
+    )
+
+    # Normalize by n_jets
+    # TODO: Update the data approach once we have the skim!
+    # h_data /= getattr(data_hists, grooming_method).n_jets
+    h_data /= np.sum(h_data.values)
+    h_hybrid /= np.sum(h_hybrid.values)
+    h_det /= np.sum(h_det.values)
+
+    for h, label in [(h_data, "Pb--Pb"), (h_hybrid, "Hybrid"), (h_det, "Det. level")]:
+        p = ax.errorbar(
+            h.axes[0].bin_centers,
+            h.values,
+            yerr=h.errors,
+            xerr=h.axes[0].bin_widths / 2,
+            marker=".",
+            linestyle="",
+            label=label,
         )
-        _plot_response_by_matching_type(
+
+        if label != "Pb--Pb":
+            # Temp exclude normalization bin of h
+            # TODO: Fix once data is skimmed.
+            h_temp = binned_data.BinnedData(
+                axes=[h.axes[0].bin_edges[1:]], values=h.values[1:], variances=h.variances[1:],
+            )
+            h_ratio = h_data / h_temp
+            # If we get 0, we don't want to show that point.
+            h_ratio.values[h_ratio.values == 0] = np.nan
+
+            # Plot the ratio
+            ax_ratio.errorbar(
+                h_ratio.axes[0].bin_centers,
+                h_ratio.values,
+                yerr=h_ratio.errors,
+                xerr=h_ratio.axes[0].bin_widths / 2,
+                marker=".",
+                linestyle="",
+                color=p[0].get_color(),
+            )
+
+    # Reference value
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+
+    # Labeling
+    text = "Iterative splittings"
+    text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+    text += "\n" + " ".join(grooming_method.split("_")).capitalize()
+    ax.text(
+        0.97,
+        0.97,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="right",
+        verticalalignment="top",
+        multialignment="right",
+    )
+
+    # Presentation
+    ax_ratio.set_xlabel(plot_config.x_label)
+    ax.set_ylabel(plot_config.y_label)
+    ax_ratio.set_ylabel("Pb--Pb/ref.")
+    ax.set_xlim([0, 25])
+    ax_ratio.set_ylim([0, 5])
+    ax.set_yscale("log")
+    ax.legend(frameon=False, loc="lower left")
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.12,
+        bottom=0.12,
+        right=0.99,
+        top=0.98,
+    )
+
+    # Store and cleanup
+    filename = f"{plot_config.name}_hybrid_{hybrid_jet_pt_bin}_iterative_splittings_{grooming_method}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def plot_compare_kt(
+    hists: Mapping[str, bh.Histogram],
+    data_hists: Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
+    grooming_methods: Sequence[str],
+    output_dir: Path,
+) -> None:
+    hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+    identifier = analysis_objects.Identifier(iterative_splittings=True, jet_pt_bin=hybrid_jet_pt_bin)
+    data_hists_for_comparion = data_hists[identifier]
+
+    for grooming_method in grooming_methods:
+        if grooming_method in [
+            "leading_kt_z_cut_02",
+            "leading_kt_z_cut_04",
+            "soft_drop_z_cut_02",
+            "soft_drop_z_cut_04",
+        ]:
+            logger.debug(f"Skipping grooming method {grooming_method} because we don't have the data comparison yet.")
+            continue
+
+        _plot_kt_comparison(
             hists=hists,
-            label="delta_R",
+            data_hists=data_hists_for_comparion,
             grooming_method=grooming_method,
-            matching_types=matching_types,
+            hybrid_jet_pt_bin=hybrid_jet_pt_bin,
             plot_config=PlotConfig(
-                name="response_delta_R_hybrid_detector", x_label=r"$R^{\text{hybrid}}$", y_label=r"$R^{\text{det}}$",
+                name="kt_spectra",
+                x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
             ),
             output_dir=output_dir,
         )
