@@ -61,14 +61,18 @@ def dask_df_from_delayed() -> None:
 
 # def df_from_file(filenames: Sequence[Path], branches: Sequence[str]):
 def df_from_file() -> None:
+    path_list = data_manager._ensure_and_expand_paths(
+        [
+            Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings.root"),
+            Path("trains/embedPythia/55*/skim/*_iterative_splittings.root"),
+        ]
+    )
     data_frames = uproot.pandas.iterate(
-        path=[
-            "temp_cache/embedPythia/55*/skim/*_iterative_splittings.root",
-            "trains/embedPythia/55*/skim/*_iterative_splittings.root",
-        ],
+        path=path_list,
         treepath="tree",
         namedecode="utf-8",
         branches=["scale_factor", "*true*", "*det_level*", "*hybrid*"],
+        reportpath=True,
     )
     # for df in data_frames:
     #    IPython.embed()
@@ -76,6 +80,7 @@ def df_from_file() -> None:
     # NOPE! Still too big...
     # df = pd.concat(data_frames, axis=1, copy=False)
 
+    # TODO: Define grooming methods better?
     grooming_methods = [
         "dynamical_z",
         "dynamical_kt",
@@ -83,6 +88,8 @@ def df_from_file() -> None:
         "leading_kt",
         "leading_kt_z_cut_02",
         "leading_kt_z_cut_04",
+        "soft_drop_z_cut_02",
+        "soft_drop_z_cut_04",
     ]
 
     # Define hists.
@@ -97,7 +104,6 @@ def df_from_file() -> None:
         "both_untagged": 7,
     }
     hists = {}
-    # TODO: Define grooming methods better...
     for grooming_method in grooming_methods:
         for matching_type in _matching_name_to_axis_value:
             # Axes: hybrid_level_jet_pt, det_level_jet_pt, residual
@@ -165,7 +171,8 @@ def df_from_file() -> None:
     progress_manager = enlighten.Manager()
     # TODO: Figure out how to get 72 from uproot.iterate
     with progress_manager.counter(total=72, desc="Analyzing", unit="tree", leave=True) as tree_counter:
-        for df in tree_counter(data_frames):
+        for df_path, df in tree_counter(data_frames):
+            logger.debug(f"Processing df from {df_path}")
             hybrid_jet_pt_mask = (df["jet_pt_hybrid"] > 40) & (df["jet_pt_hybrid"] < 120)
             for grooming_method in grooming_methods:
 
@@ -295,7 +302,6 @@ def df_from_file() -> None:
     progress_manager.stop()
 
     # Add some helpful imports and definitions
-    from pathlib import Path  # noqa: F401
     from importlib import reload  # noqa: F401
 
     try:
