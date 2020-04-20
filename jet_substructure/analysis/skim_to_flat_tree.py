@@ -314,6 +314,8 @@ def calculate_and_skim_embedding(
     # Require that we have jets that aren't dominated by hybrid jets.
     # It's super important to be ">=". That allows the leading jet in the hybrid to be the same
     # as the leading jet in the true (which would be good - we've probably found the right jet).
+    # NOTE: We already apply this cut at the analysis level, so it shouldn't really do anything here.
+    #       We're just applying it again to be certain.
     mask = mask & (true_jets.constituents.max_pt >= hybrid_jets.constituents.max_pt)
 
     # Mask the jets
@@ -437,7 +439,7 @@ if __name__ == "__main__":
     helpers.setup_logging()
     # Options
     iterative_splittings = True
-    number_of_cores = 2
+    number_of_cores = 1
 
     # Setup
     settings_class_map: Mapping[str, Type[analysis_objects.AnalysisSettings]] = {
