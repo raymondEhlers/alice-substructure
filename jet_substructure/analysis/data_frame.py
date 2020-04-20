@@ -10,14 +10,13 @@ import logging
 from pathlib import Path
 from typing import Dict, Sequence
 
-import attr
 import boost_histogram as bh
 import enlighten
 import IPython
 import pandas as pd
 import uproot
 
-from jet_substructure.base import analysis_objects, data_manager, helpers
+from jet_substructure.base import analysis_objects, data_manager, helpers, skim_analysis_objects
 
 
 logger = logging.getLogger(__name__)
@@ -60,15 +59,6 @@ def dask_df_from_delayed() -> None:
     IPython.start_ipython(user_ns=locals())
 
 
-@attr.s
-class ResponseType:
-    measured_like: str = attr.ib()
-    generator_like: str = attr.ib()
-
-    def __str__(self) -> str:
-        return f"{self.measured_like}_{self.generator_like}"
-
-
 # def df_from_file(filenames: Sequence[Path], branches: Sequence[str]):
 def df_from_file() -> None:  # noqa: 901
     # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
@@ -107,9 +97,9 @@ def df_from_file() -> None:  # noqa: 901
 
     # Define hists.
     response_types = [
-        ResponseType(measured_like="hybrid", generator_like="det_level"),
-        ResponseType(measured_like="hybrid", generator_like="true"),
-        ResponseType(measured_like="det_level", generator_like="true"),
+        skim_analysis_objects.ResponseType(measured_like="hybrid", generator_like="det_level"),
+        skim_analysis_objects.ResponseType(measured_like="hybrid", generator_like="true"),
+        skim_analysis_objects.ResponseType(measured_like="det_level", generator_like="true"),
     ]
     _matching_name_to_axis_value: Dict[str, int] = {
         "all": 0,
@@ -145,9 +135,9 @@ def df_from_file() -> None:  # noqa: 901
                     f"{grooming_method}_{str(response_type)}_kt_response_matching_type_{matching_type}"
                 ] = bh.Histogram(
                     bh.axis.Regular(28, 0, 140),
-                    bh.axis.Regular(25, 0, 25),
+                    bh.axis.Regular(26, -1, 25),
                     bh.axis.Regular(28, 0, 140),
-                    bh.axis.Regular(25, 0, 25),
+                    bh.axis.Regular(26, -1, 25),
                     storage=bh.storage.Weight(),
                 )
                 # Axes: measured_pt, measured_R, generator_pt, generator_R
@@ -155,9 +145,9 @@ def df_from_file() -> None:  # noqa: 901
                     f"{grooming_method}_{str(response_type)}_delta_R_response_matching_type_{matching_type}"
                 ] = bh.Histogram(
                     bh.axis.Regular(28, 0, 140),
-                    bh.axis.Regular(20, 0, 0.4),
+                    bh.axis.Regular(21, -0.02, 0.4),
                     bh.axis.Regular(28, 0, 140),
-                    bh.axis.Regular(20, 0, 0.4),
+                    bh.axis.Regular(21, -0.02, 0.4),
                     storage=bh.storage.Weight(),
                 )
 
@@ -313,11 +303,36 @@ def df_from_file() -> None:  # noqa: 901
 
     try:
         # May not want to import if developing.
+        from jet_substructure.analysis import analyze_tree
         from jet_substructure.analysis import plot_from_skim  # noqa: F401
     except SyntaxError:
         logger.info("Couldn't load plot_from_skim due to syntax error. You need to load it.")
 
     output_dir = Path("output/embedPythia/skim")
+
+    data_hists, data_dataset = analyze_tree.run_shared(
+        collision_system="PbPb",
+        analysis_function=analyze_tree.analyze_single_tree,
+        dataset_config_filename=Path("config") / "datasets.yaml",
+        hists_filename="data_hists",
+        jet_pt_bins=[
+            # Broadest range
+            helpers.RangeSelector(min=0, max=140),
+            # Main range of interest.
+            helpers.RangeSelector(min=40, max=120),
+            # Most likely where we will actually measure.
+            helpers.RangeSelector(min=80, max=120),
+            # Individual ranges.
+            helpers.RangeSelector(min=40, max=60),
+            helpers.RangeSelector(min=60, max=80),
+            helpers.RangeSelector(min=80, max=100),
+            helpers.RangeSelector(min=100, max=120),
+        ],
+        z_cutoff=0.2,
+        plot_only=True,
+        force_reprocessing=False,
+        number_of_cores=1,
+    )
 
     IPython.start_ipython(user_ns=locals())
 
@@ -329,6 +344,7 @@ def df_from_file() -> None:  # noqa: 901
     # plot_from_skim.plot_response_by_matching_type(
     #     hists=hists, grooming_methods=grooming_methods, matching_types=list(_matching_name_to_axis_value.keys()), output_dir=output_dir,
     # )
+    # plot_from_skim.plot_compare_kt(hists=hists, data_hists=data_hists[0], grooming_methods=grooming_methods, output_dir=output_dir)
 
 
 def map_reduce_pandas_concat() -> None:
