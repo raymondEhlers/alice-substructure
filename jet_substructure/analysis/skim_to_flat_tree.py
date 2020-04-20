@@ -11,7 +11,7 @@ import functools
 import logging
 import operator
 from pathlib import Path
-from typing import Dict, Iterable, Mapping, Tuple, Type, cast
+from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Sequence, Tuple, Type, cast
 
 import attr
 import enlighten
@@ -275,7 +275,7 @@ def calculate_splitting_number(
 
 
 def calculate_and_skim_embedding(
-    tree: data_manager.Tree, dataset: analysis_objects.Dataset, iterative_splittings: bool
+    tree: data_manager.Tree, dataset: analysis_objects.Dataset, iterative_splittings: bool,
 ) -> bool:
     """ Determine the response and prong matching for jets substructure techniques.
 
@@ -284,9 +284,10 @@ def calculate_and_skim_embedding(
     such that we can enable or disable the different options and still have appropriate return values.
     But for now, we don't worry about it.
     """
+    # Validation
+    prefixes = ["matched", "detLevel", "data"]
     # Setup
     # Perhaps make these into arguments?
-    prefixes = ["matched", "detLevel", "data"]
     iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
     # TODO: Maybe convert to hdf5? But maybe not because of compression?
     output_dir = tree.filename.parent / "skim"
@@ -435,27 +436,106 @@ def calculate_and_skim_embedding(
     return True
 
 
-if __name__ == "__main__":
-    helpers.setup_logging()
-    # Options
-    iterative_splittings = True
-    number_of_cores = 1
+def calculate_and_skim_data(
+    tree: data_manager.Tree,
+    dataset: analysis_objects.Dataset,
+    iterative_splittings: bool,
+    prefixes: Optional[Sequence[str]] = None,
+) -> bool:
+    # Validation
+    if prefixes is None:
+        prefixes = ["data"]
+
+    # Setup
+    # Perhaps make these into arguments?
+    iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
+    output_dir = tree.filename.parent / "skim"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_filename = output_dir / f"{tree.filename.stem}_{iterative_splittings_label}_splittings.root"
+
+    # Actual setup.
+    logger.info(f"Skimming tree from file {tree.filename}")
+    successfully_accessed_data, all_jets = analyze_tree.load_jets_from_tree(tree=tree, prefixes=prefixes)
+    if not successfully_accessed_data:
+        return False
+    # Only unpack if we've successfully accessed the data.
+
+    masked_jets: Dict[
+        str, Tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray, UprootArray[int]]
+    ] = {}
+    for prefix, input_jets in zip(prefixes, all_jets):
+        masked_jets[prefix] = _select_and_retrieve_splittings(
+            input_jets, np.ones_like(input_jets.jet_pt) > 0, iterative_splittings=iterative_splittings,
+        )
+
+    # Results output
+    grooming_results: Dict[str, np.ndarray] = {}
+    # Add jet pt for all prefixes.
+    for prefix, jets in masked_jets.items():
+        grooming_results[f"jet_pt_{prefix}"] = jets[0].jet_pt
+
+    # Perform our calculations.
+    functions = _define_calculation_funcs(dataset, iterative_splittings=iterative_splittings)
+    for func_name, func in functions.items():
+        for prefix, jets in masked_jets.items():
+            data_jets_calculation = Calculation(jets[0], jets[1], jets[2], *func(jets[1]),)
+
+            groomed_splittings = data_jets_calculation.splittings
+            splitting_number = calculate_splitting_number(
+                all_splittings=data_jets_calculation.input_jets.splittings,
+                selected_splittings=groomed_splittings,
+                restricted_splittings_indices=data_jets_calculation.input_splittings_indices,
+            )
+
+            # We pad with the UNFILLED_VALUE constant if any data_jets_calculations that don't
+            # find a splitting.
+            grooming_result = GroomingResultForTree(
+                grooming_method=func_name,
+                delta_R=groomed_splittings.delta_R.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
+                z=groomed_splittings.z.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
+                kt=groomed_splittings.kt.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
+                # Splitting number is already flattened.
+                n=splitting_number,
+            )
+            grooming_results.update(grooming_result.asdict(prefix="data"))
+
+    branches = {k: v.dtype for k, v in grooming_results.items()}
+    logger.info(f"Writing skim to {output_filename}")
+    with uproot.recreate(output_filename) as output_file:
+        output_file["tree"] = uproot.newtree(branches)
+        # Write all of the calculations
+        output_file["tree"].extend(grooming_results)
+
+    logger.info(f"Finished processing tree from file {tree.filename}")
+    return True
+
+
+def run(
+    collision_system: str,
+    iterative_splittings: bool,
+    calculate_and_skim_func: Callable[[data_manager.Tree, analysis_objects.Dataset, bool], bool],
+    number_of_cores: int,
+    additional_kwargs_for_analysis: Optional[Mapping[str, Any]] = None,
+) -> None:
+    # Validation
+    if additional_kwargs_for_analysis is None:
+        additional_kwargs_for_analysis = {}
 
     # Setup
     settings_class_map: Mapping[str, Type[analysis_objects.AnalysisSettings]] = {
         "embedPythia": analysis_objects.PtHardAnalysisSettings,
     }
     dataset = analysis_objects.Dataset.from_config_file(
-        collision_system="embedPythia",
+        collision_system=collision_system,
         config_filename=Path("config") / "datasets.yaml",
         override_filenames=None,
-        hists_filename_stem="embedding_hists",
+        hists_filename_stem="IGNORE",
         output_base=Path("output"),
-        settings_class=settings_class_map.get("embedPythia", analysis_objects.AnalysisSettings),
+        settings_class=settings_class_map.get(collision_system, analysis_objects.AnalysisSettings),
+        # NOTE: This value is irrelevant for the skim...
         z_cutoff=0.2,
     )
 
-    # Setup dataset
     dm = data_manager.IterateTrees(
         filenames=dataset.filenames,
         tree_name=dataset.tree_name,
@@ -472,10 +552,13 @@ if __name__ == "__main__":
     number_of_trees_processed = 0
     dm_iterator = dm.lazy_iteration(fully_lazy=(number_of_cores > 1))
     wrapper = functools.partial(
-        calculate_and_skim_embedding, dataset=dataset, iterative_splittings=iterative_splittings,
+        calculate_and_skim_func,
+        dataset=dataset,
+        iterative_splittings=iterative_splittings,
+        **additional_kwargs_for_analysis,
     )
     wrapper_multiprocessing = functools.partial(analyze_tree._wrap_multiprocessing, analysis_function=wrapper,)
-    with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
+    with progress_manager.counter(total=len(dm), desc="Skimming", unit="tree") as tree_counter:
         if number_of_cores > 1:
             with Pool(nodes=number_of_cores) as pool:
                 number_of_trees_processed = functools.reduce(
@@ -488,3 +571,34 @@ if __name__ == "__main__":
 
     # Cleanup
     progress_manager.stop()
+
+
+if __name__ == "__main__":
+    helpers.setup_logging()
+    # Options
+    iterative_splittings = True
+    number_of_cores = 3
+
+    # Run embedding
+    # run(
+    #    collision_system="embedPythia",
+    #    iterative_splittings=iterative_splittings,
+    #    calculate_and_skim_func=calculate_and_skim_embedding,
+    #    number_of_cores=number_of_cores,
+    # )
+    # Run PbPb
+    # run(
+    #    collision_system="PbPb",
+    #    iterative_splittings=iterative_splittings,
+    #    calculate_and_skim_func=calculate_and_skim_data,
+    #    number_of_cores=number_of_cores,
+    # )
+    run(
+        collision_system="pythia",
+        iterative_splittings=iterative_splittings,
+        # mypy apparently doesn't handle adding arguments, even with callable protocols...
+        # We only get away with this because the prefixes are optional.
+        calculate_and_skim_func=calculate_and_skim_data,
+        number_of_cores=number_of_cores,
+        additional_kwargs_for_analysis={"prefixes": ["data", "matched"]},
+    )
