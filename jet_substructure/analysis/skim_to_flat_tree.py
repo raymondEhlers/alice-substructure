@@ -375,8 +375,7 @@ def calculate_and_skim_embedding(
                 restricted_splittings_indices=calculation.input_splittings_indices,
             )
 
-            # We pad with the UNFILLED_VALUE constant if any calculations that don't
-            # find a splitting.
+            # We pad with the UNFILLED_VALUE constant to account for any calculations that don't find a splitting.
             grooming_result = GroomingResultForTree(
                 grooming_method=func_name,
                 delta_R=groomed_splittings.delta_R.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
@@ -478,17 +477,16 @@ def calculate_and_skim_data(
     functions = _define_calculation_funcs(dataset, iterative_splittings=iterative_splittings)
     for func_name, func in functions.items():
         for prefix, jets in masked_jets.items():
-            data_jets_calculation = Calculation(jets[0], jets[1], jets[2], *func(jets[1]),)
+            calculation = Calculation(jets[0], jets[1], jets[2], *func(jets[1]),)
 
-            groomed_splittings = data_jets_calculation.splittings
+            groomed_splittings = calculation.splittings
             splitting_number = calculate_splitting_number(
-                all_splittings=data_jets_calculation.input_jets.splittings,
+                all_splittings=calculation.input_jets.splittings,
                 selected_splittings=groomed_splittings,
-                restricted_splittings_indices=data_jets_calculation.input_splittings_indices,
+                restricted_splittings_indices=calculation.input_splittings_indices,
             )
 
-            # We pad with the UNFILLED_VALUE constant if any data_jets_calculations that don't
-            # find a splitting.
+            # We pad with the UNFILLED_VALUE constant to account for any calculations that don't find a splitting.
             grooming_result = GroomingResultForTree(
                 grooming_method=func_name,
                 delta_R=groomed_splittings.delta_R.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
@@ -497,7 +495,7 @@ def calculate_and_skim_data(
                 # Splitting number is already flattened.
                 n=splitting_number,
             )
-            grooming_results.update(grooming_result.asdict(prefix="data"))
+            grooming_results.update(grooming_result.asdict(prefix=prefix))
 
     branches = {k: v.dtype for k, v in grooming_results.items()}
     logger.info(f"Writing skim to {output_filename}")
@@ -577,7 +575,7 @@ if __name__ == "__main__":
     helpers.setup_logging()
     # Options
     iterative_splittings = True
-    number_of_cores = 3
+    number_of_cores = 2
 
     # Run embedding
     # run(
