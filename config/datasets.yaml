@@ -450,6 +450,30 @@ available_datasets:
     LHC18b8:
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
+        scale_factors:
+            1: 56.92578552984929
+            2: 17.328042052643546
+            3: 8.195465995437084
+            4: 3.002531621038932
+            5: 1.0492886080172648
+            6: 0.40224025027931926
+            7: 0.12060619768289402
+            8: 0.04217603458379322
+            9: 0.01779222914788848
+            10: 0.00601235934807644
+            11: 0.0023970138950458143
+            12: 0.0008995821318326251
+            13: 0.00045790259501916696
+            14: 0.00021355186126915894
+            15: 0.00010595784852613353
+            16: 5.6341859941791876e-05
+            17: 3.095759555909953e-05
+            18: 1.680306270578166e-05
+            19: 9.121206656758237e-06
+            20: 1.2739362264040776e-05
+        # We don't separate pythia pt hard bins by train number, but it's required by the config,
+        # so we just include an empty list.
+        train_number_to_pt_hard_bin: {}
         jet_R: 0.4
         files:
             - "trains/pythia/2110/AnalysisResults.FAST.01.repaired.root"
