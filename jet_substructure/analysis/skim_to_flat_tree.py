@@ -7,11 +7,12 @@
 
 from __future__ import annotations
 
+import argparse
 import functools
 import logging
 import operator
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Sequence, Tuple, Type, cast
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type, Union, cast
 
 import attr
 import enlighten
@@ -586,10 +587,13 @@ def run(
     calculate_and_skim_func: Callable[[data_manager.Tree, analysis_objects.Dataset, bool], bool],
     number_of_cores: int,
     additional_kwargs_for_analysis: Optional[Mapping[str, Any]] = None,
+    override_filenames: Optional[Sequence[Union[str, Path]]] = None,
 ) -> None:
     # Validation
     if additional_kwargs_for_analysis is None:
         additional_kwargs_for_analysis = {}
+    if override_filenames is None:
+        override_filenames = []
 
     # Setup
     settings_class_map: Mapping[str, Type[analysis_objects.AnalysisSettings]] = {
@@ -608,7 +612,7 @@ def run(
     )
 
     dm = data_manager.IterateTrees(
-        filenames=dataset.filenames,
+        filenames=(override_filenames if override_filenames else dataset.filenames),
         tree_name=dataset.tree_name,
         # Mypy is getting confused by Sequence[str] because str is an iterable, so we ignore the type...
         branches=dataset.branches,  # type: ignore
@@ -642,6 +646,53 @@ def run(
 
     # Cleanup
     progress_manager.stop()
+
+
+def parse_arguments() -> Tuple[str, List[Path], bool]:
+    parser = argparse.ArgumentParser(description=f"Skim provided files in a given dataset.")
+
+    parser.add_argument("-d", "--datasetName", type=str)
+    parser.add_argument("-f", "--filenames", nargs="+", default=[])
+    parser.add_argument("-r", "--recursiveSplittings", action="store_true", default=False)
+    args = parser.parse_args()
+    # Validation for filenames
+    filenames = [Path(f) for f in args.filenames]
+    return args.dataset_name, filenames, args.recursiveSplittings
+
+
+def skim_entry_point() -> None:
+    helpers.setup_logging()
+    dataset_name, override_filenames, use_recursive_splittings = parse_arguments()
+    number_of_cores = 1
+    iterative_splittings = not use_recursive_splittings
+
+    logger.info(f"Processing {dataset_name} with filenames: {override_filenames}")
+
+    if dataset_name == "embedPythia":
+        run(
+            collision_system=dataset_name,
+            iterative_splittings=iterative_splittings,
+            calculate_and_skim_func=calculate_and_skim_embedding,
+            number_of_cores=number_of_cores,
+            additional_kwargs_for_analysis={"draw_example_splittings": False},
+            override_filenames=override_filenames,
+        )
+    else:
+        additional_kwargs_for_analysis = {}
+        if dataset_name == "pythia":
+            additional_kwargs_for_analysis = {"prefixes": ["data", "matched"]}
+
+        # Run PbPb, pp, pythia
+        run(
+            collision_system=dataset_name,
+            iterative_splittings=iterative_splittings,
+            calculate_and_skim_func=calculate_and_skim_data,
+            number_of_cores=number_of_cores,
+            additional_kwargs_for_analysis=additional_kwargs_for_analysis,
+            override_filenames=override_filenames,
+        )
+
+    logger.info(f"Finished processing skim for dataset {dataset_name} with files: {override_filenames}")
 
 
 if __name__ == "__main__":
