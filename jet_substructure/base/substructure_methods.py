@@ -1041,7 +1041,7 @@ class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):  # type
             tree.get(f"{prefix}.fSubjets.fConstituentJaggedIndices", None),
         )
         logger.debug("Done with constructing subjets.")
-        logger.debug(f"Done with constructing jet inputs for {tree.filename}")
+        logger.debug(f"Done with constructing jet inputs for {tree.filename}, {prefix}")
 
         # Construct substructure jets using the above
         return cls(  # type: ignore
