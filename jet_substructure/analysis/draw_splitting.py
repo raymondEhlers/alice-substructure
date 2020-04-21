@@ -35,7 +35,11 @@ class EdgeFromSplitting:
 
 
 def splittings_graph(  # noqa: C901
-    jet: substructure_methods.SubstructureJet, path: Path, filename: Optional[str] = None, show_subjet_pt: bool = False,
+    jet: substructure_methods.SubstructureJet,
+    path: Path,
+    filename: Optional[str] = None,
+    show_subjet_pt: bool = False,
+    selected_splitting_index: int = -1,
 ) -> "networkx.DiGraph":
     """ Draw a splitting graph for a given jet.
 
@@ -50,6 +54,8 @@ def splittings_graph(  # noqa: C901
         filename: Filename under which the plot should be stored.
         show_subjet_pt: If True, we will label the subjets their pt calculated via their constituents.
             This can be used to very that we've properly following the hardest splitting. Default: False.
+        select_splitting_index: Highlight the specified splitting. Default: -1, in which case, no splitting
+            will be highlighted.
     Returns:
         The directed graph representing the splitting. A plot of the graph is also stored at the provided path and filename.
     """
@@ -229,6 +235,13 @@ def splittings_graph(  # noqa: C901
         # Identify iterative splitting edges via the subjet properties.
         if subjet.part_of_iterative_splitting:
             graph.edges[e]["color"] = "/blues3/3"
+
+    # Highlight individual splitting if requested.
+    try:
+        n = graph.nodes[f"s{selected_splitting_index}"]
+        n["color"] = "/reds3/3"
+    except KeyError:
+        ...
 
     # Now we want to draw the graph.
     # We convert to graphviz for plotting because networkx requires too much plotting configuration for labels, etc.

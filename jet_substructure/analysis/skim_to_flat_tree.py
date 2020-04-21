@@ -275,7 +275,10 @@ def calculate_splitting_number(
 
 
 def calculate_and_skim_embedding(
-    tree: data_manager.Tree, dataset: analysis_objects.Dataset, iterative_splittings: bool,
+    tree: data_manager.Tree,
+    dataset: analysis_objects.Dataset,
+    iterative_splittings: bool,
+    draw_example_splittings: bool = False,
 ) -> bool:
     """ Determine the response and prong matching for jets substructure techniques.
 
@@ -423,6 +426,41 @@ def calculate_and_skim_embedding(
             matching_output[matching.failed] = 3
             output[mask] = matching_output
             grooming_results[f"{func_name}_hybrid_detector_matching_{label}"] = output
+
+        # Look for leading kt just because it's easier to understand conceptually.
+        if draw_example_splittings and func_name == "leading_kt" and (leading_matching.properly & subleading_matching.failed).any():  # type: ignore
+            from jet_substructure.analysis import draw_splitting
+
+            # Find a sufficiently interesting jet (ie high enough pt)
+            mask_jets_of_interest = (leading_matching.properly & subleading_matching.failed) & (
+                masked_hybrid_jets.jet_pt > 80
+            )
+            # Look at most the first 5 jets.
+            for i, hybrid_jet in enumerate(masked_hybrid_jets[mask_jets_of_interest][:5]):
+                # Find the hybrid jet and splitting of interest.
+                # hybrid_jet = masked_hybrid_jets[mask_jets_of_interest][0]
+                # Take the index of the splitting of interest. We want the first jet, and then there must be one splitting index there.
+                hybrid_jet_selected_splitting_index = hybrid_jets_calculation.indices[mask_jets_of_interest][i][0]  # type: ignore
+                # Same for det level.
+                det_level_jet = masked_det_level_jets[mask_jets_of_interest][i]
+                # Take the index of the splitting of interest. We want the first jet, and then there must be one splitting index there.
+                det_level_jet_selected_splitting_index = det_level_jets_calculation.indices[mask_jets_of_interest][i][0]  # type: ignore
+
+                # Draw the splittings
+                draw_splitting.splittings_graph(
+                    jet=hybrid_jet,
+                    path=dataset.output.parent / "leading_correct_subleading_failed/",
+                    filename=f"{i}_hybrid_splittings_jet_pt_{hybrid_jet.jet_pt:.1f}GeV_selected_splitting_index_{hybrid_jet_selected_splitting_index}",
+                    show_subjet_pt=True,
+                    selected_splitting_index=hybrid_jet_selected_splitting_index,
+                )
+                draw_splitting.splittings_graph(
+                    jet=det_level_jet,
+                    path=dataset.output.parent / "leading_correct_subleading_failed/",
+                    filename=f"{i}_det_level_splittings_jet_pt_{det_level_jet.jet_pt:.1f}GeV_selected_splitting_index_{det_level_jet_selected_splitting_index}",
+                    show_subjet_pt=True,
+                    selected_splitting_index=det_level_jet_selected_splitting_index,
+                )
 
     branches = {k: v.dtype for k, v in grooming_results.items()}
     logger.info(f"Writing skim to {output_filename}")
@@ -575,15 +613,16 @@ if __name__ == "__main__":
     helpers.setup_logging()
     # Options
     iterative_splittings = True
-    number_of_cores = 2
+    number_of_cores = 1
 
     # Run embedding
-    # run(
-    #    collision_system="embedPythia",
-    #    iterative_splittings=iterative_splittings,
-    #    calculate_and_skim_func=calculate_and_skim_embedding,
-    #    number_of_cores=number_of_cores,
-    # )
+    run(
+        collision_system="embedPythia",
+        iterative_splittings=iterative_splittings,
+        calculate_and_skim_func=calculate_and_skim_embedding,
+        number_of_cores=number_of_cores,
+        additional_kwargs_for_analysis={"draw_example_splittings": False},
+    )
     # Run PbPb
     # run(
     #    collision_system="PbPb",
