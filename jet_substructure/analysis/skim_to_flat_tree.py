@@ -497,12 +497,21 @@ def calculate_and_skim_data(
         return False
     # Only unpack if we've successfully accessed the data.
 
+    # Dataset wide masks
+    # Select everything by default.
+    mask = np.ones_like(all_jets[0].jet_pt) > 0
+
+    # Apparently I can get pt hard < 5. Which is bizarre. Filter these out when applicable.
+    if dataset.collision_system == "pythia":
+        # App
+        mask = mask & (tree["ptHard"] >= 5.0)
+
     masked_jets: Dict[
         str, Tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray, UprootArray[int]]
     ] = {}
     for prefix, input_jets in zip(prefixes, all_jets):
         masked_jets[prefix] = _select_and_retrieve_splittings(
-            input_jets, np.ones_like(input_jets.jet_pt) > 0, iterative_splittings=iterative_splittings,
+            input_jets, mask, iterative_splittings=iterative_splittings,
         )
 
     # Results output
@@ -510,6 +519,31 @@ def calculate_and_skim_data(
     # Add jet pt for all prefixes.
     for prefix, jets in masked_jets.items():
         grooming_results[f"jet_pt_{prefix}"] = jets[0].jet_pt
+
+    # Add scale factors when appropriate (ie for pythia)
+    if dataset.collision_system == "pythia":
+        # Need to redo the pt hard bin ranges because we apparently get a pt hard larger than 1000!
+        # So we do it again here.
+        # pt_hard_bin_ranges = np.array([0, 5, 7, 9, 12, 16, 21, 28, 36, 45, 57, 70, 85, 99, 115, 132, 150, 169, 190, 212, 235, 2000])
+        # Need to subtract 1 because our first bin is 1-indexed.
+        # pt_hard_bins = np.searchsorted(pt_hard_bin_ranges, tree["ptHard"]) - 1
+        # print(np.unique(pt_hard_bins))
+        analysis_settings = cast(analysis_objects.PtHardAnalysisSettings, dataset.settings)
+        scale_factors = dict(analysis_settings.scale_factors)
+        # There is apparently a pt hard > 1000 in this dataset! This ends up with an entry in bin 21, which is weird.
+        # So we copy the scale factor for pt hard bin 20 to 21 to cover it. It should be more or less correct.
+        scale_factors[21] = scale_factors[20]
+
+        pt_hard_bins = tree["ptHardBin"][mask]
+        print(np.unique(pt_hard_bins))
+        IPython.start_ipython(user_ns=locals())
+        grooming_results.update(
+            {
+                "scale_factor": np.array([analysis_settings.scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
+                "pt_hard_bin": pt_hard_bins,
+                "pt_hard": tree["ptHard"][mask],
+            }
+        )
 
     # Perform our calculations.
     functions = _define_calculation_funcs(dataset, iterative_splittings=iterative_splittings)
@@ -559,6 +593,7 @@ def run(
 
     # Setup
     settings_class_map: Mapping[str, Type[analysis_objects.AnalysisSettings]] = {
+        "pythia": analysis_objects.PtHardAnalysisSettings,
         "embedPythia": analysis_objects.PtHardAnalysisSettings,
     }
     dataset = analysis_objects.Dataset.from_config_file(
