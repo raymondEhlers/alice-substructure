@@ -546,7 +546,8 @@ def plot_response_by_matching_type(
 
 def _plot_kt_comparison(
     hists: Mapping[str, bh.Histogram],
-    data_hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
+    # data_hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
+    data_hist: bh.Histogram,
     grooming_method: str,
     hybrid_jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
@@ -557,8 +558,12 @@ def _plot_kt_comparison(
 
     # Data
     rebin_factor = 2
-    bh_data = getattr(data_hists, grooming_method).kt.to_boost_histogram()
-    bh_data = bh_data[:: bh.rebin(rebin_factor)]
+    # bh_data = getattr(data_hists, grooming_method).kt.to_boost_histogram()
+    # bh_data = data_hist
+    # bh_data = bh_data[:: bh.rebin(rebin_factor)]
+    # NOTE: We already applied the 40 < hybrid jet pt < 120 cut, so it doesn't need an additional selection.
+    bh_data = data_hist
+    bh_data = bh_data[:: bh.sum, :]
     h_data = binned_data.BinnedData.from_existing_data(bh_data)
     h_data /= rebin_factor
 
@@ -601,10 +606,11 @@ def _plot_kt_comparison(
         if label != "Pb--Pb":
             # Temp exclude normalization bin of h
             # TODO: Fix once data is skimmed.
-            h_temp = binned_data.BinnedData(
-                axes=[h.axes[0].bin_edges[1:]], values=h.values[1:], variances=h.variances[1:],
-            )
-            h_ratio = h_data / h_temp
+            # h_temp = binned_data.BinnedData(
+            #    axes=[h.axes[0].bin_edges[1:]], values=h.values[1:], variances=h.variances[1:],
+            # )
+            # import IPython; IPython.embed()
+            h_ratio = h_data / h
             # If we get 0, we don't want to show that point.
             h_ratio.values[h_ratio.values == 0] = np.nan
 
@@ -644,6 +650,7 @@ def _plot_kt_comparison(
     ax_ratio.set_ylim([0, 5])
     ax.set_yscale("log")
     ax.legend(frameon=False, loc="lower left")
+    fig.align_ylabels()
     fig.tight_layout()
     fig.subplots_adjust(
         # Reduce spacing between subplots
@@ -684,7 +691,32 @@ def plot_compare_kt(
 
         _plot_kt_comparison(
             hists=hists,
-            data_hists=data_hists_for_comparion,
+            # TODO: This won't work quite right! It needs a rebin + not to be projected in the comparison function.
+            data_hist=getattr(data_hists_for_comparion, grooming_method).kt,
+            grooming_method=grooming_method,
+            hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+            plot_config=PlotConfig(
+                name="kt_spectra",
+                x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+            ),
+            output_dir=output_dir,
+        )
+
+
+def plot_compare_kt_skim(
+    data_hists: Mapping[str, bh.Histogram],
+    embed_hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    output_dir: Path,
+) -> None:
+    hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+    prefix = "data"
+
+    for grooming_method in grooming_methods:
+        _plot_kt_comparison(
+            hists=embed_hists,
+            data_hist=data_hists[f"{grooming_method}_{prefix}_kt"],
             grooming_method=grooming_method,
             hybrid_jet_pt_bin=hybrid_jet_pt_bin,
             plot_config=PlotConfig(

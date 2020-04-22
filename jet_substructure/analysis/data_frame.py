@@ -6,7 +6,9 @@
 """
 
 import functools
+import gzip
 import logging
+import pickle
 from pathlib import Path
 from typing import Dict, Sequence
 
@@ -60,7 +62,7 @@ def dask_df_from_delayed() -> None:
 
 
 # def df_from_file(filenames: Sequence[Path], branches: Sequence[str]):
-def df_from_file() -> None:  # noqa: 901
+def df_from_file_embedding() -> None:  # noqa: 901
     # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
     from pathlib import Path  # noqa: F401
 
@@ -179,8 +181,7 @@ def df_from_file() -> None:  # noqa: 901
         )
 
     progress_manager = enlighten.Manager()
-    # TODO: Figure out how to get 72 from uproot.iterate
-    with progress_manager.counter(total=72, desc="Analyzing", unit="tree", leave=True) as tree_counter:
+    with progress_manager.counter(total=len(path_list), desc="Analyzing", unit="tree", leave=True) as tree_counter:
         for df_path, df in tree_counter(data_frames):
             logger.debug(f"Processing df from {df_path}")
             hybrid_jet_pt_mask = (df["jet_pt_hybrid"] > 40) & (df["jet_pt_hybrid"] < 120)
@@ -298,43 +299,48 @@ def df_from_file() -> None:  # noqa: 901
 
     progress_manager.stop()
 
-    # Add some helpful imports and definitions
-    from importlib import reload  # noqa: F401
+    # Write the hists
+    output_dir = Path(f"output/embedPythia/skim")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    pkl_filename = output_dir / "embedded.pgz"
+    with gzip.GzipFile(pkl_filename, "w") as pkl_file:
+        pickle.dump(hists, pkl_file)  # type: ignore
 
-    try:
-        # May not want to import if developing.
-        from jet_substructure.analysis import analyze_tree
-        from jet_substructure.analysis import plot_from_skim  # noqa: F401
-    except SyntaxError:
-        logger.info("Couldn't load plot_from_skim due to syntax error. You need to load it.")
+    ## Add some helpful imports and definitions
+    # from importlib import reload  # noqa: F401
 
-    output_dir = Path("output/embedPythia/skim")
+    # try:
+    #    # May not want to import if developing.
+    #    from jet_substructure.analysis import analyze_tree
+    #    from jet_substructure.analysis import plot_from_skim  # noqa: F401
+    # except SyntaxError:
+    #    logger.info("Couldn't load plot_from_skim due to syntax error. You need to load it.")
 
-    data_hists, data_dataset = analyze_tree.run_shared(
-        collision_system="PbPb",
-        analysis_function=analyze_tree.analyze_single_tree,
-        dataset_config_filename=Path("config") / "datasets.yaml",
-        hists_filename="data_hists",
-        jet_pt_bins=[
-            # Broadest range
-            helpers.RangeSelector(min=0, max=140),
-            # Main range of interest.
-            helpers.RangeSelector(min=40, max=120),
-            # Most likely where we will actually measure.
-            helpers.RangeSelector(min=80, max=120),
-            # Individual ranges.
-            helpers.RangeSelector(min=40, max=60),
-            helpers.RangeSelector(min=60, max=80),
-            helpers.RangeSelector(min=80, max=100),
-            helpers.RangeSelector(min=100, max=120),
-        ],
-        z_cutoff=0.2,
-        plot_only=True,
-        force_reprocessing=False,
-        number_of_cores=1,
-    )
+    # data_hists, data_dataset = analyze_tree.run_shared(
+    #    collision_system="PbPb",
+    #    analysis_function=analyze_tree.analyze_single_tree,
+    #    dataset_config_filename=Path("config") / "datasets.yaml",
+    #    hists_filename="data_hists",
+    #    jet_pt_bins=[
+    #        # Broadest range
+    #        helpers.RangeSelector(min=0, max=140),
+    #        # Main range of interest.
+    #        helpers.RangeSelector(min=40, max=120),
+    #        # Most likely where we will actually measure.
+    #        helpers.RangeSelector(min=80, max=120),
+    #        # Individual ranges.
+    #        helpers.RangeSelector(min=40, max=60),
+    #        helpers.RangeSelector(min=60, max=80),
+    #        helpers.RangeSelector(min=80, max=100),
+    #        helpers.RangeSelector(min=100, max=120),
+    #    ],
+    #    z_cutoff=0.2,
+    #    plot_only=True,
+    #    force_reprocessing=False,
+    #    number_of_cores=1,
+    # )
 
-    IPython.start_ipython(user_ns=locals())
+    # IPython.start_ipython(user_ns=locals())
 
     # Plotting
     # plot_from_skim.plot_residuals_by_matching_type(
@@ -369,9 +375,151 @@ def map_reduce_pandas_concat() -> None:
     IPython.start_ipython(user_ns=locals())
 
 
+def df_from_file_data(collision_system: str) -> None:  # noqa: 901
+    # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
+    from pathlib import Path  # noqa: F401
+
+    # Setup
+    jet_R = 0.4
+    prefix = "data"
+    path_list = data_manager._ensure_and_expand_paths([Path("trains/PbPb/5537/skim/*_iterative_splittings.root")])
+    data_frames = uproot.pandas.iterate(
+        path=path_list, treepath="tree", namedecode="utf-8", branches=[f"*{prefix}*"], reportpath=True,
+    )
+    # for df in data_frames:
+    #    IPython.embed()
+
+    # NOPE! Still too big...
+    # df = pd.concat(data_frames, axis=1, copy=False)
+
+    # TODO: Define grooming methods better?
+    grooming_methods = [
+        "dynamical_z",
+        "dynamical_kt",
+        "dynamical_time",
+        "leading_kt",
+        "leading_kt_z_cut_02",
+        "leading_kt_z_cut_04",
+        "soft_drop_z_cut_02",
+        "soft_drop_z_cut_04",
+    ]
+
+    # Define hists.
+    hists = {}
+    for grooming_method in grooming_methods:
+        jet_pt_axis = bh.axis.Regular(28, 0, 140)
+        hists[f"{grooming_method}_{prefix}_kt"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(26, -1, 25), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_{prefix}_delta_R"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(21, -0.02, jet_R), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_{prefix}_theta"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(21, -0.05, 1.0), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_{prefix}_z"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(20, 0, 0.5), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_{prefix}_n"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(10, 0, 10), storage=bh.storage.Weight(),
+        )
+
+    progress_manager = enlighten.Manager()
+    with progress_manager.counter(total=len(path_list), desc="Analyzing", unit="tree", leave=True) as tree_counter:
+        for df_path, df in tree_counter(data_frames):
+            logger.debug(f"Processing df from {df_path}")
+            weight = 1.0
+            jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+            jet_pt_mask = jet_pt_bin.mask_array(df["jet_pt_data"])
+            masked_df = df[jet_pt_mask]
+            for grooming_method in grooming_methods:
+                hists[f"{grooming_method}_{prefix}_kt"].fill(
+                    masked_df["jet_pt_data"].to_numpy(),
+                    masked_df[f"{grooming_method}_{prefix}_kt"].to_numpy(),
+                    weight=weight,
+                )
+                hists[f"{grooming_method}_{prefix}_delta_R"].fill(
+                    masked_df["jet_pt_data"].to_numpy(),
+                    masked_df[f"{grooming_method}_{prefix}_delta_R"].to_numpy(),
+                    weight=weight,
+                )
+                hists[f"{grooming_method}_{prefix}_z"].fill(
+                    masked_df["jet_pt_data"].to_numpy(),
+                    masked_df[f"{grooming_method}_{prefix}_z"].to_numpy(),
+                    weight=weight,
+                )
+                hists[f"{grooming_method}_{prefix}_n"].fill(
+                    masked_df["jet_pt_data"].to_numpy(),
+                    masked_df[f"{grooming_method}_{prefix}_n"].to_numpy(),
+                    weight=weight,
+                )
+
+    progress_manager.stop()
+
+    # Write the hists
+    output_dir = Path(f"output/{collision_system}/skim")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    pkl_filename = output_dir / f"{collision_system}.pgz"
+    with gzip.GzipFile(pkl_filename, "w") as pkl_file:
+        pickle.dump(hists, pkl_file)  # type: ignore
+
+    # Add some helpful imports and definitions
+    # from importlib import reload  # noqa: F401
+
+    # try:
+    #    # May not want to import if developing.
+    #    from jet_substructure.analysis import plot_from_skim  # noqa: F401
+    # except SyntaxError:
+    #    logger.info("Couldn't load plot_from_skim due to syntax error. You need to load it.")
+
+    # IPython.start_ipython(user_ns=locals())
+
+
+def plot_all() -> None:
+    # TODO: Consolidate
+    grooming_methods = [
+        "dynamical_z",
+        "dynamical_kt",
+        "dynamical_time",
+        "leading_kt",
+        "leading_kt_z_cut_02",
+        "leading_kt_z_cut_04",
+        "soft_drop_z_cut_02",
+        "soft_drop_z_cut_04",
+    ]
+    output_dir = Path(f"output/compare/skim")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info("Loading embedded data")
+    pkl_filename = Path("output") / "embedPythia" / "skim" / "embedded.pgz"
+    with gzip.GzipFile(pkl_filename, "r") as pkl_file:
+        embedded_hists = pickle.load(pkl_file)  # type: ignore
+
+    logger.info("Loading PbPb data")
+    pkl_filename = Path("output") / "PbPb" / "skim" / "PbPb.pgz"
+    with gzip.GzipFile(pkl_filename, "r") as pkl_file:
+        pbpb_hists = pickle.load(pkl_file)  # type: ignore
+
+    # Add some helpful imports and definitions
+    from importlib import reload  # noqa: F401
+
+    try:
+        # May not want to import if developing.
+        from jet_substructure.analysis import plot_from_skim  # noqa: F401
+    except SyntaxError:
+        logger.info("Couldn't load plot_from_skim due to syntax error. You need to load it.")
+
+    IPython.start_ipython(user_ns=locals())
+
+
 if __name__ == "__main__":
     helpers.setup_logging()
-    df_from_file()
-    # dask_df_from_file()
-    # dask_df_from_delayed()
-    # map_reduce_pandas_concat()
+    plot_only = True
+    if not plot_only:
+        # df_from_file_embedding()
+        df_from_file_data(collision_system="PbPb")
+        # dask_df_from_file()
+        # dask_df_from_delayed()
+        # map_reduce_pandas_concat()
+
+    plot_all()
