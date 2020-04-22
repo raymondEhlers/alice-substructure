@@ -726,3 +726,88 @@ def plot_compare_kt_skim(
             ),
             output_dir=output_dir,
         )
+
+
+def _plot_kt_vs_jet_pt_raw_with_labels(
+    hists: Mapping[str, bh.Histogram],
+    grooming_method: str,
+    prefix: str,
+    hybrid_jet_pt_bin: helpers.RangeSelector,
+    plot_config: PlotConfig,
+    output_dir: Path,
+) -> None:
+    logger.debug(f"Plotting kt vs jet pt for {grooming_method}.")
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # We want to plot the 2D hist, so no need for any projections.
+    # However, first we need to rebin
+    bh_hist = hists[f"{grooming_method}_{prefix}_kt"]
+    h = binned_data.BinnedData.from_existing_data(bh_hist[:: bh.rebin(4), 1 :: bh.rebin(5)])
+
+    # Plot
+    # Normally, we transpose the data. However, we want the kt on the x axis and the pt on the y axis.
+    # So we leave it as is. Further, we just want the values in text, not the heatmap. So we fill everything
+    # with ones, and then below we add the ext labels.
+    mesh = ax.pcolormesh(h.axes[1].bin_edges.T, h.axes[0].bin_edges.T, np.ones_like(h.values),)
+    fig.colorbar(mesh, pad=0.02)
+
+    # Plot values labels.
+    for i, kt_bin_center in enumerate(h.axes[1].bin_centers):
+        for j, pt_bin_center in enumerate(h.axes[0].bin_centers):
+            text = ax.text(kt_bin_center, pt_bin_center, str(h.values[j, i]), ha="center", va="center", color="w")
+
+    # Labeling
+    text = "Iterative splittings"
+    text += ", " + " ".join(grooming_method.split("_")).capitalize()
+    ax.text(
+        0.03,
+        0.98,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="left",
+        verticalalignment="top",
+        multialignment="left",
+    )
+
+    # Presentation
+    ax.set_xlabel(plot_config.x_label)
+    ax.set_ylabel(plot_config.y_label)
+    ax.set_xlim([0, 25])
+    ax.set_ylim([40, 120])
+    fig.align_ylabels()
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.12,
+        bottom=0.12,
+        right=0.99,
+        top=0.98,
+    )
+
+    # Store and cleanup
+    filename = f"{plot_config.name}_hybrid_{hybrid_jet_pt_bin}_iterative_splittings_{grooming_method}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def plot_kt_vs_jet_pt(hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path,) -> None:
+    hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+    prefix = "data"
+
+    for grooming_method in grooming_methods:
+        _plot_kt_vs_jet_pt_raw_with_labels(
+            hists=hists,
+            grooming_method=grooming_method,
+            prefix=prefix,
+            hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+            plot_config=PlotConfig(
+                name="kt_vs_jet_pt_raw",
+                x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                y_label=r"$p_{\text{T}}\:(\text{GeV}/c)$",
+            ),
+            output_dir=output_dir,
+        )
