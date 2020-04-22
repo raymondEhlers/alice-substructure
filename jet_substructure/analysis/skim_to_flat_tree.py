@@ -433,19 +433,22 @@ def calculate_and_skim_embedding(
             from jet_substructure.analysis import draw_splitting
 
             # Find a sufficiently interesting jet (ie high enough pt)
-            mask_jets_of_interest = (leading_matching.properly & subleading_matching.failed) & (
-                masked_hybrid_jets.jet_pt > 80
+            mask_jets_of_interest = (
+                (leading_matching.properly & subleading_matching.failed)
+                & (masked_hybrid_jets.jet_pt > 80)
+                & (det_level_jets_calculation.splittings.kt > 10).flatten()
             )
+
             # Look at most the first 5 jets.
             for i, hybrid_jet in enumerate(masked_hybrid_jets[mask_jets_of_interest][:5]):
                 # Find the hybrid jet and splitting of interest.
                 # hybrid_jet = masked_hybrid_jets[mask_jets_of_interest][0]
                 # Take the index of the splitting of interest. We want the first jet, and then there must be one splitting index there.
-                hybrid_jet_selected_splitting_index = hybrid_jets_calculation.indices[mask_jets_of_interest][i][0]  # type: ignore
+                hybrid_jet_selected_splitting_index = hybrid_jets_calculation.indices[mask_jets_of_interest][i][0]
                 # Same for det level.
                 det_level_jet = masked_det_level_jets[mask_jets_of_interest][i]
                 # Take the index of the splitting of interest. We want the first jet, and then there must be one splitting index there.
-                det_level_jet_selected_splitting_index = det_level_jets_calculation.indices[mask_jets_of_interest][i][0]  # type: ignore
+                det_level_jet_selected_splitting_index = det_level_jets_calculation.indices[mask_jets_of_interest][i][0]
 
                 # Draw the splittings
                 draw_splitting.splittings_graph(
