@@ -554,13 +554,21 @@ def _split_array(
 
 
 def _determine_matching_types(
-    matched_subjets: substructure_methods.SubjetArray, hybrid_subjets: substructure_methods.SubjetArray,
+    matched_subjets: substructure_methods.SubjetArray,
+    hybrid_subjets: substructure_methods.SubjetArray,
+    match_using_distance: bool = False,
 ) -> UprootArray[bool]:
     """ Determine whether the given subjets match.
+
+    Note:
+        Matching by global index only works for det-hybrid matching. For part-det matching, matching must be performed
+        using distance between constituents.
 
     Args:
         matched_subjets: Subjets from the matched jets.
         hybrid_subjets: Subjets from the hybrid jets.
+        match_using_distance: If True, match using distance of the constituents,
+            rather than global index.
     Returns:
         Mask indicating when these subjets matched.
     """
@@ -577,9 +585,21 @@ def _determine_matching_types(
         constituent_pairs = matched_subset.argcross(hybrid_subset)
         matched_leading_indices, hybrid_leading_indices = constituent_pairs.unzip()
 
-        index_matching = (
-            matched_subset[matched_leading_indices].global_index == hybrid_subset[hybrid_leading_indices].global_index
-        )
+        if match_using_distance:
+            # Require delta eta and delta phi to be within 0.001
+            delta = 0.001
+            delta_eta_matching = (
+                np.abs(matched_subset[matched_leading_indices].eta - hybrid_subset[hybrid_leading_indices].eta) < delta
+            )
+            delta_phi_matching = (
+                np.abs(matched_subset[matched_leading_indices].phi - hybrid_subset[hybrid_leading_indices].phi) < delta
+            )
+            index_matching = delta_eta_matching & delta_phi_matching
+        else:
+            index_matching = (
+                matched_subset[matched_leading_indices].global_index
+                == hybrid_subset[hybrid_leading_indices].global_index
+            )
 
         shared_constituents_pts[selected_range] = matched_subset[matched_leading_indices][index_matching].pt.sum()
 
@@ -596,7 +616,9 @@ def _determine_matching_types(
 
 
 def determine_matched_jets(
-    hybrid_inputs: analysis_objects.FillHistogramInput, matched_inputs: analysis_objects.FillHistogramInput
+    hybrid_inputs: analysis_objects.FillHistogramInput,
+    matched_inputs: analysis_objects.FillHistogramInput,
+    match_using_distance: bool = False,
 ) -> Tuple[analysis_objects.MatchingResult, analysis_objects.MatchingResult]:
     """ Determine the matching between subjets.
 
@@ -606,6 +628,8 @@ def determine_matched_jets(
     Args:
         hybrid_inputs: The selected hybrid jets and splittings.
         matched_inputs: The selected matched jets and splittings.
+        match_using_distance: If True, match using distance of the constituents,
+            rather than global index.
     Returns:
         Leading subjet matching results, subleading subjet matching results.
     """
@@ -628,10 +652,18 @@ def determine_matched_jets(
     hybrid_subjets_leading, hybrid_subjets_subleading = _get_leading_and_subleading_subjets(hybrid_subjets_unsorted)
 
     # Now, determine the matching types based on the possible combinations of leading and subleading subjets.
-    matched_leading_properly = _determine_matching_types(matched_subjets_leading, hybrid_subjets_leading)
-    matched_leading_mistag = _determine_matching_types(matched_subjets_leading, hybrid_subjets_subleading)
-    matched_subleading_properly = _determine_matching_types(matched_subjets_subleading, hybrid_subjets_subleading)
-    matched_subleading_mistag = _determine_matching_types(matched_subjets_subleading, hybrid_subjets_leading)
+    matched_leading_properly = _determine_matching_types(
+        matched_subjets_leading, hybrid_subjets_leading, match_using_distance=match_using_distance
+    )
+    matched_leading_mistag = _determine_matching_types(
+        matched_subjets_leading, hybrid_subjets_subleading, match_using_distance=match_using_distance
+    )
+    matched_subleading_properly = _determine_matching_types(
+        matched_subjets_subleading, hybrid_subjets_subleading, match_using_distance=match_using_distance
+    )
+    matched_subleading_mistag = _determine_matching_types(
+        matched_subjets_subleading, hybrid_subjets_leading, match_using_distance=match_using_distance
+    )
     # Combine those cases to determine when the we failed to find the leading and subleading subjets.
     matched_leading_failed = ~matched_leading_properly & ~matched_leading_mistag
     matched_subleading_failed = ~matched_subleading_properly & ~matched_subleading_mistag
