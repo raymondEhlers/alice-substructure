@@ -540,7 +540,6 @@ def calculate_and_skim_data(
 
         pt_hard_bins = tree["ptHardBin"][mask]
         print(np.unique(pt_hard_bins))
-        IPython.start_ipython(user_ns=locals())
         grooming_results.update(
             {
                 "scale_factor": np.array([scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
