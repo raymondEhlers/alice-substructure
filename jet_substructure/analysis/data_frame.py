@@ -384,7 +384,7 @@ def df_from_file_data(collision_system: str) -> None:  # noqa: 901
     prefix = "data"
     path_list = data_manager._ensure_and_expand_paths([Path("trains/PbPb/5537/skim/*_iterative_splittings.root")])
     data_frames = uproot.pandas.iterate(
-        path=path_list, treepath="tree", namedecode="utf-8", branches=[f"*{prefix}*"], reportpath=True,
+        path=path_list, treepath="tree", namedecode="utf-8", branches=[f"*{prefix}*", "scale_factor"], reportpath=True,
     )
     # for df in data_frames:
     #    IPython.embed()
@@ -428,7 +428,11 @@ def df_from_file_data(collision_system: str) -> None:  # noqa: 901
     with progress_manager.counter(total=len(path_list), desc="Analyzing", unit="tree", leave=True) as tree_counter:
         for df_path, df in tree_counter(data_frames):
             logger.debug(f"Processing df from {df_path}")
-            weight = 1.0
+            if collision_system == "pythia":
+                weight = df["scale_factor"]
+            else:
+                weight = 1.0
+
             jet_pt_bin = helpers.RangeSelector(min=40, max=120)
             jet_pt_mask = jet_pt_bin.mask_array(df["jet_pt_data"])
             masked_df = df[jet_pt_mask]
