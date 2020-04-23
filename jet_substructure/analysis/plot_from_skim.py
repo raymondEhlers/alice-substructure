@@ -41,6 +41,129 @@ class PlotConfig:
     log_y: bool = attr.ib(default=True)
 
 
+def _project_matching(bh_hist: bh.Histogram, axis_to_keep: int) -> binned_data.BinnedData:
+    # Axes: 0 = measured_pt, 1 = measured_kt, 2 = detector_pt , 3 = detector_kt
+    selections = [
+        slice(None, None, bh.sum),
+        slice(None, None, bh.sum),
+        slice(None, None, bh.sum),
+        slice(None, None, bh.sum),
+    ]
+    selections[axis_to_keep] = slice(None)
+
+    bh_hist = bh_hist[tuple(selections)]
+
+    return binned_data.BinnedData.from_existing_data(bh_hist)
+
+
+def _plot_subjet_matching(
+    hists: Mapping[str, bh.Histogram],
+    axis_parameter: str,
+    grooming_method: str,
+    matching_types: Sequence[str],
+    hybrid_jet_pt_bin: helpers.RangeSelector,
+    plot_config: PlotConfig,
+    output_dir: Path,
+    min_hybrid_kt: float = 0,
+) -> None:
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    axis_to_keep_map = {"pt": 2, "kt": 3}
+    axis_to_keep = axis_to_keep_map[axis_parameter]
+    matching_type_label_map = {
+        "pure": "Pure matches",
+        "leading_untagged_subleading_correct": "Leading unmatched, subleading matched",
+        "leading_correct_subleading_untagged": "Leading matched, subleading unmatched",
+        "leading_untagged_subleading_mistag": "Leading unmatched, subleading in leading",
+        "leading_mistag_subleading_untagged": "Leading in subleading, subleading unmatched",
+        "swap": "Swaps",
+        "both_untagged": "Leading, subleading unmatched",
+    }
+
+    normalization = _project_matching(
+        bh_hist=hists[f"{grooming_method}_hybrid_det_level_kt_response_matching_type_all"], axis_to_keep=axis_to_keep
+    )
+
+    for matching_type in matching_types:
+        if matching_type == "all":
+            continue
+        logger.debug(
+            f"Plotting {axis_parameter} residual for {grooming_method}, {matching_type}, min_hybrid_kt: {min_hybrid_kt}"
+        )
+        h = _project_matching(
+            hists[f"{grooming_method}_hybrid_det_level_kt_response_matching_type_{matching_type}"],
+            axis_to_keep=axis_to_keep,
+        )
+
+        h /= normalization
+        ax.errorbar(
+            h.axes[0].bin_centers,
+            h.values,
+            yerr=h.errors,
+            xerr=h.axes[0].bin_widths / 2,
+            marker=".",
+            linestyle="",
+            label=matching_type_label_map[matching_type],
+        )
+
+    # Labeling
+    text = "Iterative splittings"
+    text += "\n" + f"${helpers.RangeSelector(40, 120).display_str(label='hybrid')}$"
+    text += "\n" + " ".join(grooming_method.split("_")).capitalize()
+    ax.text(
+        0.975,
+        0.55,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="right",
+        verticalalignment="center",
+        multialignment="right",
+    )
+
+    # Presentation
+    # Axis labels
+    x_axis_label = fr"${axis_parameter[0]}" + r"_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$"
+    ax.set_ylabel(plot_config.y_label)
+    ax.set_xlabel(x_axis_label)
+    ax.set_ylim([1e-3, 10])
+    ax.set_yscale("log")
+    ax.legend(frameon=False, loc="upper left", ncol=2, fontsize=14)
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.10,
+        bottom=0.08,
+        right=0.99,
+        top=0.96,
+    )
+
+    # Store and reset
+    fig.savefig(
+        output_dir
+        / f"{plot_config.name}_{axis_parameter}_hybrid_{hybrid_jet_pt_bin}_{grooming_method}_single_figure.pdf"
+    )
+    plt.close(fig)
+
+
+def plot_prong_matching(
+    hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], matching_types: Sequence[str], output_dir: Path
+) -> None:
+    hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+    for grooming_method in grooming_methods:
+        _plot_subjet_matching(
+            hists=hists,
+            grooming_method=grooming_method,
+            matching_types=matching_types,
+            axis_parameter="pt",
+            hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+            plot_config=PlotConfig(name="subjet_matching", x_label="IGNORE", y_label="Tagging fraction",),
+            output_dir=output_dir,
+        )
+
+
 def _plot_residual_by_matching_type(
     hists: Mapping[str, bh.Histogram],
     label: str,
