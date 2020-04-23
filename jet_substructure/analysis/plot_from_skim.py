@@ -273,7 +273,7 @@ def _plot_residual_mean_and_width(
 
         # Presentation
         a.set_xlabel(plot_config.x_label)
-        a.legend(frameon=False, loc="center right", fontsize=14)
+        a.legend(frameon=False, loc="upper center", fontsize=14)
         f.tight_layout()
     # Needs extra spacing on the left because the axis goes negative.
     fig_mean.subplots_adjust(
@@ -743,19 +743,26 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     # We want to plot the 2D hist, so no need for any projections.
     # However, first we need to rebin
     bh_hist = hists[f"{grooming_method}_{prefix}_kt"]
-    h = binned_data.BinnedData.from_existing_data(bh_hist[:: bh.rebin(4), 1 :: bh.rebin(5)])
+    h = binned_data.BinnedData.from_existing_data(
+        bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1 :: bh.rebin(5)]  # noqa: E203
+    )
 
     # Plot
     # Normally, we transpose the data. However, we want the kt on the x axis and the pt on the y axis.
     # So we leave it as is. Further, we just want the values in text, not the heatmap. So we fill everything
-    # with ones, and then below we add the ext labels.
-    mesh = ax.pcolormesh(h.axes[1].bin_edges.T, h.axes[0].bin_edges.T, np.ones_like(h.values),)
-    fig.colorbar(mesh, pad=0.02)
+    # with zeros, and then use a heatmap with white at 0 so it doesn't show up. We'll label the values below.
+    ax.pcolormesh(
+        h.axes[1].bin_edges.T,
+        h.axes[0].bin_edges.T,
+        np.zeros_like(h.values),
+        cmap="bwr",
+        norm=matplotlib.colors.Normalize(vmin=-1, vmax=1),
+    )
 
-    # Plot values labels.
+    # Plot values labels. These will be the only things that show up.
     for i, kt_bin_center in enumerate(h.axes[1].bin_centers):
         for j, pt_bin_center in enumerate(h.axes[0].bin_centers):
-            text = ax.text(kt_bin_center, pt_bin_center, str(h.values[j, i]), ha="center", va="center", color="w")
+            text = ax.text(kt_bin_center, pt_bin_center, str(h.values[j, i]), ha="center", va="center", color="black")
 
     # Labeling
     text = "Iterative splittings"
@@ -768,6 +775,7 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
         horizontalalignment="left",
         verticalalignment="top",
         multialignment="left",
+        color="black",
     )
 
     # Presentation
@@ -784,8 +792,8 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
         # Reduce external spacing
         left=0.12,
         bottom=0.12,
-        right=0.99,
-        top=0.98,
+        right=0.98,
+        top=0.975,
     )
 
     # Store and cleanup
