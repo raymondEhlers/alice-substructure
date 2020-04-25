@@ -209,7 +209,7 @@ def _plot_residual_by_matching_type(
         # Normalize
         h_residual /= np.sum(h_residual.values)
 
-        if matching_type in ["all", "pure", "swap"]:
+        if matching_type in ["all", "pure", "swap", "leading_correct_subleading_untagged"]:
             ax_simplified.errorbar(
                 h_residual.axes[0].bin_centers,
                 h_residual.values,
@@ -267,6 +267,8 @@ def _plot_residual_by_matching_type(
             right=0.99,
             top=0.98,
         )
+    # Set range so that it's consistent.
+    ax_simplified.set_ylim([-0.01, 0.18])
 
     # Store and cleanup
     filename = f"{plot_config.name}_iterative_splittings_{grooming_method}"
@@ -942,3 +944,250 @@ def plot_kt_vs_jet_pt(hists: Mapping[str, bh.Histogram], grooming_methods: Seque
             ),
             output_dir=output_dir,
         )
+
+
+def _plot_distance_comparison(
+    hists: Mapping[str, bh.Histogram],
+    grooming_method: str,
+    hybrid_jet_pt_bin: helpers.RangeSelector,
+    plot_config: PlotConfig,
+    output_dir: Path,
+) -> None:
+    logger.debug(f"Plotting hybrid-det distance comparison for {grooming_method}.")
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # We want to plot the 2D hist, so no need for any projections.
+    # However, first we need to rebin
+    for name, label in [
+        (f"{grooming_method}_hybrid_det_distance", "all"),
+        (f"{grooming_method}_hybrid_det_distance_pure", "pure"),
+        (
+            f"{grooming_method}_hybrid_det_distance_corner",
+            r"$k_{\text{T}}^{\text{true}} > 10, k_{\text{T}}^{\text{hybrid}} < 10$",
+        ),
+    ]:
+        h = binned_data.BinnedData.from_existing_data(hists[name])
+        # Normalize
+        h /= np.sum(h.values)
+        # Plot
+        ax.errorbar(
+            h.axes[0].bin_centers,
+            h.values,
+            yerr=h.errors,
+            xerr=h.axes[0].bin_widths / 2,
+            marker=".",
+            linestyle="",
+            label=label,
+        )
+
+    # Labeling
+    text = "Iterative splittings"
+    text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+    text += "\n" + " ".join(grooming_method.split("_")).capitalize()
+    ax.text(
+        0.95,
+        0.95,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="right",
+        verticalalignment="top",
+        multialignment="right",
+        color="black",
+    )
+
+    # Presentation
+    ax.set_xlabel(plot_config.x_label)
+    ax.set_ylabel(plot_config.y_label)
+    ax.legend(frameon=False, loc="center right")
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.12,
+        bottom=0.12,
+        right=0.97,
+        top=0.97,
+    )
+
+    # Store and cleanup
+    filename = f"{plot_config.name}_hybrid_det_{hybrid_jet_pt_bin}_iterative_splittings_{grooming_method}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def plot_distance_comparison(
+    hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path
+) -> None:
+    hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+
+    for grooming_method in grooming_methods:
+        _plot_distance_comparison(
+            hists=hists,
+            grooming_method=grooming_method,
+            hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+            plot_config=PlotConfig(
+                name="distance_comparison", x_label=r"$\Delta R_{\text{hybrid-det}}$", y_label=r"Prob.",
+            ),
+            output_dir=output_dir,
+        )
+
+
+@attr.s
+class GroomingMethodStyle:
+    color: str = attr.ib()
+    marker: str = attr.ib()
+    fillstyle: str = attr.ib()
+    label: str = attr.ib()
+    zorder: int = attr.ib()
+
+
+def _plot_compare_grooming_methods_for_attribute(
+    hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    attr_name: str,
+    prefix: str,
+    jet_pt_bin: helpers.RangeSelector,
+    plot_config: PlotConfig,
+    output_dir: Path,
+) -> None:
+    logger.info(f"Plotting grooming method comparison for {attr_name}")
+
+    import seaborn as sns
+
+    greens = sns.color_palette("GnBu_d", 3)
+    # greens = sns.color_palette("Greens_d", 3)
+    purples = sns.color_palette("Purples", 3)
+    reds = sns.color_palette("Reds_d", 2)
+    markers = ["o", "d", "s"]
+    grooming_styling = {
+        "dynamical_z": GroomingMethodStyle(
+            color=greens[0], marker=markers[0], fillstyle="full", label="$z$Drop", zorder=10
+        ),
+        "dynamical_kt": GroomingMethodStyle(
+            color=greens[1], marker=markers[0], fillstyle="full", label=r"$k_{\text{T}}$Drop", zorder=10
+        ),
+        "dynamical_time": GroomingMethodStyle(
+            color=greens[2], marker=markers[0], fillstyle="full", label=r"timeDrop", zorder=10
+        ),
+        "leading_kt": GroomingMethodStyle(
+            color=purples[1], marker=markers[0], fillstyle="full", label=r"Leading $k_{\text{T}}$", zorder=10
+        ),
+        "leading_kt_z_cut_02": GroomingMethodStyle(
+            color=purples[1], marker=markers[1], fillstyle="none", label=r"Leading $k_{\text{T}}$ $z > 0.2$", zorder=10
+        ),
+        "leading_kt_z_cut_04": GroomingMethodStyle(
+            color=purples[1], marker=markers[2], fillstyle="full", label=r"Leading $k_{\text{T}}$ $z > 0.4$", zorder=10
+        ),
+        "soft_drop_z_cut_02": GroomingMethodStyle(
+            color=reds[1], marker=markers[1], fillstyle="none", label=r"SoftDrop $z > 0.2$", zorder=5
+        ),
+        "soft_drop_z_cut_04": GroomingMethodStyle(
+            color=reds[1], marker=markers[2], fillstyle="full", label=r"SoftDrop $z > 0.4$", zorder=5
+        ),
+    }
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    for grooming_method in grooming_methods:
+        # Setup
+        style = grooming_styling[grooming_method]
+
+        # Axes: jet_pt, attr_name
+        bh_hist = hists[f"{grooming_method}_{prefix}_{attr_name}"]
+        # Need to project to just the attr of interest.
+        h = binned_data.BinnedData.from_existing_data(
+            bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :]  # noqa: E203
+        )
+
+        # Normalize
+        h /= np.sum(h.values)
+
+        # Plot options
+        kwargs = {
+            "markerfacecolor": "white" if style.fillstyle == "none" else style.color,
+            "alpha": 1 if style.fillstyle == "none" else 0.8,
+        }
+        if style.fillstyle != "none":
+            kwargs["markeredgewidth"] = 0
+
+        ax.errorbar(
+            h.axes[0].bin_centers,
+            h.values,
+            yerr=h.errors,
+            xerr=h.axes[0].bin_widths / 2,
+            color=style.color,
+            marker=style.marker,
+            fillstyle=style.fillstyle,
+            linestyle="",
+            label=style.label,
+            zorder=style.zorder,
+            **kwargs,
+        )
+
+    # Labeling
+    # TODO: Comprehensive ALICE labeling.
+    text = "Iterative splittings"
+    text += "\n" + f"${jet_pt_bin.display_str(label='')}$"
+    # text += "\n" + " ".join(grooming_method.split("_")).capitalize()
+    ax.text(
+        0.95,
+        0.95,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="right",
+        verticalalignment="top",
+        multialignment="right",
+        color="black",
+    )
+
+    # Presentation
+    # Cut out the normalization bin at < 0
+    lower, upper = ax.get_xlim()
+    ax.set_xlim([0, upper])
+    ax.set_xlabel(plot_config.x_label)
+    ax.set_ylabel(plot_config.y_label)
+    ax.set_yscale("log")
+    ax.legend(frameon=False, loc=plot_config.legend_location, fontsize=14)
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.12,
+        bottom=0.12,
+        right=0.97,
+        top=0.97,
+    )
+
+    # Store and cleanup
+    filename = f"{plot_config.name}_{attr_name}_{jet_pt_bin}_iterative_splittings"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def compare_grooming_methods_for_substructure_prod(
+    hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path
+) -> None:
+    """
+
+    """
+    jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+
+    _plot_compare_grooming_methods_for_attribute(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        attr_name="kt",
+        prefix="data",
+        jet_pt_bin=jet_pt_bin,
+        plot_config=PlotConfig(
+            name="kt_grooming_methods",
+            x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+            legend_location="lower left",
+        ),
+        output_dir=output_dir,
+    )
