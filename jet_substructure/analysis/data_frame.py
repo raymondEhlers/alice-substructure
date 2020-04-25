@@ -15,6 +15,7 @@ from typing import Dict, Sequence
 import boost_histogram as bh
 import enlighten
 import IPython
+import numpy as np
 import pandas as pd
 import uproot
 
@@ -72,11 +73,24 @@ def df_from_file_embedding() -> None:  # noqa: 901
             Path("trains/embedPythia/55*/skim/*_iterative_splittings.root"),
         ]
     )
+    path_list_friends = data_manager._ensure_and_expand_paths(
+        [
+            Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
+            Path("trains/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
+        ]
+    )
     data_frames = uproot.pandas.iterate(
         path=path_list,
         treepath="tree",
         namedecode="utf-8",
         branches=["scale_factor", "*true*", "*det_level*", "*hybrid*"],
+        reportpath=True,
+    )
+    data_frames_friends = uproot.pandas.iterate(
+        path=path_list_friends,
+        treepath="tree",
+        namedecode="utf-8",
+        branches=["*matched*", "*detLevel*", "*data*"],
         reportpath=True,
     )
     # for df in data_frames:
@@ -179,12 +193,33 @@ def df_from_file_embedding() -> None:  # noqa: 901
         hists[f"{grooming_method}_det_true_jet_pt_residual_distribution"] = bh.Histogram(
             bh.axis.Regular(15, 0, 150), bh.axis.Regular(150, -1.5, 1.5), storage=bh.storage.Weight(),
         )
+        # Distance comparison
+        hists[f"{grooming_method}_hybrid_det_distance"] = bh.Histogram(
+            bh.axis.Regular(20, 0, 0.5), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_hybrid_det_distance_pure"] = bh.Histogram(
+            bh.axis.Regular(20, 0, 0.5), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_hybrid_det_distance_corner"] = bh.Histogram(
+            bh.axis.Regular(20, 0, 0.5), storage=bh.storage.Weight(),
+        )
 
     progress_manager = enlighten.Manager()
     with progress_manager.counter(total=len(path_list), desc="Analyzing", unit="tree", leave=True) as tree_counter:
-        for df_path, df in tree_counter(data_frames):
+        for (df_path, df), (df_friend_path, df_friend) in tree_counter(zip(data_frames, data_frames_friends)):
             logger.debug(f"Processing df from {df_path}")
+            # Merge the friends together.
+            # Rename friends columns because I forgot to rename earlier.
+            df_friend = df_friend.rename(
+                columns=lambda s: s.replace("matched", "true")
+                .replace("data", "hybrid")
+                .replace("detLevel", "det_level")
+            )
+            df = pd.concat([df, df_friend], axis=1)
+
+            # Setup
             hybrid_jet_pt_mask = (df["jet_pt_hybrid"] > 40) & (df["jet_pt_hybrid"] < 120)
+            # And finally process
             for grooming_method in grooming_methods:
 
                 matching_leading = df[f"{grooming_method}_hybrid_detector_matching_leading"]
@@ -253,6 +288,26 @@ def df_from_file_embedding() -> None:  # noqa: 901
                     masked_df["jet_pt_true"].to_numpy(),
                     ((masked_df["jet_pt_det_level"] - masked_df["jet_pt_true"]) / masked_df["jet_pt_true"]).to_numpy(),
                     weight=masked_df["scale_factor"].to_numpy(),
+                )
+                # Matching distance
+                masked_df = df[hybrid_jet_pt_mask]
+                pure_mask = matching_selections["pure"][hybrid_jet_pt_mask]
+                upper_left_corner_mask = (masked_df[f"{grooming_method}_true_kt"] > 10) & (
+                    masked_df[f"{grooming_method}_hybrid_kt"] < 10
+                )
+                distances: pd.Series = np.sqrt(
+                    (masked_df["jet_eta_hybrid"] - masked_df["jet_eta_det_level"]) ** 2
+                    + (masked_df["jet_phi_hybrid"] - masked_df["jet_phi_det_level"]) ** 2
+                )
+                hists[f"{grooming_method}_hybrid_det_distance"].fill(
+                    distances.to_numpy(), weight=masked_df["scale_factor"].to_numpy()
+                )
+                hists[f"{grooming_method}_hybrid_det_distance_pure"].fill(
+                    distances[pure_mask].to_numpy(), weight=masked_df[pure_mask]["scale_factor"].to_numpy()
+                )
+                hists[f"{grooming_method}_hybrid_det_distance_corner"].fill(
+                    distances[upper_left_corner_mask].to_numpy(),
+                    weight=masked_df[upper_left_corner_mask]["scale_factor"].to_numpy(),
                 )
 
                 for matching_type in _matching_name_to_axis_value:
@@ -438,22 +493,22 @@ def df_from_file_data(collision_system: str) -> None:  # noqa: 901
             masked_df = df[jet_pt_mask]
             for grooming_method in grooming_methods:
                 hists[f"{grooming_method}_{prefix}_kt"].fill(
-                    masked_df["jet_pt_data"].to_numpy(),
+                    masked_df["jet_pt_{prefix}"].to_numpy(),
                     masked_df[f"{grooming_method}_{prefix}_kt"].to_numpy(),
                     weight=weight,
                 )
                 hists[f"{grooming_method}_{prefix}_delta_R"].fill(
-                    masked_df["jet_pt_data"].to_numpy(),
+                    masked_df["jet_pt_{prefix}"].to_numpy(),
                     masked_df[f"{grooming_method}_{prefix}_delta_R"].to_numpy(),
                     weight=weight,
                 )
                 hists[f"{grooming_method}_{prefix}_z"].fill(
-                    masked_df["jet_pt_data"].to_numpy(),
+                    masked_df["jet_pt_{prefix}"].to_numpy(),
                     masked_df[f"{grooming_method}_{prefix}_z"].to_numpy(),
                     weight=weight,
                 )
                 hists[f"{grooming_method}_{prefix}_n"].fill(
-                    masked_df["jet_pt_data"].to_numpy(),
+                    masked_df["jet_pt_{prefix}"].to_numpy(),
                     masked_df[f"{grooming_method}_{prefix}_n"].to_numpy(),
                     weight=weight,
                 )
@@ -491,7 +546,18 @@ def plot_all() -> None:
         "soft_drop_z_cut_02",
         "soft_drop_z_cut_04",
     ]
-    output_dir = Path(f"output/compare/skim")
+    # NOTE: Order is changed here to match from before!!
+    _matching_name_to_axis_value: Dict[str, int] = {
+        "all": 0,
+        "pure": 1,
+        "leading_untagged_subleading_correct": 2,
+        "swap": 6,
+        "leading_untagged_subleading_mistag": 4,
+        "leading_correct_subleading_untagged": 3,
+        "leading_mistag_subleading_untagged": 5,
+        "both_untagged": 7,
+    }
+    output_dir = Path(f"output/embedPythia/skim")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Loading embedded data")
@@ -518,10 +584,11 @@ def plot_all() -> None:
 
 if __name__ == "__main__":
     helpers.setup_logging()
-    plot_only = True
+    plot_only = False
     if not plot_only:
-        # df_from_file_embedding()
-        df_from_file_data(collision_system="PbPb")
+        df_from_file_embedding()
+        # df_from_file_data(collision_system="PbPb")
+        # df_from_file_data(collision_system="pythia")
         # dask_df_from_file()
         # dask_df_from_delayed()
         # map_reduce_pandas_concat()
