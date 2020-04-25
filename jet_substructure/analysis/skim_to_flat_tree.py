@@ -275,10 +275,11 @@ def calculate_splitting_number(
 #    #    ...
 
 
-def calculate_and_skim_embedding(
+def calculate_and_skim_embedding(  # noqa: C901
     tree: data_manager.Tree,
     dataset: analysis_objects.Dataset,
     iterative_splittings: bool,
+    create_friend_tree: bool = False,
     draw_example_splittings: bool = False,
 ) -> bool:
     """ Determine the response and prong matching for jets substructure techniques.
@@ -339,132 +340,145 @@ def calculate_and_skim_embedding(
     ) = _select_and_retrieve_splittings(hybrid_jets, mask, iterative_splittings)
 
     grooming_results = {}
-    grooming_results["scale_factor"] = np.ones_like(true_jets.jet_pt[mask]) * scale_factor
-    # Add jet pt for all prefixes.
-    grooming_results["jet_pt_true"] = masked_true_jets.jet_pt
-    grooming_results["jet_pt_det_level"] = masked_det_level_jets.jet_pt
-    grooming_results["jet_pt_hybrid"] = masked_hybrid_jets.jet_pt
+    if create_friend_tree:
+        # Extract eta-phi of jets.
+        output_filename = Path(str(output_filename.with_suffix("")) + "_friend.root")
+        for prefix, jets in zip(prefixes, [masked_true_jets, masked_det_level_jets, masked_hybrid_jets]):
+            jet_four_vec = jets.constituents.four_vectors().sum()
+            grooming_results[f"jet_eta_{prefix}"] = jet_four_vec.eta
+            grooming_results[f"jet_phi_{prefix}"] = jet_four_vec.phi
 
-    # Perform our calculations.
-    functions = _define_calculation_funcs(dataset, iterative_splittings=iterative_splittings)
-    for func_name, func in functions.items():
-        true_jets_calculation = Calculation(
-            masked_true_jets,
-            masked_true_jet_splittings,
-            masked_true_jet_splittings_indices,
-            *func(masked_true_jet_splittings),
-        )
-        det_level_jets_calculation = Calculation(
-            masked_det_level_jets,
-            masked_det_level_jet_splittings,
-            masked_det_level_jet_splittings_indices,
-            *func(masked_det_level_jet_splittings),
-        )
-        hybrid_jets_calculation = Calculation(
-            masked_hybrid_jets,
-            masked_hybrid_jet_splittings,
-            masked_hybrid_jet_splittings_indices,
-            *func(masked_hybrid_jet_splittings),
-        )
+    else:
+        grooming_results["scale_factor"] = np.ones_like(true_jets.jet_pt[mask]) * scale_factor
+        # Add jet pt for all prefixes.
+        grooming_results["jet_pt_true"] = masked_true_jets.jet_pt
+        grooming_results["jet_pt_det_level"] = masked_det_level_jets.jet_pt
+        grooming_results["jet_pt_hybrid"] = masked_hybrid_jets.jet_pt
 
-        for prefix, calculation in [
-            ("true", true_jets_calculation),
-            ("det_level", det_level_jets_calculation),
-            ("hybrid", hybrid_jets_calculation),
-        ]:
-            groomed_splittings = calculation.splittings
-            splitting_number = calculate_splitting_number(
-                all_splittings=calculation.input_jets.splittings,
-                selected_splittings=groomed_splittings,
-                restricted_splittings_indices=calculation.input_splittings_indices,
+        # Perform our calculations.
+        functions = _define_calculation_funcs(dataset, iterative_splittings=iterative_splittings)
+        for func_name, func in functions.items():
+            true_jets_calculation = Calculation(
+                masked_true_jets,
+                masked_true_jet_splittings,
+                masked_true_jet_splittings_indices,
+                *func(masked_true_jet_splittings),
+            )
+            det_level_jets_calculation = Calculation(
+                masked_det_level_jets,
+                masked_det_level_jet_splittings,
+                masked_det_level_jet_splittings_indices,
+                *func(masked_det_level_jet_splittings),
+            )
+            hybrid_jets_calculation = Calculation(
+                masked_hybrid_jets,
+                masked_hybrid_jet_splittings,
+                masked_hybrid_jet_splittings_indices,
+                *func(masked_hybrid_jet_splittings),
             )
 
-            # We pad with the UNFILLED_VALUE constant to account for any calculations that don't find a splitting.
-            grooming_result = GroomingResultForTree(
-                grooming_method=func_name,
-                delta_R=groomed_splittings.delta_R.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
-                z=groomed_splittings.z.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
-                kt=groomed_splittings.kt.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
-                # Splitting number is already flattened.
-                n=splitting_number,
-            )
-            grooming_results.update(grooming_result.asdict(prefix=prefix))
-
-        # Need to mask for calculations which have no indices (ie didn't find any that met criteria.
-        mask = (det_level_jets_calculation.indices.counts != 0) & (hybrid_jets_calculation.indices.counts != 0)
-        try:
-            masked_det_level_jets_calculation = det_level_jets_calculation[mask]
-            masked_hybrid_jets_calculation = hybrid_jets_calculation[mask]
-        except IndexError as e:
-            logger.warning(e)
-            IPython.start_ipython(user_ns=locals())
-
-        # Matching
-        # Perform hybrid-detector level matching.
-        logger.info(f"Performing hybrid-det level matching for {func_name}")
-        leading_matching, subleading_matching = analyze_tree.determine_matched_jets(
-            hybrid_inputs=analysis_objects.FillHistogramInput(
-                jets=masked_hybrid_jets_calculation.input_jets,
-                splittings=masked_hybrid_jets_calculation.input_splittings,
-                values=masked_hybrid_jets_calculation.values,
-                indices=masked_hybrid_jets_calculation.indices,
-            ),
-            matched_inputs=analysis_objects.FillHistogramInput(
-                jets=masked_det_level_jets_calculation.input_jets,
-                splittings=masked_det_level_jets_calculation.input_splittings,
-                values=masked_det_level_jets_calculation.values,
-                indices=masked_det_level_jets_calculation.indices,
-            ),
-        )
-        # Store leading, subleading matches
-        for label, matching in [("leading", leading_matching), ("subleading", subleading_matching)]:
-            # We'll store the output in an array, and then store that in the overall output with a mask
-            # We need the additional mask because we can't perform matching for every jet (single particle jets, etc).
-            output = np.zeros(len(det_level_jets_calculation.input_jets), dtype=np.int)
-            matching_output = np.zeros(len(masked_det_level_jets_calculation.input_jets), dtype=np.int)
-            matching_output[matching.properly] = 1
-            matching_output[matching.mistag] = 2
-            matching_output[matching.failed] = 3
-            output[mask] = matching_output
-            grooming_results[f"{func_name}_hybrid_detector_matching_{label}"] = output
-
-        # Look for leading kt just because it's easier to understand conceptually.
-        if draw_example_splittings and func_name == "leading_kt" and (leading_matching.properly & subleading_matching.failed).any():  # type: ignore
-            from jet_substructure.analysis import draw_splitting
-
-            # Find a sufficiently interesting jet (ie high enough pt)
-            mask_jets_of_interest = (
-                (leading_matching.properly & subleading_matching.failed)
-                & (masked_hybrid_jets.jet_pt > 80)
-                & (det_level_jets_calculation.splittings.kt > 10).flatten()
-            )
-
-            # Look at most the first 5 jets.
-            for i, hybrid_jet in enumerate(masked_hybrid_jets[mask_jets_of_interest][:5]):
-                # Find the hybrid jet and splitting of interest.
-                # hybrid_jet = masked_hybrid_jets[mask_jets_of_interest][0]
-                # Take the index of the splitting of interest. We want the first jet, and then there must be one splitting index there.
-                hybrid_jet_selected_splitting_index = hybrid_jets_calculation.indices[mask_jets_of_interest][i][0]
-                # Same for det level.
-                det_level_jet = masked_det_level_jets[mask_jets_of_interest][i]
-                # Take the index of the splitting of interest. We want the first jet, and then there must be one splitting index there.
-                det_level_jet_selected_splitting_index = det_level_jets_calculation.indices[mask_jets_of_interest][i][0]
-
-                # Draw the splittings
-                draw_splitting.splittings_graph(
-                    jet=hybrid_jet,
-                    path=dataset.output.parent / "leading_correct_subleading_failed/",
-                    filename=f"{i}_hybrid_splittings_jet_pt_{hybrid_jet.jet_pt:.1f}GeV_selected_splitting_index_{hybrid_jet_selected_splitting_index}",
-                    show_subjet_pt=True,
-                    selected_splitting_index=hybrid_jet_selected_splitting_index,
+            for prefix, calculation in [
+                ("true", true_jets_calculation),
+                ("det_level", det_level_jets_calculation),
+                ("hybrid", hybrid_jets_calculation),
+            ]:
+                groomed_splittings = calculation.splittings
+                splitting_number = calculate_splitting_number(
+                    all_splittings=calculation.input_jets.splittings,
+                    selected_splittings=groomed_splittings,
+                    restricted_splittings_indices=calculation.input_splittings_indices,
                 )
-                draw_splitting.splittings_graph(
-                    jet=det_level_jet,
-                    path=dataset.output.parent / "leading_correct_subleading_failed/",
-                    filename=f"{i}_det_level_splittings_jet_pt_{det_level_jet.jet_pt:.1f}GeV_selected_splitting_index_{det_level_jet_selected_splitting_index}",
-                    show_subjet_pt=True,
-                    selected_splitting_index=det_level_jet_selected_splitting_index,
+
+                # We pad with the UNFILLED_VALUE constant to account for any calculations that don't find a splitting.
+                grooming_result = GroomingResultForTree(
+                    grooming_method=func_name,
+                    delta_R=groomed_splittings.delta_R.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
+                    z=groomed_splittings.z.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
+                    kt=groomed_splittings.kt.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
+                    # Splitting number is already flattened.
+                    n=splitting_number,
                 )
+                grooming_results.update(grooming_result.asdict(prefix=prefix))
+
+            # Need to mask for calculations which have no indices (ie didn't find any that met criteria.
+            mask = (det_level_jets_calculation.indices.counts != 0) & (hybrid_jets_calculation.indices.counts != 0)
+            try:
+                masked_det_level_jets_calculation = det_level_jets_calculation[mask]
+                masked_hybrid_jets_calculation = hybrid_jets_calculation[mask]
+            except IndexError as e:
+                logger.warning(e)
+                IPython.start_ipython(user_ns=locals())
+
+            # Matching
+            # Perform hybrid-detector level matching.
+            logger.info(f"Performing hybrid-det level matching for {func_name}")
+            leading_matching, subleading_matching = analyze_tree.determine_matched_jets(
+                hybrid_inputs=analysis_objects.FillHistogramInput(
+                    jets=masked_hybrid_jets_calculation.input_jets,
+                    splittings=masked_hybrid_jets_calculation.input_splittings,
+                    values=masked_hybrid_jets_calculation.values,
+                    indices=masked_hybrid_jets_calculation.indices,
+                ),
+                matched_inputs=analysis_objects.FillHistogramInput(
+                    jets=masked_det_level_jets_calculation.input_jets,
+                    splittings=masked_det_level_jets_calculation.input_splittings,
+                    values=masked_det_level_jets_calculation.values,
+                    indices=masked_det_level_jets_calculation.indices,
+                ),
+            )
+            # Store leading, subleading matches
+            for label, matching in [("leading", leading_matching), ("subleading", subleading_matching)]:
+                # We'll store the output in an array, and then store that in the overall output with a mask
+                # We need the additional mask because we can't perform matching for every jet (single particle jets, etc).
+                output = np.zeros(len(det_level_jets_calculation.input_jets), dtype=np.int)
+                matching_output = np.zeros(len(masked_det_level_jets_calculation.input_jets), dtype=np.int)
+                matching_output[matching.properly] = 1
+                matching_output[matching.mistag] = 2
+                matching_output[matching.failed] = 3
+                output[mask] = matching_output
+                grooming_results[f"{func_name}_hybrid_detector_matching_{label}"] = output
+
+            # Add part-det matching using distance.
+
+            # Look for leading kt just because it's easier to understand conceptually.
+            if draw_example_splittings and func_name == "leading_kt" and (leading_matching.properly & subleading_matching.failed).any():  # type: ignore
+                from jet_substructure.analysis import draw_splitting
+
+                # Find a sufficiently interesting jet (ie high enough pt)
+                mask_jets_of_interest = (
+                    (leading_matching.properly & subleading_matching.failed)
+                    & (masked_hybrid_jets.jet_pt > 80)
+                    & (det_level_jets_calculation.splittings.kt > 10).flatten()
+                )
+
+                # Look at most the first 5 jets.
+                for i, hybrid_jet in enumerate(masked_hybrid_jets[mask_jets_of_interest][:5]):
+                    # Find the hybrid jet and splitting of interest.
+                    # hybrid_jet = masked_hybrid_jets[mask_jets_of_interest][0]
+                    # Take the index of the splitting of interest. We want the first jet, and then there must be one splitting index there.
+                    hybrid_jet_selected_splitting_index = hybrid_jets_calculation.indices[mask_jets_of_interest][i][0]
+                    # Same for det level.
+                    det_level_jet = masked_det_level_jets[mask_jets_of_interest][i]
+                    # Take the index of the splitting of interest. We want the first jet, and then there must be one splitting index there.
+                    det_level_jet_selected_splitting_index = det_level_jets_calculation.indices[mask_jets_of_interest][
+                        i
+                    ][0]
+
+                    # Draw the splittings
+                    draw_splitting.splittings_graph(
+                        jet=hybrid_jet,
+                        path=dataset.output.parent / "leading_correct_subleading_failed/",
+                        filename=f"{i}_hybrid_splittings_jet_pt_{hybrid_jet.jet_pt:.1f}GeV_selected_splitting_index_{hybrid_jet_selected_splitting_index}",
+                        show_subjet_pt=True,
+                        selected_splitting_index=hybrid_jet_selected_splitting_index,
+                    )
+                    draw_splitting.splittings_graph(
+                        jet=det_level_jet,
+                        path=dataset.output.parent / "leading_correct_subleading_failed/",
+                        filename=f"{i}_det_level_splittings_jet_pt_{det_level_jet.jet_pt:.1f}GeV_selected_splitting_index_{det_level_jet_selected_splitting_index}",
+                        show_subjet_pt=True,
+                        selected_splitting_index=det_level_jet_selected_splitting_index,
+                    )
 
     branches = {k: v.dtype for k, v in grooming_results.items()}
     logger.info(f"Writing skim to {output_filename}")
@@ -622,10 +636,6 @@ def run(
     logger.info("Setup complete. Beginning processing of trees.")
 
     progress_manager = enlighten.get_manager()
-    # with progress_manager.counter(total=len(dm), desc="Analyzing", unit="tree") as tree_counter:
-    #    for tree in tree_counter(dm):
-    #        calculate_and_skim_embedding(tree=tree, dataset=dataset)
-
     number_of_trees_processed = 0
     dm_iterator = dm.lazy_iteration(fully_lazy=(number_of_cores > 1))
     wrapper = functools.partial(
@@ -709,7 +719,7 @@ if __name__ == "__main__":
         iterative_splittings=iterative_splittings,
         calculate_and_skim_func=calculate_and_skim_embedding,
         number_of_cores=number_of_cores,
-        additional_kwargs_for_analysis={"draw_example_splittings": False},
+        additional_kwargs_for_analysis={"create_friend_tree": True, "draw_example_splittings": False},
     )
     # Run PbPb
     # run(
@@ -718,12 +728,12 @@ if __name__ == "__main__":
     #    calculate_and_skim_func=calculate_and_skim_data,
     #    number_of_cores=number_of_cores,
     # )
-    run(
-        collision_system="pythia",
-        iterative_splittings=iterative_splittings,
-        # mypy apparently doesn't handle adding arguments, even with callable protocols...
-        # We only get away with this because the prefixes are optional.
-        calculate_and_skim_func=calculate_and_skim_data,
-        number_of_cores=number_of_cores,
-        additional_kwargs_for_analysis={"prefixes": ["data", "matched"]},
-    )
+    # run(
+    #    collision_system="pythia",
+    #    iterative_splittings=iterative_splittings,
+    #    # mypy apparently doesn't handle adding arguments, even with callable protocols...
+    #    # We only get away with this because the prefixes are optional.
+    #    calculate_and_skim_func=calculate_and_skim_data,
+    #    number_of_cores=number_of_cores,
+    #    additional_kwargs_for_analysis={"prefixes": ["data", "matched"]},
+    # )
