@@ -709,6 +709,23 @@ def _plot_kt_comparison(
         values=np.sum(h_embed_response.values, axis=(0, 1, 2)),
         variances=np.sum(h_embed_response.variances, axis=(0, 1, 2)),
     )
+    # Pure response spectra
+    h_embed_response_pure = binned_data.BinnedData.from_existing_data(
+        hists[f"{grooming_method}_hybrid_true_kt_response_matching_type_pure"]
+    )
+    # Select the variables (for the example of kt)
+    # Axes: hybrid_pt, hybrid_kt, det_level_pt, det_level_kt
+    # NOTE: We already applied the 40 < hybrid jet pt < 120 cut, so it doesn't need an additional selection.
+    h_hybrid_pure = binned_data.BinnedData(
+        axes=[h_embed_response_pure.axes[1]],
+        values=np.sum(h_embed_response_pure.values, axis=(0, 2, 3)),
+        variances=np.sum(h_embed_response_pure.variances, axis=(0, 2, 3)),
+    )
+    h_det_pure = binned_data.BinnedData(
+        axes=[h_embed_response_pure.axes[3]],
+        values=np.sum(h_embed_response_pure.values, axis=(0, 1, 2)),
+        variances=np.sum(h_embed_response_pure.variances, axis=(0, 1, 2)),
+    )
 
     # Normalize by n_jets
     # TODO: Update the data approach once we have the skim!
@@ -716,8 +733,16 @@ def _plot_kt_comparison(
     h_data /= np.sum(h_data.values)
     h_hybrid /= np.sum(h_hybrid.values)
     h_det /= np.sum(h_det.values)
+    h_hybrid_pure /= np.sum(h_hybrid_pure.values)
+    h_det_pure /= np.sum(h_det_pure.values)
 
-    for h, label in [(h_data, "Pb--Pb"), (h_hybrid, "Hybrid"), (h_det, "Det. level")]:
+    for h, label in [
+        (h_data, "Pb--Pb"),
+        (h_hybrid, "Hybrid"),
+        (h_det, "Det. level"),
+        (h_hybrid_pure, "Hybrid pure matches"),
+        (h_det_pure, "Det. level pure matches"),
+    ]:
         p = ax.errorbar(
             h.axes[0].bin_centers,
             h.values,
@@ -774,7 +799,7 @@ def _plot_kt_comparison(
     ax.set_xlim([0, 25])
     ax_ratio.set_ylim([0, 5])
     ax.set_yscale("log")
-    ax.legend(frameon=False, loc="lower left")
+    ax.legend(frameon=False, loc="lower left", fontsize=14)
     fig.align_ylabels()
     fig.tight_layout()
     fig.subplots_adjust(
