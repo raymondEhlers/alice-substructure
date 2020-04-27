@@ -7,6 +7,7 @@
 
 import functools
 import gzip
+import itertools
 import logging
 import pickle
 from pathlib import Path
@@ -63,22 +64,10 @@ def dask_df_from_delayed() -> None:
 
 
 # def df_from_file(filenames: Sequence[Path], branches: Sequence[str]):
-def df_from_file_embedding() -> None:  # noqa: 901
+def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequence[Path]) -> None:  # noqa: 901
     # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
     from pathlib import Path  # noqa: F401
 
-    path_list = data_manager._ensure_and_expand_paths(
-        [
-            Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings.root"),
-            Path("trains/embedPythia/55*/skim/*_iterative_splittings.root"),
-        ]
-    )
-    path_list_friends = data_manager._ensure_and_expand_paths(
-        [
-            Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
-            Path("trains/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
-        ]
-    )
     data_frames = uproot.pandas.iterate(
         path=path_list,
         treepath="tree",
@@ -130,23 +119,32 @@ def df_from_file_embedding() -> None:  # noqa: 901
     hists = {}
     for grooming_method in grooming_methods:
         for matching_type in _matching_name_to_axis_value:
+            #
+            # Residuals by matching type
+            #
+            # jet_pt residual
             # Axes: hybrid_level_jet_pt, det_level_jet_pt, residual
-            hists[f"{grooming_method}_hybrid_det_jet_pt_residuals_matching_type_{matching_type}"] = bh.Histogram(
+            hists[f"{grooming_method}_hybrid_det_level_jet_pt_residuals_matching_type_{matching_type}"] = bh.Histogram(
                 bh.axis.Regular(28, 0, 140),
                 bh.axis.Regular(28, 0, 140),
                 bh.axis.Regular(80, -2, 2),
                 storage=bh.storage.Weight(),
             )
+            # kt residual
             # Axes: hybrid_level_jet_kt, det_level_jet_kt, residual
-            hists[f"{grooming_method}_hybrid_det_kt_residuals_matching_type_{matching_type}"] = bh.Histogram(
+            hists[f"{grooming_method}_hybrid_det_level_kt_residuals_matching_type_{matching_type}"] = bh.Histogram(
                 bh.axis.Regular(25, 0, 25),
                 bh.axis.Regular(25, 0, 25),
                 bh.axis.Regular(80, -2, 2),
                 storage=bh.storage.Weight(),
             )
+            #
+            # Responses
+            #
             # Example axes: hybrid_pt, hybrid_kt, det_level_pt, det_level_kt
             # Generally: measured_pt, measured_kt, generator_pt, generator_kt
             for response_type in response_types:
+                # kt response
                 hists[
                     f"{grooming_method}_{str(response_type)}_kt_response_matching_type_{matching_type}"
                 ] = bh.Histogram(
@@ -156,6 +154,7 @@ def df_from_file_embedding() -> None:  # noqa: 901
                     bh.axis.Regular(26, -1, 25),
                     storage=bh.storage.Weight(),
                 )
+                # Delta R response
                 # Axes: measured_pt, measured_R, generator_pt, generator_R
                 hists[
                     f"{grooming_method}_{str(response_type)}_delta_R_response_matching_type_{matching_type}"
@@ -167,24 +166,51 @@ def df_from_file_embedding() -> None:  # noqa: 901
                     storage=bh.storage.Weight(),
                 )
 
-        # Residual mean
+            # Where we restrict the matching distance.
+            # kt response
+            hists[
+                f"{grooming_method}_hybrid_det_level_kt_response_matching_type_leading_correct_subleading_untagged_distance_less_than_005"
+            ] = bh.Histogram(
+                bh.axis.Regular(28, 0, 140),
+                bh.axis.Regular(26, -1, 25),
+                bh.axis.Regular(28, 0, 140),
+                bh.axis.Regular(26, -1, 25),
+                storage=bh.storage.Weight(),
+            )
+            # Delta R response
+            # Axes: measured_pt, measured_R, generator_pt, generator_R
+            hists[
+                f"{grooming_method}_hybrid_det_level_delta_R_response_matching_type_leading_correct_subleading_untagged_distance_less_than_005"
+            ] = bh.Histogram(
+                bh.axis.Regular(28, 0, 140),
+                bh.axis.Regular(21, -0.02, 0.4),
+                bh.axis.Regular(28, 0, 140),
+                bh.axis.Regular(21, -0.02, 0.4),
+                storage=bh.storage.Weight(),
+            )
+
+        #
+        # Residuals
+        #
+        # Jet pt residual mean: JES
+        # Error is the width: JER
         # We normalize the width by the true jet pt afterwards, so we have to collect it separately.
         # NOTE: Ideally, we'd extract both values from one profile histogram which is binned in true and
         #       hybrid jet pt, but projecting profiles doesn't seem to work quite as expected with bh, and
         #       it's not worth investigating further at the moment.
         for hybrid_jet_pt_bin in [helpers.RangeSelector(40, 120), helpers.RangeSelector(20, 200)]:
-            hists[f"{grooming_method}_hybrid_det_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"] = bh.Histogram(
-                bh.axis.Regular(25, 0, 250), storage=bh.storage.WeightedMean(),
-            )
+            hists[
+                f"{grooming_method}_hybrid_det_level_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"
+            ] = bh.Histogram(bh.axis.Regular(25, 0, 250), storage=bh.storage.WeightedMean(),)
             hists[f"{grooming_method}_hybrid_true_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"] = bh.Histogram(
                 bh.axis.Regular(25, 0, 250), storage=bh.storage.WeightedMean(),
             )
             hists[f"{grooming_method}_det_true_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"] = bh.Histogram(
                 bh.axis.Regular(25, 0, 250), storage=bh.storage.WeightedMean(),
             )
-        # Residual
+        # Residual so we can see the entire distribution.
         # We intentionally don't select the hybrid jet pt range here.
-        hists[f"{grooming_method}_hybrid_det_jet_pt_residual_distribution"] = bh.Histogram(
+        hists[f"{grooming_method}_hybrid_det_level_jet_pt_residual_distribution"] = bh.Histogram(
             bh.axis.Regular(15, 0, 150), bh.axis.Regular(150, -1.5, 1.5), storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_hybrid_true_jet_pt_residual_distribution"] = bh.Histogram(
@@ -193,16 +219,12 @@ def df_from_file_embedding() -> None:  # noqa: 901
         hists[f"{grooming_method}_det_true_jet_pt_residual_distribution"] = bh.Histogram(
             bh.axis.Regular(15, 0, 150), bh.axis.Regular(150, -1.5, 1.5), storage=bh.storage.Weight(),
         )
-        # Distance comparison
-        hists[f"{grooming_method}_hybrid_det_distance"] = bh.Histogram(
-            bh.axis.Regular(20, 0, 0.5), storage=bh.storage.Weight(),
-        )
-        hists[f"{grooming_method}_hybrid_det_distance_pure"] = bh.Histogram(
-            bh.axis.Regular(20, 0, 0.5), storage=bh.storage.Weight(),
-        )
-        hists[f"{grooming_method}_hybrid_det_distance_corner"] = bh.Histogram(
-            bh.axis.Regular(20, 0, 0.5), storage=bh.storage.Weight(),
-        )
+
+        # Distance comparison by matching type
+        for matching_type in _matching_name_to_axis_value:
+            hists[f"{grooming_method}_hybrid_det_level_distance_matching_type_{matching_type}"] = bh.Histogram(
+                bh.axis.Regular(20, 0, 0.5), storage=bh.storage.Weight(),
+            )
 
     progress_manager = enlighten.Manager()
     with progress_manager.counter(total=len(path_list), desc="Analyzing", unit="tree", leave=True) as tree_counter:
@@ -250,7 +272,7 @@ def df_from_file_embedding() -> None:  # noqa: 901
                     # mean and the width. Note that it's slightly less accurate because then normalize by the bin center
                     # rather than the exact true jet pt per fill, but it's close enough for our purposes.
                     hists[
-                        f"{grooming_method}_hybrid_det_jet_pt_residual_mean_hybrid_{str(temp_hybrid_jet_pt_bin)}"
+                        f"{grooming_method}_hybrid_det_level_jet_pt_residual_mean_hybrid_{str(temp_hybrid_jet_pt_bin)}"
                     ].fill(
                         masked_df["jet_pt_true"].to_numpy(),
                         sample=(masked_df["jet_pt_hybrid"] - masked_df["jet_pt_det_level"]).to_numpy(),
@@ -272,7 +294,7 @@ def df_from_file_embedding() -> None:  # noqa: 901
                 # NOTE: We intentionally didn't apply a hybrid jet pt cut. And our true jet pt selection will
                 #       be applied when plotting.
                 masked_df = df[mask]
-                hists[f"{grooming_method}_hybrid_det_jet_pt_residual_distribution"].fill(
+                hists[f"{grooming_method}_hybrid_det_level_jet_pt_residual_distribution"].fill(
                     masked_df["jet_pt_true"].to_numpy(),
                     (
                         (masked_df["jet_pt_hybrid"] - masked_df["jet_pt_det_level"]) / masked_df["jet_pt_det_level"]
@@ -291,30 +313,15 @@ def df_from_file_embedding() -> None:  # noqa: 901
                 )
                 # Matching distance
                 masked_df = df[hybrid_jet_pt_mask]
-                pure_mask = matching_selections["pure"][hybrid_jet_pt_mask]
-                upper_left_corner_mask = (masked_df[f"{grooming_method}_true_kt"] > 10) & (
-                    masked_df[f"{grooming_method}_hybrid_kt"] < 10
-                )
                 distances: pd.Series = np.sqrt(
                     (masked_df["jet_eta_hybrid"] - masked_df["jet_eta_det_level"]) ** 2
                     + (masked_df["jet_phi_hybrid"] - masked_df["jet_phi_det_level"]) ** 2
                 )
-                hists[f"{grooming_method}_hybrid_det_distance"].fill(
-                    distances.to_numpy(), weight=masked_df["scale_factor"].to_numpy()
-                )
-                hists[f"{grooming_method}_hybrid_det_distance_pure"].fill(
-                    distances[pure_mask].to_numpy(), weight=masked_df[pure_mask]["scale_factor"].to_numpy()
-                )
-                hists[f"{grooming_method}_hybrid_det_distance_corner"].fill(
-                    distances[upper_left_corner_mask].to_numpy(),
-                    weight=masked_df[upper_left_corner_mask]["scale_factor"].to_numpy(),
-                )
-
                 for matching_type in _matching_name_to_axis_value:
                     mask = matching_selections[matching_type]
                     masked_df = df[mask & hybrid_jet_pt_mask]
                     # Axes: hybrid_level_jet_pt, det_level_jet_pt, residual
-                    hists[f"{grooming_method}_hybrid_det_jet_pt_residuals_matching_type_{matching_type}"].fill(
+                    hists[f"{grooming_method}_hybrid_det_level_jet_pt_residuals_matching_type_{matching_type}"].fill(
                         masked_df["jet_pt_hybrid"].to_numpy(),
                         masked_df["jet_pt_det_level"].to_numpy(),
                         (
@@ -323,7 +330,7 @@ def df_from_file_embedding() -> None:  # noqa: 901
                         weight=masked_df["scale_factor"].to_numpy(),
                     )
                     # Axes: hybrid_level_jet_kt, det_level_jet_kt, residual
-                    hists[f"{grooming_method}_hybrid_det_kt_residuals_matching_type_{matching_type}"].fill(
+                    hists[f"{grooming_method}_hybrid_det_level_kt_residuals_matching_type_{matching_type}"].fill(
                         masked_df[f"{grooming_method}_hybrid_kt"].to_numpy(),
                         masked_df[f"{grooming_method}_det_level_kt"].to_numpy(),
                         (
@@ -332,6 +339,14 @@ def df_from_file_embedding() -> None:  # noqa: 901
                         ).to_numpy(),
                         weight=masked_df["scale_factor"].to_numpy(),
                     )
+
+                    # Matching distances
+                    # Distances were only calculated for hybrid jets, so we don't need to reapply the hybrid jet pt cut here.
+                    # Just apply the matching mask to the distances.
+                    hists[f"{grooming_method}_hybrid_det_level_distance_matching_type_{matching_type}"].fill(
+                        distances[mask].to_numpy(), weight=masked_df["scale_factor"].to_numpy()
+                    )
+
                     for response_type in response_types:
                         # Axes: measured_like_pt, measured_like_kt, generator_like_pt, generator_like_kt
                         hists[f"{grooming_method}_{str(response_type)}_kt_response_matching_type_{matching_type}"].fill(
@@ -351,6 +366,33 @@ def df_from_file_embedding() -> None:  # noqa: 901
                             masked_df[f"{grooming_method}_{response_type.generator_like}_delta_R"].to_numpy(),
                             weight=masked_df["scale_factor"].to_numpy(),
                         )
+                    # Response with matching distance for leading_correct_subleading_untagged
+                    if matching_type == "leading_correct_subleading_untagged":
+                        distance_mask = distances[mask & hybrid_jet_pt_mask] < 0.05
+                        # kt
+                        hists[
+                            f"{grooming_method}_hybrid_det_level_kt_response_matching_type_leading_correct_subleading_untagged_distance_less_than_005"
+                        ].fill(
+                            masked_df[distance_mask][f"jet_pt_{response_type.measured_like}"].to_numpy(),
+                            masked_df[distance_mask][f"{grooming_method}_{response_type.measured_like}_kt"].to_numpy(),
+                            masked_df[distance_mask][f"jet_pt_{response_type.generator_like}"].to_numpy(),
+                            masked_df[distance_mask][f"{grooming_method}_{response_type.generator_like}_kt"].to_numpy(),
+                            weight=masked_df[distance_mask]["scale_factor"].to_numpy(),
+                        )
+                        # Delta R
+                        hists[
+                            f"{grooming_method}_hybrid_det_level_delta_R_response_matching_type_leading_correct_subleading_untagged_distance_less_than_005"
+                        ].fill(
+                            masked_df[distance_mask][f"jet_pt_{response_type.measured_like}"].to_numpy(),
+                            masked_df[distance_mask][
+                                f"{grooming_method}_{response_type.measured_like}_delta_R"
+                            ].to_numpy(),
+                            masked_df[distance_mask][f"jet_pt_{response_type.generator_like}"].to_numpy(),
+                            masked_df[distance_mask][
+                                f"{grooming_method}_{response_type.generator_like}_delta_R"
+                            ].to_numpy(),
+                            weight=masked_df[distance_mask]["scale_factor"].to_numpy(),
+                        )
 
     progress_manager.stop()
 
@@ -360,52 +402,6 @@ def df_from_file_embedding() -> None:  # noqa: 901
     pkl_filename = output_dir / "embedded.pgz"
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
         pickle.dump(hists, pkl_file)  # type: ignore
-
-    ## Add some helpful imports and definitions
-    # from importlib import reload  # noqa: F401
-
-    # try:
-    #    # May not want to import if developing.
-    #    from jet_substructure.analysis import analyze_tree
-    #    from jet_substructure.analysis import plot_from_skim  # noqa: F401
-    # except SyntaxError:
-    #    logger.info("Couldn't load plot_from_skim due to syntax error. You need to load it.")
-
-    # data_hists, data_dataset = analyze_tree.run_shared(
-    #    collision_system="PbPb",
-    #    analysis_function=analyze_tree.analyze_single_tree,
-    #    dataset_config_filename=Path("config") / "datasets.yaml",
-    #    hists_filename="data_hists",
-    #    jet_pt_bins=[
-    #        # Broadest range
-    #        helpers.RangeSelector(min=0, max=140),
-    #        # Main range of interest.
-    #        helpers.RangeSelector(min=40, max=120),
-    #        # Most likely where we will actually measure.
-    #        helpers.RangeSelector(min=80, max=120),
-    #        # Individual ranges.
-    #        helpers.RangeSelector(min=40, max=60),
-    #        helpers.RangeSelector(min=60, max=80),
-    #        helpers.RangeSelector(min=80, max=100),
-    #        helpers.RangeSelector(min=100, max=120),
-    #    ],
-    #    z_cutoff=0.2,
-    #    plot_only=True,
-    #    force_reprocessing=False,
-    #    number_of_cores=1,
-    # )
-
-    # IPython.start_ipython(user_ns=locals())
-
-    # Plotting
-    # plot_from_skim.plot_residuals_by_matching_type(
-    #     hists=hists, grooming_methods=grooming_methods, matching_types=list(_matching_name_to_axis_value.keys()), output_dir=output_dir
-    # )
-    # plot_from_skim.plot_residuals(hists=hists, grooming_methods=grooming_methods, output_dir=output_dir)
-    # plot_from_skim.plot_response_by_matching_type(
-    #     hists=hists, grooming_methods=grooming_methods, matching_types=list(_matching_name_to_axis_value.keys()), output_dir=output_dir,
-    # )
-    # plot_from_skim.plot_compare_kt(hists=hists, data_hists=data_hists[0], grooming_methods=grooming_methods, output_dir=output_dir)
 
 
 def map_reduce_pandas_concat() -> None:
@@ -430,22 +426,18 @@ def map_reduce_pandas_concat() -> None:
     IPython.start_ipython(user_ns=locals())
 
 
-def df_from_file_data(collision_system: str) -> None:  # noqa: 901
+def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: str) -> None:  # noqa: 901
     # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
     from pathlib import Path  # noqa: F401
 
     # Setup
     jet_R = 0.4
-    prefix = "data"
-    path_list = data_manager._ensure_and_expand_paths([Path("trains/PbPb/5537/skim/*_iterative_splittings.root")])
+    branches = [f"*{prefix}*"]
+    if collision_system in ["pythia", "embedPythia"]:
+        branches.append("scale_factor")
     data_frames = uproot.pandas.iterate(
-        path=path_list, treepath="tree", namedecode="utf-8", branches=[f"*{prefix}*", "scale_factor"], reportpath=True,
+        path=path_list, treepath="tree", namedecode="utf-8", branches=branches, reportpath=True,
     )
-    # for df in data_frames:
-    #    IPython.embed()
-
-    # NOPE! Still too big...
-    # df = pd.concat(data_frames, axis=1, copy=False)
 
     # TODO: Define grooming methods better?
     grooming_methods = [
@@ -458,10 +450,14 @@ def df_from_file_data(collision_system: str) -> None:  # noqa: 901
         "soft_drop_z_cut_02",
         "soft_drop_z_cut_04",
     ]
+    direct_comparison_grooming_methods = [
+        "leading_kt_z_cut_02_first_split",
+        "leading_kt_z_cut_04_first_split",
+    ]
 
     # Define hists.
     hists = {}
-    for grooming_method in grooming_methods:
+    for grooming_method in itertools.chain(grooming_methods, direct_comparison_grooming_methods):
         jet_pt_axis = bh.axis.Regular(28, 0, 140)
         hists[f"{grooming_method}_{prefix}_kt"] = bh.Histogram(
             jet_pt_axis, bh.axis.Regular(26, -1, 25), storage=bh.storage.Weight(),
@@ -483,34 +479,61 @@ def df_from_file_data(collision_system: str) -> None:  # noqa: 901
     with progress_manager.counter(total=len(path_list), desc="Analyzing", unit="tree", leave=True) as tree_counter:
         for df_path, df in tree_counter(data_frames):
             logger.debug(f"Processing df from {df_path}")
-            if collision_system == "pythia":
-                weight = df["scale_factor"]
+            if collision_system in ["pythia", "embedPythia"]:
+                weight = df["scale_factor"].to_numpy()
             else:
-                weight = 1.0
+                weight = np.ones_like(df[f"jet_pt_{prefix}"])
 
             jet_pt_bin = helpers.RangeSelector(min=40, max=120)
-            jet_pt_mask = jet_pt_bin.mask_array(df["jet_pt_data"])
+            jet_pt_mask = jet_pt_bin.mask_array(df[f"jet_pt_{prefix}"])
             masked_df = df[jet_pt_mask]
+
             for grooming_method in grooming_methods:
                 hists[f"{grooming_method}_{prefix}_kt"].fill(
-                    masked_df["jet_pt_{prefix}"].to_numpy(),
+                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
                     masked_df[f"{grooming_method}_{prefix}_kt"].to_numpy(),
-                    weight=weight,
+                    weight=weight[jet_pt_mask],
                 )
                 hists[f"{grooming_method}_{prefix}_delta_R"].fill(
-                    masked_df["jet_pt_{prefix}"].to_numpy(),
+                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
                     masked_df[f"{grooming_method}_{prefix}_delta_R"].to_numpy(),
-                    weight=weight,
+                    weight=weight[jet_pt_mask],
                 )
                 hists[f"{grooming_method}_{prefix}_z"].fill(
-                    masked_df["jet_pt_{prefix}"].to_numpy(),
+                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
                     masked_df[f"{grooming_method}_{prefix}_z"].to_numpy(),
-                    weight=weight,
+                    weight=weight[jet_pt_mask],
                 )
                 hists[f"{grooming_method}_{prefix}_n"].fill(
-                    masked_df["jet_pt_{prefix}"].to_numpy(),
+                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
                     masked_df[f"{grooming_method}_{prefix}_n"].to_numpy(),
-                    weight=weight,
+                    weight=weight[jet_pt_mask],
+                )
+
+            # Direct comparison plots
+            mask = jet_pt_mask & (df[f"{grooming_method}_{prefix}_n"] <= 1)
+            masked_df = df[mask]
+            for grooming_method in direct_comparison_grooming_methods:
+                true_grooming_method = grooming_method[: grooming_method.find("_first_split")]
+                hists[f"{grooming_method}_{prefix}_kt"].fill(
+                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
+                    masked_df[f"{true_grooming_method}_{prefix}_kt"].to_numpy(),
+                    weight=weight[mask],
+                )
+                hists[f"{grooming_method}_{prefix}_delta_R"].fill(
+                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
+                    masked_df[f"{true_grooming_method}_{prefix}_delta_R"].to_numpy(),
+                    weight=weight[mask],
+                )
+                hists[f"{grooming_method}_{prefix}_z"].fill(
+                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
+                    masked_df[f"{true_grooming_method}_{prefix}_z"].to_numpy(),
+                    weight=weight[mask],
+                )
+                hists[f"{grooming_method}_{prefix}_n"].fill(
+                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
+                    masked_df[f"{true_grooming_method}_{prefix}_n"].to_numpy(),
+                    weight=weight[mask],
                 )
 
     progress_manager.stop()
@@ -521,17 +544,6 @@ def df_from_file_data(collision_system: str) -> None:  # noqa: 901
     pkl_filename = output_dir / f"{collision_system}.pgz"
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
         pickle.dump(hists, pkl_file)  # type: ignore
-
-    # Add some helpful imports and definitions
-    # from importlib import reload  # noqa: F401
-
-    # try:
-    #    # May not want to import if developing.
-    #    from jet_substructure.analysis import plot_from_skim  # noqa: F401
-    # except SyntaxError:
-    #    logger.info("Couldn't load plot_from_skim due to syntax error. You need to load it.")
-
-    # IPython.start_ipython(user_ns=locals())
 
 
 def plot_all() -> None:
@@ -581,13 +593,49 @@ def plot_all() -> None:
 
     IPython.start_ipython(user_ns=locals())
 
+    # Plotting
+    # plot_from_skim.plot_residuals_by_matching_type(
+    #     hists=hists, grooming_methods=grooming_methods, matching_types=list(_matching_name_to_axis_value.keys()), output_dir=output_dir
+    # )
+    # plot_from_skim.plot_residuals(hists=hists, grooming_methods=grooming_methods, output_dir=output_dir)
+    # plot_from_skim.plot_response_by_matching_type(
+    #     hists=hists, grooming_methods=grooming_methods, matching_types=list(_matching_name_to_axis_value.keys()), output_dir=output_dir,
+    # )
+    # plot_from_skim.plot_compare_kt(hists=hists, data_hists=data_hists[0], grooming_methods=grooming_methods, output_dir=output_dir)
+
+
+def run_embed_pythia(run_response: bool = True) -> None:
+    path_list = data_manager._ensure_and_expand_paths(
+        [
+            Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings.root"),
+            Path("trains/embedPythia/55*/skim/*_iterative_splittings.root"),
+        ]
+    )
+    path_list_friends = data_manager._ensure_and_expand_paths(
+        [
+            Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
+            Path("trains/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
+        ]
+    )
+    if run_response:
+        df_from_file_embedding(path_list=path_list, path_list_friends=path_list_friends)
+    df_from_file_data(
+        collision_system="embedPythia", path_list=path_list, prefix="hybrid",
+    )
+
 
 if __name__ == "__main__":
     helpers.setup_logging()
     plot_only = False
     if not plot_only:
-        df_from_file_embedding()
-        # df_from_file_data(collision_system="PbPb")
+        df_from_file_data(
+            collision_system="PbPb",
+            path_list=data_manager._ensure_and_expand_paths(
+                [Path("trains/PbPb/5537/skim/*_iterative_splittings.root")]
+            ),
+            prefix="data",
+        )
+        # run_embed_pythia(run_response=False)
         # df_from_file_data(collision_system="pythia")
         # dask_df_from_file()
         # dask_df_from_delayed()

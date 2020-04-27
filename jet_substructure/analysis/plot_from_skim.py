@@ -188,7 +188,7 @@ def _plot_residual_by_matching_type(
         )
 
         matches_label = " ".join(matching_type.split("_")).capitalize()
-        bh_hist = hists[f"{grooming_method}_hybrid_det_{label}_residuals_matching_type_{matching_type}"]
+        bh_hist = hists[f"{grooming_method}_hybrid_det_level_{label}_residuals_matching_type_{matching_type}"]
         h = binned_data.BinnedData.from_existing_data(bh_hist)
 
         selection_list = [slice(None), slice(None), slice(None)]
@@ -290,7 +290,7 @@ def plot_residuals_by_matching_type(
             grooming_method=grooming_method,
             matching_types=matching_types,
             plot_config=PlotConfig(
-                name="jet_pt_residual_hybrid_detector",
+                name="jet_pt_residual_hybrid_det_level",
                 x_label=r"$(p_{\text{T}}^{\text{hybrid}} - p_{\text{T}}^{\text{det}}) / p_{\text{T}}^{\text{det}}$",
                 y_label="",
             ),
@@ -302,7 +302,7 @@ def plot_residuals_by_matching_type(
             grooming_method=grooming_method,
             matching_types=matching_types,
             plot_config=PlotConfig(
-                name="kt_residual_hybrid_detector",
+                name="kt_residual_hybrid_det_level",
                 x_label=r"$(k_{\text{T}}^{\text{hybrid}} - k_{\text{T}}^{\text{det}}) / k_{\text{T}}^{\text{det}}$",
                 y_label="",
             ),
@@ -314,7 +314,7 @@ def plot_residuals_by_matching_type(
             grooming_method=grooming_method,
             matching_types=matching_types,
             plot_config=PlotConfig(
-                name="kt_residual_hybrid_detector",
+                name="kt_residual_hybrid_det_level",
                 x_label=r"$(k_{\text{T}}^{\text{hybrid}} - k_{\text{T}}^{\text{det}}) / k_{\text{T}}^{\text{det}}$",
                 y_label="",
             ),
@@ -949,6 +949,7 @@ def plot_kt_vs_jet_pt(hists: Mapping[str, bh.Histogram], grooming_methods: Seque
 def _plot_distance_comparison(
     hists: Mapping[str, bh.Histogram],
     grooming_method: str,
+    matching_types: Sequence[str],
     hybrid_jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
     output_dir: Path,
@@ -959,17 +960,27 @@ def _plot_distance_comparison(
 
     # We want to plot the 2D hist, so no need for any projections.
     # However, first we need to rebin
-    for name, label in [
-        (f"{grooming_method}_hybrid_det_distance", "all"),
-        (f"{grooming_method}_hybrid_det_distance_pure", "pure"),
-        (
-            f"{grooming_method}_hybrid_det_distance_corner",
-            r"$k_{\text{T}}^{\text{true}} > 10, k_{\text{T}}^{\text{hybrid}} < 10$",
-        ),
-    ]:
-        h = binned_data.BinnedData.from_existing_data(hists[name])
+    # for name, label in [
+    #    (f"{grooming_method}_hybrid_det_distance", "all"),
+    #    (f"{grooming_method}_hybrid_det_distance_pure", "pure"),
+    #    (
+    #        f"{grooming_method}_hybrid_det_distance_corner",
+    #        r"$k_{\text{T}}^{\text{true}} > 10, k_{\text{T}}^{\text{hybrid}} < 10$",
+    #    ),
+    # ]:
+    for matching_type in matching_types:
+        matches_label = " ".join(matching_type.split("_")).capitalize()
+        h = binned_data.BinnedData.from_existing_data(
+            hists[f"{grooming_method}_hybrid_det_level_distance_matching_type_{matching_type}"]
+        )
+
+        if matching_type not in ["all", "pure", "swap", "leading_correct_subleading_untagged"]:
+            # Let's rebin otherwise to reduce error bar size for some other the other methods.
+            h = binned_data.BinnedData.from_existing_data(h.to_boost_histogram()[:: bh.rebin(2)])
+
         # Normalize
         h /= np.sum(h.values)
+
         # Plot
         ax.errorbar(
             h.axes[0].bin_centers,
@@ -978,7 +989,7 @@ def _plot_distance_comparison(
             xerr=h.axes[0].bin_widths / 2,
             marker=".",
             linestyle="",
-            label=label,
+            label=matches_label,
         )
 
     # Labeling
@@ -999,7 +1010,8 @@ def _plot_distance_comparison(
     # Presentation
     ax.set_xlabel(plot_config.x_label)
     ax.set_ylabel(plot_config.y_label)
-    ax.legend(frameon=False, loc="center right")
+    ax.set_xlim([0, 0.4])
+    ax.legend(frameon=False, loc="center right", fontsize=12)
     fig.tight_layout()
     fig.subplots_adjust(
         # Reduce spacing between subplots
@@ -1013,13 +1025,94 @@ def _plot_distance_comparison(
     )
 
     # Store and cleanup
-    filename = f"{plot_config.name}_hybrid_det_{hybrid_jet_pt_bin}_iterative_splittings_{grooming_method}"
+    filename = f"{plot_config.name}_hybrid_det_level_{hybrid_jet_pt_bin}_iterative_splittings_{grooming_method}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def _plot_leading_matched_subleading_unmatched_short_distance_response(
+    hists: Mapping[str, bh.Histogram],
+    grooming_method: str,
+    hybrid_jet_pt_bin: helpers.RangeSelector,
+    plot_config: PlotConfig,
+    output_dir: Path,
+) -> None:
+    logger.debug(f"Plotting hybrid-det leading correct, subleading unmatched short distance for {grooming_method}.")
+
+    h_input = binned_data.BinnedData.from_existing_data(
+        hists[
+            f"{grooming_method}_hybrid_det_level_kt_response_matching_type_leading_correct_subleading_untagged_distance_less_than_005"
+        ]
+    )
+    # Select the variables (for the example of kt)
+    # Axes: hybrid_pt, hybrid_kt, det_level_pt, det_level_kt
+    # NOTE: We already applied the 40 < hybrid jet pt < 120 cut, so it doesn't need an additional selection.
+    h = binned_data.BinnedData(
+        axes=[h_input.axes[1], h_input.axes[3]],
+        values=np.sum(h_input.values, axis=(0, 2)),
+        variances=np.sum(h_input.variances, axis=(0, 2)),
+    )
+
+    # Normalize the response.
+    normalization_values = h.values.sum(axis=0, keepdims=True)
+    h.values = np.divide(h.values, normalization_values, out=np.zeros_like(h.values), where=normalization_values != 0)
+
+    # Finish setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Determine the normalization range
+    z_axis_range = {
+        # "vmin": h_proj.values[h_proj.values > 0].min(),
+        "vmin": 1e-4,
+        "vmax": h.values.max(),
+    }
+
+    # Plot
+    mesh = ax.pcolormesh(
+        h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+    )
+    fig.colorbar(mesh, pad=0.02)
+
+    # Labeling
+    text = "Iterative splittings"
+    text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+    text += "\n" + " ".join(grooming_method.split("_")).capitalize()
+    text += "\n" + "Leading matched, subleading unmatched"
+    text += "\n" + r"$\Delta R < 0.05$"
+    ax.text(
+        0.95,
+        0.95,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="right",
+        verticalalignment="top",
+        multialignment="right",
+        color="black",
+    )
+
+    # Presentation
+    ax.set_xlabel(plot_config.x_label)
+    ax.set_ylabel(plot_config.y_label)
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.12,
+        bottom=0.12,
+        right=0.97,
+        top=0.97,
+    )
+
+    # Store and cleanup
+    filename = f"{plot_config.name}_hybrid_det_level_{hybrid_jet_pt_bin}_iterative_splittings_{grooming_method}"
     fig.savefig(output_dir / f"{filename}.pdf")
     plt.close(fig)
 
 
 def plot_distance_comparison(
-    hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path
+    hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], matching_types: Sequence[str], output_dir: Path
 ) -> None:
     hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
 
@@ -1027,9 +1120,21 @@ def plot_distance_comparison(
         _plot_distance_comparison(
             hists=hists,
             grooming_method=grooming_method,
+            matching_types=matching_types,
             hybrid_jet_pt_bin=hybrid_jet_pt_bin,
             plot_config=PlotConfig(
                 name="distance_comparison", x_label=r"$\Delta R_{\text{hybrid-det}}$", y_label=r"Prob.",
+            ),
+            output_dir=output_dir,
+        )
+        _plot_leading_matched_subleading_unmatched_short_distance_response(
+            hists=hists,
+            grooming_method=grooming_method,
+            hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+            plot_config=PlotConfig(
+                name="leading_matched_subleading_unmatched_short_distance",
+                x_label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$",
+                y_label=r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$",
             ),
             output_dir=output_dir,
         )
