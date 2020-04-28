@@ -587,7 +587,7 @@ def _determine_matching_types(
 
         if match_using_distance:
             # Require delta eta and delta phi to be within 0.001
-            delta = 0.001
+            delta = 0.01
             delta_eta_matching = (
                 np.abs(matched_subset[matched_leading_indices].eta - hybrid_subset[hybrid_leading_indices].eta) < delta
             )
