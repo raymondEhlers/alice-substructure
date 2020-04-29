@@ -1087,7 +1087,7 @@ def _plot_leading_matched_subleading_unmatched_short_distance_response(
 
     # Determine the normalization range
     z_axis_range = {
-        # "vmin": h_proj.values[h_proj.values > 0].min(),
+        # "vmin": h.values[h.values > 0].min(),
         "vmin": 1e-4,
         "vmax": h.values.max(),
     }
@@ -1159,7 +1159,7 @@ def plot_distance_comparison(
             plot_config=PlotConfig(
                 name="leading_matched_subleading_unmatched_short_distance",
                 x_label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$",
-                y_label=r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$",
+                y_label=r"$k_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$",
             ),
             output_dir=output_dir,
         )
@@ -1180,6 +1180,7 @@ def _plot_compare_grooming_methods_for_attribute(
     attr_name: str,
     prefix: str,
     jet_pt_bin: helpers.RangeSelector,
+    set_zero_to_nan: bool,
     plot_config: PlotConfig,
     output_dir: Path,
 ) -> None:
@@ -1189,6 +1190,7 @@ def _plot_compare_grooming_methods_for_attribute(
 
     greens = sns.color_palette("GnBu_d", 3)
     # greens = sns.color_palette("Greens_d", 3)
+    true_greens = sns.color_palette("Greens_d", 3)
     purples = sns.color_palette("Purples", 3)
     reds = sns.color_palette("Reds_d", 2)
     markers = ["o", "d", "s"]
@@ -1206,13 +1208,28 @@ def _plot_compare_grooming_methods_for_attribute(
             color=purples[1], marker=markers[0], fillstyle="full", label=r"Leading $k_{\text{T}}$", zorder=10
         ),
         "leading_kt_z_cut_02": GroomingMethodStyle(
-            color=purples[1], marker=markers[1], fillstyle="none", label=r"Leading $k_{\text{T}}$ $z > 0.2$", zorder=10
+            color=purples[1], marker=markers[1], fillstyle="none", label=r"Leading $k_{\text{T}}$ $z > 0.2$", zorder=4
         ),
         "leading_kt_z_cut_04": GroomingMethodStyle(
             color=purples[1], marker=markers[2], fillstyle="full", label=r"Leading $k_{\text{T}}$ $z > 0.4$", zorder=10
         ),
+        # Leading kt with z cuts, but n <= 1
+        "leading_kt_z_cut_02_first_split": GroomingMethodStyle(
+            color=true_greens[1],
+            marker="P",
+            fillstyle="none",
+            label=r"Leading $k_{\text{T}}$ $z > 0.2$, $n \leq 1$",
+            zorder=4,
+        ),
+        "leading_kt_z_cut_04_first_split": GroomingMethodStyle(
+            color=true_greens[1],
+            marker="P",
+            fillstyle="full",
+            label=r"Leading $k_{\text{T}}$ $z > 0.4$, $n \leq 1$",
+            zorder=10,
+        ),
         "soft_drop_z_cut_02": GroomingMethodStyle(
-            color=reds[1], marker=markers[1], fillstyle="none", label=r"SoftDrop $z > 0.2$", zorder=5
+            color=reds[1], marker=markers[1], fillstyle="none", label=r"SoftDrop $z > 0.2$", zorder=4
         ),
         "soft_drop_z_cut_04": GroomingMethodStyle(
             color=reds[1], marker=markers[2], fillstyle="full", label=r"SoftDrop $z > 0.4$", zorder=5
@@ -1233,7 +1250,15 @@ def _plot_compare_grooming_methods_for_attribute(
         )
 
         # Normalize
+        # Normalize by the sum of the values to get the n_jets values.
+        # Then, we still need to normalize by the bin widths.
         h /= np.sum(h.values)
+        h /= h.axes[0].bin_widths
+
+        # Set 0s to NaN (for example, in z_g where have a good portion of the range cut off).
+        if set_zero_to_nan:
+            h.errors[h.values == 0] = np.nan
+            h.values[h.values == 0] = np.nan
 
         # Plot options
         kwargs = {
@@ -1276,10 +1301,12 @@ def _plot_compare_grooming_methods_for_attribute(
     # Presentation
     # Cut out the normalization bin at < 0
     lower, upper = ax.get_xlim()
-    ax.set_xlim([0, upper])
+    # TEMP: Remove
+    # ax.set_xlim([0, upper])
     ax.set_xlabel(plot_config.x_label)
     ax.set_ylabel(plot_config.y_label)
-    ax.set_yscale("log")
+    if plot_config.log_y:
+        ax.set_yscale("log")
     ax.legend(frameon=False, loc=plot_config.legend_location, fontsize=14)
     fig.tight_layout()
     fig.subplots_adjust(
@@ -1294,7 +1321,14 @@ def _plot_compare_grooming_methods_for_attribute(
     )
 
     # Store and cleanup
-    filename = f"{plot_config.name}_{attr_name}_{jet_pt_bin}_iterative_splittings"
+    # It's expected that the attr_name is already included in the `plot_config.name`.
+    # Sanity check to make sure we don't get that wrong!
+    if attr_name not in plot_config.name:
+        raise ValueError(
+            f"PlotConfig name must contain the attr name! attr_name: {attr_name}, name: {plot_config.name}"
+        )
+
+    filename = f"{plot_config.name}_{jet_pt_bin}_iterative_splittings"
     fig.savefig(output_dir / f"{filename}.pdf")
     plt.close(fig)
 
@@ -1313,11 +1347,63 @@ def compare_grooming_methods_for_substructure_prod(
         attr_name="kt",
         prefix="data",
         jet_pt_bin=jet_pt_bin,
+        set_zero_to_nan=False,
         plot_config=PlotConfig(
             name="kt_grooming_methods",
             x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
             y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
             legend_location="lower left",
+        ),
+        output_dir=output_dir,
+    )
+
+    _plot_compare_grooming_methods_for_attribute(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        attr_name="delta_R",
+        prefix="data",
+        jet_pt_bin=jet_pt_bin,
+        set_zero_to_nan=False,
+        plot_config=PlotConfig(
+            name="delta_R_grooming_methods",
+            x_label=r"$\Delta R$",
+            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$",
+            legend_location="center right",
+            log_y=False,
+        ),
+        output_dir=output_dir,
+    )
+
+    _plot_compare_grooming_methods_for_attribute(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        attr_name="z",
+        prefix="data",
+        jet_pt_bin=jet_pt_bin,
+        set_zero_to_nan=True,
+        plot_config=PlotConfig(
+            name="z_grooming_methods",
+            x_label=r"$z$",
+            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$",
+            legend_location="upper center",
+            log_y=False,
+        ),
+        output_dir=output_dir,
+    )
+
+    _plot_compare_grooming_methods_for_attribute(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        attr_name="n",
+        prefix="data",
+        jet_pt_bin=jet_pt_bin,
+        set_zero_to_nan=False,
+        plot_config=PlotConfig(
+            name="number_to_split_grooming_methods",
+            x_label=r"$n$",
+            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$",
+            legend_location="center right",
+            log_y=False,
         ),
         output_dir=output_dir,
     )
