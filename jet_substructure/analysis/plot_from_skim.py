@@ -7,7 +7,7 @@
 
 import logging
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Dict, Mapping, Optional, Sequence, Tuple
 
 import attr
 import boost_histogram as bh
@@ -15,6 +15,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
+import seaborn as sns
 from pachyderm import binned_data
 
 from jet_substructure.base import analysis_objects, helpers, skim_analysis_objects
@@ -35,10 +36,62 @@ matplotlib.rcParams["ytick.minor.right"] = True
 @attr.s
 class PlotConfig:
     name: str = attr.ib()
-    x_label: str = attr.ib()
-    y_label: str = attr.ib()
-    legend_location: str = attr.ib(default="center right")
-    log_y: bool = attr.ib(default=True)
+    x_label: str = attr.ib(default="")
+    y_label: str = attr.ib(default="")
+    log_x: bool = attr.ib(default=False)
+    log_y: bool = attr.ib(default=False)
+    x_range: Tuple[Optional[float], Optional[float]] = attr.ib(default=None)
+    y_range: Tuple[Optional[float], Optional[float]] = attr.ib(default=None)
+    # Legend options
+    legend_location: str = attr.ib(default=None)
+    legend_fontsize: int = attr.ib(default=None)
+    subplots_adjust_kwargs: Mapping[str, float] = attr.ib(factory=dict)
+
+    def apply_to_axis(self, ax: matplotlib.axes.Axes) -> None:
+        # TODO: Add some point, switch to metaprogramming...
+        # Labels
+        ax.set_xlabel(self.x_label)
+        ax.set_ylabel(self.y_label)
+        # Log
+        if self.log_x:
+            ax.set_xscale("log")
+        if self.log_y:
+            ax.set_yscale("log")
+        # Range
+        if self.x_range:
+            min_range, max_range = self.x_range
+            min_current_range, max_current_range = ax.get_xlim()
+            if min_range is None:
+                min_range = min_current_range
+            if max_range is None:
+                max_range = max_current_range
+            ax.set_xlim([min_range, max_range])
+        if self.y_range:
+            min_range, max_range = self.y_range
+            min_current_range, max_current_range = ax.get_ylim()
+            if min_range is None:
+                min_range = min_current_range
+            if max_range is None:
+                max_range = max_current_range
+            ax.set_ylim([min_range, max_range])
+        # Need to allow legend_location to be None to allow us to skip drawing it.
+        if self.legend_location is not None:
+            ax.legend(frameon=False, loc=self.legend_location, fontsize=self.legend_fontsize)
+
+    def apply_to_fig(self, fig: matplotlib.figure.Figure) -> None:
+        fig.tight_layout()
+        adjust_default_args = dict(
+            # Reduce spacing between subplots
+            hspace=0,
+            wspace=0,
+            # Reduce external spacing
+            left=0.10,
+            bottom=0.08,
+            right=0.98,
+            top=0.98,
+        )
+        adjust_default_args.update(self.subplots_adjust_kwargs)
+        fig.subplots_adjust(**adjust_default_args)
 
 
 def _project_matching(bh_hist: bh.Histogram, axis_to_keep: int) -> binned_data.BinnedData:
@@ -1174,6 +1227,86 @@ class GroomingMethodStyle:
     zorder: int = attr.ib()
 
 
+def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
+    # Setup
+    styles = {}
+
+    for label in ["", "_compare"]:
+        if label == "":
+            # These are our main colors.
+            # The methods are similar, but different, so we want to spread out the colors.
+            # dynamical_grooming_colors = sns.color_palette(f"GnBu_d", 3)
+            dynamical_grooming_colors = sns.color_palette(f"Greens_d", 4)
+            leading_kt_colors = sns.color_palette(f"Purples_d", 3)
+            soft_drop_colors = sns.color_palette(f"Reds_d", 3)
+        else:
+            # These are our comparison colors. Similar in order and often shade, but distinct.
+            dynamical_grooming_colors = sns.color_palette(f"Greys_r", 5)
+            leading_kt_colors = sns.color_palette(f"Blues_r", 3)
+            soft_drop_colors = sns.color_palette(f"Oranges_r", 3)
+        markers = ["o", "d", "s"]
+        grooming_styling = {
+            f"dynamical_z{label}": GroomingMethodStyle(
+                color=dynamical_grooming_colors[0], marker=markers[0], fillstyle="full", label="$z$Drop", zorder=10
+            ),
+            f"dynamical_kt{label}": GroomingMethodStyle(
+                color=dynamical_grooming_colors[1],
+                marker=markers[0],
+                fillstyle="full",
+                label=r"$k_{\text{T}}$Drop",
+                zorder=10,
+            ),
+            f"dynamical_time{label}": GroomingMethodStyle(
+                color=dynamical_grooming_colors[2], marker=markers[0], fillstyle="full", label=r"timeDrop", zorder=10
+            ),
+            f"leading_kt{label}": GroomingMethodStyle(
+                color=leading_kt_colors[1],
+                marker=markers[0],
+                fillstyle="full",
+                label=r"Leading $k_{\text{T}}$",
+                zorder=10,
+            ),
+            f"leading_kt_z_cut_02{label}": GroomingMethodStyle(
+                color=leading_kt_colors[1],
+                marker=markers[1],
+                fillstyle="none",
+                label=r"Leading $k_{\text{T}}$ $z > 0.2$",
+                zorder=4,
+            ),
+            f"leading_kt_z_cut_04{label}": GroomingMethodStyle(
+                color=leading_kt_colors[1],
+                marker=markers[2],
+                fillstyle="full",
+                label=r"Leading $k_{\text{T}}$ $z > 0.4$",
+                zorder=10,
+            ),
+            # Leading kt with z cuts, but n <= 1
+            f"leading_kt_z_cut_02_first_split{label}": GroomingMethodStyle(
+                color=leading_kt_colors[0],
+                marker="P",
+                fillstyle="none",
+                label=r"Leading $k_{\text{T}}$ $z > 0.2$, $n \leq 1$",
+                zorder=4,
+            ),
+            f"leading_kt_z_cut_04_first_split{label}": GroomingMethodStyle(
+                color=leading_kt_colors[0],
+                marker="P",
+                fillstyle="full",
+                label=r"Leading $k_{\text{T}}$ $z > 0.4$, $n \leq 1$",
+                zorder=10,
+            ),
+            f"soft_drop_z_cut_02{label}": GroomingMethodStyle(
+                color=soft_drop_colors[1], marker=markers[1], fillstyle="none", label=r"SoftDrop $z > 0.2$", zorder=4
+            ),
+            f"soft_drop_z_cut_04{label}": GroomingMethodStyle(
+                color=soft_drop_colors[1], marker=markers[2], fillstyle="full", label=r"SoftDrop $z > 0.4$", zorder=5
+            ),
+        }
+        styles.update(grooming_styling)
+
+    return styles
+
+
 def _plot_compare_grooming_methods_for_attribute(
     hists: Mapping[str, bh.Histogram],
     grooming_methods: Sequence[str],
@@ -1186,57 +1319,9 @@ def _plot_compare_grooming_methods_for_attribute(
 ) -> None:
     logger.info(f"Plotting grooming method comparison for {attr_name}")
 
-    import seaborn as sns
-
-    greens = sns.color_palette("GnBu_d", 3)
-    # greens = sns.color_palette("Greens_d", 3)
-    true_greens = sns.color_palette("Greens_d", 3)
-    purples = sns.color_palette("Purples", 3)
-    reds = sns.color_palette("Reds_d", 2)
-    markers = ["o", "d", "s"]
-    grooming_styling = {
-        "dynamical_z": GroomingMethodStyle(
-            color=greens[0], marker=markers[0], fillstyle="full", label="$z$Drop", zorder=10
-        ),
-        "dynamical_kt": GroomingMethodStyle(
-            color=greens[1], marker=markers[0], fillstyle="full", label=r"$k_{\text{T}}$Drop", zorder=10
-        ),
-        "dynamical_time": GroomingMethodStyle(
-            color=greens[2], marker=markers[0], fillstyle="full", label=r"timeDrop", zorder=10
-        ),
-        "leading_kt": GroomingMethodStyle(
-            color=purples[1], marker=markers[0], fillstyle="full", label=r"Leading $k_{\text{T}}$", zorder=10
-        ),
-        "leading_kt_z_cut_02": GroomingMethodStyle(
-            color=purples[1], marker=markers[1], fillstyle="none", label=r"Leading $k_{\text{T}}$ $z > 0.2$", zorder=4
-        ),
-        "leading_kt_z_cut_04": GroomingMethodStyle(
-            color=purples[1], marker=markers[2], fillstyle="full", label=r"Leading $k_{\text{T}}$ $z > 0.4$", zorder=10
-        ),
-        # Leading kt with z cuts, but n <= 1
-        "leading_kt_z_cut_02_first_split": GroomingMethodStyle(
-            color=true_greens[1],
-            marker="P",
-            fillstyle="none",
-            label=r"Leading $k_{\text{T}}$ $z > 0.2$, $n \leq 1$",
-            zorder=4,
-        ),
-        "leading_kt_z_cut_04_first_split": GroomingMethodStyle(
-            color=true_greens[1],
-            marker="P",
-            fillstyle="full",
-            label=r"Leading $k_{\text{T}}$ $z > 0.4$, $n \leq 1$",
-            zorder=10,
-        ),
-        "soft_drop_z_cut_02": GroomingMethodStyle(
-            color=reds[1], marker=markers[1], fillstyle="none", label=r"SoftDrop $z > 0.2$", zorder=4
-        ),
-        "soft_drop_z_cut_04": GroomingMethodStyle(
-            color=reds[1], marker=markers[2], fillstyle="full", label=r"SoftDrop $z > 0.4$", zorder=5
-        ),
-    }
-
     fig, ax = plt.subplots(figsize=(8, 6))
+
+    grooming_styling = define_grooming_styles()
 
     for grooming_method in grooming_methods:
         # Setup
@@ -1323,10 +1408,10 @@ def _plot_compare_grooming_methods_for_attribute(
     # Store and cleanup
     # It's expected that the attr_name is already included in the `plot_config.name`.
     # Sanity check to make sure we don't get that wrong!
-    if attr_name not in plot_config.name:
-        raise ValueError(
-            f"PlotConfig name must contain the attr name! attr_name: {attr_name}, name: {plot_config.name}"
-        )
+    # if attr_name not in plot_config.name:
+    #    raise ValueError(
+    #        f"PlotConfig name must contain the attr name! attr_name: {attr_name}, name: {plot_config.name}"
+    #    )
 
     filename = f"{plot_config.name}_{jet_pt_bin}_iterative_splittings"
     fig.savefig(output_dir / f"{filename}.pdf")
@@ -1353,6 +1438,7 @@ def compare_grooming_methods_for_substructure_prod(
             x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
             y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
             legend_location="lower left",
+            log_y=True,
         ),
         output_dir=output_dir,
     )
@@ -1407,3 +1493,392 @@ def compare_grooming_methods_for_substructure_prod(
         ),
         output_dir=output_dir,
     )
+
+    # High kt comparison
+    _plot_compare_grooming_methods_for_attribute(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        attr_name="kt_high_kt",
+        prefix="data",
+        jet_pt_bin=jet_pt_bin,
+        set_zero_to_nan=False,
+        plot_config=PlotConfig(
+            name="kt_high_kt_grooming_methods",
+            x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+            legend_location="lower left",
+            log_y=True,
+        ),
+        output_dir=output_dir,
+    )
+
+    _plot_compare_grooming_methods_for_attribute(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        attr_name="delta_R_high_kt",
+        prefix="data",
+        jet_pt_bin=jet_pt_bin,
+        set_zero_to_nan=False,
+        plot_config=PlotConfig(
+            name="delta_R_high_kt_grooming_methods",
+            x_label=r"$\Delta R$",
+            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$",
+            legend_location="center right",
+            log_y=False,
+        ),
+        output_dir=output_dir,
+    )
+
+    _plot_compare_grooming_methods_for_attribute(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        attr_name="z_high_kt",
+        prefix="data",
+        jet_pt_bin=jet_pt_bin,
+        set_zero_to_nan=True,
+        plot_config=PlotConfig(
+            name="z_high_kt_grooming_methods",
+            x_label=r"$z$",
+            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$",
+            legend_location="upper center",
+            log_y=False,
+        ),
+        output_dir=output_dir,
+    )
+
+    _plot_compare_grooming_methods_for_attribute(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        attr_name="n_high_kt",
+        prefix="data",
+        jet_pt_bin=jet_pt_bin,
+        set_zero_to_nan=False,
+        plot_config=PlotConfig(
+            name="number_to_split_high_kt_grooming_methods",
+            x_label=r"$n$",
+            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$",
+            legend_location="center right",
+            log_y=False,
+        ),
+        output_dir=output_dir,
+    )
+
+
+def _project_and_prepare_grooming_variable_hist(
+    bh_hist: bh.Histogram, jet_pt_bin: helpers.RangeSelector, set_zero_to_nan: bool
+) -> binned_data.BinnedData:
+    # Need to project to just the attr of interest.
+    h = binned_data.BinnedData.from_existing_data(
+        bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :]  # noqa: E203
+    )
+
+    # Normalize
+    # Normalize by the sum of the values to get the n_jets values.
+    # Then, we still need to normalize by the bin widths.
+    h /= np.sum(h.values)
+    h /= h.axes[0].bin_widths
+
+    # Set 0s to NaN (for example, in z_g where have a good portion of the range cut off).
+    if set_zero_to_nan:
+        mask = h.values == 0
+        h.errors[mask] = np.nan
+        h.values[mask] = np.nan
+
+    return h
+
+
+@attr.s
+class PlotHists:
+    hists: Mapping[str, bh.Histogram] = attr.ib()
+    prefix: str = attr.ib()
+    identifier: str = attr.ib()
+    display_label: str = attr.ib()
+
+
+def _plot_compare_grooming_methods_for_attribute_data_embed(
+    hists: Sequence[PlotHists],
+    # main_hists: Mapping[str, bh.Histogram],
+    # comparison_hists: Sequence[Mapping[str, bh.Histogram]],
+    # data_hists: Mapping[str, bh.Histogram],
+    # compare_hists: Mapping[str, bh.Histogram],
+    # data_prefix: str,
+    # compare_prefix: str,
+    # data_label: str,
+    # compare_label: str,
+    attr_name: str,
+    grooming_methods: Sequence[str],
+    jet_pt_bin: helpers.RangeSelector,
+    set_zero_to_nan: bool,
+    plot_config: PlotConfig,
+    output_dir: Path,
+) -> None:
+    # Setup
+    display_labels_vs = " vs. ".join([obj.display_label for obj in hists])
+    logger.info(
+        f"Plotting grooming method comparison for {attr_name}, {display_labels_vs}, grooming_methods: {grooming_methods}"
+    )
+    fig, (ax, ax_ratio) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+    grooming_styling = define_grooming_styles()
+
+    # TODO: Ratio plot!
+
+    for grooming_method in grooming_methods:
+        main_hist = None
+        for hists_obj in hists:
+            # Setup and project
+            # Axes: jet_pt, attr_name
+            h = _project_and_prepare_grooming_variable_hist(
+                bh_hist=hists_obj.hists[f"{grooming_method}_{hists_obj.prefix}_{attr_name}"],
+                jet_pt_bin=jet_pt_bin,
+                set_zero_to_nan=set_zero_to_nan,
+            )
+
+            # Setup
+            # First, we determine the style
+            style = grooming_styling[grooming_method]
+            if main_hist is not None:
+                style = grooming_styling[f"{grooming_method}_compare"]
+            # And then the label
+            label = f"{hists_obj.display_label}, {style.label}"
+
+            # Additional plot styling
+            kwargs = {
+                "markerfacecolor": "white" if style.fillstyle == "none" else style.color,
+                "alpha": 1 if style.fillstyle == "none" else 0.8,
+            }
+            if style.fillstyle != "none":
+                kwargs["markeredgewidth"] = 0
+
+            ax.errorbar(
+                h.axes[0].bin_centers,
+                h.values,
+                yerr=h.errors,
+                xerr=h.axes[0].bin_widths / 2,
+                color=style.color,
+                marker=style.marker,
+                fillstyle=style.fillstyle,
+                linestyle="",
+                label=label,
+                zorder=style.zorder,
+                **kwargs,
+            )
+
+            # We've plotted the main obj, so now we store that hist, and we will treat the rest as comparisons.
+            # For those comparisons, we want to create ratios.
+            if main_hist is None:
+                main_hist = h
+            else:
+                ratio = h / main_hist
+                ax_ratio.errorbar(
+                    ratio.axes[0].bin_centers,
+                    ratio.values,
+                    yerr=h.errors,
+                    xerr=h.axes[0].bin_widths / 2,
+                    color=style.color,
+                    marker=style.marker,
+                    fillstyle=style.fillstyle,
+                    linestyle="",
+                    zorder=style.zorder,
+                    **kwargs,
+                )
+
+    # Labeling
+    # TODO: Comprehensive ALICE labeling.
+    text = "Iterative splittings"
+    text += "\n" + f"${jet_pt_bin.display_str(label='')}$"
+    # if len(grooming_methods) == 1:
+    #    text += "\n" + grooming_styling[grooming_methods[0]].label
+    # text += "\n" + " ".join(grooming_method.split("_")).capitalize()
+    ax.text(
+        0.975,
+        0.975,
+        text,
+        transform=ax.transAxes,
+        horizontalalignment="right",
+        verticalalignment="top",
+        multialignment="right",
+        color="black",
+    )
+
+    # Presentation
+    # Cut out the normalization bin at < 0
+    lower, upper = ax.get_xlim()
+    # TEMP: Remove
+    # ax.set_xlim([0, upper])
+    ax.set_xlabel(plot_config.x_label)
+    ax.set_ylabel(plot_config.y_label)
+    if plot_config.log_y:
+        ax.set_yscale("log")
+    ax.legend(frameon=False, loc=plot_config.legend_location, fontsize=14)
+    fig.tight_layout()
+    fig.subplots_adjust(
+        # Reduce spacing between subplots
+        hspace=0,
+        wspace=0,
+        # Reduce external spacing
+        left=0.12,
+        bottom=0.12,
+        right=0.97,
+        top=0.97,
+    )
+
+    # Store and cleanup
+    # It's expected that the attr_name is already included in the `plot_config.name`.
+    # Sanity check to make sure we don't get that wrong!
+    # if attr_name not in plot_config.name:
+    #    raise ValueError(
+    #        f"PlotConfig name must contain the attr name! attr_name: {attr_name}, name: {plot_config.name}"
+    #    )
+
+    grooming_methods_filename_label = ""
+    if len(grooming_methods) == 1:
+        grooming_methods_filename_label = f"_{grooming_methods[0]}"
+    identifiers = "_".join([obj.identifier for obj in hists])
+    filename = f"{plot_config.name}_{jet_pt_bin}{grooming_methods_filename_label}_{identifiers}_iterative_splittings"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def compare_grooming_methods_for_substructure_data_embed_prod(
+    data_hists: Mapping[str, bh.Histogram],
+    embed_hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    output_dir: Path,
+) -> None:
+    """
+
+    """
+    jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+
+    hists = [
+        PlotHists(hists=data_hists, prefix="data", identifier="PbPb", display_label="Pb--Pb",),
+        PlotHists(hists=embed_hists, prefix="hybrid", identifier="hybrid", display_label="Hybrid",),
+    ]
+    for grooming_method in grooming_methods:
+        _plot_compare_grooming_methods_for_attribute_data_embed(
+            hists=hists,
+            attr_name="kt",
+            grooming_methods=[grooming_method],
+            jet_pt_bin=jet_pt_bin,
+            set_zero_to_nan=False,
+            plot_config=PlotConfig(
+                name="kt_grooming_methods",
+                x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                legend_location="lower left",
+                log_y=True,
+            ),
+            output_dir=output_dir,
+        )
+        _plot_compare_grooming_methods_for_attribute_data_embed(
+            hists=hists,
+            attr_name="delta_R",
+            grooming_methods=[grooming_method],
+            jet_pt_bin=jet_pt_bin,
+            set_zero_to_nan=False,
+            plot_config=PlotConfig(
+                name="delta_R_grooming_methods",
+                x_label=r"$\Delta R$",
+                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$",
+                legend_location="upper center",
+                log_y=False,
+            ),
+            output_dir=output_dir,
+        )
+
+        _plot_compare_grooming_methods_for_attribute_data_embed(
+            hists=hists,
+            attr_name="z",
+            grooming_methods=[grooming_method],
+            jet_pt_bin=jet_pt_bin,
+            set_zero_to_nan=True,
+            plot_config=PlotConfig(
+                name="z_grooming_methods",
+                x_label=r"$z$",
+                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$",
+                legend_location="upper center",
+                log_y=False,
+            ),
+            output_dir=output_dir,
+        )
+
+        _plot_compare_grooming_methods_for_attribute_data_embed(
+            hists=hists,
+            attr_name="n",
+            grooming_methods=[grooming_method],
+            jet_pt_bin=jet_pt_bin,
+            set_zero_to_nan=False,
+            plot_config=PlotConfig(
+                name="number_to_split_grooming_methods",
+                x_label=r"$n$",
+                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$",
+                legend_location="center right",
+                log_y=False,
+            ),
+            output_dir=output_dir,
+        )
+
+        # High kt comparison
+        _plot_compare_grooming_methods_for_attribute_data_embed(
+            hists=hists,
+            attr_name="kt_high_kt",
+            grooming_methods=[grooming_method],
+            jet_pt_bin=jet_pt_bin,
+            set_zero_to_nan=False,
+            plot_config=PlotConfig(
+                name="kt_high_kt_grooming_methods",
+                x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                legend_location="lower left",
+                log_y=True,
+            ),
+            output_dir=output_dir,
+        )
+
+        _plot_compare_grooming_methods_for_attribute_data_embed(
+            hists=hists,
+            attr_name="delta_R_high_kt",
+            grooming_methods=[grooming_method],
+            jet_pt_bin=jet_pt_bin,
+            set_zero_to_nan=False,
+            plot_config=PlotConfig(
+                name="delta_R_high_kt_grooming_methods",
+                x_label=r"$\Delta R$",
+                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$",
+                legend_location="center right",
+                log_y=False,
+            ),
+            output_dir=output_dir,
+        )
+
+        _plot_compare_grooming_methods_for_attribute_data_embed(
+            hists=hists,
+            attr_name="z_high_kt",
+            grooming_methods=[grooming_method],
+            jet_pt_bin=jet_pt_bin,
+            set_zero_to_nan=True,
+            plot_config=PlotConfig(
+                name="z_high_kt_grooming_methods",
+                x_label=r"$z$",
+                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$",
+                legend_location="upper center",
+                log_y=False,
+            ),
+            output_dir=output_dir,
+        )
+
+        _plot_compare_grooming_methods_for_attribute_data_embed(
+            hists=hists,
+            attr_name="n_high_kt",
+            grooming_methods=[grooming_method],
+            jet_pt_bin=jet_pt_bin,
+            set_zero_to_nan=False,
+            plot_config=PlotConfig(
+                name="number_to_split_high_kt_grooming_methods",
+                x_label=r"$n$",
+                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$",
+                legend_location="center right",
+                log_y=False,
+            ),
+            output_dir=output_dir,
+        )

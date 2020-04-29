@@ -27,6 +27,7 @@ coloredlogs = "^14.0"
 dask = {extras = ["dataframe"], version = "^2.14.0"}
 enlighten = "^1.4.0"
 pathos = "^0.2.5"
+seaborn = "^0.10.1"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.761"

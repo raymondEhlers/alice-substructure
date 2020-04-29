@@ -11,7 +11,7 @@ import itertools
 import logging
 import pickle
 from pathlib import Path
-from typing import Dict, Sequence
+from typing import Dict, Mapping, Optional, Sequence
 
 import boost_histogram as bh
 import enlighten
@@ -427,6 +427,58 @@ def map_reduce_pandas_concat() -> None:
     IPython.start_ipython(user_ns=locals())
 
 
+def _fill_grooming_hists(
+    masked_df: pd.DataFrame,
+    grooming_method: str,
+    hists: Mapping[str, bh.Histogram],
+    prefix: str,
+    suffix: Optional[str] = None,
+) -> None:
+    """ Fill grooming hists using the df.
+
+    This is in a separate function so the DataFrame can be masked.
+
+    Args:
+        masked_df: Masked DataFrame to be used for filling.
+        grooming_method: Grooming method to be filled.
+        hists: Hists to be filled.
+        prefix: Prefix specifying the data type, such as "data", "matched", "true", etc.
+        suffix: Suffix to additional identify the hists.
+    Returns:
+        None. The hists stored in the hists dict are filled.
+    """
+    if suffix is None:
+        suffix = ""
+    else:
+        if not suffix.startswith("_"):
+            suffix = f"_{suffix}"
+
+    # Handle the case of the first split.
+    # If "_first_split" isn't included in the grooming method, then nothing is replaced.
+    grooming_method_for_df = grooming_method.replace("_first_split", "")
+
+    hists[f"{grooming_method}_{prefix}_kt{suffix}"].fill(
+        masked_df[f"jet_pt_{prefix}"].to_numpy(),
+        masked_df[f"{grooming_method_for_df}_{prefix}_kt"].to_numpy(),
+        weight=masked_df["scale_factor"].to_numpy(),
+    )
+    hists[f"{grooming_method}_{prefix}_delta_R{suffix}"].fill(
+        masked_df[f"jet_pt_{prefix}"].to_numpy(),
+        masked_df[f"{grooming_method_for_df}_{prefix}_delta_R"].to_numpy(),
+        weight=masked_df["scale_factor"].to_numpy(),
+    )
+    hists[f"{grooming_method}_{prefix}_z{suffix}"].fill(
+        masked_df[f"jet_pt_{prefix}"].to_numpy(),
+        masked_df[f"{grooming_method_for_df}_{prefix}_z"].to_numpy(),
+        weight=masked_df["scale_factor"].to_numpy(),
+    )
+    hists[f"{grooming_method}_{prefix}_n{suffix}"].fill(
+        masked_df[f"jet_pt_{prefix}"].to_numpy(),
+        masked_df[f"{grooming_method_for_df}_{prefix}_n"].to_numpy(),
+        weight=masked_df["scale_factor"].to_numpy(),
+    )
+
+
 def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: str) -> None:  # noqa: 901
     # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
     from pathlib import Path  # noqa: F401
@@ -459,6 +511,7 @@ def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: 
     # Define hists.
     hists = {}
     for grooming_method in itertools.chain(grooming_methods, direct_comparison_grooming_methods):
+        # Standard
         jet_pt_axis = bh.axis.Regular(28, 0, 140)
         hists[f"{grooming_method}_{prefix}_kt"] = bh.Histogram(
             jet_pt_axis, bh.axis.Regular(26, -1, 25), storage=bh.storage.Weight(),
@@ -475,66 +528,52 @@ def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: 
         hists[f"{grooming_method}_{prefix}_n"] = bh.Histogram(
             jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
         )
+        # High kt
+        hists[f"{grooming_method}_{prefix}_kt_high_kt"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(26, -1, 25), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_{prefix}_delta_R_high_kt"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(21, -0.02, jet_R), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_{prefix}_theta_high_kt"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(21, -0.05, 1.0), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_{prefix}_z_high_kt"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(21, -0.025, 0.5), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_{prefix}_n_high_kt"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
+        )
 
     progress_manager = enlighten.Manager()
     with progress_manager.counter(total=len(path_list), desc="Analyzing", unit="tree", leave=True) as tree_counter:
         for df_path, df in tree_counter(data_frames):
             logger.debug(f"Processing df from {df_path}")
-            if collision_system in ["pythia", "embedPythia"]:
-                weight = df["scale_factor"].to_numpy()
-            else:
-                weight = np.ones_like(df[f"jet_pt_{prefix}"])
-
+            # Setup
+            # Add scale_factor weight as 1 if it's not included. This way, we can always weight from the
+            # scale factor of the masked_df.
+            if "scale_factor" not in df:
+                df = df.assign(scale_factor=np.ones_like(df[f"jet_pt_{prefix}"]))
+            # Jet pt bin
             jet_pt_bin = helpers.RangeSelector(min=40, max=120)
             jet_pt_mask = jet_pt_bin.mask_array(df[f"jet_pt_{prefix}"])
-            masked_df = df[jet_pt_mask]
 
+            # Standard grooming method plots
+            masked_df = df[jet_pt_mask]
             for grooming_method in grooming_methods:
-                hists[f"{grooming_method}_{prefix}_kt"].fill(
-                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
-                    masked_df[f"{grooming_method}_{prefix}_kt"].to_numpy(),
-                    weight=weight[jet_pt_mask],
-                )
-                hists[f"{grooming_method}_{prefix}_delta_R"].fill(
-                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
-                    masked_df[f"{grooming_method}_{prefix}_delta_R"].to_numpy(),
-                    weight=weight[jet_pt_mask],
-                )
-                hists[f"{grooming_method}_{prefix}_z"].fill(
-                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
-                    masked_df[f"{grooming_method}_{prefix}_z"].to_numpy(),
-                    weight=weight[jet_pt_mask],
-                )
-                hists[f"{grooming_method}_{prefix}_n"].fill(
-                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
-                    masked_df[f"{grooming_method}_{prefix}_n"].to_numpy(),
-                    weight=weight[jet_pt_mask],
-                )
+                _fill_grooming_hists(masked_df=masked_df, grooming_method=grooming_method, hists=hists, prefix=prefix)
 
             # Direct comparison plots
             mask = jet_pt_mask & (df[f"{grooming_method}_{prefix}_n"] <= 1)
             masked_df = df[mask]
             for grooming_method in direct_comparison_grooming_methods:
-                true_grooming_method = grooming_method[: grooming_method.find("_first_split")]
-                hists[f"{grooming_method}_{prefix}_kt"].fill(
-                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
-                    masked_df[f"{true_grooming_method}_{prefix}_kt"].to_numpy(),
-                    weight=weight[mask],
-                )
-                hists[f"{grooming_method}_{prefix}_delta_R"].fill(
-                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
-                    masked_df[f"{true_grooming_method}_{prefix}_delta_R"].to_numpy(),
-                    weight=weight[mask],
-                )
-                hists[f"{grooming_method}_{prefix}_z"].fill(
-                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
-                    masked_df[f"{true_grooming_method}_{prefix}_z"].to_numpy(),
-                    weight=weight[mask],
-                )
-                hists[f"{grooming_method}_{prefix}_n"].fill(
-                    masked_df[f"jet_pt_{prefix}"].to_numpy(),
-                    masked_df[f"{true_grooming_method}_{prefix}_n"].to_numpy(),
-                    weight=weight[mask],
+                _fill_grooming_hists(masked_df=masked_df, grooming_method=grooming_method, hists=hists, prefix=prefix)
+
+            # High kt grooming plots.
+            for grooming_method in grooming_methods:
+                mask = jet_pt_mask & (df[f"{grooming_method}_{prefix}_kt"] > 10)
+                _fill_grooming_hists(
+                    masked_df=df[mask], grooming_method=grooming_method, hists=hists, prefix=prefix, suffix="_high_kt"
                 )
 
     progress_manager.stop()
@@ -545,6 +584,23 @@ def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: 
     pkl_filename = output_dir / f"{collision_system}.pgz"
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
         pickle.dump(hists, pkl_file)  # type: ignore
+
+
+def output_dir_f(output_dir: Path, identifier: str) -> Path:
+    """ Format an output_dir path with a given identifier.
+
+    Also ensures that the directory exists.
+
+    Args:
+        output_dir: Output dir containing a format identifier, `{identifier}`.
+        identifier: Identifier to include in the path. Usually, it's the collision system,
+            but it doesn't have to be.
+    Returns:
+        Output path formatted with the identifier.
+    """
+    p = Path(str(output_dir).format(identifier=identifier))
+    p.mkdir(parents=True, exist_ok=True)
+    return p
 
 
 def plot_all() -> None:
@@ -575,8 +631,8 @@ def plot_all() -> None:
         "both_untagged": 7,
     }
 
-    output_dir = Path(f"output/compare/skim")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # NOTE: Intentionally skipping the f-string here. We want to format it later!
+    base_dir = Path("output/{identifier}/skim")
 
     logger.info("Loading embedded response data")
     pkl_filename = Path("output") / "embedPythia" / "skim" / "embedded.pgz"
@@ -602,7 +658,9 @@ def plot_all() -> None:
     except SyntaxError:
         logger.info("Couldn't load plot_from_skim due to syntax error. You need to load it.")
 
-    IPython.start_ipython(user_ns=locals())
+    user_ns = locals()
+    user_ns.update({"output_dir_f": output_dir_f})
+    IPython.start_ipython(user_ns=user_ns)
 
     # Plotting
     # plot_from_skim.plot_residuals_by_matching_type(
@@ -637,7 +695,7 @@ def run_embed_pythia(run_response: bool = True) -> None:
 
 if __name__ == "__main__":
     helpers.setup_logging()
-    plot_only = True
+    plot_only = False
     if not plot_only:
         df_from_file_data(
             collision_system="PbPb",
