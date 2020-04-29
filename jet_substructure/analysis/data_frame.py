@@ -313,10 +313,11 @@ def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequenc
                 )
                 # Matching distance
                 masked_df = df[hybrid_jet_pt_mask]
-                distances: pd.Series = np.sqrt(
+                # We convert from pd.Series to ndarray because the pd.Series conversions seem a bit odd at times.
+                distances = np.sqrt(
                     (masked_df["jet_eta_hybrid"] - masked_df["jet_eta_det_level"]) ** 2
                     + (masked_df["jet_phi_hybrid"] - masked_df["jet_phi_det_level"]) ** 2
-                )
+                ).to_numpy()
                 for matching_type in _matching_name_to_axis_value:
                     mask = matching_selections[matching_type]
                     masked_df = df[mask & hybrid_jet_pt_mask]
@@ -469,10 +470,10 @@ def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: 
             jet_pt_axis, bh.axis.Regular(21, -0.05, 1.0), storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_{prefix}_z"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(20, 0, 0.5), storage=bh.storage.Weight(),
+            jet_pt_axis, bh.axis.Regular(21, -0.025, 0.5), storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_{prefix}_n"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(10, 0, 10), storage=bh.storage.Weight(),
+            jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
         )
 
     progress_manager = enlighten.Manager()
@@ -558,6 +559,10 @@ def plot_all() -> None:
         "soft_drop_z_cut_02",
         "soft_drop_z_cut_04",
     ]
+    direct_comparison_grooming_methods = [
+        "leading_kt_z_cut_02_first_split",
+        "leading_kt_z_cut_04_first_split",
+    ]
     # NOTE: Order is changed here to match from before!!
     _matching_name_to_axis_value: Dict[str, int] = {
         "all": 0,
@@ -569,18 +574,24 @@ def plot_all() -> None:
         "leading_mistag_subleading_untagged": 5,
         "both_untagged": 7,
     }
-    output_dir = Path(f"output/embedPythia/skim")
+
+    output_dir = Path(f"output/compare/skim")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Loading embedded data")
+    logger.info("Loading embedded response data")
     pkl_filename = Path("output") / "embedPythia" / "skim" / "embedded.pgz"
     with gzip.GzipFile(pkl_filename, "r") as pkl_file:
-        embedded_hists = pickle.load(pkl_file)  # type: ignore
+        response_hists = pickle.load(pkl_file)  # type: ignore
+
+    logger.info("Loading embedPythia data")
+    pkl_filename = Path("output") / "embedPythia" / "skim" / "embedPythia.pgz"
+    with gzip.GzipFile(pkl_filename, "r") as pkl_file:
+        embed_pythia_hists = pickle.load(pkl_file)  # type: ignore
 
     logger.info("Loading PbPb data")
     pkl_filename = Path("output") / "PbPb" / "skim" / "PbPb.pgz"
     with gzip.GzipFile(pkl_filename, "r") as pkl_file:
-        pbpb_hists = pickle.load(pkl_file)  # type: ignore
+        PbPb_hists = pickle.load(pkl_file)  # type: ignore
 
     # Add some helpful imports and definitions
     from importlib import reload  # noqa: F401
@@ -626,7 +637,7 @@ def run_embed_pythia(run_response: bool = True) -> None:
 
 if __name__ == "__main__":
     helpers.setup_logging()
-    plot_only = False
+    plot_only = True
     if not plot_only:
         df_from_file_data(
             collision_system="PbPb",
@@ -635,7 +646,7 @@ if __name__ == "__main__":
             ),
             prefix="data",
         )
-        # run_embed_pythia(run_response=False)
+        run_embed_pythia(run_response=False)
         # df_from_file_data(collision_system="pythia")
         # dask_df_from_file()
         # dask_df_from_delayed()
