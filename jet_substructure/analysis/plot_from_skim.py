@@ -5,9 +5,11 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Sequence, Tuple
+from typing import Dict, Mapping, Optional, Sequence, Tuple, Union
 
 import attr
 import boost_histogram as bh
@@ -33,52 +35,143 @@ matplotlib.rcParams["ytick.right"] = True
 matplotlib.rcParams["ytick.minor.right"] = True
 
 
+_label_to_display_string: Dict[str, Dict[str, str]] = {
+    "ALICE": dict(work_in_progress="ALICE Work in Progress", preliminary="ALICE Preliminary", final="ALICE",),
+    "collision_system": dict(
+        PbPb=r"$Pb--Pb \sqrt{s_{\text{NN}}} = 5.02$ TeV",
+        embedPythia=r"$PYTHIA \bigotimes {main_system} Pb--Pb$",
+        pp_5=r"$pp \sqrt{s_{\text{NN}}} = 5.02$ TeV",
+    ),
+    "jets": {"R0{i}": fr"$\text{{anti}}-k_{{\text{{T}}}} charged jets R=0.{i}" for i in range(1, 7)},
+}
+
+
+def _validate_axis_name(instance: "AxisConfig", attribute: attr.Attribute[str], value: str) -> None:
+    if value not in ["x", "y", "z"]:
+        raise ValueError("Invalid axis name: {value}")
+
+
 @attr.s
-class PlotConfig:
-    name: str = attr.ib()
-    x_label: str = attr.ib(default="")
-    y_label: str = attr.ib(default="")
-    log_x: bool = attr.ib(default=False)
-    log_y: bool = attr.ib(default=False)
-    x_range: Tuple[Optional[float], Optional[float]] = attr.ib(default=None)
-    y_range: Tuple[Optional[float], Optional[float]] = attr.ib(default=None)
-    # Legend options
-    legend_location: str = attr.ib(default=None)
-    legend_fontsize: int = attr.ib(default=None)
-    subplots_adjust_kwargs: Mapping[str, float] = attr.ib(factory=dict)
+class AxisConfig:
+    axis: str = attr.ib(validator=[_validate_axis_name])
+    label: str = attr.ib(default="")
+    log: bool = attr.ib(default=False)
+    range: Tuple[Optional[float], Optional[float]] = attr.ib(default=None)
 
-    def apply_to_axis(self, ax: matplotlib.axes.Axes) -> None:
-        # TODO: Add some point, switch to metaprogramming...
-        # Labels
-        ax.set_xlabel(self.x_label)
-        ax.set_ylabel(self.y_label)
-        # Log
-        if self.log_x:
-            ax.set_xscale("log")
-        if self.log_y:
-            ax.set_yscale("log")
-        # Range
-        if self.x_range:
-            min_range, max_range = self.x_range
-            min_current_range, max_current_range = ax.get_xlim()
+    def apply(self, ax: matplotlib.axes.Axes) -> None:
+        if self.label:
+            getattr(ax, f"set_{self.axis}label")(self.label)
+        if self.log:
+            getattr(ax, f"set_{self.axis}scale")("log")
+            # Probably need to increase the number of ticks for a log axis. We just assume that's the case.
+            # I really wish it handled this better by default...
+            # See: https://stackoverflow.com/a/44079725/12907985
+            major_locator = matplotlib.ticker.LogLocator(base=10, numticks=12)
+            getattr(ax, f"{self.axis}axis").set_major_locator(major_locator)
+            minor_locator = matplotlib.ticker.LogLocator(base=10.0, subs=np.linspace(0.2, 0.9, 8), numticks=12)
+            getattr(ax, f"{self.axis}axis").set_minor_locator(minor_locator)
+            # But we don't want to label these ticks.
+            getattr(ax, f"{self.axis}axis").set_minor_formatter(matplotlib.ticker.NullFormatter())
+        if self.range:
+            min_range, max_range = self.range
+            min_current_range, max_current_range = getattr(ax, f"get_{self.axis}lim")()
             if min_range is None:
                 min_range = min_current_range
             if max_range is None:
                 max_range = max_current_range
-            ax.set_xlim([min_range, max_range])
-        if self.y_range:
-            min_range, max_range = self.y_range
-            min_current_range, max_current_range = ax.get_ylim()
-            if min_range is None:
-                min_range = min_current_range
-            if max_range is None:
-                max_range = max_current_range
-            ax.set_ylim([min_range, max_range])
-        # Need to allow legend_location to be None to allow us to skip drawing it.
-        if self.legend_location is not None:
-            ax.legend(frameon=False, loc=self.legend_location, fontsize=self.legend_fontsize)
+            getattr(ax, f"set_{self.axis}lim")([min_range, max_range])
 
-    def apply_to_fig(self, fig: matplotlib.figure.Figure) -> None:
+
+@attr.s
+class TextConfig:
+    text: str = attr.ib()
+    x: float = attr.ib()
+    y: float = attr.ib()
+    alignment: str = attr.ib(default=None)
+
+    def apply(self, ax: matplotlib.axes.Axes) -> None:
+        # Some reasonable defaults
+        if self.alignment is None:
+            ud = "upper" if self.y >= 0.5 else "lower"
+            lr = "right" if self.x >= 0.5 else "left"
+            self.alignment = f"{ud} {lr}"
+
+        alignments = {
+            "upper right": dict(horizontalalignment="right", verticalalignment="top", multialignment="right",),
+            "upper left": dict(horizontalalignment="left", verticalalignment="top", multialignment="left",),
+            "lower right": dict(horizontalalignment="right", verticalalignment="bottom", multialignment="right",),
+            "lower left": dict(horizontalalignment="left", verticalalignment="bottom", multialignment="left",),
+        }
+        alignment_kwargs = alignments[self.alignment]
+
+        # Finally, draw the text.
+        ax.text(
+            self.x,
+            self.y,
+            self.text,
+            # We always want to place using normalized coordinates.
+            # In the rare case that we don't want to, we can place by hand.
+            transform=ax.transAxes,
+            **alignment_kwargs,
+        )
+
+
+@attr.s
+class LegendConfig:
+    location: str = attr.ib(default=None)
+    # Takes advantage of the fact that None will use the default.
+    anchor: Optional[Tuple[float, float]] = attr.ib(default=None)
+    font_size: Optional[float] = attr.ib(default=None)
+    ncol: Optional[float] = attr.ib(default=1)
+
+    def apply(self, ax: matplotlib.axes.Axes) -> None:
+        if self.location:
+            ax.legend(
+                loc=self.location,
+                bbox_to_anchor=self.anchor,
+                # If we specify an anchor, we want to reduce an additional padding
+                # to ensure that we have accurate placement.
+                borderaxespad=(0 if self.anchor else None),
+                borderpad=(0 if self.anchor else None),
+                fontsize=self.font_size,
+                frameon=False,
+                ncol=self.ncol,
+            )
+
+
+def _ensure_sequence_of_axis_config(value: Union[AxisConfig, Sequence[AxisConfig]]) -> Sequence[AxisConfig]:
+    if isinstance(value, AxisConfig):
+        value = [value]
+    return value
+
+
+@attr.s
+class Panel:
+    axes: Sequence[AxisConfig] = attr.ib(converter=_ensure_sequence_of_axis_config)
+    text: Optional[TextConfig] = attr.ib(default=None)
+    legend: LegendConfig = attr.ib(default=None)
+
+    def apply(self, ax: matplotlib.axes.Axes) -> None:
+        # Axes
+        for axis in self.axes:
+            axis.apply(ax)
+        # Text
+        if self.text is not None:
+            self.text.apply(ax)
+        # Legend
+        if self.legend is not None:
+            self.legend.apply(ax)
+
+
+@attr.s
+class Figure:
+    edge_padding: Mapping[str, float] = attr.ib(factory=dict)
+
+    def apply(self, fig: matplotlib.figure.Figure) -> None:
+        # It shouldn't hurt to align the labels if there's only one.
+        fig.align_ylabels()
+
+        # Adjust the layout.
         fig.tight_layout()
         adjust_default_args = dict(
             # Reduce spacing between subplots
@@ -86,12 +179,61 @@ class PlotConfig:
             wspace=0,
             # Reduce external spacing
             left=0.10,
-            bottom=0.08,
+            bottom=0.105,
             right=0.98,
             top=0.98,
         )
-        adjust_default_args.update(self.subplots_adjust_kwargs)
+        adjust_default_args.update(self.edge_padding)
         fig.subplots_adjust(**adjust_default_args)
+
+
+def _ensure_sequence_of_panels(value: Union[Panel, Sequence[Panel]]) -> Sequence[Panel]:
+    if isinstance(value, Panel):
+        value = [value]
+    return value
+
+
+@attr.s
+class PlotConfig:
+    name: str = attr.ib()
+    panels: Sequence[Panel] = attr.ib(converter=_ensure_sequence_of_panels)
+    figure: Figure = attr.ib(factory=Figure)
+
+    def apply(
+        self,
+        fig: matplotlib.figure.Figure,
+        ax: Optional[matplotlib.axes.Axes] = None,
+        axes: Optional[Sequence[matplotlib.axes.Axes]] = None,
+    ) -> None:
+        # Validation
+        if ax is None and axes is None:
+            raise TypeError("Must pass the axis or axes of the figure.")
+        if ax is not None and axes is not None:
+            raise TypeError("Cannot pass both a single axis and multiple axes.")
+        # If we just have a single axis, wrap it up into a list so we can process it along with our panels.
+        if ax is not None:
+            axes = [ax]
+        # Help out mypy...
+        assert axes is not None
+        if len(axes) != len(self.panels):
+            raise ValueError(
+                f"Must have the same number of axes and panels. Passed axes: {axes}, panels: {self.panels}"
+            )
+
+        # Finally, we can actually apply the stored properties.
+        # Apply panels to the axes.
+        for ax, panel in zip(axes, self.panels):
+            panel.apply(ax)
+        # Figure
+        self.figure.apply(fig)
+
+
+@attr.s
+class PlotHists:
+    hists: Mapping[str, bh.Histogram] = attr.ib()
+    prefix: str = attr.ib()
+    identifier: str = attr.ib()
+    display_label: str = attr.ib()
 
 
 def _project_matching(bh_hist: bh.Histogram, axis_to_keep: int) -> binned_data.BinnedData:
@@ -176,22 +318,9 @@ def _plot_subjet_matching(
     # Presentation
     # Axis labels
     x_axis_label = fr"${axis_parameter[0]}" + r"_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$"
-    ax.set_ylabel(plot_config.y_label)
     ax.set_xlabel(x_axis_label)
-    ax.set_ylim([1e-3, 10])
-    ax.set_yscale("log")
-    ax.legend(frameon=False, loc="upper left", ncol=2, fontsize=14)
-    fig.tight_layout()
-    fig.subplots_adjust(
-        # Reduce spacing between subplots
-        hspace=0,
-        wspace=0,
-        # Reduce external spacing
-        left=0.10,
-        bottom=0.08,
-        right=0.99,
-        top=0.96,
-    )
+    # Apply the PlotConfig
+    plot_config.apply(fig=fig, axes=[ax])
 
     # Store and reset
     fig.savefig(
@@ -212,7 +341,14 @@ def plot_prong_matching(
             matching_types=matching_types,
             axis_parameter="pt",
             hybrid_jet_pt_bin=hybrid_jet_pt_bin,
-            plot_config=PlotConfig(name="subjet_matching", x_label="IGNORE", y_label="Tagging fraction",),
+            plot_config=PlotConfig(
+                name="subjet_matching",
+                panels=Panel(
+                    axes=[AxisConfig("y", label="Tagging Fraction", log=True, range=(1e-3, 10))],
+                    legend=LegendConfig(location="upper left", ncol=2, font_size=14),
+                ),
+                figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
+            ),
             output_dir=output_dir,
         )
 
@@ -290,36 +426,14 @@ def _plot_residual_by_matching_type(
 
     # Labeling
     for a, f in [(ax, fig), (ax_simplified, fig_simplified)]:
-        text = "Iterative splittings"
-        text += "\n" + f"${helpers.RangeSelector(40, 120).display_str(label='hybrid')}$"
-        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
-        if min_hybrid_kt:
-            text += "\n" + fr"$k_{{\text{{T}}}}^{{\text{{hybrid}}}} > {min_hybrid_kt}\:\text{{GeV}}/c$"
-        a.text(
-            0.97,
-            0.97,
-            text,
-            transform=a.transAxes,
-            horizontalalignment="right",
-            verticalalignment="top",
-            multialignment="right",
-        )
-
         # Presentation
-        a.set_xlabel(plot_config.x_label)
-        a.set_ylabel(plot_config.y_label)
-        a.legend(frameon=False, loc="upper left", fontsize=14)
-        f.tight_layout()
-        f.subplots_adjust(
-            # Reduce spacing between subplots
-            hspace=0,
-            wspace=0,
-            # Reduce external spacing
-            left=0.10,
-            bottom=0.12,
-            right=0.99,
-            top=0.98,
-        )
+        if min_hybrid_kt:
+            # Help out mypy...
+            assert plot_config.panels[0].text is not None
+            plot_config.panels[0].text.text += (
+                "\n" + fr"$k_{{\text{{T}}}}^{{\text{{hybrid}}}} > {min_hybrid_kt}\:\text{{GeV}}/c$"
+            )
+        plot_config.apply(fig=f, axes=[a])
     # Set range so that it's consistent.
     ax_simplified.set_ylim([-0.01, 0.18])
 
@@ -337,6 +451,11 @@ def plot_residuals_by_matching_type(
     hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], matching_types: Sequence[str], output_dir: Path
 ) -> None:
     for grooming_method in grooming_methods:
+        # Define shared text.
+        text = "Iterative splittings"
+        text += "\n" + f"${helpers.RangeSelector(40, 120).display_str(label='hybrid')}$"
+        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
+
         _plot_residual_by_matching_type(
             hists=hists,
             label="jet_pt",
@@ -344,8 +463,18 @@ def plot_residuals_by_matching_type(
             matching_types=matching_types,
             plot_config=PlotConfig(
                 name="jet_pt_residual_hybrid_det_level",
-                x_label=r"$(p_{\text{T}}^{\text{hybrid}} - p_{\text{T}}^{\text{det}}) / p_{\text{T}}^{\text{det}}$",
-                y_label="",
+                panels=Panel(
+                    axes=[
+                        AxisConfig(
+                            "x",
+                            label=r"$(p_{\text{T}}^{\text{hybrid}} - p_{\text{T}}^{\text{det}}) / p_{\text{T}}^{\text{det}}$",
+                        ),
+                        AxisConfig("y", label=""),
+                    ],
+                    text=TextConfig(x=0.97, y=0.97, text=text),
+                    legend=LegendConfig(location="upper left", font_size=14),
+                ),
+                figure=Figure(edge_padding=dict(bottom=0.12)),
             ),
             output_dir=output_dir,
         )
@@ -356,8 +485,18 @@ def plot_residuals_by_matching_type(
             matching_types=matching_types,
             plot_config=PlotConfig(
                 name="kt_residual_hybrid_det_level",
-                x_label=r"$(k_{\text{T}}^{\text{hybrid}} - k_{\text{T}}^{\text{det}}) / k_{\text{T}}^{\text{det}}$",
-                y_label="",
+                panels=Panel(
+                    axes=[
+                        AxisConfig(
+                            "x",
+                            label=r"$(k_{\text{T}}^{\text{hybrid}} - k_{\text{T}}^{\text{det}}) / k_{\text{T}}^{\text{det}}$",
+                        ),
+                        AxisConfig("y", label=""),
+                    ],
+                    text=TextConfig(x=0.97, y=0.97, text=text),
+                    legend=LegendConfig(location="upper left", font_size=14),
+                ),
+                figure=Figure(edge_padding=dict(bottom=0.12)),
             ),
             output_dir=output_dir,
         )
@@ -368,8 +507,18 @@ def plot_residuals_by_matching_type(
             matching_types=matching_types,
             plot_config=PlotConfig(
                 name="kt_residual_hybrid_det_level",
-                x_label=r"$(k_{\text{T}}^{\text{hybrid}} - k_{\text{T}}^{\text{det}}) / k_{\text{T}}^{\text{det}}$",
-                y_label="",
+                panels=Panel(
+                    axes=[
+                        AxisConfig(
+                            "x",
+                            label=r"$(k_{\text{T}}^{\text{hybrid}} - k_{\text{T}}^{\text{det}}) / k_{\text{T}}^{\text{det}}$",
+                        ),
+                        AxisConfig("y", label=""),
+                    ],
+                    text=TextConfig(x=0.97, y=0.97, text=text),
+                    legend=LegendConfig(location="upper left", font_size=14),
+                ),
+                figure=Figure(edge_padding=dict(bottom=0.12)),
             ),
             output_dir=output_dir,
             min_hybrid_kt=5,
@@ -380,7 +529,8 @@ def _plot_residual_mean_and_width(
     hists: Mapping[str, bh.Histogram],
     grooming_method: str,
     hybrid_jet_pt_bin: helpers.RangeSelector,
-    plot_config: PlotConfig,
+    plot_config_mean: PlotConfig,
+    plot_config_width: PlotConfig,
     output_dir: Path,
 ) -> None:
     logger.debug(
@@ -426,60 +576,16 @@ def _plot_residual_mean_and_width(
             color=color,
         )
 
-    # Labeling
-    # Individual labeling
-    ax_mean.set_ylabel(r"$(p_{\text{T}}^{\text{rec}} - p_{\text{T}}^{\text{part}}) / p_{\text{T}}^{\text{part}}$")
-    ax_mean.set_ylim([-1, 2])
-    ax_width.set_ylabel(
-        r"$\sigma(p_{\text{T}}^{\text{rec}} - p_{\text{T}}^{\text{part}}) / p_{\text{T}}^{\text{part}}$"
-    )
-    ax_width.set_ylim([0, 0.5])
-    # Shared
-    for a, f in [(ax_mean, fig_mean), (ax_width, fig_width)]:
-        text = "Iterative splittings"
-        text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
-        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
-        a.text(
-            0.97,
-            0.97,
-            text,
-            transform=a.transAxes,
-            horizontalalignment="right",
-            verticalalignment="top",
-            multialignment="right",
-        )
-
-        # Presentation
-        a.set_xlabel(plot_config.x_label)
-        a.legend(frameon=False, loc="upper center", fontsize=14)
-        f.tight_layout()
-    # Needs extra spacing on the left because the axis goes negative.
-    fig_mean.subplots_adjust(
-        # Reduce spacing between subplots
-        hspace=0,
-        wspace=0,
-        # Reduce external spacing
-        left=0.13,
-        bottom=0.12,
-        right=0.99,
-        top=0.98,
-    )
-    fig_width.subplots_adjust(
-        # Reduce spacing between subplots
-        hspace=0,
-        wspace=0,
-        # Reduce external spacing
-        left=0.10,
-        bottom=0.12,
-        right=0.99,
-        top=0.98,
-    )
+    # Labeling and presentation
+    plot_config_mean.apply(fig=fig_mean, ax=ax_mean)
+    plot_config_width.apply(fig=fig_width, ax=ax_width)
 
     # Store and cleanup
-    filename = f"{plot_config.name}_hybrid_{str(hybrid_jet_pt_bin)}_iterative_splittings_{grooming_method}"
-    fig_mean.savefig(output_dir / f"{filename}_mean.pdf")
+    filename_mean = f"{plot_config_mean.name}_hybrid_{str(hybrid_jet_pt_bin)}_iterative_splittings_{grooming_method}"
+    fig_mean.savefig(output_dir / f"{filename_mean}_mean.pdf")
     plt.close(fig_mean)
-    fig_width.savefig(output_dir / f"{filename}_width.pdf")
+    filename_width = f"{plot_config_width.name}_hybrid_{str(hybrid_jet_pt_bin)}_iterative_splittings_{grooming_method}"
+    fig_width.savefig(output_dir / f"{filename_width}_width.pdf")
     plt.close(fig_width)
 
 
@@ -525,36 +631,8 @@ def _plot_jet_pt_residual_distribution(
             color=color,
         )
 
-    # Labeling
-    text = "Iterative splittings"
-    text += "\n" + f"${true_jet_pt_bin.display_str(label='part')}$"
-    text += "\n" + " ".join(grooming_method.split("_")).capitalize()
-    ax.text(
-        0.97,
-        0.97,
-        text,
-        transform=ax.transAxes,
-        horizontalalignment="right",
-        verticalalignment="top",
-        multialignment="right",
-    )
-
-    # Presentation
-    ax.set_xlabel(plot_config.x_label)
-    ax.set_ylabel(plot_config.y_label)
-    ax.set_ylim([-0.02, 0.32])
-    ax.legend(frameon=False, loc="upper left", fontsize=14)
-    fig.tight_layout()
-    fig.subplots_adjust(
-        # Reduce spacing between subplots
-        hspace=0,
-        wspace=0,
-        # Reduce external spacing
-        left=0.10,
-        bottom=0.12,
-        right=0.99,
-        top=0.98,
-    )
+    # Labeling and presentation
+    plot_config.apply(fig=fig, ax=ax)
 
     # Store and cleanup
     filename = f"{plot_config.name}_true_{str(true_jet_pt_bin)}_iterative_splittings_{grooming_method}"
@@ -567,27 +645,69 @@ def plot_residuals(hists: Mapping[str, bh.Histogram], grooming_methods: Sequence
     true_jet_pt_bin = helpers.RangeSelector(40, 60)
     for grooming_method in grooming_methods:
         for hybrid_jet_pt_bin in hybrid_jet_pt_bins:
+            text = "Iterative splittings"
+            text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+            text += "\n" + " ".join(grooming_method.split("_")).capitalize()
             _plot_residual_mean_and_width(
                 hists=hists,
                 grooming_method=grooming_method,
                 hybrid_jet_pt_bin=hybrid_jet_pt_bin,
-                plot_config=PlotConfig(
-                    name="jet_pt_residual",
-                    x_label=r"$p_{\text{T}}^{\text{part}}\:(\text{GeV}/c)$",
-                    # Will be set individually during plotting of mean, width
-                    y_label="IGNORE",
+                plot_config_mean=PlotConfig(
+                    name="jet_pt_residual_mean",
+                    panels=Panel(
+                        axes=[
+                            AxisConfig("x", label=r"$p_{\text{T}}^{\text{part}}\:(\text{GeV}/c)$"),
+                            AxisConfig(
+                                "y",
+                                label=r"$(p_{\text{T}}^{\text{rec}} - p_{\text{T}}^{\text{part}}) / p_{\text{T}}^{\text{part}}$",
+                                range=(-1, 2),
+                            ),
+                        ],
+                        text=TextConfig(x=0.97, y=0.97, text=text),
+                        legend=LegendConfig(location="upper center", font_size=14),
+                    ),
+                    figure=Figure(edge_padding=dict(left=0.13, bottom=0.12)),
+                ),
+                plot_config_width=PlotConfig(
+                    name="jet_pt_residual_width",
+                    panels=Panel(
+                        axes=[
+                            AxisConfig("x", label=r"$p_{\text{T}}^{\text{part}}\:(\text{GeV}/c)$"),
+                            AxisConfig(
+                                "y",
+                                label=r"$\sigma(p_{\text{T}}^{\text{rec}} - p_{\text{T}}^{\text{part}}) / p_{\text{T}}^{\text{part}}$",
+                                range=(0, 0.5),
+                            ),
+                        ],
+                        text=TextConfig(x=0.97, y=0.97, text=text),
+                        legend=LegendConfig(location="upper center", font_size=14),
+                    ),
+                    figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
                 ),
                 output_dir=output_dir,
             )
 
+        text = "Iterative splittings"
+        text += "\n" + f"${true_jet_pt_bin.display_str(label='part')}$"
+        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
         _plot_jet_pt_residual_distribution(
             hists=hists,
             grooming_method=grooming_method,
             true_jet_pt_bin=true_jet_pt_bin,
             plot_config=PlotConfig(
                 name="jet_pt_residual_distribution",
-                x_label=r"$(p_{\text{T}}^{\text{hybrid}} - p_{\text{T}}^{\text{det}}) / p_{\text{T}}^{\text{det}}$",
-                y_label="",
+                panels=Panel(
+                    axes=[
+                        AxisConfig(
+                            "x",
+                            label=r"$(p_{\text{T}}^{\text{hybrid}} - p_{\text{T}}^{\text{det}}) / p_{\text{T}}^{\text{det}}$",
+                        ),
+                        AxisConfig("y", label="", range=(-0.02, 0.32)),
+                    ],
+                    text=TextConfig(x=0.97, y=0.97, text=text),
+                    legend=LegendConfig(location="upper left", font_size=14),
+                ),
+                figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
             ),
             output_dir=output_dir,
         )
@@ -643,35 +763,11 @@ def _plot_response_by_matching_type(
         )
         fig.colorbar(mesh, pad=0.02)
 
-        # Labeling
-        text = "Iterative splittings"
-        text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
-        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
-        text += "\n" + matches_label + " matches"
-        ax.text(
-            0.03,
-            0.97,
-            text,
-            transform=ax.transAxes,
-            horizontalalignment="left",
-            verticalalignment="top",
-            multialignment="left",
-        )
-
-        # Presentation
-        ax.set_xlabel(plot_config.x_label)
-        ax.set_ylabel(plot_config.y_label)
-        fig.tight_layout()
-        fig.subplots_adjust(
-            # Reduce spacing between subplots
-            hspace=0,
-            wspace=0,
-            # Reduce external spacing
-            left=0.10,
-            bottom=0.12,
-            right=0.99,
-            top=0.98,
-        )
+        # Labeling and presentation
+        # Help out mypy...
+        assert plot_config.panels[0].text is not None
+        plot_config.panels[0].text.text += "\n" + matches_label + " matches"
+        plot_config.apply(fig=fig, ax=ax)
 
         # Store and cleanup
         filename = f"{plot_config.name}_iterative_splittings_{grooming_method}_matching_type_{matching_type}"
@@ -692,6 +788,9 @@ def plot_response_by_matching_type(
             # Improve the display of labels (such as "det_level" -> "det"
             measured_like_label = response_type.measured_like.replace("_level", "")
             generator_like_label = response_type.generator_like.replace("_level", "")
+            text = "Iterative splittings"
+            text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+            text += "\n" + " ".join(grooming_method.split("_")).capitalize()
             _plot_response_by_matching_type(
                 hists=hists,
                 label="kt",
@@ -701,8 +800,19 @@ def plot_response_by_matching_type(
                 hybrid_jet_pt_bin=hybrid_jet_pt_bin,
                 plot_config=PlotConfig(
                     name=f"response_kt_{response_type}",
-                    x_label=fr"$k_{{\text{{T}}}}^{{\text{{{measured_like_label}}}}}\:(\text{{GeV}}/c)$",
-                    y_label=fr"$k_{{\text{{T}}}}^{{\text{{{generator_like_label}}}}}\:(\text{{GeV}}/c)$",
+                    panels=Panel(
+                        axes=[
+                            AxisConfig(
+                                "x", label=fr"$k_{{\text{{T}}}}^{{\text{{{measured_like_label}}}}}\:(\text{{GeV}}/c)$"
+                            ),
+                            AxisConfig(
+                                "y", label=fr"$k_{{\text{{T}}}}^{{\text{{{generator_like_label}}}}}\:(\text{{GeV}}/c)$"
+                            ),
+                        ],
+                        text=TextConfig(x=0.03, y=0.97, text=text),
+                        legend=LegendConfig(location="upper left", font_size=14),
+                    ),
+                    figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
                 ),
                 output_dir=output_dir,
             )
@@ -715,8 +825,15 @@ def plot_response_by_matching_type(
                 hybrid_jet_pt_bin=hybrid_jet_pt_bin,
                 plot_config=PlotConfig(
                     name=f"response_delta_R_{response_type}",
-                    x_label=fr"$R^{{\text{{ {measured_like_label} }}}}$",
-                    y_label=fr"$R^{{\text{{ {generator_like_label} }}}}$",
+                    panels=Panel(
+                        axes=[
+                            AxisConfig("x", label=fr"$R^{{\text{{ {measured_like_label} }}}}$"),
+                            AxisConfig("y", label=fr"$R^{{\text{{ {generator_like_label} }}}}$"),
+                        ],
+                        text=TextConfig(x=0.03, y=0.97, text=text),
+                        legend=LegendConfig(location="upper left", font_size=14),
+                    ),
+                    figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
                 ),
                 output_dir=output_dir,
             )
@@ -831,40 +948,8 @@ def _plot_kt_comparison(
     # Reference value
     ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
-    # Labeling
-    text = "Iterative splittings"
-    text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
-    text += "\n" + " ".join(grooming_method.split("_")).capitalize()
-    ax.text(
-        0.97,
-        0.97,
-        text,
-        transform=ax.transAxes,
-        horizontalalignment="right",
-        verticalalignment="top",
-        multialignment="right",
-    )
-
-    # Presentation
-    ax_ratio.set_xlabel(plot_config.x_label)
-    ax.set_ylabel(plot_config.y_label)
-    ax_ratio.set_ylabel("Pb--Pb/ref.")
-    ax.set_xlim([0, 25])
-    ax_ratio.set_ylim([0, 5])
-    ax.set_yscale("log")
-    ax.legend(frameon=False, loc="lower left", fontsize=14)
-    fig.align_ylabels()
-    fig.tight_layout()
-    fig.subplots_adjust(
-        # Reduce spacing between subplots
-        hspace=0,
-        wspace=0,
-        # Reduce external spacing
-        left=0.12,
-        bottom=0.12,
-        right=0.99,
-        top=0.98,
-    )
+    # Labeling and presentation
+    plot_config.apply(fig=fig, axes=[ax, ax_ratio])
 
     # Store and cleanup
     filename = f"{plot_config.name}_hybrid_{hybrid_jet_pt_bin}_iterative_splittings_{grooming_method}"
@@ -892,6 +977,9 @@ def plot_compare_kt(
             logger.debug(f"Skipping grooming method {grooming_method} because we don't have the data comparison yet.")
             continue
 
+        text = "Iterative splittings"
+        text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
         _plot_kt_comparison(
             hists=hists,
             # TODO: This won't work quite right! It needs a rebin + not to be projected in the comparison function.
@@ -900,8 +988,28 @@ def plot_compare_kt(
             hybrid_jet_pt_bin=hybrid_jet_pt_bin,
             plot_config=PlotConfig(
                 name="kt_spectra",
-                x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                panels=[
+                    # Main panel
+                    Panel(
+                        axes=[
+                            AxisConfig(
+                                "y",
+                                label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                                log=True,
+                            )
+                        ],
+                        text=TextConfig(x=0.97, y=0.97, text=text),
+                        legend=LegendConfig(location="lower left", font_size=14),
+                    ),
+                    # Ratio
+                    Panel(
+                        axes=[
+                            AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0, 25)),
+                            AxisConfig("y", label="Pb--Pb/ref.", range=(0, 5)),
+                        ],
+                    ),
+                ],
+                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
             ),
             output_dir=output_dir,
         )
@@ -917,6 +1025,9 @@ def plot_compare_kt_skim(
     prefix = "data"
 
     for grooming_method in grooming_methods:
+        text = "Iterative splittings"
+        text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
         _plot_kt_comparison(
             hists=embed_hists,
             data_hist=data_hists[f"{grooming_method}_{prefix}_kt"],
@@ -924,8 +1035,28 @@ def plot_compare_kt_skim(
             hybrid_jet_pt_bin=hybrid_jet_pt_bin,
             plot_config=PlotConfig(
                 name="kt_spectra",
-                x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                panels=[
+                    # Main panel
+                    Panel(
+                        axes=[
+                            AxisConfig(
+                                "y",
+                                label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                                log=True,
+                            )
+                        ],
+                        text=TextConfig(x=0.97, y=0.97, text=text),
+                        legend=LegendConfig(location="lower left", font_size=14),
+                    ),
+                    # Ratio
+                    Panel(
+                        axes=[
+                            AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0, 25)),
+                            AxisConfig("y", label="Pb--Pb/ref.", range=(0, 5)),
+                        ],
+                    ),
+                ],
+                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
             ),
             output_dir=output_dir,
         )
@@ -965,39 +1096,10 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     # Plot values labels. These will be the only things that show up.
     for i, kt_bin_center in enumerate(h.axes[1].bin_centers):
         for j, pt_bin_center in enumerate(h.axes[0].bin_centers):
-            text = ax.text(kt_bin_center, pt_bin_center, str(h.values[j, i]), ha="center", va="center", color="black")
+            ax.text(kt_bin_center, pt_bin_center, str(h.values[j, i]), ha="center", va="center", color="black")
 
-    # Labeling
-    text = "Iterative splittings"
-    text += ", " + " ".join(grooming_method.split("_")).capitalize()
-    ax.text(
-        0.03,
-        0.98,
-        text,
-        transform=ax.transAxes,
-        horizontalalignment="left",
-        verticalalignment="top",
-        multialignment="left",
-        color="black",
-    )
-
-    # Presentation
-    ax.set_xlabel(plot_config.x_label)
-    ax.set_ylabel(plot_config.y_label)
-    ax.set_xlim([0, 25])
-    ax.set_ylim([40, 120])
-    fig.align_ylabels()
-    fig.tight_layout()
-    fig.subplots_adjust(
-        # Reduce spacing between subplots
-        hspace=0,
-        wspace=0,
-        # Reduce external spacing
-        left=0.12,
-        bottom=0.12,
-        right=0.98,
-        top=0.975,
-    )
+    # Labeling and presentation
+    plot_config.apply(fig=fig, ax=ax)
 
     # Store and cleanup
     filename = f"{plot_config.name}_hybrid_{hybrid_jet_pt_bin}_iterative_splittings_{grooming_method}"
@@ -1010,6 +1112,8 @@ def plot_kt_vs_jet_pt(hists: Mapping[str, bh.Histogram], grooming_methods: Seque
     prefix = "data"
 
     for grooming_method in grooming_methods:
+        text = "Iterative splittings"
+        text += ", " + " ".join(grooming_method.split("_")).capitalize()
         _plot_kt_vs_jet_pt_raw_with_labels(
             hists=hists,
             grooming_method=grooming_method,
@@ -1017,8 +1121,15 @@ def plot_kt_vs_jet_pt(hists: Mapping[str, bh.Histogram], grooming_methods: Seque
             hybrid_jet_pt_bin=hybrid_jet_pt_bin,
             plot_config=PlotConfig(
                 name="kt_vs_jet_pt_raw",
-                x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-                y_label=r"$p_{\text{T}}\:(\text{GeV}/c)$",
+                panels=Panel(
+                    axes=[
+                        AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0, 25)),
+                        AxisConfig("y", label=r"$p_{\text{T}}\:(\text{GeV}/c)$", range=(40, 120)),
+                    ],
+                    text=TextConfig(x=0.03, y=0.97, text=text),
+                    legend=LegendConfig(location="upper left", font_size=14),
+                ),
+                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
             ),
             output_dir=output_dir,
         )
@@ -1070,37 +1181,8 @@ def _plot_distance_comparison(
             label=matches_label,
         )
 
-    # Labeling
-    text = "Iterative splittings"
-    text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
-    text += "\n" + " ".join(grooming_method.split("_")).capitalize()
-    ax.text(
-        0.95,
-        0.95,
-        text,
-        transform=ax.transAxes,
-        horizontalalignment="right",
-        verticalalignment="top",
-        multialignment="right",
-        color="black",
-    )
-
-    # Presentation
-    ax.set_xlabel(plot_config.x_label)
-    ax.set_ylabel(plot_config.y_label)
-    ax.set_xlim([0, 0.4])
-    ax.legend(frameon=False, loc="center right", fontsize=12)
-    fig.tight_layout()
-    fig.subplots_adjust(
-        # Reduce spacing between subplots
-        hspace=0,
-        wspace=0,
-        # Reduce external spacing
-        left=0.12,
-        bottom=0.12,
-        right=0.97,
-        top=0.97,
-    )
+    # Labeling and presentation
+    plot_config.apply(fig=fig, ax=ax)
 
     # Store and cleanup
     filename = f"{plot_config.name}_hybrid_det_level_{hybrid_jet_pt_bin}_iterative_splittings_{grooming_method}"
@@ -1151,37 +1233,8 @@ def _plot_leading_matched_subleading_unmatched_short_distance_response(
     )
     fig.colorbar(mesh, pad=0.02)
 
-    # Labeling
-    text = "Iterative splittings"
-    text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
-    text += "\n" + " ".join(grooming_method.split("_")).capitalize()
-    text += "\n" + "Leading matched, subleading unmatched"
-    text += "\n" + r"$\Delta R < 0.05$"
-    ax.text(
-        0.95,
-        0.95,
-        text,
-        transform=ax.transAxes,
-        horizontalalignment="right",
-        verticalalignment="top",
-        multialignment="right",
-        color="black",
-    )
-
-    # Presentation
-    ax.set_xlabel(plot_config.x_label)
-    ax.set_ylabel(plot_config.y_label)
-    fig.tight_layout()
-    fig.subplots_adjust(
-        # Reduce spacing between subplots
-        hspace=0,
-        wspace=0,
-        # Reduce external spacing
-        left=0.12,
-        bottom=0.12,
-        right=0.97,
-        top=0.97,
-    )
+    # Labeling and presentation
+    plot_config.apply(fig=fig, ax=ax)
 
     # Store and cleanup
     filename = f"{plot_config.name}_hybrid_det_level_{hybrid_jet_pt_bin}_iterative_splittings_{grooming_method}"
@@ -1195,24 +1248,49 @@ def plot_distance_comparison(
     hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
 
     for grooming_method in grooming_methods:
+        text = "Iterative splittings"
+        text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
         _plot_distance_comparison(
             hists=hists,
             grooming_method=grooming_method,
             matching_types=matching_types,
             hybrid_jet_pt_bin=hybrid_jet_pt_bin,
             plot_config=PlotConfig(
-                name="distance_comparison", x_label=r"$\Delta R_{\text{hybrid-det}}$", y_label=r"Prob.",
+                name="distance_comparison",
+                panels=Panel(
+                    axes=[
+                        AxisConfig("x", label=r"$\Delta R_{\text{hybrid-det}}$", range=(0, 0.4)),
+                        AxisConfig("y", label=r"Prob."),
+                    ],
+                    text=TextConfig(x=0.97, y=0.97, text=text),
+                    legend=LegendConfig(location="center right", font_size=12),
+                ),
+                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
             ),
             output_dir=output_dir,
         )
+
+        text = "Iterative splittings"
+        text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
+        text += "\n" + "Leading matched, subleading unmatched"
+        text += "\n" + r"$\Delta R < 0.05$"
         _plot_leading_matched_subleading_unmatched_short_distance_response(
             hists=hists,
             grooming_method=grooming_method,
             hybrid_jet_pt_bin=hybrid_jet_pt_bin,
             plot_config=PlotConfig(
                 name="leading_matched_subleading_unmatched_short_distance",
-                x_label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$",
-                y_label=r"$k_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$",
+                panels=Panel(
+                    axes=[
+                        AxisConfig("x", label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$"),
+                        AxisConfig("y", label=r"$k_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$"),
+                    ],
+                    text=TextConfig(x=0.97, y=0.97, text=text),
+                    legend=LegendConfig(location="center right", font_size=12),
+                ),
+                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
             ),
             output_dir=output_dir,
         )
@@ -1307,6 +1385,29 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
     return styles
 
 
+def _project_and_prepare_grooming_variable_hist(
+    bh_hist: bh.Histogram, jet_pt_bin: helpers.RangeSelector, set_zero_to_nan: bool
+) -> binned_data.BinnedData:
+    # Need to project to just the attr of interest.
+    h = binned_data.BinnedData.from_existing_data(
+        bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :]  # noqa: E203
+    )
+
+    # Normalize
+    # Normalize by the sum of the values to get the n_jets values.
+    # Then, we still need to normalize by the bin widths.
+    h /= np.sum(h.values)
+    h /= h.axes[0].bin_widths
+
+    # Set 0s to NaN (for example, in z_g where have a good portion of the range cut off).
+    if set_zero_to_nan:
+        mask = h.values == 0
+        h.errors[mask] = np.nan
+        h.values[mask] = np.nan
+
+    return h
+
+
 def _plot_compare_grooming_methods_for_attribute(
     hists: Mapping[str, bh.Histogram],
     grooming_methods: Sequence[str],
@@ -1367,43 +1468,8 @@ def _plot_compare_grooming_methods_for_attribute(
             **kwargs,
         )
 
-    # Labeling
-    # TODO: Comprehensive ALICE labeling.
-    text = "Iterative splittings"
-    text += "\n" + f"${jet_pt_bin.display_str(label='')}$"
-    # text += "\n" + " ".join(grooming_method.split("_")).capitalize()
-    ax.text(
-        0.95,
-        0.95,
-        text,
-        transform=ax.transAxes,
-        horizontalalignment="right",
-        verticalalignment="top",
-        multialignment="right",
-        color="black",
-    )
-
-    # Presentation
-    # Cut out the normalization bin at < 0
-    lower, upper = ax.get_xlim()
-    # TEMP: Remove
-    # ax.set_xlim([0, upper])
-    ax.set_xlabel(plot_config.x_label)
-    ax.set_ylabel(plot_config.y_label)
-    if plot_config.log_y:
-        ax.set_yscale("log")
-    ax.legend(frameon=False, loc=plot_config.legend_location, fontsize=14)
-    fig.tight_layout()
-    fig.subplots_adjust(
-        # Reduce spacing between subplots
-        hspace=0,
-        wspace=0,
-        # Reduce external spacing
-        left=0.12,
-        bottom=0.12,
-        right=0.97,
-        top=0.97,
-    )
+    # Labeling and presentation
+    plot_config.apply(fig=fig, ax=ax)
 
     # Store and cleanup
     # It's expected that the attr_name is already included in the `plot_config.name`.
@@ -1426,6 +1492,10 @@ def compare_grooming_methods_for_substructure_prod(
     """
     jet_pt_bin = helpers.RangeSelector(min=40, max=120)
 
+    # TODO: Comprehensive ALICE labeling.
+    text = "Iterative splittings"
+    text += "\n" + f"${jet_pt_bin.display_str(label='')}$"
+    # text += "\n" + " ".join(grooming_method.split("_")).capitalize()
     _plot_compare_grooming_methods_for_attribute(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -1435,10 +1505,17 @@ def compare_grooming_methods_for_substructure_prod(
         set_zero_to_nan=False,
         plot_config=PlotConfig(
             name="kt_grooming_methods",
-            x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
-            legend_location="lower left",
-            log_y=True,
+            panels=Panel(
+                axes=[
+                    AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
+                    AxisConfig(
+                        "y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
+                    ),
+                ],
+                text=TextConfig(x=0.97, y=0.97, text=text),
+                legend=LegendConfig(location="lower left", font_size=14),
+            ),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
         ),
         output_dir=output_dir,
     )
@@ -1452,10 +1529,15 @@ def compare_grooming_methods_for_substructure_prod(
         set_zero_to_nan=False,
         plot_config=PlotConfig(
             name="delta_R_grooming_methods",
-            x_label=r"$\Delta R$",
-            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$",
-            legend_location="center right",
-            log_y=False,
+            panels=Panel(
+                axes=[
+                    AxisConfig("x", label=r"$\Delta R$"),
+                    AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$", log=False),
+                ],
+                text=TextConfig(x=0.97, y=0.97, text=text),
+                legend=LegendConfig(location="center right", font_size=14),
+            ),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
         ),
         output_dir=output_dir,
     )
@@ -1469,10 +1551,15 @@ def compare_grooming_methods_for_substructure_prod(
         set_zero_to_nan=True,
         plot_config=PlotConfig(
             name="z_grooming_methods",
-            x_label=r"$z$",
-            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$",
-            legend_location="upper center",
-            log_y=False,
+            panels=Panel(
+                axes=[
+                    AxisConfig("x", label=r"$z$"),
+                    AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$", log=False),
+                ],
+                text=TextConfig(x=0.97, y=0.97, text=text),
+                legend=LegendConfig(location="upper right", font_size=14),
+            ),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
         ),
         output_dir=output_dir,
     )
@@ -1486,10 +1573,15 @@ def compare_grooming_methods_for_substructure_prod(
         set_zero_to_nan=False,
         plot_config=PlotConfig(
             name="number_to_split_grooming_methods",
-            x_label=r"$n$",
-            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$",
-            legend_location="center right",
-            log_y=False,
+            panels=Panel(
+                axes=[
+                    AxisConfig("x", label=r"$n$"),
+                    AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$", log=False),
+                ],
+                text=TextConfig(x=0.97, y=0.97, text=text),
+                legend=LegendConfig(location="center right", font_size=14),
+            ),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
         ),
         output_dir=output_dir,
     )
@@ -1504,10 +1596,17 @@ def compare_grooming_methods_for_substructure_prod(
         set_zero_to_nan=False,
         plot_config=PlotConfig(
             name="kt_high_kt_grooming_methods",
-            x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
-            legend_location="lower left",
-            log_y=True,
+            panels=Panel(
+                axes=[
+                    AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
+                    AxisConfig(
+                        "y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
+                    ),
+                ],
+                text=TextConfig(x=0.97, y=0.97, text=text),
+                legend=LegendConfig(location="lower left", font_size=14),
+            ),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
         ),
         output_dir=output_dir,
     )
@@ -1521,10 +1620,15 @@ def compare_grooming_methods_for_substructure_prod(
         set_zero_to_nan=False,
         plot_config=PlotConfig(
             name="delta_R_high_kt_grooming_methods",
-            x_label=r"$\Delta R$",
-            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$",
-            legend_location="center right",
-            log_y=False,
+            panels=Panel(
+                axes=[
+                    AxisConfig("x", label=r"$\Delta R$"),
+                    AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$", log=False),
+                ],
+                text=TextConfig(x=0.97, y=0.97, text=text),
+                legend=LegendConfig(location="center right", font_size=14),
+            ),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
         ),
         output_dir=output_dir,
     )
@@ -1538,10 +1642,15 @@ def compare_grooming_methods_for_substructure_prod(
         set_zero_to_nan=True,
         plot_config=PlotConfig(
             name="z_high_kt_grooming_methods",
-            x_label=r"$z$",
-            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$",
-            legend_location="upper center",
-            log_y=False,
+            panels=Panel(
+                axes=[
+                    AxisConfig("x", label=r"$z$"),
+                    AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$", log=False),
+                ],
+                text=TextConfig(x=0.97, y=0.97, text=text),
+                legend=LegendConfig(location="upper center", font_size=14),
+            ),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
         ),
         output_dir=output_dir,
     )
@@ -1555,56 +1664,22 @@ def compare_grooming_methods_for_substructure_prod(
         set_zero_to_nan=False,
         plot_config=PlotConfig(
             name="number_to_split_high_kt_grooming_methods",
-            x_label=r"$n$",
-            y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$",
-            legend_location="center right",
-            log_y=False,
+            panels=Panel(
+                axes=[
+                    AxisConfig("x", label=r"$n$"),
+                    AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$", log=False),
+                ],
+                text=TextConfig(x=0.97, y=0.97, text=text),
+                legend=LegendConfig(location="upper right", font_size=14),
+            ),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
         ),
         output_dir=output_dir,
     )
 
 
-def _project_and_prepare_grooming_variable_hist(
-    bh_hist: bh.Histogram, jet_pt_bin: helpers.RangeSelector, set_zero_to_nan: bool
-) -> binned_data.BinnedData:
-    # Need to project to just the attr of interest.
-    h = binned_data.BinnedData.from_existing_data(
-        bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :]  # noqa: E203
-    )
-
-    # Normalize
-    # Normalize by the sum of the values to get the n_jets values.
-    # Then, we still need to normalize by the bin widths.
-    h /= np.sum(h.values)
-    h /= h.axes[0].bin_widths
-
-    # Set 0s to NaN (for example, in z_g where have a good portion of the range cut off).
-    if set_zero_to_nan:
-        mask = h.values == 0
-        h.errors[mask] = np.nan
-        h.values[mask] = np.nan
-
-    return h
-
-
-@attr.s
-class PlotHists:
-    hists: Mapping[str, bh.Histogram] = attr.ib()
-    prefix: str = attr.ib()
-    identifier: str = attr.ib()
-    display_label: str = attr.ib()
-
-
 def _plot_compare_grooming_methods_for_attribute_data_embed(
     hists: Sequence[PlotHists],
-    # main_hists: Mapping[str, bh.Histogram],
-    # comparison_hists: Sequence[Mapping[str, bh.Histogram]],
-    # data_hists: Mapping[str, bh.Histogram],
-    # compare_hists: Mapping[str, bh.Histogram],
-    # data_prefix: str,
-    # compare_prefix: str,
-    # data_label: str,
-    # compare_label: str,
     attr_name: str,
     grooming_methods: Sequence[str],
     jet_pt_bin: helpers.RangeSelector,
@@ -1619,8 +1694,6 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
     )
     fig, (ax, ax_ratio) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
     grooming_styling = define_grooming_styles()
-
-    # TODO: Ratio plot!
 
     for grooming_method in grooming_methods:
         main_hist = None
@@ -1668,7 +1741,7 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
             if main_hist is None:
                 main_hist = h
             else:
-                ratio = h / main_hist
+                ratio = main_hist / h
                 ax_ratio.errorbar(
                     ratio.axes[0].bin_centers,
                     ratio.values,
@@ -1682,45 +1755,11 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
                     **kwargs,
                 )
 
-    # Labeling
-    # TODO: Comprehensive ALICE labeling.
-    text = "Iterative splittings"
-    text += "\n" + f"${jet_pt_bin.display_str(label='')}$"
-    # if len(grooming_methods) == 1:
-    #    text += "\n" + grooming_styling[grooming_methods[0]].label
-    # text += "\n" + " ".join(grooming_method.split("_")).capitalize()
-    ax.text(
-        0.975,
-        0.975,
-        text,
-        transform=ax.transAxes,
-        horizontalalignment="right",
-        verticalalignment="top",
-        multialignment="right",
-        color="black",
-    )
+    # Reference value for ratio
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
-    # Presentation
-    # Cut out the normalization bin at < 0
-    lower, upper = ax.get_xlim()
-    # TEMP: Remove
-    # ax.set_xlim([0, upper])
-    ax.set_xlabel(plot_config.x_label)
-    ax.set_ylabel(plot_config.y_label)
-    if plot_config.log_y:
-        ax.set_yscale("log")
-    ax.legend(frameon=False, loc=plot_config.legend_location, fontsize=14)
-    fig.tight_layout()
-    fig.subplots_adjust(
-        # Reduce spacing between subplots
-        hspace=0,
-        wspace=0,
-        # Reduce external spacing
-        left=0.12,
-        bottom=0.12,
-        right=0.97,
-        top=0.97,
-    )
+    # Apply the PlotConfig
+    plot_config.apply(fig=fig, axes=[ax, ax_ratio])
 
     # Store and cleanup
     # It's expected that the attr_name is already included in the `plot_config.name`.
@@ -1749,6 +1788,9 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
 
     """
     jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+    text = "Iterative splittings"
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    text_high_kt = text + "\n" + r"$k_{\text{T}} > 10\:\text{GeV}/c$"
 
     hists = [
         PlotHists(hists=data_hists, prefix="data", identifier="PbPb", display_label="Pb--Pb",),
@@ -1763,10 +1805,26 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             set_zero_to_nan=False,
             plot_config=PlotConfig(
                 name="kt_grooming_methods",
-                x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
-                legend_location="lower left",
-                log_y=True,
+                panels=[
+                    # Main axis.
+                    Panel(
+                        axes=AxisConfig(
+                            "y",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                            log=True,
+                        ),
+                        text=TextConfig(x=0.96, y=0.96, text=text),
+                        legend=LegendConfig(location="lower left"),
+                    ),
+                    # Ratio.
+                    Panel(
+                        axes=[
+                            AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
+                            AxisConfig("y", label="Pb--Pb/Hybrid", range=(-0.2, 10)),
+                        ]
+                    ),
+                ],
+                figure=Figure(edge_padding={"left": 0.12}),
             ),
             output_dir=output_dir,
         )
@@ -1778,10 +1836,22 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             set_zero_to_nan=False,
             plot_config=PlotConfig(
                 name="delta_R_grooming_methods",
-                x_label=r"$\Delta R$",
-                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$",
-                legend_location="upper center",
-                log_y=False,
+                panels=[
+                    # Main axis.
+                    # NOTE: This intentionally cuts off the normalization bin
+                    Panel(
+                        axes=[
+                            AxisConfig("x", range=(0, 0.41)),
+                            AxisConfig(
+                                "y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$", range=(-0.4, 19.1)
+                            ),
+                        ],
+                        text=TextConfig(x=0.04, y=0.96, text=text),
+                        legend=LegendConfig(location="upper left", anchor=(0.02, 0.79)),
+                    ),
+                    # Ratio.
+                    Panel(axes=[AxisConfig("x", label=r"$\Delta R$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
+                ],
             ),
             output_dir=output_dir,
         )
@@ -1794,10 +1864,19 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             set_zero_to_nan=True,
             plot_config=PlotConfig(
                 name="z_grooming_methods",
-                x_label=r"$z$",
-                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$",
-                legend_location="upper center",
-                log_y=False,
+                panels=[
+                    # Main axis.
+                    Panel(
+                        axes=[
+                            AxisConfig("x", range=(0, 0.51)),
+                            AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$", range=(-0.1, 9.9)),
+                        ],
+                        text=TextConfig(x=0.04, y=0.96, text=text),
+                        legend=LegendConfig(location="upper left", anchor=(0.02, 0.79)),
+                    ),
+                    # Ratio.
+                    Panel(axes=[AxisConfig("x", label=r"$z$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
+                ],
             ),
             output_dir=output_dir,
         )
@@ -1810,10 +1889,16 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             set_zero_to_nan=False,
             plot_config=PlotConfig(
                 name="number_to_split_grooming_methods",
-                x_label=r"$n$",
-                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$",
-                legend_location="center right",
-                log_y=False,
+                panels=[
+                    # Main axis.
+                    Panel(
+                        axes=[AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$")],
+                        text=TextConfig(x=0.96, y=0.96, text=text),
+                        legend=LegendConfig(location="upper right", anchor=(0.96, 0.79)),
+                    ),
+                    # Ratio.
+                    Panel(axes=[AxisConfig("x", label=r"$n$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
+                ],
             ),
             output_dir=output_dir,
         )
@@ -1827,10 +1912,26 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             set_zero_to_nan=False,
             plot_config=PlotConfig(
                 name="kt_high_kt_grooming_methods",
-                x_label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
-                legend_location="lower left",
-                log_y=True,
+                panels=[
+                    # Main axis.
+                    Panel(
+                        axes=AxisConfig(
+                            "y",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                            log=True,
+                        ),
+                        text=TextConfig(x=0.96, y=0.96, text=text_high_kt),
+                        legend=LegendConfig(location="lower left"),
+                    ),
+                    # Ratio.
+                    Panel(
+                        axes=[
+                            AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
+                            AxisConfig("y", label="Pb--Pb/Hybrid", range=(-0.2, 9.9)),
+                        ]
+                    ),
+                ],
+                figure=Figure(edge_padding={"left": 0.12}),
             ),
             output_dir=output_dir,
         )
@@ -1843,10 +1944,21 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             set_zero_to_nan=False,
             plot_config=PlotConfig(
                 name="delta_R_high_kt_grooming_methods",
-                x_label=r"$\Delta R$",
-                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$",
-                legend_location="center right",
-                log_y=False,
+                panels=[
+                    # Main axis.
+                    Panel(
+                        axes=[
+                            AxisConfig("x", range=(0, 0.41)),
+                            AxisConfig(
+                                "y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$", range=(-0.4, 19.1)
+                            ),
+                        ],
+                        text=TextConfig(x=0.04, y=0.96, text=text_high_kt),
+                        legend=LegendConfig(location="upper left", anchor=(0.02, 0.73)),
+                    ),
+                    # Ratio.
+                    Panel(axes=[AxisConfig("x", label=r"$\Delta R$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
+                ],
             ),
             output_dir=output_dir,
         )
@@ -1856,13 +1968,24 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             attr_name="z_high_kt",
             grooming_methods=[grooming_method],
             jet_pt_bin=jet_pt_bin,
-            set_zero_to_nan=True,
+            set_zero_to_nan=False,
             plot_config=PlotConfig(
                 name="z_high_kt_grooming_methods",
-                x_label=r"$z$",
-                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$",
-                legend_location="upper center",
-                log_y=False,
+                panels=[
+                    # Main axis.
+                    Panel(
+                        axes=[
+                            AxisConfig("x", range=(0, 0.51)),
+                            AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$", range=(-1, 21)),
+                        ],
+                        text=TextConfig(x=0.04, y=0.96, text=text_high_kt),
+                        legend=LegendConfig(location="upper left", anchor=(0.02, 0.73)),
+                    ),
+                    # Ratio.
+                    Panel(
+                        axes=[AxisConfig("x", label=r"$z$", range=(0.2, 0.51)), AxisConfig("y", label="Pb--Pb/Hybrid")]
+                    ),
+                ],
             ),
             output_dir=output_dir,
         )
@@ -1875,10 +1998,16 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             set_zero_to_nan=False,
             plot_config=PlotConfig(
                 name="number_to_split_high_kt_grooming_methods",
-                x_label=r"$n$",
-                y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$",
-                legend_location="center right",
-                log_y=False,
+                panels=[
+                    # Main axis.
+                    Panel(
+                        axes=[AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$")],
+                        text=TextConfig(x=0.96, y=0.96, text=text_high_kt),
+                        legend=LegendConfig(location="upper right", anchor=(0.96, 0.73)),
+                    ),
+                    # Ratio.
+                    Panel(axes=[AxisConfig("x", label=r"$n$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
+                ],
             ),
             output_dir=output_dir,
         )
