@@ -1833,7 +1833,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             attr_name="delta_R",
             grooming_methods=[grooming_method],
             jet_pt_bin=jet_pt_bin,
-            set_zero_to_nan=False,
+            set_zero_to_nan=True,
             plot_config=PlotConfig(
                 name="delta_R_grooming_methods",
                 panels=[
@@ -1867,15 +1867,14 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                 panels=[
                     # Main axis.
                     Panel(
-                        axes=[
-                            AxisConfig("x", range=(0, 0.51)),
-                            AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$", range=(-0.1, 9.9)),
-                        ],
+                        axes=[AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$", range=(-0.1, 9.9))],
                         text=TextConfig(x=0.04, y=0.96, text=text),
                         legend=LegendConfig(location="upper left", anchor=(0.02, 0.79)),
                     ),
                     # Ratio.
-                    Panel(axes=[AxisConfig("x", label=r"$z$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
+                    Panel(
+                        axes=[AxisConfig("x", label=r"$z$", range=(0, 0.51)), AxisConfig("y", label="Pb--Pb/Hybrid")]
+                    ),
                 ],
             ),
             output_dir=output_dir,
@@ -1941,24 +1940,32 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             attr_name="delta_R_high_kt",
             grooming_methods=[grooming_method],
             jet_pt_bin=jet_pt_bin,
-            set_zero_to_nan=False,
+            set_zero_to_nan=True,
             plot_config=PlotConfig(
                 name="delta_R_high_kt_grooming_methods",
                 panels=[
                     # Main axis.
                     Panel(
                         axes=[
-                            AxisConfig("x", range=(0, 0.41)),
                             AxisConfig(
-                                "y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$", range=(-0.4, 19.1)
+                                "y",
+                                label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}\Delta R$",
+                                range=(1e-3, 25),
+                                log=True,
                             ),
                         ],
                         text=TextConfig(x=0.04, y=0.96, text=text_high_kt),
                         legend=LegendConfig(location="upper left", anchor=(0.02, 0.73)),
                     ),
                     # Ratio.
-                    Panel(axes=[AxisConfig("x", label=r"$\Delta R$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
+                    Panel(
+                        axes=[
+                            AxisConfig("x", label=r"$\Delta R$", range=(0, 0.41)),
+                            AxisConfig("y", label="Pb--Pb/Hybrid"),
+                        ]
+                    ),
                 ],
+                figure=Figure(edge_padding={"left": 0.12}),
             ),
             output_dir=output_dir,
         )
@@ -1968,22 +1975,19 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             attr_name="z_high_kt",
             grooming_methods=[grooming_method],
             jet_pt_bin=jet_pt_bin,
-            set_zero_to_nan=False,
+            set_zero_to_nan=True,
             plot_config=PlotConfig(
                 name="z_high_kt_grooming_methods",
                 panels=[
                     # Main axis.
                     Panel(
-                        axes=[
-                            AxisConfig("x", range=(0, 0.51)),
-                            AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$", range=(-1, 21)),
-                        ],
+                        axes=[AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$", range=(-1, 21))],
                         text=TextConfig(x=0.04, y=0.96, text=text_high_kt),
                         legend=LegendConfig(location="upper left", anchor=(0.02, 0.73)),
                     ),
                     # Ratio.
                     Panel(
-                        axes=[AxisConfig("x", label=r"$z$", range=(0.2, 0.51)), AxisConfig("y", label="Pb--Pb/Hybrid")]
+                        axes=[AxisConfig("x", label=r"$z$", range=(0, 0.51)), AxisConfig("y", label="Pb--Pb/Hybrid")]
                     ),
                 ],
             ),
