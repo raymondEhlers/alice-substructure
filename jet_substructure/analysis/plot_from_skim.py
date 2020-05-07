@@ -1066,7 +1066,7 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     hists: Mapping[str, bh.Histogram],
     grooming_method: str,
     prefix: str,
-    hybrid_jet_pt_bin: helpers.RangeSelector,
+    jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
     output_dir: Path,
 ) -> None:
@@ -1078,7 +1078,7 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     # However, first we need to rebin
     bh_hist = hists[f"{grooming_method}_{prefix}_kt"]
     h = binned_data.BinnedData.from_existing_data(
-        bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1 :: bh.rebin(5)]  # noqa: E203
+        bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1 :: bh.rebin(2)]  # noqa: E203
     )
 
     # Plot
@@ -1096,19 +1096,29 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     # Plot values labels. These will be the only things that show up.
     for i, kt_bin_center in enumerate(h.axes[1].bin_centers):
         for j, pt_bin_center in enumerate(h.axes[0].bin_centers):
-            ax.text(kt_bin_center, pt_bin_center, str(h.values[j, i]), ha="center", va="center", color="black")
+            ax.text(
+                kt_bin_center,
+                pt_bin_center,
+                f"{h.values[j, i]:g}",
+                ha="center",
+                va="center",
+                color="black",
+                rotation=45,
+            )
 
     # Labeling and presentation
+    # Add ticks outwards because otherwise they're covered by the white on the plot.
+    ax.tick_params(axis="both", which="both", direction="out")
     plot_config.apply(fig=fig, ax=ax)
 
     # Store and cleanup
-    filename = f"{plot_config.name}_hybrid_{hybrid_jet_pt_bin}_iterative_splittings_{grooming_method}"
+    filename = f"{plot_config.name}_{jet_pt_bin}_iterative_splittings_{grooming_method}"
     fig.savefig(output_dir / f"{filename}.pdf")
     plt.close(fig)
 
 
 def plot_kt_vs_jet_pt(hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path,) -> None:
-    hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+    jet_pt_bin = helpers.RangeSelector(min=40, max=120)
     prefix = "data"
 
     for grooming_method in grooming_methods:
@@ -1118,7 +1128,7 @@ def plot_kt_vs_jet_pt(hists: Mapping[str, bh.Histogram], grooming_methods: Seque
             hists=hists,
             grooming_method=grooming_method,
             prefix=prefix,
-            hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+            jet_pt_bin=jet_pt_bin,
             plot_config=PlotConfig(
                 name="kt_vs_jet_pt_raw",
                 panels=Panel(
@@ -1126,8 +1136,7 @@ def plot_kt_vs_jet_pt(hists: Mapping[str, bh.Histogram], grooming_methods: Seque
                         AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0, 25)),
                         AxisConfig("y", label=r"$p_{\text{T}}\:(\text{GeV}/c)$", range=(40, 120)),
                     ],
-                    text=TextConfig(x=0.03, y=0.97, text=text),
-                    legend=LegendConfig(location="upper left", font_size=14),
+                    text=TextConfig(x=0.98, y=0.02, text=text),
                 ),
                 figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
             ),
