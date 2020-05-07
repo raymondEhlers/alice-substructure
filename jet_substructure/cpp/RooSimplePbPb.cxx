@@ -121,6 +121,12 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
 
   // Setup
   ROOT::EnableImplicitMT();
+  // Hybrid as input data refolding test.
+  bool hybridAsInputData = true;
+  std::string outputFilename = "unfolding_leading_kt_test.root";
+  if (hybridAsInputData == true) {
+    outputFilename = "unfolding_hybrid_as_input.root";
+  }
 
   // Get the tree for data
   //TString fnamedata;
@@ -128,48 +134,26 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
   TChain dataChain("tree");
   dataChain.Add("trains/PbPb/5537/skim/*.root");
   dataChain.ls();
-  //TFile* inputdata;
-  //inputdata = TFile::Open(fnamedata);
-  //inputdata->ls();
 
   //***************************************************
 
+  // Define binning
   std::vector<double> smearedJetPtBins = {40, 50, 60, 80, 100, 120};
-  std::vector<double> smearedKtBins = {0, 5, 10, 15, 20};
-  std::vector<double> trueKtBins = {0, 5, 10, 15, 20};
-  //Double_t xbins[6];
-  //xbins[0] = 40;
-  //xbins[1] = 50;
-  //xbins[2] = 60;
-  //xbins[3] = 80;
-  //xbins[4] = 100;
-  //xbins[5] = 120;
-
-  Double_t xbinsb[6];
-
-  xbinsb[0] = 0.;
-  xbinsb[1] = 1;
-  xbinsb[2] = 2;
-  xbinsb[3] = 3;
-  xbinsb[4] = 4;
-  //	 xbinsb[5]=5;
-  //	 xbinsb[6]=6;
-  // xbinsb[7]=7;
-  xbinsb[5] = 8;
-  //         xbinsb[9]=9;
-  //         xbinsb[10]=10;
-  //         xbinsb[11]=11;
+  std::vector<double> trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
+  std::vector<double> smearedKtBins = {1, 2, 3, 4, 5, 7, 10, 15, 20};
+  std::vector<double> trueKtBins = {0, 1, 2, 3, 4, 5, 7, 10, 15, 20, 50};
 
   // the raw correlation (ie. data)
   TH2F* h2raw = new TH2F("r", "raw", smearedKtBins.size() - 1, smearedKtBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
   // detector measure level (ie. hybrid)
   TH2F* h2smeared = new TH2F("smeared", "smeared", smearedKtBins.size() - 1, smearedKtBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
-  // detector measure level no cuts (ie. hybrid, but no cuts)
-  TH2F* h2smearednocuts = new TH2F("smearednocuts", "smearednocuts", smearedKtBins.size() - 1, smearedKtBins.data(), 8, 0, 160);
+  // detector measure level no cuts (ie. hybrid, but no cuts).
+  // NOTE: Strictly speaking, the y axis binning is at the hybrid level, but we want a wider range. So we use the trueJetPtBins.
+  TH2F* h2smearednocuts = new TH2F("smearednocuts", "smearednocuts", smearedKtBins.size() - 1, smearedKtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
   // true correlations with measured cuts
-  TH2F* h2true = new TH2F("true", "true", trueKtBins.size() - 1, trueKtBins.data(), 8, 0, 160);
+  TH2F* h2true = new TH2F("true", "true", trueKtBins.size() - 1, trueKtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
   // full true correlation (without cuts)
-  TH2F* h2fulleff = new TH2F("truef", "truef", trueKtBins.size() - 1, trueKtBins.data(), 8, 0, 160);
+  TH2F* h2fulleff = new TH2F("truef", "truef", trueKtBins.size() - 1, trueKtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
 
   TH2F* hcovariance = new TH2F("covariance", "covariance", 10, 0., 1., 10, 0, 1.);
 
@@ -344,7 +328,7 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
   effok7->Divide(effok8);
   effok7->SetName("correff80-120");
 
-  TFile* fout = new TFile(Form("Unfoldng_ebye_sd2_R25_Feb3.root"), "RECREATE");
+  TFile* fout = new TFile(outputFilename.c_str(), "RECREATE");
   fout->cd();
   effok->Write();
   effok3->Write();
@@ -364,7 +348,8 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
     std::cout << "==============Unfold h1====================="
          << "\n";
 
-    RooUnfoldBayes unfold(&response, h2raw, iter); // OR
+    // Allow for the possibility of using the hybrid as input data for closure.
+    RooUnfoldBayes unfold(&response, hybridAsInputData ? h2smeared : h2raw, iter); // OR
     TH2D* hunf = (TH2D*)unfold.Hreco(errorTreatment);
     // FOLD BACK
     TH1* hfold = response.ApplyToTruth(hunf, "");
