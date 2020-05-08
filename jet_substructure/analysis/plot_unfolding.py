@@ -447,13 +447,17 @@ def plot_refolded_pt(hists: Mapping[str, binned_data.BinnedData], smeared_input:
 
 
 def run() -> None:
-    # for val, smeared_input in [("hybrid_as_input", True), ("leading_kt_test", False)]:
-    for val, smeared_input in [("leading_kt_test", False)]:
+    # for val, smeared_input in [("leading_kt_z_cut_04_test", False)]:
+    for val, smeared_input in [
+        ("hybrid_as_input", True),
+        ("leading_kt_test", False),
+        ("leading_kt_z_cut_04_test", False),
+    ]:
         output_dir = Path("output") / "unfolding" / val
         output_dir.mkdir(parents=True, exist_ok=True)
         filename = Path(f"unfolding_{val}.root")
         logger.info(f"Processing file {filename}")
-        logger.info(f"Outputting to {output_dir}")
+        logger.info(f"Output dir: {output_dir}")
 
         # Extract with uproot and convert to BinnedData
         hists = {}
@@ -464,53 +468,16 @@ def run() -> None:
             hists[hist_key] = binned_data.BinnedData.from_existing_data(f[k])
 
         # Hists:
-        # Bayesian_Foldediter1           Bayesian_Foldediter2           Bayesian_Foldediter3           Bayesian_Foldediter4           Bayesian_Foldediter5           Bayesian_Foldediter6
-        # Bayesian_Foldediter7           Bayesian_Foldediter8           Bayesian_Foldediter9           Bayesian_Unfoldediter1         Bayesian_Unfoldediter2         Bayesian_Unfoldediter3
-        # Bayesian_Unfoldediter4         Bayesian_Unfoldediter5         Bayesian_Unfoldediter6         Bayesian_Unfoldediter7         Bayesian_Unfoldediter8         Bayesian_Unfoldediter9
-        # efficiency                     pearsonmatrix_iter8_binpt0     pearsonmatrix_iter8_binshape0  pearsonmatrix_iter8_binshape1  pearsonmatrix_iter8_binshape2  pearsonmatrix_iter8_binshape3
-        # pearsonmatrix_iter8_binshape4  pearsonmatrix_iter8_binshape5  pearsonmatrix_iter8_binshape6  pearsonmatrix_iter8_binshape7  raw                            smeared
-        # true                           truef                          trueptd
-        [
-            "correff20-40",
-            "correff40-60",
-            "correff60-80",
-            "correff80-120",
-            "raw",
-            "smeared",
-            "trueptd",
-            "true",
-            "truef",
-            "Bayesian_Unfoldediter1",
-            "Bayesian_Foldediter1",
-            "Bayesian_Unfoldediter2",
-            "Bayesian_Foldediter2",
-            "Bayesian_Unfoldediter3",
-            "Bayesian_Foldediter3",
-            "Bayesian_Unfoldediter4",
-            "Bayesian_Foldediter4",
-            "Bayesian_Unfoldediter5",
-            "Bayesian_Foldediter5",
-            "Bayesian_Unfoldediter6",
-            "Bayesian_Foldediter6",
-            "Bayesian_Unfoldediter7",
-            "Bayesian_Foldediter7",
-            "Bayesian_Unfoldediter8",
-            "Bayesian_Foldediter8",
-            "Bayesian_Unfoldediter9",
-            "Bayesian_Foldediter9",
-            "pearsonmatrix_iter8_binshape0",
-            "pearsonmatrix_iter8_binshape1",
-            "pearsonmatrix_iter8_binshape2",
-            "pearsonmatrix_iter8_binshape3",
-            "pearsonmatrix_iter8_binpt0",
-            "pearsonmatrix_iter8_binpt1",
-            "pearsonmatrix_iter8_binpt2",
-            "pearsonmatrix_iter8_binpt3",
-            "pearsonmatrix_iter8_binpt4",
-            "pearsonmatrix_iter8_binpt5",
-            "pearsonmatrix_iter8_binpt6",
-            "pearsonmatrix_iter8_binpt7",
-        ]
+        # [
+        #     "correff20-40", "correff40-60", "correff60-80", "correff80-120",
+        #     "raw", "smeared", "trueptd", "true", "truef",
+        #     "Bayesian_Unfoldediter1", "Bayesian_Foldediter1", "Bayesian_Unfoldediter2", "Bayesian_Foldediter2", "Bayesian_Unfoldediter3", "Bayesian_Foldediter3",
+        #     "Bayesian_Unfoldediter4", "Bayesian_Foldediter4", "Bayesian_Unfoldediter5", "Bayesian_Foldediter5", "Bayesian_Unfoldediter6", "Bayesian_Foldediter6",
+        #     "Bayesian_Unfoldediter7", "Bayesian_Foldediter7", "Bayesian_Unfoldediter8", "Bayesian_Foldediter8", "Bayesian_Unfoldediter9", "Bayesian_Foldediter9",
+        #     "pearsonmatrix_iter8_binshape0", "pearsonmatrix_iter8_binshape1", "pearsonmatrix_iter8_binshape2", "pearsonmatrix_iter8_binshape3",
+        #     "pearsonmatrix_iter8_binpt0", "pearsonmatrix_iter8_binpt1", "pearsonmatrix_iter8_binpt2", "pearsonmatrix_iter8_binpt3", "pearsonmatrix_iter8_binpt4",
+        #     "pearsonmatrix_iter8_binpt5", "pearsonmatrix_iter8_binpt6", "pearsonmatrix_iter8_binpt7",
+        # ]
 
         import seaborn as sns
 
