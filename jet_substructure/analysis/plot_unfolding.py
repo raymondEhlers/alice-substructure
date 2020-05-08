@@ -191,22 +191,36 @@ def plot_unfolded(
     plt.close(fig)
 
 
-def plot_refolded_kt(hists: Mapping[str, binned_data.BinnedData], smeared_input: bool, output_dir: Path) -> None:
+def _normalize_refolded(hist: binned_data.BinnedData) -> binned_data.BinnedData:
     """
 
     """
-    logger.debug("Plotting refolded kt")
+    hist /= np.sum(hist.values)
+    hist /= hist.axes[0].bin_widths
+    return hist
+
+
+def plot_refolded(
+    hists: Mapping[str, binned_data.BinnedData],
+    projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
+    smeared_input: bool,
+    label: str,
+    measured_bin: helpers.RangeSelector,
+    output_dir: Path,
+) -> None:
+    """ Plot refolded.
+
+    """
+    logger.debug(f"Plotting refolded {label}")
     # Setup
+    symbol_label = label[:1]
     fig, axes = plt.subplots(2, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
     ax_upper, ax_lower = axes
 
     # Raw
-    bh_hist_raw_2d = hists["raw"].to_boost_histogram()
-    # Project
-    hist_raw = binned_data.BinnedData.from_existing_data(bh_hist_raw_2d[:, bh.loc(40) : bh.loc(120) : bh.sum])
+    hist_raw = projection_func(hists["raw"], measured_bin)
     # Normalize
-    hist_raw /= np.sum(hist_raw.values)
-    hist_raw /= hist_raw.axes[0].bin_widths
+    hist_raw = _normalize_refolded(hist_raw)
     ax_upper.errorbar(
         hist_raw.axes[0].bin_centers,
         hist_raw.values,
@@ -219,10 +233,8 @@ def plot_refolded_kt(hists: Mapping[str, binned_data.BinnedData], smeared_input:
     )
 
     # Smeared
-    bh_hist_smeared_2d = hists["smeared"].to_boost_histogram()
-    hist_smeared = binned_data.BinnedData.from_existing_data(bh_hist_smeared_2d[:, bh.loc(40) : bh.loc(120) : bh.sum])
-    hist_smeared /= np.sum(hist_smeared.values)
-    hist_smeared /= hist_smeared.axes[0].bin_widths
+    hist_smeared = projection_func(hists["smeared"], measured_bin)
+    hist_smeared = _normalize_refolded(hist_smeared)
     ax_upper.errorbar(
         hist_smeared.axes[0].bin_centers,
         hist_smeared.values,
@@ -237,10 +249,8 @@ def plot_refolded_kt(hists: Mapping[str, binned_data.BinnedData], smeared_input:
     ratio_denominator = hist_smeared if smeared_input else hist_raw
     for i in range(1, 10):
         # Convert
-        bh_hist = hists[f"Bayesian_Foldediter{i}"].to_boost_histogram()
-        hist = binned_data.BinnedData.from_existing_data(bh_hist[:, bh.loc(40) : bh.loc(120) : bh.sum])
-        hist /= np.sum(hist.values)
-        hist /= hist.axes[0].bin_widths
+        hist = projection_func(hists[f"Bayesian_Foldediter{i}"], measured_bin)
+        hist = _normalize_refolded(hist)
         ax_upper.errorbar(
             hist.axes[0].bin_centers,
             hist.values,
@@ -271,10 +281,10 @@ def plot_refolded_kt(hists: Mapping[str, binned_data.BinnedData], smeared_input:
     ax_upper.yaxis.set_major_locator(matplotlib.ticker.LogLocator(base=10.0, subs=(1.0,), numticks=100))
     ax_upper.yaxis.set_minor_locator(matplotlib.ticker.LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1, numticks=100))
     ax_upper.legend(loc="upper right", frameon=False)
-    ax_upper.set_ylabel(r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$")
+    ax_upper.set_ylabel(fr"$\text{{d}}N/\text{{d}}{symbol_label}_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$")
 
     # Finalize presentation for lower panel
-    ax_lower.set_xlabel(r"$k_{\text{T}}\:(\text{GeV}/c)$")
+    ax_lower.set_xlabel(fr"${symbol_label}_{{\text{{T}}}}\:(\text{{GeV}}/c)$")
     ax_lower.set_ylabel(r"Ratio to smeared" if smeared_input else "Ratio to data")
     ax_lower.set_ylim([0, 2])
     fig.align_ylabels()
@@ -293,113 +303,7 @@ def plot_refolded_kt(hists: Mapping[str, binned_data.BinnedData], smeared_input:
     ax_upper.legend(frameon=False, loc="upper right")
     ax_upper.set_yscale("log")
 
-    fig.savefig(output_dir / "refolded_kt.pdf")
-    plt.close(fig)
-
-
-def plot_refolded_pt(hists: Mapping[str, binned_data.BinnedData], smeared_input: bool, output_dir: Path) -> None:
-    """
-
-    """
-    logger.debug("Plotting refolded pt")
-    # Setup
-    fig, axes = plt.subplots(2, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
-    ax_upper, ax_lower = axes
-
-    # Raw
-    bh_hist_raw_2d = hists["raw"].to_boost_histogram()
-    # Project
-    hist_raw = binned_data.BinnedData.from_existing_data(bh_hist_raw_2d[:: bh.sum, :])
-    # Normalize
-    hist_raw /= np.sum(hist_raw.values)
-    hist_raw /= hist_raw.axes[0].bin_widths
-    ax_upper.errorbar(
-        hist_raw.axes[0].bin_centers,
-        hist_raw.values,
-        xerr=hist_raw.axes[0].bin_widths / 2,
-        yerr=hist_raw.errors,
-        label="Raw",
-        marker="o",
-        linestyle="",
-        color="red",
-    )
-
-    # Smeared
-    bh_hist_smeared_2d = hists["smeared"].to_boost_histogram()
-    hist_smeared = binned_data.BinnedData.from_existing_data(bh_hist_smeared_2d[:: bh.sum, :])
-    hist_smeared /= np.sum(hist_smeared.values)
-    hist_smeared /= hist_smeared.axes[0].bin_widths
-    ax_upper.errorbar(
-        hist_smeared.axes[0].bin_centers,
-        hist_smeared.values,
-        xerr=hist_smeared.axes[0].bin_widths / 2,
-        yerr=hist_smeared.errors,
-        label="Smeared",
-        marker="o",
-        linestyle="",
-        color="green",
-    )
-
-    ratio_denominator = hist_smeared if smeared_input else hist_raw
-    for i in range(1, 10):
-        # Convert
-        bh_hist = hists[f"Bayesian_Foldediter{i}"].to_boost_histogram()
-        hist = binned_data.BinnedData.from_existing_data(bh_hist[:: bh.sum, :])
-        hist /= np.sum(hist.values)
-        hist /= hist.axes[0].bin_widths
-        ax_upper.errorbar(
-            hist.axes[0].bin_centers,
-            hist.values,
-            xerr=hist.axes[0].bin_widths / 2,
-            yerr=hist.errors,
-            label=f"Bayes {i}",
-            marker="o",
-            linestyle="",
-            alpha=0.8,
-        )
-
-        ratio = hist / ratio_denominator
-        ax_lower.errorbar(
-            ratio.axes[0].bin_centers,
-            ratio.values,
-            xerr=ratio.axes[0].bin_widths / 2,
-            yerr=ratio.errors,
-            marker="o",
-            linestyle="",
-            alpha=0.8,
-        )
-
-    # Draw reference line for ratio
-    ax_lower.axhline(y=1, color="black", linestyle="dashed", zorder=1)
-
-    # Finalize presentation for upper panel
-    ax_upper.set_yscale("log")
-    ax_upper.yaxis.set_major_locator(matplotlib.ticker.LogLocator(base=10.0, subs=(1.0,), numticks=100))
-    ax_upper.yaxis.set_minor_locator(matplotlib.ticker.LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1, numticks=100))
-    ax_upper.legend(loc="upper right", frameon=False)
-    ax_upper.set_ylabel(r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$")
-
-    # Finalize presentation for lower panel
-    ax_lower.set_xlabel(r"$p_{\text{T}}\:(\text{GeV}/c)$")
-    ax_lower.set_ylabel(r"Ratio to smeared" if smeared_input else "Ratio to data")
-    ax_lower.set_ylim([0, 2])
-    fig.align_ylabels()
-
-    fig.tight_layout()
-    fig.subplots_adjust(
-        # Reduce spacing between subplots
-        wspace=0,
-        hspace=0,
-        # Reduce external spacing
-        left=0.12,
-        right=0.98,
-        top=0.98,
-        bottom=0.07,
-    )
-    ax_upper.legend(frameon=False, loc="upper right")
-    ax_upper.set_yscale("log")
-
-    fig.savefig(output_dir / "refolded_pt.pdf")
+    fig.savefig(output_dir / f"refolded_new_{label}.pdf")
     plt.close(fig)
 
 
@@ -458,8 +362,22 @@ def run() -> None:
                 true_bin=helpers.RangeSelector(0, 25),
                 output_dir=output_dir,
             )
-            plot_refolded_kt(hists, smeared_input, output_dir)
-            plot_refolded_pt(hists, smeared_input, output_dir)
+            plot_refolded(
+                hists=hists,
+                projection_func=_project_kt,
+                smeared_input=smeared_input,
+                label="kt",
+                measured_bin=helpers.RangeSelector(40, 120),
+                output_dir=output_dir,
+            )
+            plot_refolded(
+                hists=hists,
+                projection_func=_project_pt,
+                smeared_input=smeared_input,
+                label="pt",
+                measured_bin=helpers.RangeSelector(0, 15),
+                output_dir=output_dir,
+            )
 
         # TODO: Plot efficiency
         # plot_spectra_comparison(hists, output_dir)
