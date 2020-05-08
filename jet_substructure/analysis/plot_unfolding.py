@@ -27,6 +27,7 @@ def plot_unfolded_kt(hists: Mapping[str, binned_data.BinnedData], output_dir: Pa
     """ Plot unfolded.
 
     """
+    logger.debug("Plotting unfolded kt")
     # Setup
     # True jet pt range
     true_jet_pt_range = helpers.RangeSelector(60, 80)
@@ -137,48 +138,34 @@ def plot_unfolded_pt(hists: Mapping[str, binned_data.BinnedData], output_dir: Pa
     """ Plot unfolded.
 
     """
+    logger.debug("Plotting unfolded pt")
     # Setup
     fig, axes = plt.subplots(2, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
     ax_upper, ax_lower = axes
 
-    # efficiency = binned_data.BinnedData.from_existing_data(hists["correff60-80"])
-    # efficiency = histogram.Histogram1D.from_existing_hist(hists["efficiency"])
+    # NOTE: We don't output the pt efficiency (?)
+    # TODO: Do we need to restrict the kt range here?
 
     # True
-    # Prject true onto the kt axis.
-    # TODO: Check that sum is equal to counts_in_interval
+    # Project true onto the pt axis.
     bh_true_2d = hists["true"].to_boost_histogram()
     hist_true = binned_data.BinnedData.from_existing_data(bh_true_2d[:: bh.sum, :])
-    # hist_true = histogram.Histogram1D.from_existing_hist(hists["true"])
-    # hist_true /= efficiency
-    # value, _ = hist_true.counts_in_interval(min_bin=0, max_bin=len(hist_true.x))
-    value = np.sum(hist_true.values)
-    hist_true /= value
+    hist_true /= np.sum(hist_true.values)
     hist_true /= hist_true.axes[0].bin_widths
 
     # Determine ratio denominator.
     n_iter = 4
     # Retrieve the hist and normalize it properly.
     bh_ratio_denominator_2d = hists[f"Bayesian_Unfoldediter{n_iter}"].to_boost_histogram()
-    # TODO: What is the right jet pt range here??
     h_ratio_denominator = binned_data.BinnedData.from_existing_data(bh_ratio_denominator_2d[:: bh.sum, :])
-
-    # hist /= efficiency
-    # value, _ = hist.counts_in_interval(min_bin=0, max_bin=len(hist.x))
-    value = np.sum(h_ratio_denominator.values)
-    h_ratio_denominator /= value
+    h_ratio_denominator /= np.sum(h_ratio_denominator.values)
     h_ratio_denominator /= h_ratio_denominator.axes[0].bin_widths
 
     for i in range(1, 10):
         # Retrieve the hist and normalize it properly.
         bh_2d = hists[f"Bayesian_Unfoldediter{i}"].to_boost_histogram()
-        # TODO: What is the right jet pt range here??
         hist = binned_data.BinnedData.from_existing_data(bh_2d[:: bh.sum, :])
-
-        # hist /= efficiency
-        # value, _ = hist.counts_in_interval(min_bin=0, max_bin=len(hist.x))
-        value = np.sum(hist.values)
-        hist /= value
+        hist /= np.sum(hist.values)
         hist /= hist.axes[0].bin_widths
 
         ax_upper.errorbar(
@@ -251,18 +238,17 @@ def plot_refolded_kt(hists: Mapping[str, binned_data.BinnedData], smeared_input:
     """
 
     """
+    logger.debug("Plotting refolded kt")
     # Setup
     fig, axes = plt.subplots(2, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
     ax_upper, ax_lower = axes
 
     # Raw
     bh_hist_raw_2d = hists["raw"].to_boost_histogram()
-    hist_raw = binned_data.BinnedData.from_existing_data(bh_hist_raw_2d[:, bh.loc(40) : bh.loc(120) : bh.sum])
     # Project
-    # hist_raw = histogram.Histogram1D.from_existing_hist(hists["raw"])
-    # value, error = hist_raw.counts_in_interval(min_bin=0, max_bin=len(hist_raw.x))
-    value = np.sum(hist_raw.values)
-    hist_raw /= value
+    hist_raw = binned_data.BinnedData.from_existing_data(bh_hist_raw_2d[:, bh.loc(40) : bh.loc(120) : bh.sum])
+    # Normalize
+    hist_raw /= np.sum(hist_raw.values)
     hist_raw /= hist_raw.axes[0].bin_widths
     ax_upper.errorbar(
         hist_raw.axes[0].bin_centers,
@@ -278,10 +264,7 @@ def plot_refolded_kt(hists: Mapping[str, binned_data.BinnedData], smeared_input:
     # Smeared
     bh_hist_smeared_2d = hists["smeared"].to_boost_histogram()
     hist_smeared = binned_data.BinnedData.from_existing_data(bh_hist_smeared_2d[:, bh.loc(40) : bh.loc(120) : bh.sum])
-    # hist_smeared = histogram.Histogram1D.from_existing_hist(hists["smeared"])
-    # value, error = hist_smeared.counts_in_interval(min_bin=0, max_bin=len(hist_smeared.x))
-    value = np.sum(hist_smeared.values)
-    hist_smeared /= value
+    hist_smeared /= np.sum(hist_smeared.values)
     hist_smeared /= hist_smeared.axes[0].bin_widths
     ax_upper.errorbar(
         hist_smeared.axes[0].bin_centers,
@@ -299,10 +282,7 @@ def plot_refolded_kt(hists: Mapping[str, binned_data.BinnedData], smeared_input:
         # Convert
         bh_hist = hists[f"Bayesian_Foldediter{i}"].to_boost_histogram()
         hist = binned_data.BinnedData.from_existing_data(bh_hist[:, bh.loc(40) : bh.loc(120) : bh.sum])
-        value = np.sum(hist.values)
-        # hist = histogram.Histogram1D.from_existing_hist(hists[f"Bayesian_Foldediter{i}"])
-        # value, error = hist.counts_in_interval(min_bin=0, max_bin=len(hist.x))
-        hist /= value
+        hist /= np.sum(hist.values)
         hist /= hist.axes[0].bin_widths
         ax_upper.errorbar(
             hist.axes[0].bin_centers,
@@ -364,18 +344,17 @@ def plot_refolded_pt(hists: Mapping[str, binned_data.BinnedData], smeared_input:
     """
 
     """
+    logger.debug("Plotting refolded pt")
     # Setup
     fig, axes = plt.subplots(2, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
     ax_upper, ax_lower = axes
 
     # Raw
     bh_hist_raw_2d = hists["raw"].to_boost_histogram()
-    hist_raw = binned_data.BinnedData.from_existing_data(bh_hist_raw_2d[:: bh.sum, :])
     # Project
-    # hist_raw = histogram.Histogram1D.from_existing_hist(hists["raw"])
-    # value, error = hist_raw.counts_in_interval(min_bin=0, max_bin=len(hist_raw.x))
-    value = np.sum(hist_raw.values)
-    hist_raw /= value
+    hist_raw = binned_data.BinnedData.from_existing_data(bh_hist_raw_2d[:: bh.sum, :])
+    # Normalize
+    hist_raw /= np.sum(hist_raw.values)
     hist_raw /= hist_raw.axes[0].bin_widths
     ax_upper.errorbar(
         hist_raw.axes[0].bin_centers,
@@ -391,10 +370,7 @@ def plot_refolded_pt(hists: Mapping[str, binned_data.BinnedData], smeared_input:
     # Smeared
     bh_hist_smeared_2d = hists["smeared"].to_boost_histogram()
     hist_smeared = binned_data.BinnedData.from_existing_data(bh_hist_smeared_2d[:: bh.sum, :])
-    # hist_smeared = histogram.Histogram1D.from_existing_hist(hists["smeared"])
-    # value, error = hist_smeared.counts_in_interval(min_bin=0, max_bin=len(hist_smeared.x))
-    value = np.sum(hist_smeared.values)
-    hist_smeared /= value
+    hist_smeared /= np.sum(hist_smeared.values)
     hist_smeared /= hist_smeared.axes[0].bin_widths
     ax_upper.errorbar(
         hist_smeared.axes[0].bin_centers,
@@ -412,10 +388,7 @@ def plot_refolded_pt(hists: Mapping[str, binned_data.BinnedData], smeared_input:
         # Convert
         bh_hist = hists[f"Bayesian_Foldediter{i}"].to_boost_histogram()
         hist = binned_data.BinnedData.from_existing_data(bh_hist[:: bh.sum, :])
-        value = np.sum(hist.values)
-        # hist = histogram.Histogram1D.from_existing_hist(hists[f"Bayesian_Foldediter{i}"])
-        # value, error = hist.counts_in_interval(min_bin=0, max_bin=len(hist.x))
-        hist /= value
+        hist /= np.sum(hist.values)
         hist /= hist.axes[0].bin_widths
         ax_upper.errorbar(
             hist.axes[0].bin_centers,
@@ -474,15 +447,15 @@ def plot_refolded_pt(hists: Mapping[str, binned_data.BinnedData], smeared_input:
 
 
 def run() -> None:
-    for val, smeared_input in [("hybrid_as_input", True), ("leading_kt_test", False)]:
+    # for val, smeared_input in [("hybrid_as_input", True), ("leading_kt_test", False)]:
+    for val, smeared_input in [("leading_kt_test", False)]:
         output_dir = Path("output") / "unfolding" / val
         output_dir.mkdir(parents=True, exist_ok=True)
         filename = Path(f"unfolding_{val}.root")
         logger.info(f"Processing file {filename}")
+        logger.info(f"Outputting to {output_dir}")
 
-        # TODO: Just use uproot..
-        # hists = histogram.get_histograms_in_file(filename=filename)
-        # Convert to binned_data
+        # Extract with uproot and convert to BinnedData
         hists = {}
         f = uproot.open(filename)
         for k in f.keys():
