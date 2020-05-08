@@ -120,20 +120,16 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
   RooUnfold::ErrorTreatment errorTreatment = RooUnfold::kCovariance;
 
   // Setup
-  ROOT::EnableImplicitMT();
-  // Hybrid as input data refolding test.
-  bool hybridAsInputData = true;
+  std::string groomingMethod = "leading_kt";
+  // If true, use hybrid as input data refolding test.
+  bool hybridAsInputData = false;
   std::string outputFilename = "unfolding_leading_kt_test.root";
   if (hybridAsInputData == true) {
     outputFilename = "unfolding_hybrid_as_input.root";
   }
 
-  // Get the tree for data
-  //TString fnamedata;
-  //fnamedata = "../../trains/PbPb/5537/skim/*.root";
-  TChain dataChain("tree");
-  dataChain.Add("trains/PbPb/5537/skim/*.root");
-  dataChain.ls();
+  // Configuration (not totally clear if this actually does anything...)
+  ROOT::EnableImplicitMT();
 
   //***************************************************
 
@@ -167,26 +163,32 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
   h2raw->Sumw2();
   h2fulleff->Sumw2();
 
-  // Read in the data and store the raw values.
-  //TTreeReader dataReader("tree", inputdata);
+  // Read the data and create the raw data hist.
+  // First, setup the input data.
+  TChain dataChain("tree");
+  dataChain.Add("trains/PbPb/5537/skim/*.root");
+  // Print out for logs (and to mirror Leticia).
+  dataChain.ls();
   TTreeReader dataReader(&dataChain);
 
-  std::string grooming_method = "leading_kt";
+  // Determines the type of data that we use. Usually, this is going to be "data" for raw data.
   std::string data_prefix = "data";
 
   TTreeReaderValue<float> ptJet(dataReader, ("jet_pt_" + data_prefix).c_str());
-  TTreeReaderValue<float> kt(dataReader, (grooming_method + "_" + data_prefix + "_kt").c_str());
+  TTreeReaderValue<float> kt(dataReader, (groomingMethod + "_" + data_prefix + "_kt").c_str());
   while (dataReader.Next()) {
-    if (*ptJet > 120 || *ptJet < 40) {
+    // Jet pt cut.
+    if (*ptJet > smearedJetPtBins[smearedJetPtBins.size() - 1] || *ptJet < smearedJetPtBins[0]) {
+      continue;
+    }
+    // Kt cut.
+    if (*kt < smearedKtBins[0] || *kt > 15) {
       continue;
     }
     h2raw->Fill(*kt, *ptJet);
   }
 
-  //ifstream infile2;
-  //infile2.open(cFiles2.Data());
-  //char filename2[300];
-  // Setup
+  // Setup for the response
   RooUnfoldResponse response;
   RooUnfoldResponse responsenotrunc;
   response.Setup(h2smeared, h2true);
@@ -194,7 +196,7 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
 
   TChain embeddedChain("tree");
   // We are specific on the filenames to avoid the friend trees.
-  // It appears that it can only handle one * per call.
+  // It appears that it can only handle one * per call. So we have to enuemrate each train.
   //embeddedChain.Add("temp_cache/embedPythia/55*/skim/*_iterative_splittings.root");
   embeddedChain.Add("temp_cache/embedPythia/5517/skim/*_iterative_splittings.root");
   embeddedChain.Add("temp_cache/embedPythia/5518/skim/*_iterative_splittings.root");
@@ -226,9 +228,9 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
   TTreeReaderValue<float> scaleFactor(mcReader, "scale_factor");
   //TTreeReaderValue<float> ptJet(dataReader, "ptJet");
   TTreeReaderValue<float> hybridJetPt(mcReader, ("jet_pt_" + hybridPrefix).c_str());
-  TTreeReaderValue<float> hybridKt(mcReader, (grooming_method + "_" + hybridPrefix + "_kt").c_str());
+  TTreeReaderValue<float> hybridKt(mcReader, (groomingMethod + "_" + hybridPrefix + "_kt").c_str());
   TTreeReaderValue<float> trueJetPt(mcReader, ("jet_pt_" + truePrefix).c_str());
-  TTreeReaderValue<float> trueKt(mcReader, (grooming_method + "_" + truePrefix + "_kt").c_str());
+  TTreeReaderValue<float> trueKt(mcReader, (groomingMethod + "_" + truePrefix + "_kt").c_str());
 
   while (mcReader.Next()) {
     if (*trueJetPt > 160) {
@@ -239,11 +241,11 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
     h2smearednocuts->Fill(*hybridKt, *hybridJetPt, *scaleFactor);
     responsenotrunc.Fill(*hybridKt, *hybridJetPt, *trueKt, *trueJetPt, *scaleFactor);
 
-    if (*hybridJetPt > 120 || *hybridJetPt < 40) {
+    if (*hybridJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1] || *hybridJetPt < smearedJetPtBins[0]) {
       continue;
     }
     // Also cut on hybrid kt
-    if (*hybridKt < 2) {
+    if (*hybridKt < smearedKtBins[0] || *hybridKt > 15) {
       continue;
     }
     h2smeared->Fill(*hybridKt, *hybridJetPt, *scaleFactor);
@@ -251,61 +253,8 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
     response.Fill(*hybridKt, *hybridJetPt, *trueKt, *trueJetPt, *scaleFactor);
   }
 
-  /*while (infile2 >> filename2) {
-    int pthardbin = 0;
-
-    TFile* input = TFile::Open(filename2);
-    TList* list = (TList*)input->Get("AliAnalysisTaskEmcalEmbeddingHelper_histos");
-    TList* list2 = (TList*)list->FindObject("EventCuts");
-    TH1D* hcent = (TH1D*)list2->FindObject("Centrality_selected");
-    TProfile* hcross = (TProfile*)list->FindObject("fHistXsection");
-    TH1D* htrials = (TH1D*)list->FindObject("fHistTrials");
-    TH1D* hpthard = (TH1D*)list->FindObject("fHistPtHard");
-    TH1D* hnevent = (TH1D*)list->FindObject("fHistEventCount");
-    for (Int_t i = 1; i <= htrials->GetNbinsX(); i++) {
-      if (htrials->GetBinContent(i) != 0) {
-        pthardbin = i;
-      }
-    }
-    double scalefactor =
-     (hcross->Integral(pthardbin, pthardbin) * hcross->GetEntries()) / htrials->Integral(pthardbin, pthardbin);
-
-    // Setup to fill Roounfold from MC tree.
-    TTreeReader mcReader("AliAnalysisTaskJetDynamicalGrooming_RawTree_EventSub_Incl", input);
-    TTreeReaderValue<float> ptJet(mcReader, "ptJet");
-    TTreeReaderValue<float> ng(mcReader, "ng");
-    TTreeReaderValue<float> zg(mcReader, "zg");
-    TTreeReaderValue<float> rg(mcReader, "rg");
-    TTreeReaderValue<float> kt(mcReader, "ktg");
-    TTreeReaderValue<float> ptJetMatch(mcReader, "ptJetMatch");
-    TTreeReaderValue<float> ngMatch(mcReader, "ngMatch");
-    TTreeReaderValue<float> zgMatch(mcReader, "zgMatch");
-    TTreeReaderValue<float> rgMatch(mcReader, "rgMatch");
-    TTreeReaderValue<float> ktMatch(mcReader, "ktgMatch");
-
-    while (mcReader.Next()) {
-      if (*ptJetMatch > 160) {
-        continue;
-      }
-
-      h2fulleff->Fill(*ngMatch, *ptJetMatch, scalefactor);
-      h2smearednocuts->Fill(*ng, *ptJet, scalefactor);
-      responsenotrunc.Fill(*ng, *ptJet, *rgMatch, *ptJetMatch, scalefactor);
-
-      if (*ptJet > 120 || *ptJet < 40) {
-        continue;
-      }
-      h2smeared->Fill(*ng, *ptJet, scalefactor);
-      h2true->Fill(*ngMatch, *ptJetMatch, scalefactor);
-      response.Fill(*ng, *ptJet, *ngMatch, *ptJetMatch, scalefactor);
-    }
-  }*/
-
   TH1F* htrueptd = (TH1F*)h2fulleff->ProjectionX("trueptd", 1, -1);
   TH1F* htruept = (TH1F*)h2fulleff->ProjectionY("truept", 1, -1);
-
-  //    TH2D* hfold=(TH2D*)h2raw->Clone("hfold");
-  //    hfold->Sumw2();
 
   //////////efficiencies done////////////////////////////////////
   TH1D* effok = (TH1D*)h2true->ProjectionX("effok", 2, 2);
@@ -353,26 +302,6 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
     TH2D* hunf = (TH2D*)unfold.Hreco(errorTreatment);
     // FOLD BACK
     TH1* hfold = response.ApplyToTruth(hunf, "");
-
-    /* for(int i=0;i<11;i++){
- for(int j=0;j<5;j++){
-double effects=0;
-double error=0;
-for(int k=0;k<11;k++){
-for(int l=0;l<8;l++){
-
- int indexm=i+11*j;
- int indext=k+8*l;
-
-
-
- effects=effects+hunf->GetBinContent(k+1,l+1)*response(indexm,indext);
- error=error+hunf->GetBinError(k+1,l+1)*hunf->GetBinError(k+1,l+1)*response(indexm,indext)*response(indexm,indext);
-
-}}
-   hfold->SetBinContent(i+1,j+1,effects);
-hfold->SetBinError(i+1,j+1,sqrt(error));
-}}*/
 
     TH2D* htempUnf = (TH2D*)hunf->Clone("htempUnf");
     htempUnf->SetName(Form("Bayesian_Unfoldediter%d", iter));
