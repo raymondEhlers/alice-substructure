@@ -9,19 +9,16 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 import boost_histogram as bh
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import pachyderm.plot
 import uproot
 from pachyderm import binned_data
 
+from jet_substructure.analysis import plot_base as pb
 from jet_substructure.base import helpers
 
 
 logger = logging.getLogger(__name__)
-
-pachyderm.plot.configure()
 
 
 def _efficiency_kt(
@@ -92,16 +89,15 @@ def plot_unfolded(
     projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
     efficiency_func: Callable[[Mapping[str, binned_data.BinnedData], helpers.RangeSelector], binned_data.BinnedData],
     n_iter_for_ratio: int,
-    label: str,
     true_bin: helpers.RangeSelector,
+    plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
     """ Plot unfolded.
 
     """
-    logger.debug(f"Plotting unfolded {label}")
+    logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
     # Setup
-    symbol_label = label[:1]
     fig, axes = plt.subplots(2, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
     ax_upper, ax_lower = axes
 
@@ -147,47 +143,40 @@ def plot_unfolded(
             alpha=0.8,
         )
 
-    # Plot truth
+    # Cross check.
+    ## Plot truth and compare to the full efficient truth.
+    ## Plot truth
     # ax_upper.errorbar(hist_true.axes[0].bin_centers, hist_true.values, xerr=hist_true.axes[0].bin_widths / 2, yerr=hist_true.errors, label = "True",
-    #            marker="o", linestyle="", color="red")
+    #                  marker="o", linestyle="", color="black", alpha=0.8)
+
+    ## Compare to the full efficiency to make sure that have the right shape...
+    # full_eff_true = projection_func(hists["truef"], true_bin)
+    ## Then normalize by the integral (sum) and bin width.
+    ## Don't need to correct for the kinematic efficiency here because it's already fully efficient.
+    # full_eff_true /= np.sum(full_eff_true.values)
+    # full_eff_true /= full_eff_true.axes[0].bin_widths
+    # ax_upper.errorbar(full_eff_true.axes[0].bin_centers, full_eff_true.values, xerr=full_eff_true.axes[0].bin_widths / 2, yerr=full_eff_true.errors, label = "True fully eff",
+    #                  marker="o", linestyle="", alpha=0.8)
+    ## Add ratio...
+    # ratio = hist_true / full_eff_true
+    # ax_lower.errorbar(
+    #    ratio.axes[0].bin_centers,
+    #    ratio.values,
+    #    xerr=ratio.axes[0].bin_widths / 2,
+    #    yerr=ratio.errors,
+    #    marker="o",
+    #    linestyle="",
+    #    alpha=0.8,
+    #    color="black",
+    # )
 
     # Draw reference line for ratio
     ax_lower.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
-    # trueptd, which comes from the fully efficient truth and therefore doesn't need the kinematic efficiency correction
-    # hist_true = histogram.Histogram1D.from_existing_hist(hists["trueptd"])
-    ## Don't need to correct for the kinematic efficiency here.
-    # value, error = hist_true.counts_in_interval(min_bin=0, max_bin=len(hist_true.x))
-    # hist_true /= value
-    # hist_true /= hist_true.bin_widths
-    # ax.errorbar(hist_true.x, hist_true.y, xerr=hist_true.bin_widths / 2, yerr=hist_true.errors, label = "True (ptd)",
-    #            marker="o", linestyle="")
+    # Label and layout
+    plot_config.apply(fig=fig, axes=[ax_upper, ax_lower])
 
-    # Finalize presentation for upper panel
-    ax_upper.set_yscale("log")
-    ax_upper.yaxis.set_major_locator(matplotlib.ticker.LogLocator(base=10.0, subs=(1.0,), numticks=100))
-    ax_upper.yaxis.set_minor_locator(matplotlib.ticker.LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1, numticks=100))
-    ax_upper.legend(loc="upper right", frameon=False)
-    ax_upper.set_ylabel(fr"$\text{{d}}N/\text{{d}}{symbol_label}_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$")
-
-    # Finalize presentation for lower panel
-    ax_lower.set_xlabel(r"$k_{\text{T}}\:(\text{GeV}/c$)")
-    ax_lower.set_ylabel(fr"Ratio to iter {n_iter_for_ratio}")
-    ax_lower.set_ylim([0, 2])
-    fig.align_ylabels()
-
-    fig.tight_layout()
-    fig.subplots_adjust(
-        # Reduce spacing between subplots
-        wspace=0,
-        hspace=0,
-        # Reduce external spacing
-        left=0.12,
-        right=0.98,
-        top=0.98,
-        bottom=0.07,
-    )
-    fig.savefig(output_dir / f"unfolded_{label}.pdf")
+    fig.savefig(output_dir / f"{plot_config.name}.pdf")
     plt.close(fig)
 
 
@@ -204,16 +193,15 @@ def plot_refolded(
     hists: Mapping[str, binned_data.BinnedData],
     projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
     smeared_input: bool,
-    label: str,
     measured_bin: helpers.RangeSelector,
+    plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
     """ Plot refolded.
 
     """
-    logger.debug(f"Plotting refolded {label}")
+    logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
     # Setup
-    symbol_label = label[:1]
     fig, axes = plt.subplots(2, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
     ax_upper, ax_lower = axes
 
@@ -276,34 +264,10 @@ def plot_refolded(
     # Draw reference line for ratio
     ax_lower.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
-    # Finalize presentation for upper panel
-    ax_upper.set_yscale("log")
-    ax_upper.yaxis.set_major_locator(matplotlib.ticker.LogLocator(base=10.0, subs=(1.0,), numticks=100))
-    ax_upper.yaxis.set_minor_locator(matplotlib.ticker.LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1, numticks=100))
-    ax_upper.legend(loc="upper right", frameon=False)
-    ax_upper.set_ylabel(fr"$\text{{d}}N/\text{{d}}{symbol_label}_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$")
+    # Label and layout
+    plot_config.apply(fig=fig, axes=[ax_upper, ax_lower])
 
-    # Finalize presentation for lower panel
-    ax_lower.set_xlabel(fr"${symbol_label}_{{\text{{T}}}}\:(\text{{GeV}}/c)$")
-    ax_lower.set_ylabel(r"Ratio to smeared" if smeared_input else "Ratio to data")
-    ax_lower.set_ylim([0, 2])
-    fig.align_ylabels()
-
-    fig.tight_layout()
-    fig.subplots_adjust(
-        # Reduce spacing between subplots
-        wspace=0,
-        hspace=0,
-        # Reduce external spacing
-        left=0.12,
-        right=0.98,
-        top=0.98,
-        bottom=0.07,
-    )
-    ax_upper.legend(frameon=False, loc="upper right")
-    ax_upper.set_yscale("log")
-
-    fig.savefig(output_dir / f"refolded_new_{label}.pdf")
+    fig.savefig(output_dir / f"{plot_config.name}.pdf")
     plt.close(fig)
 
 
@@ -312,7 +276,7 @@ def run() -> None:
     for val, smeared_input in [
         ("hybrid_as_input", True),
         ("leading_kt_test", False),
-        ("leading_kt_z_cut_04_test", False),
+        # ("leading_kt_z_cut_04_test", False),
     ]:
         output_dir = Path("output") / "unfolding" / val
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -344,38 +308,133 @@ def run() -> None:
 
         # with sns.color_palette("GnBu_d", n_colors=11):
         with sns.color_palette("Paired", n_colors=11):
+            n_iter_for_ratio = 6
+            text = "Text"
             plot_unfolded(
                 hists=hists,
                 projection_func=_project_kt,
                 efficiency_func=_efficiency_kt,
-                n_iter_for_ratio=6,
-                label="kt",
+                n_iter_for_ratio=n_iter_for_ratio,
                 true_bin=helpers.RangeSelector(60, 80),
+                plot_config=pb.PlotConfig(
+                    name="unfolded_kt",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y",
+                                    label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",
+                                    log=True,
+                                )
+                            ],
+                            # legend=pb.LegendConfig(location="lower left"),
+                            legend=pb.LegendConfig(location="center right"),
+                            text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                        # Ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
+                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
+                            ],
+                        ),
+                    ],
+                ),
                 output_dir=output_dir,
             )
             plot_unfolded(
                 hists=hists,
                 projection_func=_project_pt,
                 efficiency_func=_efficiency_pt,
-                n_iter_for_ratio=6,
-                label="pt",
+                n_iter_for_ratio=n_iter_for_ratio,
                 true_bin=helpers.RangeSelector(0, 25),
+                plot_config=pb.PlotConfig(
+                    name="unfolded_pt",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
+                                )
+                            ],
+                            legend=pb.LegendConfig(location="lower left"),
+                            text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                        # Ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c$)"),
+                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
+                            ],
+                        ),
+                    ],
+                ),
                 output_dir=output_dir,
             )
             plot_refolded(
                 hists=hists,
                 projection_func=_project_kt,
                 smeared_input=smeared_input,
-                label="kt",
                 measured_bin=helpers.RangeSelector(40, 120),
+                plot_config=pb.PlotConfig(
+                    name="refolded_kt",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
+                                )
+                            ],
+                            legend=pb.LegendConfig(location="lower left"),
+                            text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                        # Ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c$)"),
+                                # y label is set in the function.
+                                pb.AxisConfig(
+                                    "y", label="Ratio to smeared" if smeared_input else "Ratio to data", range=(0, 2)
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
                 output_dir=output_dir,
             )
             plot_refolded(
                 hists=hists,
                 projection_func=_project_pt,
                 smeared_input=smeared_input,
-                label="pt",
                 measured_bin=helpers.RangeSelector(0, 15),
+                plot_config=pb.PlotConfig(
+                    name="refolded_pt",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
+                                )
+                            ],
+                            legend=pb.LegendConfig(location="lower left"),
+                            text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                        # Ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c$)"),
+                                # y label is set in the function.
+                                pb.AxisConfig(
+                                    "y", label="Ratio to smeared" if smeared_input else "Ratio to data", range=(0, 2)
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
                 output_dir=output_dir,
             )
 
@@ -396,9 +455,9 @@ if __name__ == "__main__":
     # Enable ticks on all sides
     # Unfortunately, some of this is overriding the pachyderm plotting style.
     # That will have to be updated eventually...
-    matplotlib.rcParams["xtick.top"] = True
-    matplotlib.rcParams["xtick.minor.top"] = True
-    matplotlib.rcParams["ytick.right"] = True
-    matplotlib.rcParams["ytick.minor.right"] = True
+    # matplotlib.rcParams["xtick.top"] = True
+    # matplotlib.rcParams["xtick.minor.top"] = True
+    # matplotlib.rcParams["ytick.right"] = True
+    # matplotlib.rcParams["ytick.minor.right"] = True
 
     run()
