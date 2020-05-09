@@ -10,7 +10,7 @@
 #include <TFile.h>
 #include <TH1D.h>
 #include <TH2D.h>
-#include <TH2F.h>
+#include <TH2D.h>
 #include <TLegend.h>
 #include <TLine.h>
 #include <TNtuple.h>
@@ -135,7 +135,9 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
     outputFilename += "_pureMatches";
   }
   outputFilename += ".root";
+  std::cout << "*********** Settings ***********\n";
   std::cout << "output filename: " << outputFilename << "\n";
+  std::cout << "********************************\n";
 
   // Configuration (not totally clear if this actually does anything...)
   ROOT::EnableImplicitMT();
@@ -146,25 +148,25 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
   //std::vector<double> smearedJetPtBins = {40, 50, 60, 80, 100, 120};
   std::vector<double> smearedJetPtBins = {40, 50, 60, 70, 90, 120};
   std::vector<double> trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
-  std::vector<double> smearedKtBins = {1, 2, 3, 4, 5, 7, 10, 15, 20};
-  std::vector<double> trueKtBins = {0, 1, 2, 3, 4, 5, 7, 10, 15, 20, 50};
+  std::vector<double> smearedKtBins = {1, 2, 3, 4, 5, 7, 10, 15};
+  std::vector<double> trueKtBins = {0, 1, 2, 3, 4, 5, 7, 10, 15, 20, 100};
 
   // the raw correlation (ie. data)
-  TH2F* h2raw = new TH2F("r", "raw", smearedKtBins.size() - 1, smearedKtBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
+  TH2D* h2raw = new TH2D("r", "raw", smearedKtBins.size() - 1, smearedKtBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
   // detector measure level (ie. hybrid)
-  TH2F* h2smeared = new TH2F("smeared", "smeared", smearedKtBins.size() - 1, smearedKtBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
+  TH2D* h2smeared = new TH2D("smeared", "smeared", smearedKtBins.size() - 1, smearedKtBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
   // detector measure level no cuts (ie. hybrid, but no cuts).
   // NOTE: Strictly speaking, the y axis binning is at the hybrid level, but we want a wider range. So we use the trueJetPtBins.
-  TH2F* h2smearednocuts = new TH2F("smearednocuts", "smearednocuts", smearedKtBins.size() - 1, smearedKtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
+  TH2D* h2smearednocuts = new TH2D("smearednocuts", "smearednocuts", smearedKtBins.size() - 1, smearedKtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
   // true correlations with measured cuts
-  TH2F* h2true = new TH2F("true", "true", trueKtBins.size() - 1, trueKtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
+  TH2D* h2true = new TH2D("true", "true", trueKtBins.size() - 1, trueKtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
   // full true correlation (without cuts)
-  TH2F* h2fulleff = new TH2F("truef", "truef", trueKtBins.size() - 1, trueKtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
+  TH2D* h2fulleff = new TH2D("truef", "truef", trueKtBins.size() - 1, trueKtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
 
-  TH2F* hcovariance = new TH2F("covariance", "covariance", 10, 0., 1., 10, 0, 1.);
+  TH2D* hcovariance = new TH2D("covariance", "covariance", 10, 0., 1., 10, 0, 1.);
 
-  TH2F* effnum = (TH2F*)h2fulleff->Clone("effnum");
-  TH2F* effdenom = (TH2F*)h2fulleff->Clone("effdenom");
+  TH2D* effnum = (TH2D*)h2fulleff->Clone("effnum");
+  TH2D* effdenom = (TH2D*)h2fulleff->Clone("effdenom");
 
   effnum->Sumw2();
   effdenom->Sumw2();
@@ -274,8 +276,8 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
     response.Fill(*hybridKt, *hybridJetPt, *trueKt, *trueJetPt, *scaleFactor);
   }
 
-  TH1F* htrueptd = (TH1F*)h2fulleff->ProjectionX("trueptd", 1, -1);
-  TH1F* htruept = (TH1F*)h2fulleff->ProjectionY("truept", 1, -1);
+  TH1D* htrueptd = (TH1D*)h2fulleff->ProjectionX("trueptd", 1, -1);
+  TH1D* htruept = (TH1D*)h2fulleff->ProjectionY("truept", 1, -1);
 
   //////////efficiencies done////////////////////////////////////
   TH1D* effok = (TH1D*)h2true->ProjectionX("effok", 2, 2);
