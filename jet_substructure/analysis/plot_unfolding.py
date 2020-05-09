@@ -6,7 +6,7 @@
 import functools
 import logging
 from pathlib import Path
-from typing import Callable, Mapping
+from typing import Callable, Mapping, Sequence
 
 import boost_histogram as bh
 import matplotlib.pyplot as plt
@@ -271,6 +271,45 @@ def plot_refolded(
     plt.close(fig)
 
 
+def plot_efficiency(
+    hists: Mapping[str, binned_data.BinnedData],
+    efficiency_func: Callable[[Mapping[str, binned_data.BinnedData], helpers.RangeSelector], binned_data.BinnedData],
+    true_bins: Sequence[helpers.RangeSelector],
+    true_bin_label: str,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+) -> None:
+    """ Plot kinematic efficiency.
+
+    """
+    logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
+    # Setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    for true_bin in true_bins:
+        # Project
+        # We need the efficiency in the true bin that we actually want to measure.
+        hist = efficiency_func(hists, true_bin)
+
+        # Plot
+        ax.errorbar(
+            hist.axes[0].bin_centers,
+            hist.values,
+            xerr=hist.axes[0].bin_widths / 2,
+            yerr=hist.errors,
+            label=fr"${true_bin.min} < {true_bin_label}_{{\text{{T,jet}}}}^{{\text{{true}}}} < {true_bin.max}$",
+            marker="o",
+            linestyle="",
+            alpha=0.8,
+        )
+
+    # Label and layout
+    plot_config.apply(fig=fig, ax=ax)
+
+    fig.savefig(output_dir / f"{plot_config.name}.pdf")
+    plt.close(fig)
+
+
 def run() -> None:
     # for val, smeared_input in [("leading_kt_z_cut_04_test", False)]:
     for val, smeared_input in [
@@ -411,6 +450,8 @@ def run() -> None:
                 ),
                 output_dir=output_dir,
             )
+            jet_pt_for_text = helpers.RangeSelector(40, 120)
+            text = f"${jet_pt_for_text.display_str(label='data')}$"
             plot_refolded(
                 hists=hists,
                 projection_func=_project_kt,
@@ -443,11 +484,12 @@ def run() -> None:
                 ),
                 output_dir=output_dir,
             )
+            text = ""
             plot_refolded(
                 hists=hists,
                 projection_func=_project_pt,
                 smeared_input=smeared_input,
-                measured_bin=helpers.RangeSelector(0, 15),
+                measured_bin=helpers.RangeSelector(1, 15),
                 plot_config=pb.PlotConfig(
                     name="refolded_pt",
                     panels=[
@@ -475,6 +517,53 @@ def run() -> None:
                 ),
                 output_dir=output_dir,
             )
+
+        plot_efficiency(
+            hists=hists,
+            efficiency_func=_efficiency_kt,
+            true_bins=[
+                helpers.RangeSelector(40, 120),
+                helpers.RangeSelector(40, 60),
+                helpers.RangeSelector(60, 80),
+                helpers.RangeSelector(80, 120),
+            ],
+            true_bin_label="p",
+            plot_config=pb.PlotConfig(
+                name="efficiency_kt",
+                panels=pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c$)", log=True),
+                        pb.AxisConfig("y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
+                    ],
+                    legend=pb.LegendConfig(location="lower left"),
+                    text=pb.TextConfig(text, 0.97, 0.97),
+                ),
+            ),
+            output_dir=output_dir,
+        )
+        plot_efficiency(
+            hists=hists,
+            efficiency_func=_efficiency_pt,
+            true_bins=[
+                helpers.RangeSelector(1, 13),
+                helpers.RangeSelector(1, 15),
+                helpers.RangeSelector(2, 13),
+                helpers.RangeSelector(2, 15),
+            ],
+            true_bin_label="k",
+            plot_config=pb.PlotConfig(
+                name="efficiency_pt",
+                panels=pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c$)"),
+                        pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
+                    ],
+                    legend=pb.LegendConfig(location="lower right"),
+                    text=pb.TextConfig(text, 0.97, 0.97),
+                ),
+            ),
+            output_dir=output_dir,
+        )
 
         # TODO: Plot efficiency
         # plot_spectra_comparison(hists, output_dir)
