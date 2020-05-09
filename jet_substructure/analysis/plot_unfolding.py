@@ -309,7 +309,8 @@ def run() -> None:
         # with sns.color_palette("GnBu_d", n_colors=11):
         with sns.color_palette("Paired", n_colors=11):
             n_iter_for_ratio = 6
-            text = "Text"
+            jet_pt_for_text = helpers.RangeSelector(60, 80)
+            text = f"${jet_pt_for_text.display_str(label='true')}$"
             plot_unfolded(
                 hists=hists,
                 projection_func=_project_kt,
@@ -317,7 +318,7 @@ def run() -> None:
                 n_iter_for_ratio=n_iter_for_ratio,
                 true_bin=helpers.RangeSelector(60, 80),
                 plot_config=pb.PlotConfig(
-                    name="unfolded_kt",
+                    name="unfolded_kt_true_pt_60_80",
                     panels=[
                         # Main panel
                         pb.Panel(
@@ -343,6 +344,43 @@ def run() -> None:
                 ),
                 output_dir=output_dir,
             )
+            # 40-120 true pt.
+            jet_pt_for_text = helpers.RangeSelector(40, 120)
+            text = f"${jet_pt_for_text.display_str(label='true')}$"
+            plot_unfolded(
+                hists=hists,
+                projection_func=_project_kt,
+                efficiency_func=_efficiency_kt,
+                n_iter_for_ratio=n_iter_for_ratio,
+                true_bin=helpers.RangeSelector(40, 120),
+                plot_config=pb.PlotConfig(
+                    name="unfolded_kt_true_pt_40_120",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y",
+                                    label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",
+                                    log=True,
+                                )
+                            ],
+                            # legend=pb.LegendConfig(location="lower left"),
+                            legend=pb.LegendConfig(location="center right"),
+                            text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                        # Ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
+                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
+                            ],
+                        ),
+                    ],
+                ),
+                output_dir=output_dir,
+            )
+            text = ""
             plot_unfolded(
                 hists=hists,
                 projection_func=_project_pt,
