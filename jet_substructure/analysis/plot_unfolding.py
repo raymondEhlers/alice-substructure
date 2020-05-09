@@ -43,9 +43,8 @@ def _project_kt(input_hist: binned_data.BinnedData, true_jet_pt_bin: helpers.Ran
     # For convenience
     bh_hist = input_hist.to_boost_histogram()
 
-    return binned_data.BinnedData.from_existing_data(
-        bh_hist[:, bh.loc(true_jet_pt_bin.min) : bh.loc(true_jet_pt_bin.max) : bh.sum]  # noqa: E203
-    )
+    selection = slice(bh.loc(true_jet_pt_bin.min), bh.loc(true_jet_pt_bin.max), bh.sum)
+    return binned_data.BinnedData.from_existing_data(bh_hist[:, selection])
 
 
 def _efficiency_pt(
@@ -59,9 +58,9 @@ def _efficiency_pt(
     bh_full_efficiency = hists["truef"].to_boost_histogram()
 
     # Select true pt range.
-    # selection = slice(bh.loc(true_kt_bin.min), bh.loc(true_kt_bin.max), bh.sum)
-    cut = binned_data.BinnedData.from_existing_data(bh_cut_efficiency[:: bh.sum, :])
-    full = binned_data.BinnedData.from_existing_data(bh_full_efficiency[:: bh.sum, :])
+    selection = slice(bh.loc(true_kt_bin.min), bh.loc(true_kt_bin.max), bh.sum)
+    cut = binned_data.BinnedData.from_existing_data(bh_cut_efficiency[selection, :])
+    full = binned_data.BinnedData.from_existing_data(bh_full_efficiency[selection, :])
 
     return cut / full
 
@@ -72,7 +71,8 @@ def _project_pt(input_hist: binned_data.BinnedData, true_kt_bin: helpers.RangeSe
     """
     bh_hist = input_hist.to_boost_histogram()
 
-    return binned_data.BinnedData.from_existing_data(bh_hist[:: bh.sum, :])
+    selection = slice(bh.loc(true_kt_bin.min), bh.loc(true_kt_bin.max), bh.sum)
+    return binned_data.BinnedData.from_existing_data(bh_hist[selection, :])
 
 
 def _normalize_unfolded(hist: binned_data.BinnedData, efficiency: binned_data.BinnedData) -> binned_data.BinnedData:
