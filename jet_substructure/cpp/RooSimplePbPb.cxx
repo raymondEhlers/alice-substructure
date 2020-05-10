@@ -113,7 +113,13 @@ enum UnfoldingType_t {
   rg = 2
 };
 
-void RooSimplePbPb()
+
+/**
+ * Unfolding for a specified substructure variable. Most settings must be changed inside of the function...
+ *
+ * @param[in] hybridAsInputData If true, use hybrid as input data refolding test.
+ */
+void RunUnfolding(const bool hybridAsInputData = false)
 {
 #ifdef __CINT__
   gSystem->Load("libRooUnfold");
@@ -130,15 +136,13 @@ void RooSimplePbPb()
   };
 
   // Setup
-  // Grooming method
-  std::string groomingMethod = "leading_kt_z_cut_04";
   // Unfolding type
   UnfoldingType_t unfoldingType = UnfoldingType_t::kt;
   std::string substructureVariableName = unfoldingTypeNames.at(unfoldingType);
-  // If true, use hybrid as input data refolding test.
-  bool hybridAsInputData = false;
+  // Grooming method
+  const std::string groomingMethod = "leading_kt_z_cut_04";
   // If true, use pure matches
-  bool usePureMatches = false;
+  const bool usePureMatches = false;
   // Unfolding settings
   RooUnfold::ErrorTreatment errorTreatment = RooUnfold::kCovariance;
   // Determine output filename
@@ -157,11 +161,12 @@ void RooSimplePbPb()
   std::string outputDir = "output/unfolding";
   gSystem->mkdir(outputDir.c_str(), true);
   outputFilename = outputDir + "/" + outputFilename;
-  std::cout << "\n*********** Settings ***********\n";
-  std::cout << "Unfolding for: " << substructureVariableName << "\n";
-  std::cout << "Grooming method: " << groomingMethod << "\n";
-  std::cout << "output filename: " << outputFilename << "\n";
-  std::cout << "********************************\n\n";
+  std::cout << "\n*********** Settings ***********\n" << std::boolalpha
+       << "Unfolding for: " << substructureVariableName << "\n"
+       << "Grooming method: " << groomingMethod << "\n"
+       << "Hybrid as input data: "<< hybridAsInputData << "\n"
+       << "output filename: " << outputFilename << "\n"
+       << "********************************\n\n";
 
   // Configuration (not totally clear if this actually does anything...)
   ROOT::EnableImplicitMT();
@@ -198,7 +203,6 @@ void RooSimplePbPb()
       throw std::runtime_error("Must specify an unfolding type.");
       break;
   }
-
 
   // the raw correlation (ie. data)
   TH2D* h2raw = new TH2D("r", "raw", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
@@ -398,7 +402,7 @@ void RooSimplePbPb()
       }
 
       for (Int_t k = 0; k < h2true->GetNbinsY(); k++) {
-        TH2D* hCorr = (TH2D*)CorrelationHistPt(covmat, Form("corr%d", k), "Covariance matrix",
+        TH2D* hCorr = (TH2D*)CorrelationHistPt(covmat, Form("corr%dpt", k), "Covariance matrix",
                             h2true->GetNbinsX(), h2true->GetNbinsY(), k);
         TH2D* covpt = (TH2D*)hCorr->Clone("covpt");
         covpt->SetName(Form("pearsonmatrix_iter%d_binpt%d", iter, k));
@@ -410,9 +414,12 @@ void RooSimplePbPb()
 }
 
 #ifndef __CINT__
-int main()
+int RooSimplePbPb()
 {
-  RooSimplePbPb();
+  // Run both with and without hybrid as input.
+  // I do it everytime as a cross check, so I might as well just do it automatically.
+  RunUnfolding(false);
+  RunUnfolding(true);
   return 0;
 } // Main program when run stand-alone
 #endif
