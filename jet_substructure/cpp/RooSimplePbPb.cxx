@@ -20,7 +20,7 @@
 #include <TRandom.h>
 #include <TString.h>
 #include <TStyle.h>
-#include <TVectorD.h>
+#include <TSystem.h>
 
 #include <RooUnfoldBayes.h>
 #include <RooUnfoldResponse.h>
@@ -107,6 +107,12 @@ TH2D* CorrelationHist(const TMatrixD& cov, const char* name, const char* title, 
 // Example Unfolding
 //==============================================================================
 
+enum UnfoldingType_t {
+  kt = 0,
+  zg = 1,
+  rg = 2
+};
+
 void RooSimplePbPb()
 {
 #ifdef __CINT__
@@ -115,16 +121,31 @@ void RooSimplePbPb()
   std::cout
    << "==================================== pick up the response matrix for background==========================\n";
   ///////////////////parameter setting
-  RooUnfold::ErrorTreatment errorTreatment = RooUnfold::kCovariance;
+
+  // NOTE: These need to map to the branch names.
+  std::map<UnfoldingType_t, std::string> unfoldingTypeNames = {
+    std::make_pair(UnfoldingType_t::kt, "kt"),
+    std::make_pair(UnfoldingType_t::zg, "z"),
+    std::make_pair(UnfoldingType_t::rg, "delta_R")
+  };
 
   // Setup
+  // Grooming method
   std::string groomingMethod = "leading_kt_z_cut_04";
+  // Unfolding type
+  UnfoldingType_t unfoldingType = UnfoldingType_t::kt;
+  std::string substructureVariableName = unfoldingTypeNames.at(unfoldingType);
   // If true, use hybrid as input data refolding test.
   bool hybridAsInputData = false;
   // If true, use pure matches
   bool usePureMatches = false;
+  // Unfolding settings
+  RooUnfold::ErrorTreatment errorTreatment = RooUnfold::kCovariance;
   // Determine output filename
-  std::string outputFilename = "unfolding_" + groomingMethod;
+  std::string outputFilename = "unfolding_";
+  outputFilename += substructureVariableName;
+  outputFilename += "_grooming_method_";
+  outputFilename += groomingMethod;
   if (hybridAsInputData == true) {
     outputFilename += "_hybrid_as_input";
   }
@@ -132,7 +153,13 @@ void RooSimplePbPb()
     outputFilename += "_pureMatches";
   }
   outputFilename += "_test.root";
-  std::cout << "*********** Settings ***********\n\n";
+  // And put it in an output directory to keep it managable.
+  std::string outputDir = "output/unfolding";
+  gSystem->mkdir(outputDir.c_str(), true);
+  outputFilename = outputDir + "/" + outputFilename;
+  std::cout << "\n*********** Settings ***********\n";
+  std::cout << "Unfolding for: " << substructureVariableName << "\n";
+  std::cout << "Grooming method: " << groomingMethod << "\n";
   std::cout << "output filename: " << outputFilename << "\n";
   std::cout << "********************************\n\n";
 
@@ -141,24 +168,49 @@ void RooSimplePbPb()
 
   //***************************************************
 
-  // Define binning
-  //std::vector<double> smearedJetPtBins = {40, 50, 60, 80, 100, 120};
-  std::vector<double> smearedJetPtBins = {40, 50, 60, 70, 90, 120};
-  std::vector<double> trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
-  std::vector<double> smearedKtBins = {1, 2, 3, 4, 5, 7, 10, 15};
-  std::vector<double> trueKtBins = {0, 1, 2, 3, 4, 5, 7, 10, 15, 100};
+  // Define binning and tree branch names
+  std::vector<double> smearedJetPtBins;
+  std::vector<double> trueJetPtBins;
+  std::vector<double> smearedSplittingVariableBins;
+  std::vector<double> trueSplittingVariableBins;
+
+  switch (unfoldingType) {
+    case UnfoldingType_t::kt:
+      //smearedJetPtBins = {40, 50, 60, 80, 100, 120};
+      smearedJetPtBins = {40, 50, 60, 70, 90, 120};
+      trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
+      smearedSplittingVariableBins = {1, 2, 3, 4, 5, 7, 10, 15};
+      trueSplittingVariableBins = {0, 1, 2, 3, 4, 5, 7, 10, 15, 100};
+      break;
+    case UnfoldingType_t::zg:
+      smearedJetPtBins = {40, 50, 60, 70, 80, 100, 120};
+      trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
+      smearedSplittingVariableBins = {-0.05, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5};
+      trueSplittingVariableBins = {0, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5};
+      break;
+    case UnfoldingType_t::rg:
+      smearedJetPtBins = {40, 50, 60, 70, 90, 120};
+      trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
+      smearedSplittingVariableBins = {-0.05, 0, 0.02, 0.04, 0.06, 0.1, 0.2, 0.35};
+      trueSplittingVariableBins = {-0.05, 0, 0.02, 0.04, 0.06, 0.1, 0.2, 0.35, 0.6};
+      break;
+    default:
+      throw std::runtime_error("Must specify an unfolding type.");
+      break;
+  }
+
 
   // the raw correlation (ie. data)
-  TH2D* h2raw = new TH2D("r", "raw", smearedKtBins.size() - 1, smearedKtBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
+  TH2D* h2raw = new TH2D("r", "raw", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
   // detector measure level (ie. hybrid)
-  TH2D* h2smeared = new TH2D("smeared", "smeared", smearedKtBins.size() - 1, smearedKtBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
+  TH2D* h2smeared = new TH2D("smeared", "smeared", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
   // detector measure level no cuts (ie. hybrid, but no cuts).
   // NOTE: Strictly speaking, the y axis binning is at the hybrid level, but we want a wider range. So we use the trueJetPtBins.
-  TH2D* h2smearednocuts = new TH2D("smearednocuts", "smearednocuts", smearedKtBins.size() - 1, smearedKtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
+  TH2D* h2smearednocuts = new TH2D("smearednocuts", "smearednocuts", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
   // true correlations with measured cuts
-  TH2D* h2true = new TH2D("true", "true", trueKtBins.size() - 1, trueKtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
+  TH2D* h2true = new TH2D("true", "true", trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
   // full true correlation (without cuts)
-  TH2D* h2fulleff = new TH2D("truef", "truef", trueKtBins.size() - 1, trueKtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
+  TH2D* h2fulleff = new TH2D("truef", "truef", trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
 
   TH2D* hcovariance = new TH2D("covariance", "covariance", 10, 0., 1., 10, 0, 1.);
 
@@ -184,17 +236,17 @@ void RooSimplePbPb()
   std::string data_prefix = "data";
 
   TTreeReaderValue<float> dataJetPt(dataReader, ("jet_pt_" + data_prefix).c_str());
-  TTreeReaderValue<float> dataKt(dataReader, (groomingMethod + "_" + data_prefix + "_kt").c_str());
+  TTreeReaderValue<float> dataSubstructureVariable(dataReader, (groomingMethod + "_" + data_prefix + "_" + substructureVariableName).c_str());
   while (dataReader.Next()) {
     // Jet pt cut.
     if (*dataJetPt < smearedJetPtBins[0] || *dataJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
       continue;
     }
-    // Kt cut.
-    if (*dataKt < smearedKtBins[0] || *dataKt > smearedKtBins[smearedKtBins.size() - 1]) {
+    // Substructure variable cut.
+    if (*dataSubstructureVariable < smearedSplittingVariableBins[0] || *dataSubstructureVariable > smearedSplittingVariableBins[smearedSplittingVariableBins.size() - 1]) {
       continue;
     }
-    h2raw->Fill(*dataKt, *dataJetPt);
+    h2raw->Fill(*dataSubstructureVariable, *dataJetPt);
   }
 
   // Setup response tree.
@@ -231,9 +283,9 @@ void RooSimplePbPb()
   TTreeReader mcReader(&embeddedChain);
   TTreeReaderValue<float> scaleFactor(mcReader, "scale_factor");
   TTreeReaderValue<float> hybridJetPt(mcReader, ("jet_pt_" + hybridPrefix).c_str());
-  TTreeReaderValue<float> hybridKt(mcReader, (groomingMethod + "_" + hybridPrefix + "_kt").c_str());
+  TTreeReaderValue<float> hybridSubstructureVariable(mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
   TTreeReaderValue<float> trueJetPt(mcReader, ("jet_pt_" + truePrefix).c_str());
-  TTreeReaderValue<float> trueKt(mcReader, (groomingMethod + "_" + truePrefix + "_kt").c_str());
+  TTreeReaderValue<float> trueSubstructureVariable(mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
   TTreeReaderValue<long long> matchingLeading(mcReader, (groomingMethod + "_hybrid_detector_matching_leading").c_str());
   TTreeReaderValue<long long> matchingSubleading(mcReader, (groomingMethod + "_hybrid_detector_matching_subleading").c_str());
 
@@ -244,33 +296,33 @@ void RooSimplePbPb()
   responsenotrunc.Setup(h2smearednocuts, h2fulleff);
 
   while (mcReader.Next()) {
-    // Ensure that we are in the right true pt and kt range.
+    // Ensure that we are in the right true pt and substructure variable range.
     if (*trueJetPt > trueJetPtBins[trueJetPtBins.size() - 1]) {
       continue;
     }
-    if (*trueKt > trueKtBins[trueKtBins.size() - 1]) {
+    if (*trueSubstructureVariable > trueSplittingVariableBins[trueSplittingVariableBins.size() - 1]) {
       continue;
     }
 
-    h2fulleff->Fill(*trueKt, *trueJetPt, *scaleFactor);
-    h2smearednocuts->Fill(*hybridKt, *hybridJetPt, *scaleFactor);
-    responsenotrunc.Fill(*hybridKt, *hybridJetPt, *trueKt, *trueJetPt, *scaleFactor);
+    h2fulleff->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    h2smearednocuts->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
+    responsenotrunc.Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
 
     // Now start making cuts on the hybrid level.
     if (*hybridJetPt < smearedJetPtBins[0] || *hybridJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
       continue;
     }
-    // Also cut on hybrid kt
-    if (*hybridKt < smearedKtBins[0] || *hybridKt > smearedKtBins[smearedKtBins.size() - 1]) {
+    // Also cut on hybrid substructure variable.
+    if (*hybridSubstructureVariable < smearedSplittingVariableBins[0] || *hybridSubstructureVariable > smearedSplittingVariableBins[smearedSplittingVariableBins.size() - 1]) {
       continue;
     }
     // Try matching cuts
     if (usePureMatches && !(*matchingLeading == 1 && *matchingSubleading == 1)) {
       continue;
     }
-    h2smeared->Fill(*hybridKt, *hybridJetPt, *scaleFactor);
-    h2true->Fill(*trueKt, *trueJetPt, *scaleFactor);
-    response.Fill(*hybridKt, *hybridJetPt, *trueKt, *trueJetPt, *scaleFactor);
+    h2smeared->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
+    h2true->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    response.Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
   }
 
   TH1D* htrueptd = (TH1D*)h2fulleff->ProjectionX("trueptd", 1, -1);
