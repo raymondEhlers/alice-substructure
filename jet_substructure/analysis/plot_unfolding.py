@@ -6,11 +6,13 @@
 import functools
 import logging
 from pathlib import Path
-from typing import Callable, Mapping, Sequence
+from typing import Callable, Dict, Mapping, Sequence, Tuple
 
+import attr
 import boost_histogram as bh
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 import uproot
 from pachyderm import binned_data
 
@@ -144,11 +146,32 @@ def plot_unfolded(
         )
 
     # Cross check.
-    ## Plot truth and compare to the full efficient truth.
-    ## Plot truth
-    # ax_upper.errorbar(hist_true.axes[0].bin_centers, hist_true.values, xerr=hist_true.axes[0].bin_widths / 2, yerr=hist_true.errors, label = "True",
-    #                  marker="o", linestyle="", color="black", alpha=0.8)
+    # Plot truth
+    ax_upper.errorbar(
+        hist_true.axes[0].bin_centers,
+        hist_true.values,
+        xerr=hist_true.axes[0].bin_widths / 2,
+        yerr=hist_true.errors,
+        label="True",
+        marker="o",
+        linestyle="",
+        color="black",
+        alpha=0.8,
+    )
+    # And the ratio to the iter
+    ratio = hist_true / h_ratio_denominator
+    ax_lower.errorbar(
+        ratio.axes[0].bin_centers,
+        ratio.values,
+        xerr=ratio.axes[0].bin_widths / 2,
+        yerr=ratio.errors,
+        marker="o",
+        linestyle="",
+        color="black",
+        alpha=0.8,
+    )
 
+    # Plot truth and compare to the full efficient truth.
     ## Compare to the full efficiency to make sure that have the right shape...
     # full_eff_true = projection_func(hists["truef"], true_bin)
     ## Then normalize by the integral (sum) and bin width.
@@ -310,40 +333,66 @@ def plot_efficiency(
     plt.close(fig)
 
 
+@attr.s
+class InputFile:
+    substructure_variable: str = attr.ib()
+    grooming_method: str = attr.ib()
+    smeared_input: bool = attr.ib(default=False)
+    suffix: str = attr.ib(default="")
+
+    @property
+    def identifier(self) -> str:
+        name = f"{self.substructure_variable}_grooming_method_{self.grooming_method}"
+        if self.smeared_input:
+            name += "_hybrid_as_input"
+        if self.suffix:
+            name += f"_{self.suffix}"
+        return name
+
+    @property
+    def filename(self) -> str:
+        return f"unfolding_{self.identifier}.root"
+
+
+def setup(input_file: InputFile) -> Tuple[Dict[str, binned_data.BinnedData], Path]:
+    base_dir = Path("output") / "unfolding"
+    input_filename = base_dir / input_file.filename
+    output_dir = base_dir / input_file.substructure_variable / input_file.identifier
+    output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Processing file {input_filename}")
+    logger.info(f"Output dir: {output_dir}")
+
+    # Extract with uproot and convert to BinnedData
+    hists = {}
+    f = uproot.open(input_filename)
+    for k in f.keys():
+        hist_key = k.decode("utf-8")
+        hist_key = hist_key[: hist_key.find(";")]
+        hists[hist_key] = binned_data.BinnedData.from_existing_data(f[k])
+
+    # Hists:
+    # [
+    #     "correff20-40", "correff40-60", "correff60-80", "correff80-120",
+    #     "raw", "smeared", "trueptd", "true", "truef",
+    #     "Bayesian_Unfoldediter1", "Bayesian_Foldediter1", "Bayesian_Unfoldediter2", "Bayesian_Foldediter2", "Bayesian_Unfoldediter3", "Bayesian_Foldediter3",
+    #     "Bayesian_Unfoldediter4", "Bayesian_Foldediter4", "Bayesian_Unfoldediter5", "Bayesian_Foldediter5", "Bayesian_Unfoldediter6", "Bayesian_Foldediter6",
+    #     "Bayesian_Unfoldediter7", "Bayesian_Foldediter7", "Bayesian_Unfoldediter8", "Bayesian_Foldediter8", "Bayesian_Unfoldediter9", "Bayesian_Foldediter9",
+    #     "pearsonmatrix_iter8_binshape0", "pearsonmatrix_iter8_binshape1", "pearsonmatrix_iter8_binshape2", "pearsonmatrix_iter8_binshape3",
+    #     "pearsonmatrix_iter8_binpt0", "pearsonmatrix_iter8_binpt1", "pearsonmatrix_iter8_binpt2", "pearsonmatrix_iter8_binpt3", "pearsonmatrix_iter8_binpt4",
+    #     "pearsonmatrix_iter8_binpt5", "pearsonmatrix_iter8_binpt6", "pearsonmatrix_iter8_binpt7",
+    # ]
+
+    return hists, output_dir
+
+
 def run() -> None:
-    # for val, smeared_input in [("leading_kt_z_cut_04_test", False)]:
-    for val, smeared_input in [
-        ("hybrid_as_input", True),
-        ("leading_kt_test", False),
-        # ("leading_kt_z_cut_04_test", False),
+    for input_file in [
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="test"),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="test", smeared_input=True),
+        InputFile("kt", "leading_kt_z_cut_04", suffix="test"),
+        InputFile("kt", "leading_kt_z_cut_04", suffix="test", smeared_input=True),
     ]:
-        output_dir = Path("output") / "unfolding" / val
-        output_dir.mkdir(parents=True, exist_ok=True)
-        filename = Path(f"unfolding_{val}.root")
-        logger.info(f"Processing file {filename}")
-        logger.info(f"Output dir: {output_dir}")
-
-        # Extract with uproot and convert to BinnedData
-        hists = {}
-        f = uproot.open(filename)
-        for k in f.keys():
-            hist_key = k.decode("utf-8")
-            hist_key = hist_key[: hist_key.find(";")]
-            hists[hist_key] = binned_data.BinnedData.from_existing_data(f[k])
-
-        # Hists:
-        # [
-        #     "correff20-40", "correff40-60", "correff60-80", "correff80-120",
-        #     "raw", "smeared", "trueptd", "true", "truef",
-        #     "Bayesian_Unfoldediter1", "Bayesian_Foldediter1", "Bayesian_Unfoldediter2", "Bayesian_Foldediter2", "Bayesian_Unfoldediter3", "Bayesian_Foldediter3",
-        #     "Bayesian_Unfoldediter4", "Bayesian_Foldediter4", "Bayesian_Unfoldediter5", "Bayesian_Foldediter5", "Bayesian_Unfoldediter6", "Bayesian_Foldediter6",
-        #     "Bayesian_Unfoldediter7", "Bayesian_Foldediter7", "Bayesian_Unfoldediter8", "Bayesian_Foldediter8", "Bayesian_Unfoldediter9", "Bayesian_Foldediter9",
-        #     "pearsonmatrix_iter8_binshape0", "pearsonmatrix_iter8_binshape1", "pearsonmatrix_iter8_binshape2", "pearsonmatrix_iter8_binshape3",
-        #     "pearsonmatrix_iter8_binpt0", "pearsonmatrix_iter8_binpt1", "pearsonmatrix_iter8_binpt2", "pearsonmatrix_iter8_binpt3", "pearsonmatrix_iter8_binpt4",
-        #     "pearsonmatrix_iter8_binpt5", "pearsonmatrix_iter8_binpt6", "pearsonmatrix_iter8_binpt7",
-        # ]
-
-        import seaborn as sns
+        hists, output_dir = setup(input_file=input_file)
 
         # with sns.color_palette("GnBu_d", n_colors=11):
         with sns.color_palette("Paired", n_colors=11):
@@ -357,7 +406,7 @@ def run() -> None:
                 n_iter_for_ratio=n_iter_for_ratio,
                 true_bin=helpers.RangeSelector(60, 80),
                 plot_config=pb.PlotConfig(
-                    name="unfolded_kt_true_pt_60_80",
+                    name=f"unfolded_{input_file.substructure_variable}_true_pt_60_80",
                     panels=[
                         # Main panel
                         pb.Panel(
@@ -393,7 +442,7 @@ def run() -> None:
                 n_iter_for_ratio=n_iter_for_ratio,
                 true_bin=helpers.RangeSelector(40, 120),
                 plot_config=pb.PlotConfig(
-                    name="unfolded_kt_true_pt_40_120",
+                    name=f"unfolded_{input_file.substructure_variable}_true_pt_40_120",
                     panels=[
                         # Main panel
                         pb.Panel(
@@ -442,7 +491,7 @@ def run() -> None:
                         # Ratio
                         pb.Panel(
                             axes=[
-                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c$)"),
+                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
                                 pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
                             ],
                         ),
@@ -455,10 +504,10 @@ def run() -> None:
             plot_refolded(
                 hists=hists,
                 projection_func=_project_kt,
-                smeared_input=smeared_input,
+                smeared_input=input_file.smeared_input,
                 measured_bin=helpers.RangeSelector(40, 120),
                 plot_config=pb.PlotConfig(
-                    name="refolded_kt",
+                    name=f"refolded_{input_file.substructure_variable}",
                     panels=[
                         # Main panel
                         pb.Panel(
@@ -473,10 +522,12 @@ def run() -> None:
                         # Ratio
                         pb.Panel(
                             axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c$)"),
+                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
                                 # y label is set in the function.
                                 pb.AxisConfig(
-                                    "y", label="Ratio to smeared" if smeared_input else "Ratio to data", range=(0, 2)
+                                    "y",
+                                    label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
+                                    range=(0, 2),
                                 ),
                             ],
                         ),
@@ -488,7 +539,7 @@ def run() -> None:
             plot_refolded(
                 hists=hists,
                 projection_func=_project_pt,
-                smeared_input=smeared_input,
+                smeared_input=input_file.smeared_input,
                 measured_bin=helpers.RangeSelector(1, 15),
                 plot_config=pb.PlotConfig(
                     name="refolded_pt",
@@ -506,10 +557,12 @@ def run() -> None:
                         # Ratio
                         pb.Panel(
                             axes=[
-                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c$)"),
+                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
                                 # y label is set in the function.
                                 pb.AxisConfig(
-                                    "y", label="Ratio to smeared" if smeared_input else "Ratio to data", range=(0, 2)
+                                    "y",
+                                    label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
+                                    range=(0, 2),
                                 ),
                             ],
                         ),
@@ -529,10 +582,10 @@ def run() -> None:
             ],
             true_bin_label="p",
             plot_config=pb.PlotConfig(
-                name="efficiency_kt",
+                name=f"efficiency_{input_file.substructure_variable}",
                 panels=pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c$)", log=True),
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", log=True),
                         pb.AxisConfig("y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
                     ],
                     legend=pb.LegendConfig(location="lower left"),
@@ -555,7 +608,7 @@ def run() -> None:
                 name="efficiency_pt",
                 panels=pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c$)"),
+                        pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
                         pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
                     ],
                     legend=pb.LegendConfig(location="lower right"),
@@ -565,11 +618,183 @@ def run() -> None:
             output_dir=output_dir,
         )
 
-        # TODO: Plot efficiency
         # plot_spectra_comparison(hists, output_dir)
         # plot_spectra_comparison_fine_binned(hists, output_dir)
-        # plot_efficiency(hists, output_dir)
         # plot_response_matrix(hists["responseUnscaled"], "response", output_dir)
+
+
+def run_delta_R() -> None:
+    for input_file in [
+        InputFile("delta_R", "leading_kt_z_cut_04", suffix="test"),
+        InputFile("delta_R", "leading_kt_z_cut_04", suffix="test", smeared_input=True),
+    ]:
+        hists, output_dir = setup(input_file=input_file)
+
+        # with sns.color_palette("GnBu_d", n_colors=11):
+        with sns.color_palette("Paired", n_colors=11):
+            n_iter_for_ratio = 6
+            jet_pt_for_text = helpers.RangeSelector(60, 80)
+            text = f"${jet_pt_for_text.display_str(label='true')}$"
+            plot_unfolded(
+                hists=hists,
+                projection_func=_project_kt,
+                efficiency_func=_efficiency_kt,
+                n_iter_for_ratio=n_iter_for_ratio,
+                true_bin=helpers.RangeSelector(60, 80),
+                plot_config=pb.PlotConfig(
+                    name=f"unfolded_{input_file.substructure_variable}_true_pt_60_80",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[pb.AxisConfig("y", label=r"$\text{d}N/\text{d}\Delta R$", log=True,)],
+                            # legend=pb.LegendConfig(location="lower left"),
+                            legend=pb.LegendConfig(location="center right"),
+                            text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                        # Ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$\Delta R$"),
+                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
+                            ],
+                        ),
+                    ],
+                ),
+                output_dir=output_dir,
+            )
+            # 40-120 true pt.
+            jet_pt_for_text = helpers.RangeSelector(40, 120)
+            text = f"${jet_pt_for_text.display_str(label='true')}$"
+            plot_unfolded(
+                hists=hists,
+                projection_func=_project_kt,
+                efficiency_func=_efficiency_kt,
+                n_iter_for_ratio=n_iter_for_ratio,
+                true_bin=helpers.RangeSelector(40, 120),
+                plot_config=pb.PlotConfig(
+                    name=f"unfolded_{input_file.substructure_variable}_true_pt_40_120",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y",
+                                    label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",
+                                    log=True,
+                                )
+                            ],
+                            legend=pb.LegendConfig(location="center right"),
+                            text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                        # Ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$\Delta R$"),
+                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
+                            ],
+                        ),
+                    ],
+                ),
+                output_dir=output_dir,
+            )
+            text = ""
+            plot_unfolded(
+                hists=hists,
+                projection_func=_project_pt,
+                efficiency_func=_efficiency_pt,
+                n_iter_for_ratio=n_iter_for_ratio,
+                true_bin=helpers.RangeSelector(0, 0.6),
+                plot_config=pb.PlotConfig(
+                    name="unfolded_pt",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
+                                )
+                            ],
+                            legend=pb.LegendConfig(location="lower left"),
+                            text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                        # Ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
+                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
+                            ],
+                        ),
+                    ],
+                ),
+                output_dir=output_dir,
+            )
+            jet_pt_for_text = helpers.RangeSelector(40, 120)
+            text = f"${jet_pt_for_text.display_str(label='data')}$"
+            plot_refolded(
+                hists=hists,
+                projection_func=_project_kt,
+                smeared_input=input_file.smeared_input,
+                measured_bin=helpers.RangeSelector(40, 120),
+                plot_config=pb.PlotConfig(
+                    name=f"refolded_{input_file.substructure_variable}",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[pb.AxisConfig("y", label=r"$\text{d}N/\text{d}\Delta R$", log=True)],
+                            legend=pb.LegendConfig(location="lower left"),
+                            text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                        # Ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$\Delta R$"),
+                                # y label is set in the function.
+                                pb.AxisConfig(
+                                    "y",
+                                    label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
+                                    range=(0, 2),
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+                output_dir=output_dir,
+            )
+            text = ""
+            plot_refolded(
+                hists=hists,
+                projection_func=_project_pt,
+                smeared_input=input_file.smeared_input,
+                measured_bin=helpers.RangeSelector(0, 0.35),
+                plot_config=pb.PlotConfig(
+                    name="refolded_pt",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
+                                )
+                            ],
+                            legend=pb.LegendConfig(location="lower left"),
+                            text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                        # Ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
+                                # y label is set in the function.
+                                pb.AxisConfig(
+                                    "y",
+                                    label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
+                                    range=(0, 2),
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+                output_dir=output_dir,
+            )
 
 
 if __name__ == "__main__":
@@ -588,3 +813,4 @@ if __name__ == "__main__":
     # matplotlib.rcParams["ytick.minor.right"] = True
 
     run()
+    run_delta_R()
