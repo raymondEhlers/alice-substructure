@@ -107,37 +107,34 @@ TH2D* CorrelationHist(const TMatrixD& cov, const char* name, const char* title, 
 // Example Unfolding
 //==============================================================================
 
-void RooSimplePbPb(TString cFiles2 = "files1.txt")
+void RooSimplePbPb()
 {
 #ifdef __CINT__
   gSystem->Load("libRooUnfold");
 #endif
-  Int_t difference = 1;
-  Int_t Ppol = 0;
   std::cout
    << "==================================== pick up the response matrix for background==========================\n";
   ///////////////////parameter setting
   RooUnfold::ErrorTreatment errorTreatment = RooUnfold::kCovariance;
 
   // Setup
-  //std::string groomingMethod = "leading_kt_z_cut_04";
-  std::string groomingMethod = "leading_kt";
+  std::string groomingMethod = "leading_kt_z_cut_04";
   // If true, use hybrid as input data refolding test.
   bool hybridAsInputData = false;
   // If true, use pure matches
   bool usePureMatches = false;
   // Determine output filename
-  std::string outputFilename = "unfolding_" + groomingMethod + "_test";
+  std::string outputFilename = "unfolding_" + groomingMethod;
   if (hybridAsInputData == true) {
-    outputFilename = "unfolding_hybrid_as_input";
+    outputFilename += "_hybrid_as_input";
   }
   if (usePureMatches == true) {
     outputFilename += "_pureMatches";
   }
-  outputFilename += ".root";
-  std::cout << "*********** Settings ***********\n";
+  outputFilename += "_test.root";
+  std::cout << "*********** Settings ***********\n\n";
   std::cout << "output filename: " << outputFilename << "\n";
-  std::cout << "********************************\n";
+  std::cout << "********************************\n\n";
 
   // Configuration (not totally clear if this actually does anything...)
   ROOT::EnableImplicitMT();
@@ -149,7 +146,7 @@ void RooSimplePbPb(TString cFiles2 = "files1.txt")
   std::vector<double> smearedJetPtBins = {40, 50, 60, 70, 90, 120};
   std::vector<double> trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
   std::vector<double> smearedKtBins = {1, 2, 3, 4, 5, 7, 10, 15};
-  std::vector<double> trueKtBins = {0, 1, 2, 3, 4, 5, 7, 10, 15, 20, 100};
+  std::vector<double> trueKtBins = {0, 1, 2, 3, 4, 5, 7, 10, 15, 100};
 
   // the raw correlation (ie. data)
   TH2D* h2raw = new TH2D("r", "raw", smearedKtBins.size() - 1, smearedKtBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
