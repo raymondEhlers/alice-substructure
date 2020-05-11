@@ -115,8 +115,12 @@ def plot_unfolded(
     hist_true = _normalize_hist(hist_true)
 
     # Determine ratio denominator.
-    h_ratio_denominator = projection_func(hists[f"Bayesian_Unfoldediter{n_iter_for_ratio}"], true_bin)
-    h_ratio_denominator = _normalize_hist(h_ratio_denominator)
+    if n_iter_for_ratio > 0:
+        selected_n_iter_hist = projection_func(hists[f"Bayesian_Unfoldediter{n_iter_for_ratio}"], true_bin)
+        selected_n_iter_hist = _normalize_hist(selected_n_iter_hist)
+        h_ratio_denominator = selected_n_iter_hist
+    else:
+        h_ratio_denominator = hist_true
 
     for i in range(1, 10):
         # Retrieve the hist and normalize it properly.
@@ -158,18 +162,18 @@ def plot_unfolded(
         color="black",
         alpha=0.8,
     )
-    # And the ratio to the iter
-    ratio = hist_true / h_ratio_denominator
-    ax_lower.errorbar(
-        ratio.axes[0].bin_centers,
-        ratio.values,
-        xerr=ratio.axes[0].bin_widths / 2,
-        yerr=ratio.errors,
-        marker="o",
-        linestyle="",
-        color="black",
-        alpha=0.8,
-    )
+    ## And the ratio too
+    # ratio = hist_true / h_ratio_denominator
+    # ax_lower.errorbar(
+    #    ratio.axes[0].bin_centers,
+    #    ratio.values,
+    #    xerr=ratio.axes[0].bin_widths / 2,
+    #    yerr=ratio.errors,
+    #    marker="o",
+    #    linestyle="",
+    #    color="black",
+    #    alpha=0.8,
+    # )
 
     # Plot truth and compare to the full efficient truth.
     ## Compare to the full efficiency to make sure that have the right shape...
@@ -284,6 +288,20 @@ def plot_refolded(
             alpha=0.8,
         )
 
+    # Add smeared ratio in the right circumstances.
+    if not smeared_input:
+        r = hist_smeared / ratio_denominator
+        ax_lower.errorbar(
+            r.axes[0].bin_centers,
+            r.values,
+            xerr=r.axes[0].bin_widths / 2,
+            yerr=r.errors,
+            marker="o",
+            linestyle="",
+            color="green",
+            alpha=0.8,
+        )
+
     # Draw reference line for ratio
     ax_lower.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
@@ -338,6 +356,7 @@ class InputFile:
     substructure_variable: str = attr.ib()
     grooming_method: str = attr.ib()
     smeared_input: bool = attr.ib(default=False)
+    pure_matches: bool = attr.ib(default=False)
     suffix: str = attr.ib(default="")
 
     @property
@@ -345,6 +364,8 @@ class InputFile:
         name = f"{self.substructure_variable}_grooming_method_{self.grooming_method}"
         if self.smeared_input:
             name += "_hybrid_as_input"
+        if self.pure_matches:
+            name += "_pureMatches"
         if self.suffix:
             name += f"_{self.suffix}"
         return name
@@ -391,12 +412,14 @@ def run() -> None:
         # InputFile("kt", "leading_kt_z_cut_02", suffix="test", smeared_input=True),
         InputFile("kt", "leading_kt_z_cut_04", suffix="test"),
         InputFile("kt", "leading_kt_z_cut_04", suffix="test", smeared_input=True),
+        # InputFile("kt", "leading_kt_z_cut_04", suffix="test", pure_matches=True),
+        # InputFile("kt", "leading_kt_z_cut_04", suffix="test", pure_matches=True, smeared_input=True),
     ]:
         hists, output_dir = setup(input_file=input_file)
 
         # with sns.color_palette("GnBu_d", n_colors=11):
         with sns.color_palette("Paired", n_colors=11):
-            n_iter_for_ratio = 6
+            n_iter_for_ratio = -1
             jet_pt_for_text = helpers.RangeSelector(60, 80)
             text = f"${jet_pt_for_text.display_str(label='true')}$"
             plot_unfolded(
@@ -417,15 +440,20 @@ def run() -> None:
                                     log=True,
                                 )
                             ],
-                            # legend=pb.LegendConfig(location="lower left"),
-                            legend=pb.LegendConfig(location="center right"),
+                            legend=pb.LegendConfig(location="lower left"),
                             text=pb.TextConfig(text, 0.97, 0.97),
                         ),
                         # Ratio
                         pb.Panel(
                             axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
-                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
+                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0, 15)),
+                                pb.AxisConfig(
+                                    "y",
+                                    label=fr"Ratio to iter {n_iter_for_ratio}"
+                                    if n_iter_for_ratio > 0
+                                    else "Ratio to true",
+                                    range=(0, 2),
+                                ),
                             ],
                         ),
                     ],
@@ -453,15 +481,20 @@ def run() -> None:
                                     log=True,
                                 )
                             ],
-                            # legend=pb.LegendConfig(location="lower left"),
-                            legend=pb.LegendConfig(location="center right"),
+                            legend=pb.LegendConfig(location="lower left"),
                             text=pb.TextConfig(text, 0.97, 0.97),
                         ),
                         # Ratio
                         pb.Panel(
                             axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
-                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
+                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0, 15)),
+                                pb.AxisConfig(
+                                    "y",
+                                    label=fr"Ratio to iter {n_iter_for_ratio}"
+                                    if n_iter_for_ratio > 0
+                                    else "Ratio to true",
+                                    range=(0, 2),
+                                ),
                             ],
                         ),
                     ],
@@ -469,6 +502,7 @@ def run() -> None:
                 output_dir=output_dir,
             )
             text = ""
+            n_iter_for_ratio = 6
             plot_unfolded(
                 hists=hists,
                 projection_func=_project_pt,
@@ -492,7 +526,13 @@ def run() -> None:
                         pb.Panel(
                             axes=[
                                 pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
-                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
+                                pb.AxisConfig(
+                                    "y",
+                                    label=fr"Ratio to iter {n_iter_for_ratio}"
+                                    if n_iter_for_ratio > 0
+                                    else "Ratio to true",
+                                    range=(0, 2),
+                                ),
                             ],
                         ),
                     ],
