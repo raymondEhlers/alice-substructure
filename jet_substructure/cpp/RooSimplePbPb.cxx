@@ -178,25 +178,31 @@ void RunUnfolding(const bool hybridAsInputData = false)
   std::vector<double> trueJetPtBins;
   std::vector<double> smearedSplittingVariableBins;
   std::vector<double> trueSplittingVariableBins;
+  double minSmearedSplittingVariable = 0.;
 
   switch (unfoldingType) {
     case UnfoldingType_t::kt:
       //smearedJetPtBins = {40, 50, 60, 80, 100, 120};
       smearedJetPtBins = {40, 50, 60, 70, 90, 120};
       trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
-      smearedSplittingVariableBins = {1, 2, 3, 4, 5, 7, 10, 15};
-      trueSplittingVariableBins = {0, 1, 2, 3, 4, 5, 7, 10, 15, 100};
+      // NOTE: (0-1) is the untagged bin.
+      smearedSplittingVariableBins = {0, 1, 2, 3, 4, 5, 7, 10, 15};
+      minSmearedSplittingVariable = 1.0;
+      trueSplittingVariableBins = {-0.05, 0, 1, 2, 3, 4, 5, 7, 10, 15, 100};
       break;
     case UnfoldingType_t::zg:
+      // This is for z_cut > 0.2
       smearedJetPtBins = {40, 50, 60, 70, 80, 100, 120};
       trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
       smearedSplittingVariableBins = {-0.05, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5};
+      minSmearedSplittingVariable = 0.2;
       trueSplittingVariableBins = {0, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5};
       break;
     case UnfoldingType_t::rg:
       smearedJetPtBins = {40, 50, 60, 70, 90, 120};
       trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
       smearedSplittingVariableBins = {-0.05, 0, 0.02, 0.04, 0.06, 0.1, 0.2, 0.35};
+      minSmearedSplittingVariable = 0.0;
       trueSplittingVariableBins = {-0.05, 0, 0.02, 0.04, 0.06, 0.1, 0.2, 0.35, 0.6};
       break;
     default:
@@ -247,10 +253,17 @@ void RunUnfolding(const bool hybridAsInputData = false)
       continue;
     }
     // Substructure variable cut.
-    if (*dataSubstructureVariable < smearedSplittingVariableBins[0] || *dataSubstructureVariable > smearedSplittingVariableBins[smearedSplittingVariableBins.size() - 1]) {
-      continue;
+    double dataSubstructureVariableValue = *dataSubstructureVariable;
+    if (dataSubstructureVariableValue < 0) {
+      // Assign to the untagged bin.
+      dataSubstructureVariableValue = 0.5;
     }
-    h2raw->Fill(*dataSubstructureVariable, *dataJetPt);
+    else {
+      if (dataSubstructureVariableValue < minSmearedSplittingVariable || dataSubstructureVariableValue > smearedSplittingVariableBins[smearedSplittingVariableBins.size() - 1]) {
+        continue;
+      }
+    }
+    h2raw->Fill(dataSubstructureVariableValue, *dataJetPt);
   }
 
   // Setup response tree.
@@ -317,16 +330,23 @@ void RunUnfolding(const bool hybridAsInputData = false)
       continue;
     }
     // Also cut on hybrid substructure variable.
-    if (*hybridSubstructureVariable < smearedSplittingVariableBins[0] || *hybridSubstructureVariable > smearedSplittingVariableBins[smearedSplittingVariableBins.size() - 1]) {
-      continue;
+    double hybridSubstructureVariableValue = *hybridSubstructureVariable;
+    if (hybridSubstructureVariableValue < 0) {
+      // Assign to the untagged bin.
+      hybridSubstructureVariableValue = 0.5;
     }
-    // Try matching cuts
+    else {
+      if (hybridSubstructureVariableValue < minSmearedSplittingVariable || hybridSubstructureVariableValue > smearedSplittingVariableBins[smearedSplittingVariableBins.size() - 1]) {
+        continue;
+      }
+    }
+    // Matching cuts: Requiring a pure match.
     if (usePureMatches && !(*matchingLeading == 1 && *matchingSubleading == 1)) {
       continue;
     }
-    h2smeared->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
+    h2smeared->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
     h2true->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
-    response.Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    response.Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
   }
 
   TH1D* htrueptd = (TH1D*)h2fulleff->ProjectionX("trueptd", 1, -1);
