@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Sequence, Tuple, Union
+from typing import Mapping, Sequence
 
 import attr
 import boost_histogram as bh
@@ -17,9 +17,17 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
-import seaborn as sns
 from pachyderm import binned_data
 
+from jet_substructure.analysis.plot_base import (
+    AxisConfig,
+    Figure,
+    LegendConfig,
+    Panel,
+    PlotConfig,
+    TextConfig,
+    define_grooming_styles,
+)
 from jet_substructure.base import analysis_objects, helpers, skim_analysis_objects
 
 
@@ -33,199 +41,6 @@ matplotlib.rcParams["xtick.top"] = True
 matplotlib.rcParams["xtick.minor.top"] = True
 matplotlib.rcParams["ytick.right"] = True
 matplotlib.rcParams["ytick.minor.right"] = True
-
-
-_label_to_display_string: Dict[str, Dict[str, str]] = {
-    "ALICE": dict(work_in_progress="ALICE Work in Progress", preliminary="ALICE Preliminary", final="ALICE",),
-    "collision_system": dict(
-        PbPb=r"$Pb--Pb \sqrt{s_{\text{NN}}} = 5.02$ TeV",
-        embedPythia=r"$PYTHIA \bigotimes {main_system} Pb--Pb$",
-        pp_5=r"$pp \sqrt{s_{\text{NN}}} = 5.02$ TeV",
-    ),
-    "jets": {"R0{i}": fr"$\text{{anti}}-k_{{\text{{T}}}} charged jets R=0.{i}" for i in range(1, 7)},
-}
-
-
-def _validate_axis_name(instance: "AxisConfig", attribute: attr.Attribute[str], value: str) -> None:
-    if value not in ["x", "y", "z"]:
-        raise ValueError("Invalid axis name: {value}")
-
-
-@attr.s
-class AxisConfig:
-    axis: str = attr.ib(validator=[_validate_axis_name])
-    label: str = attr.ib(default="")
-    log: bool = attr.ib(default=False)
-    range: Tuple[Optional[float], Optional[float]] = attr.ib(default=None)
-
-    def apply(self, ax: matplotlib.axes.Axes) -> None:
-        if self.label:
-            getattr(ax, f"set_{self.axis}label")(self.label)
-        if self.log:
-            getattr(ax, f"set_{self.axis}scale")("log")
-            # Probably need to increase the number of ticks for a log axis. We just assume that's the case.
-            # I really wish it handled this better by default...
-            # See: https://stackoverflow.com/a/44079725/12907985
-            major_locator = matplotlib.ticker.LogLocator(base=10, numticks=12)
-            getattr(ax, f"{self.axis}axis").set_major_locator(major_locator)
-            minor_locator = matplotlib.ticker.LogLocator(base=10.0, subs=np.linspace(0.2, 0.9, 8), numticks=12)
-            getattr(ax, f"{self.axis}axis").set_minor_locator(minor_locator)
-            # But we don't want to label these ticks.
-            getattr(ax, f"{self.axis}axis").set_minor_formatter(matplotlib.ticker.NullFormatter())
-        if self.range:
-            min_range, max_range = self.range
-            min_current_range, max_current_range = getattr(ax, f"get_{self.axis}lim")()
-            if min_range is None:
-                min_range = min_current_range
-            if max_range is None:
-                max_range = max_current_range
-            getattr(ax, f"set_{self.axis}lim")([min_range, max_range])
-
-
-@attr.s
-class TextConfig:
-    text: str = attr.ib()
-    x: float = attr.ib()
-    y: float = attr.ib()
-    alignment: str = attr.ib(default=None)
-
-    def apply(self, ax: matplotlib.axes.Axes) -> None:
-        # Some reasonable defaults
-        if self.alignment is None:
-            ud = "upper" if self.y >= 0.5 else "lower"
-            lr = "right" if self.x >= 0.5 else "left"
-            self.alignment = f"{ud} {lr}"
-
-        alignments = {
-            "upper right": dict(horizontalalignment="right", verticalalignment="top", multialignment="right",),
-            "upper left": dict(horizontalalignment="left", verticalalignment="top", multialignment="left",),
-            "lower right": dict(horizontalalignment="right", verticalalignment="bottom", multialignment="right",),
-            "lower left": dict(horizontalalignment="left", verticalalignment="bottom", multialignment="left",),
-        }
-        alignment_kwargs = alignments[self.alignment]
-
-        # Finally, draw the text.
-        ax.text(
-            self.x,
-            self.y,
-            self.text,
-            # We always want to place using normalized coordinates.
-            # In the rare case that we don't want to, we can place by hand.
-            transform=ax.transAxes,
-            **alignment_kwargs,
-        )
-
-
-@attr.s
-class LegendConfig:
-    location: str = attr.ib(default=None)
-    # Takes advantage of the fact that None will use the default.
-    anchor: Optional[Tuple[float, float]] = attr.ib(default=None)
-    font_size: Optional[float] = attr.ib(default=None)
-    ncol: Optional[float] = attr.ib(default=1)
-
-    def apply(self, ax: matplotlib.axes.Axes) -> None:
-        if self.location:
-            ax.legend(
-                loc=self.location,
-                bbox_to_anchor=self.anchor,
-                # If we specify an anchor, we want to reduce an additional padding
-                # to ensure that we have accurate placement.
-                borderaxespad=(0 if self.anchor else None),
-                borderpad=(0 if self.anchor else None),
-                fontsize=self.font_size,
-                frameon=False,
-                ncol=self.ncol,
-            )
-
-
-def _ensure_sequence_of_axis_config(value: Union[AxisConfig, Sequence[AxisConfig]]) -> Sequence[AxisConfig]:
-    if isinstance(value, AxisConfig):
-        value = [value]
-    return value
-
-
-@attr.s
-class Panel:
-    axes: Sequence[AxisConfig] = attr.ib(converter=_ensure_sequence_of_axis_config)
-    text: Optional[TextConfig] = attr.ib(default=None)
-    legend: LegendConfig = attr.ib(default=None)
-
-    def apply(self, ax: matplotlib.axes.Axes) -> None:
-        # Axes
-        for axis in self.axes:
-            axis.apply(ax)
-        # Text
-        if self.text is not None:
-            self.text.apply(ax)
-        # Legend
-        if self.legend is not None:
-            self.legend.apply(ax)
-
-
-@attr.s
-class Figure:
-    edge_padding: Mapping[str, float] = attr.ib(factory=dict)
-
-    def apply(self, fig: matplotlib.figure.Figure) -> None:
-        # It shouldn't hurt to align the labels if there's only one.
-        fig.align_ylabels()
-
-        # Adjust the layout.
-        fig.tight_layout()
-        adjust_default_args = dict(
-            # Reduce spacing between subplots
-            hspace=0,
-            wspace=0,
-            # Reduce external spacing
-            left=0.10,
-            bottom=0.105,
-            right=0.98,
-            top=0.98,
-        )
-        adjust_default_args.update(self.edge_padding)
-        fig.subplots_adjust(**adjust_default_args)
-
-
-def _ensure_sequence_of_panels(value: Union[Panel, Sequence[Panel]]) -> Sequence[Panel]:
-    if isinstance(value, Panel):
-        value = [value]
-    return value
-
-
-@attr.s
-class PlotConfig:
-    name: str = attr.ib()
-    panels: Sequence[Panel] = attr.ib(converter=_ensure_sequence_of_panels)
-    figure: Figure = attr.ib(factory=Figure)
-
-    def apply(
-        self,
-        fig: matplotlib.figure.Figure,
-        ax: Optional[matplotlib.axes.Axes] = None,
-        axes: Optional[Sequence[matplotlib.axes.Axes]] = None,
-    ) -> None:
-        # Validation
-        if ax is None and axes is None:
-            raise TypeError("Must pass the axis or axes of the figure.")
-        if ax is not None and axes is not None:
-            raise TypeError("Cannot pass both a single axis and multiple axes.")
-        # If we just have a single axis, wrap it up into a list so we can process it along with our panels.
-        if ax is not None:
-            axes = [ax]
-        # Help out mypy...
-        assert axes is not None
-        if len(axes) != len(self.panels):
-            raise ValueError(
-                f"Must have the same number of axes and panels. Passed axes: {axes}, panels: {self.panels}"
-            )
-
-        # Finally, we can actually apply the stored properties.
-        # Apply panels to the axes.
-        for ax, panel in zip(axes, self.panels):
-            panel.apply(ax)
-        # Figure
-        self.figure.apply(fig)
 
 
 @attr.s
@@ -1303,95 +1118,6 @@ def plot_distance_comparison(
             ),
             output_dir=output_dir,
         )
-
-
-@attr.s
-class GroomingMethodStyle:
-    color: str = attr.ib()
-    marker: str = attr.ib()
-    fillstyle: str = attr.ib()
-    label: str = attr.ib()
-    zorder: int = attr.ib()
-
-
-def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
-    # Setup
-    styles = {}
-
-    for label in ["", "_compare"]:
-        if label == "":
-            # These are our main colors.
-            # The methods are similar, but different, so we want to spread out the colors.
-            # dynamical_grooming_colors = sns.color_palette(f"GnBu_d", 3)
-            dynamical_grooming_colors = sns.color_palette(f"Greens_d", 4)
-            leading_kt_colors = sns.color_palette(f"Purples_d", 3)
-            soft_drop_colors = sns.color_palette(f"Reds_d", 3)
-        else:
-            # These are our comparison colors. Similar in order and often shade, but distinct.
-            dynamical_grooming_colors = sns.color_palette(f"Greys_r", 5)
-            leading_kt_colors = sns.color_palette(f"Blues_r", 3)
-            soft_drop_colors = sns.color_palette(f"Oranges_r", 3)
-        markers = ["o", "d", "s"]
-        grooming_styling = {
-            f"dynamical_z{label}": GroomingMethodStyle(
-                color=dynamical_grooming_colors[0], marker=markers[0], fillstyle="full", label="$z$Drop", zorder=10
-            ),
-            f"dynamical_kt{label}": GroomingMethodStyle(
-                color=dynamical_grooming_colors[1],
-                marker=markers[0],
-                fillstyle="full",
-                label=r"$k_{\text{T}}$Drop",
-                zorder=10,
-            ),
-            f"dynamical_time{label}": GroomingMethodStyle(
-                color=dynamical_grooming_colors[2], marker=markers[0], fillstyle="full", label=r"timeDrop", zorder=10
-            ),
-            f"leading_kt{label}": GroomingMethodStyle(
-                color=leading_kt_colors[1],
-                marker=markers[0],
-                fillstyle="full",
-                label=r"Leading $k_{\text{T}}$",
-                zorder=10,
-            ),
-            f"leading_kt_z_cut_02{label}": GroomingMethodStyle(
-                color=leading_kt_colors[1],
-                marker=markers[1],
-                fillstyle="none",
-                label=r"Leading $k_{\text{T}}$ $z > 0.2$",
-                zorder=4,
-            ),
-            f"leading_kt_z_cut_04{label}": GroomingMethodStyle(
-                color=leading_kt_colors[1],
-                marker=markers[2],
-                fillstyle="full",
-                label=r"Leading $k_{\text{T}}$ $z > 0.4$",
-                zorder=10,
-            ),
-            # Leading kt with z cuts, but n <= 1
-            f"leading_kt_z_cut_02_first_split{label}": GroomingMethodStyle(
-                color=leading_kt_colors[0],
-                marker="P",
-                fillstyle="none",
-                label=r"Leading $k_{\text{T}}$ $z > 0.2$, $n \leq 1$",
-                zorder=4,
-            ),
-            f"leading_kt_z_cut_04_first_split{label}": GroomingMethodStyle(
-                color=leading_kt_colors[0],
-                marker="P",
-                fillstyle="full",
-                label=r"Leading $k_{\text{T}}$ $z > 0.4$, $n \leq 1$",
-                zorder=10,
-            ),
-            f"soft_drop_z_cut_02{label}": GroomingMethodStyle(
-                color=soft_drop_colors[1], marker=markers[1], fillstyle="none", label=r"SoftDrop $z > 0.2$", zorder=4
-            ),
-            f"soft_drop_z_cut_04{label}": GroomingMethodStyle(
-                color=soft_drop_colors[1], marker=markers[2], fillstyle="full", label=r"SoftDrop $z > 0.4$", zorder=5
-            ),
-        }
-        styles.update(grooming_styling)
-
-    return styles
 
 
 def _project_and_prepare_grooming_variable_hist(
