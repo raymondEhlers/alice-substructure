@@ -164,7 +164,8 @@ void RunUnfolding(const bool hybridAsInputData = false)
   std::cout << "\n*********** Settings ***********\n" << std::boolalpha
        << "Unfolding for: " << substructureVariableName << "\n"
        << "Grooming method: " << groomingMethod << "\n"
-       << "Hybrid as input data: "<< hybridAsInputData << "\n"
+       << "Hybrid as input data: " << hybridAsInputData << "\n"
+       << "Use pure matches in the response: " << usePureMatches << "\n"
        << "output filename: " << outputFilename << "\n"
        << "********************************\n\n";
 
@@ -185,9 +186,10 @@ void RunUnfolding(const bool hybridAsInputData = false)
       //smearedJetPtBins = {40, 50, 60, 80, 100, 120};
       smearedJetPtBins = {40, 50, 60, 70, 90, 120};
       trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
-      // NOTE: (0-1) is the untagged bin.
+      // NOTE: (0, 1) is the untagged bin.
       smearedSplittingVariableBins = {0, 1, 2, 3, 4, 5, 7, 10, 15};
       minSmearedSplittingVariable = 1.0;
+      // NOTE: (-0.05, 0) is the untagged bin.
       trueSplittingVariableBins = {-0.05, 0, 1, 2, 3, 4, 5, 7, 10, 15, 100};
       break;
     case UnfoldingType_t::zg:
@@ -211,28 +213,28 @@ void RunUnfolding(const bool hybridAsInputData = false)
   }
 
   // the raw correlation (ie. data)
-  TH2D* h2raw = new TH2D("r", "raw", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
+  TH2D h2raw("r", "raw", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
   // detector measure level (ie. hybrid)
-  TH2D* h2smeared = new TH2D("smeared", "smeared", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
+  TH2D h2smeared("smeared", "smeared", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
   // detector measure level no cuts (ie. hybrid, but no cuts).
   // NOTE: Strictly speaking, the y axis binning is at the hybrid level, but we want a wider range. So we use the trueJetPtBins.
-  TH2D* h2smearednocuts = new TH2D("smearednocuts", "smearednocuts", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
+  TH2D h2smearednocuts("smearednocuts", "smearednocuts", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
   // true correlations with measured cuts
-  TH2D* h2true = new TH2D("true", "true", trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
+  TH2D h2true("true", "true", trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
   // full true correlation (without cuts)
-  TH2D* h2fulleff = new TH2D("truef", "truef", trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
+  TH2D h2fulleff("truef", "truef", trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
 
-  TH2D* hcovariance = new TH2D("covariance", "covariance", 10, 0., 1., 10, 0, 1.);
+  //TH2D hcovariance("covariance", "covariance", 10, 0., 1., 10, 0, 1.);
 
-  TH2D* effnum = (TH2D*)h2fulleff->Clone("effnum");
-  TH2D* effdenom = (TH2D*)h2fulleff->Clone("effdenom");
+  TH2D* effnum = dynamic_cast<TH2D*>(h2fulleff.Clone("effnum"));
+  TH2D* effdenom = dynamic_cast<TH2D*>(h2fulleff.Clone("effdenom"));
 
   effnum->Sumw2();
   effdenom->Sumw2();
-  h2smeared->Sumw2();
-  h2true->Sumw2();
-  h2raw->Sumw2();
-  h2fulleff->Sumw2();
+  h2smeared.Sumw2();
+  h2true.Sumw2();
+  h2raw.Sumw2();
+  h2fulleff.Sumw2();
 
   // Read the data and create the raw data hist.
   // First, setup the input data.
@@ -263,7 +265,7 @@ void RunUnfolding(const bool hybridAsInputData = false)
         continue;
       }
     }
-    h2raw->Fill(dataSubstructureVariableValue, *dataJetPt);
+    h2raw.Fill(dataSubstructureVariableValue, *dataJetPt);
   }
 
   // Setup response tree.
@@ -309,8 +311,8 @@ void RunUnfolding(const bool hybridAsInputData = false)
   // Setup for the response
   RooUnfoldResponse response;
   RooUnfoldResponse responsenotrunc;
-  response.Setup(h2smeared, h2true);
-  responsenotrunc.Setup(h2smearednocuts, h2fulleff);
+  response.Setup(&h2smeared, &h2true);
+  responsenotrunc.Setup(&h2smearednocuts, &h2fulleff);
 
   while (mcReader.Next()) {
     // Ensure that we are in the right true pt and substructure variable range.
@@ -321,8 +323,8 @@ void RunUnfolding(const bool hybridAsInputData = false)
       continue;
     }
 
-    h2fulleff->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
-    h2smearednocuts->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
+    h2fulleff.Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    h2smearednocuts.Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
     responsenotrunc.Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
 
     // Now start making cuts on the hybrid level.
@@ -344,32 +346,32 @@ void RunUnfolding(const bool hybridAsInputData = false)
     if (usePureMatches && !(*matchingLeading == 1 && *matchingSubleading == 1)) {
       continue;
     }
-    h2smeared->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
-    h2true->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    h2smeared.Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
+    h2true.Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
     response.Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
   }
 
-  TH1D* htrueptd = (TH1D*)h2fulleff->ProjectionX("trueptd", 1, -1);
-  TH1D* htruept = (TH1D*)h2fulleff->ProjectionY("truept", 1, -1);
+  TH1D* htrueptd = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("trueptd", 1, -1));
+  TH1D* htruept = dynamic_cast<TH1D*>(h2fulleff.ProjectionY("truept", 1, -1));
 
   //////////efficiencies done////////////////////////////////////
-  TH1D* effok = (TH1D*)h2true->ProjectionX("effok", 2, 2);
-  TH1D* effok1 = (TH1D*)h2fulleff->ProjectionX("effok2", 2, 2);
+  TH1D* effok = dynamic_cast<TH1D*>(h2true.ProjectionX("effok", 2, 2));
+  TH1D* effok1 = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("effok2", 2, 2));
   effok->Divide(effok1);
   effok->SetName("correff20-40");
 
-  TH1D* effok3 = (TH1D*)h2true->ProjectionX("effok3", 3, 3);
-  TH1D* effok4 = (TH1D*)h2fulleff->ProjectionX("effok4", 3, 3);
+  TH1D* effok3 = dynamic_cast<TH1D*>(h2true.ProjectionX("effok3", 3, 3));
+  TH1D* effok4 = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("effok4", 3, 3));
   effok3->Divide(effok4);
   effok3->SetName("correff40-60");
 
-  TH1D* effok5 = (TH1D*)h2true->ProjectionX("effok5", 4, 4);
-  TH1D* effok6 = (TH1D*)h2fulleff->ProjectionX("effok6", 4, 4);
+  TH1D* effok5 = dynamic_cast<TH1D*>(h2true.ProjectionX("effok5", 4, 4));
+  TH1D* effok6 = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("effok6", 4, 4));
   effok5->Divide(effok6);
   effok5->SetName("correff60-80");
 
-  TH1D* effok7 = (TH1D*)h2true->ProjectionX("effok7", 5, 6);
-  TH1D* effok8 = (TH1D*)h2fulleff->ProjectionX("effok8", 5, 6);
+  TH1D* effok7 = dynamic_cast<TH1D*>(h2true.ProjectionX("effok7", 5, 6));
+  TH1D* effok8 = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("effok8", 5, 6));
   effok7->Divide(effok8);
   effok7->SetName("correff80-120");
 
@@ -379,14 +381,14 @@ void RunUnfolding(const bool hybridAsInputData = false)
   effok3->Write();
   effok5->Write();
   effok7->Write();
-  h2raw->SetName("raw");
-  h2raw->Write();
-  h2smeared->SetName("smeared");
-  h2smeared->Write();
+  h2raw.SetName("raw");
+  h2raw.Write();
+  h2smeared.SetName("smeared");
+  h2smeared.Write();
   htrueptd->Write();
-  h2true->SetName("true");
-  h2true->Write();
-  h2fulleff->Write();
+  h2true.SetName("true");
+  h2true.Write();
+  h2fulleff.Write();
   for (int jar = 1; jar < 10; jar++) {
     Int_t iter = jar;
     std::cout << "iteration" << iter << "\n";
@@ -394,7 +396,7 @@ void RunUnfolding(const bool hybridAsInputData = false)
          << "\n";
 
     // Allow for the possibility of using the hybrid as input data for closure.
-    RooUnfoldBayes unfold(&response, (hybridAsInputData ? h2smeared : h2raw), iter); // OR
+    RooUnfoldBayes unfold(&response, (hybridAsInputData ? &h2smeared : &h2raw), iter); // OR
     TH2D* hunf = (TH2D*)unfold.Hreco(errorTreatment);
     // FOLD BACK
     TH1* hfold = response.ApplyToTruth(hunf, "");
@@ -412,18 +414,18 @@ void RunUnfolding(const bool hybridAsInputData = false)
 
     if (iter == 8) {
       TMatrixD covmat = unfold.Ereco((RooUnfold::ErrorTreatment)RooUnfold::kCovariance);
-      for (Int_t k = 0; k < h2true->GetNbinsX(); k++) {
+      for (Int_t k = 0; k < h2true.GetNbinsX(); k++) {
         TH2D* hCorr = (TH2D*)CorrelationHistShape(covmat, Form("corr%d", k), "Covariance matrix",
-                             h2true->GetNbinsX(), h2true->GetNbinsY(), k);
+                             h2true.GetNbinsX(), h2true.GetNbinsY(), k);
         TH2D* covshape = (TH2D*)hCorr->Clone("covshape");
         covshape->SetName(Form("pearsonmatrix_iter%d_binshape%d", iter, k));
         covshape->SetDrawOption("colz");
         covshape->Write();
       }
 
-      for (Int_t k = 0; k < h2true->GetNbinsY(); k++) {
+      for (Int_t k = 0; k < h2true.GetNbinsY(); k++) {
         TH2D* hCorr = (TH2D*)CorrelationHistPt(covmat, Form("corr%dpt", k), "Covariance matrix",
-                            h2true->GetNbinsX(), h2true->GetNbinsY(), k);
+                            h2true.GetNbinsX(), h2true.GetNbinsY(), k);
         TH2D* covpt = (TH2D*)hCorr->Clone("covpt");
         covpt->SetName(Form("pearsonmatrix_iter%d_binpt%d", iter, k));
         covpt->SetDrawOption("colz");
@@ -431,6 +433,9 @@ void RunUnfolding(const bool hybridAsInputData = false)
       }
     }
   }
+
+  // Cleanup
+  fout->Close();
 }
 
 #ifndef __CINT__
