@@ -198,6 +198,10 @@ def calculate_splitting_number(
     parent_index = selected_splittings.parent_index
     counts = np.zeros_like(all_splittings_parent_index, dtype=np.int)
 
+    # First, increment all which have a selected splitting, meaning that if the splitting is at
+    # the origin, it is the considered the 1st splitting (so we're reserving 0 for the untagged).
+    counts[selected_splittings.counts > 0] += 1
+
     # The general procedure is that we will mask as true all parent_index != -1
     # If those pass all of the cuts (including that it is in the restricted splittings)
     # then we increment the count. Once a parent index gets to -1, then we stop selecting it
@@ -206,7 +210,7 @@ def calculate_splitting_number(
     #       unavoidable here. And I don't think it should loop more than 30-40 times in the
     #       worst case (and often much less).
     while True:
-        # First, we need to access if we're done. If so, all parent_index values will be -1.
+        # First, we need to determine if we're done. If so, all parent_index values will be -1.
         mask = parent_index != -1
         # Need two all() calls because the mask is jagged (with dim one of the jagged axis).
         if (mask != True).all().all():  # noqa: E712
