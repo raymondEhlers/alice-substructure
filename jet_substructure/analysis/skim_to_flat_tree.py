@@ -326,7 +326,9 @@ def calculate_and_skim_embedding(  # noqa: C901
     # as the leading jet in the true (which would be good - we've probably found the right jet).
     # NOTE: We already apply this cut at the analysis level, so it shouldn't really do anything here.
     #       We're just applying it again to be certain.
-    mask = mask & (true_jets.constituents.max_pt >= hybrid_jets.constituents.max_pt)
+    # NOTE: As of 7 May 2020, we skip this cut at the analysis level, so it's super important to
+    #       apply it here.
+    mask = mask & (det_level_jets.constituents.max_pt >= hybrid_jets.constituents.max_pt)
 
     # Mask the jets
     masked_true_jets, masked_true_jet_splittings, masked_true_jet_splittings_indices = _select_and_retrieve_splittings(
