@@ -703,53 +703,58 @@ class JetSplittingArrayMethods(ArrayMethods):
         """
         return self.delta_R / jet_R
 
-    def dynamical_z(self, R: float) -> Tuple[UprootArray[float], UprootArray[int]]:
+    def dynamical_z(self, R: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
         """ Dynamical z of the jet splittings.
 
         Args:
             R: Jet resolution parameter.
         Returns:
-            Leading dynamical z values, leading dynamical z indices.
+            Leading dynamical z values, leading dynamical z indices, indices of all splittings.
         """
-        return find_leading(dynamical_z(self.delta_R, self.z, self.parent_pt, R))
+        values, indices = find_leading(dynamical_z(self.delta_R, self.z, self.parent_pt, R))
+        return values, indices, self.z.localindex
 
-    def dynamical_kt(self, R: float) -> Tuple[UprootArray[float], UprootArray[int]]:
+    def dynamical_kt(self, R: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
         """ Dynamical kt of the jet splittings.
 
         Args:
             R: Jet resolution parameter.
         Returns:
-            Leading dynamical kt values, leading dynamical kt indices.
+            Leading dynamical kt values, leading dynamical kt indices, indices of all splittings.
         """
-        return find_leading(dynamical_kt(self.delta_R, self.z, self.parent_pt, R))
+        values, indices = find_leading(dynamical_kt(self.delta_R, self.z, self.parent_pt, R))
+        return values, indices, self.z.localindex
 
-    def dynamical_time(self, R: float) -> Tuple[UprootArray[float], UprootArray[int]]:
+    def dynamical_time(self, R: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
         """ Dynamical time of the jet splittings.
 
         Args:
             R: Jet resolution parameter.
         Returns:
-            Leading dynamical time values, leading dynamical time indices.
+            Leading dynamical time values, leading dynamical time indices, indices of all splittings.
         """
-        return find_leading(dynamical_time(self.delta_R, self.z, self.parent_pt, R))
+        values, indices = find_leading(dynamical_time(self.delta_R, self.z, self.parent_pt, R))
+        return values, indices, self.z.localindex
 
-    def leading_kt(self, z_cutoff: Optional[float] = None) -> Tuple[UprootArray[float], UprootArray[int]]:
+    def leading_kt(
+        self, z_cutoff: Optional[float] = None
+    ) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
         """ Leading kt of the jet splittings.
 
         Args:
             z_cutoff: Z cutoff to be applied before calculating the leading kt.
         Returns:
-            Leading kt values, leading kt indices.
+            Leading kt values, leading kt indices, indices of all splittings which pass the cutoff.
         """
         # Need to use the local index because we are going to mask z values. If we index from the masked
         # z values, it it is applied to the unmasked array later, it will give nonsense. So we mask the local index,
         # find the leading, and then apply that index back to the local index, which then gives us the leading index
         # in the unmasked array.
-        local_index_mask = self.z.localindex
+        indices_passing_cutoff = self.z.localindex
         if z_cutoff is not None:
-            local_index_mask = self.z.localindex[self.z > z_cutoff]
-        values, indices = find_leading(self.kt[local_index_mask])
-        return values, local_index_mask[indices]
+            indices_passing_cutoff = self.z.localindex[self.z > z_cutoff]
+        values, indices = find_leading(self.kt[indices_passing_cutoff])
+        return values, indices_passing_cutoff[indices], indices_passing_cutoff
 
     def soft_drop(self, z_cutoff: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
         """ Calculate soft drop of the splittings.
@@ -758,18 +763,21 @@ class JetSplittingArrayMethods(ArrayMethods):
             z_g is filled with the `UNFILLED_VALUE` if a splitting wasn't selected. In that case, there is
             no index (ie. an emptry JaggedArray entry), and n_sd = 0.
 
+        Note:
+            n_sd can be calculated by using `count_nonzero()` on the indices which pass the cutoff.
+
         Args:
             z_cutoff: Minimum z for Soft Drop.
         Returns:
-            First z passing cutoff (z_g), number of splittings passing SD (n_sd), index of z passing cutoff.
+            First z passing cutoff (z_g), index of z passing cutoff, indices of all splittings which pass the cutoff.
         """
         z_cutoff_mask = self.z > z_cutoff
+        indices_passing_cutoff = self.z.localindex[z_cutoff_mask]
         # We use :1 because this maintains the jagged structure. That way, we can apply it to initial arrays.
-        z_index = self.z.localindex[z_cutoff_mask][:, :1]
+        z_index = indices_passing_cutoff[:, :1]
         z_g = self.z[z_index].pad(1).fillna(UNFILLED_VALUE).flatten()
-        n_sd = self.z[z_cutoff_mask].count_nonzero()
 
-        return z_g, n_sd, z_index
+        return z_g, z_index, indices_passing_cutoff
 
 
 # Adds in JaggedArray methods for constructing objects with jagged structure.
@@ -855,7 +863,7 @@ class SubstructureJetCommonMethods:
         """ Leading track pt. """
         return self.constituents.max_pt
 
-    def dynamical_z(self, R: float) -> Tuple[ArrayOrScalar[float], ArrayOrScalar[int]]:
+    def dynamical_z(self, R: float) -> Tuple[ArrayOrScalar[float], ArrayOrScalar[int], ArrayOrScalar[int]]:
         """ Dynamical z of the jet splittings.
 
         Args:
@@ -865,7 +873,7 @@ class SubstructureJetCommonMethods:
         """
         return self.splittings.dynamical_z(R=R)
 
-    def dynamical_kt(self, R: float) -> Tuple[ArrayOrScalar[float], ArrayOrScalar[int]]:
+    def dynamical_kt(self, R: float) -> Tuple[ArrayOrScalar[float], ArrayOrScalar[int], ArrayOrScalar[int]]:
         """ Dynamical kt of the jet splittings.
 
         Args:
@@ -875,7 +883,7 @@ class SubstructureJetCommonMethods:
         """
         return self.splittings.dynamical_kt(R=R)
 
-    def dynamical_time(self, R: float) -> Tuple[ArrayOrScalar[float], ArrayOrScalar[int]]:
+    def dynamical_time(self, R: float) -> Tuple[ArrayOrScalar[float], ArrayOrScalar[int], ArrayOrScalar[int]]:
         """ Dynamical time of the jet splittings.
 
         Args:
@@ -885,7 +893,9 @@ class SubstructureJetCommonMethods:
         """
         return self.splittings.dynamical_time(R=R)
 
-    def leading_kt(self, z_cutoff: Optional[float] = None) -> Tuple[ArrayOrScalar[float], ArrayOrScalar[int]]:
+    def leading_kt(
+        self, z_cutoff: Optional[float] = None
+    ) -> Tuple[ArrayOrScalar[float], ArrayOrScalar[int], ArrayOrScalar[int]]:
         """ Leading kt of the jet splittings.
 
         Args:
