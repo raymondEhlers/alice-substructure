@@ -24,7 +24,6 @@ import numpy as np
 from pachyderm import binned_data, yaml
 from pathos.multiprocessing import ProcessingPool as Pool
 
-from jet_substructure.analysis import plot_results
 from jet_substructure.base import analysis_objects, data_manager, helpers, substructure_methods
 from jet_substructure.base.helpers import UprootArray
 
@@ -168,7 +167,7 @@ def load_jets_from_tree(
 
 def _calculate_inclusive(
     splittings: substructure_methods.JetSplittingArray,
-) -> Tuple[UprootArray[float], UprootArray[int]]:
+) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
     """ Calculate the inclusive splittings.
 
     Note:
@@ -181,18 +180,18 @@ def _calculate_inclusive(
     Returns:
         Ones in the same length as the indices, indices for all splittings.
     """
-    return splittings.kt.ones_like().flatten(), splittings.localindex
+    return splittings.kt.ones_like().flatten(), splittings.localindex, splittings.localindex
 
 
 def _define_calculation_funcs(
     dataset: analysis_objects.Dataset,
 ) -> Tuple[
-    functools.partial[Tuple[UprootArray[float], UprootArray[int]]],
-    functools.partial[Tuple[UprootArray[float], UprootArray[int]]],
-    functools.partial[Tuple[UprootArray[float], UprootArray[int]]],
-    functools.partial[Tuple[UprootArray[float], UprootArray[int]]],
-    functools.partial[Tuple[UprootArray[float], UprootArray[int]]],
-    functools.partial[Tuple[UprootArray[float], UprootArray[int]]],
+    functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
 ]:
     """ Define the calculation functions of interest.
 
@@ -226,7 +225,7 @@ def _define_calculation_funcs(
 
 
 def _fill_substructure_hists_with_calculation(
-    calculation: functools.partial[Tuple[UprootArray[float], UprootArray[int]]],
+    calculation: functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
     fill_attr_name: str,
     restricted_jets: substructure_methods.SubstructureJetArray,
     restricted_jets_splittings: substructure_methods.JetSplittingArray,
@@ -236,7 +235,7 @@ def _fill_substructure_hists_with_calculation(
 ) -> None:
     # Calculate the inputs
     inputs = analysis_objects.FillHistogramInput(
-        restricted_jets, restricted_jets_splittings, *calculation(restricted_jets_splittings),
+        restricted_jets, restricted_jets_splittings, *calculation(restricted_jets_splittings)[:2],
     )
     # And fill the results.
     # NOTE: cast is to help out mypy.
@@ -345,7 +344,7 @@ def analyze_single_tree(
 
 
 def _fill_toy_hists_with_calculation(
-    calculation: functools.partial[Tuple[UprootArray[float], UprootArray[int]]],
+    calculation: functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
     fill_attr_name: str,
     restricted_data_jets: substructure_methods.SubstructureJetArray,
     restricted_data_jets_splittings: substructure_methods.JetSplittingArray,
@@ -357,13 +356,13 @@ def _fill_toy_hists_with_calculation(
 ) -> None:
     # Calculate the inputs
     data_inputs = analysis_objects.FillHistogramInput(
-        restricted_data_jets, restricted_data_jets_splittings, *calculation(restricted_data_jets_splittings),
+        restricted_data_jets, restricted_data_jets_splittings, *calculation(restricted_data_jets_splittings)[:2],
     )
     # TODO: We absolutely shouldn't be calculating the splitting properties here!
     # TODO: If we take the leading, we already know that it was only one splitting, and we already
     # TODO: know the values...
     true_inputs = analysis_objects.FillHistogramInput(
-        restricted_true_jets, restricted_true_jets_splittings, *calculation(restricted_true_jets_splittings),
+        restricted_true_jets, restricted_true_jets_splittings, *calculation(restricted_true_jets_splittings)[:2],
     )
     # NOTE: cast is to help out mypy.
     selected_toy_hists = cast(analysis_objects.SubstructureToyHists, getattr(hists, fill_attr_name))
@@ -677,7 +676,7 @@ def determine_matched_jets(
 
 
 def _fill_embedded_hists_with_calculation(
-    calculation: functools.partial[Tuple[UprootArray[float], UprootArray[int]]],
+    calculation: functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
     fill_attr_name: str,
     identifier: analysis_objects.Identifier,
     restricted_true_jets: substructure_methods.SubstructureJetArray,
@@ -701,15 +700,15 @@ def _fill_embedded_hists_with_calculation(
 ) -> None:
     # Calculate the inputs
     true_inputs = analysis_objects.FillHistogramInput(
-        restricted_true_jets, restricted_true_jets_splittings, *calculation(restricted_true_jets_splittings),
+        restricted_true_jets, restricted_true_jets_splittings, *calculation(restricted_true_jets_splittings)[:2],
     )
     det_level_inputs = analysis_objects.FillHistogramInput(
         restricted_det_level_jets,
         restricted_det_level_jets_splittings,
-        *calculation(restricted_det_level_jets_splittings),
+        *calculation(restricted_det_level_jets_splittings)[:2],
     )
     hybrid_inputs = analysis_objects.FillHistogramInput(
-        restricted_hybrid_jets, restricted_hybrid_jets_splittings, *calculation(restricted_hybrid_jets_splittings),
+        restricted_hybrid_jets, restricted_hybrid_jets_splittings, *calculation(restricted_hybrid_jets_splittings)[:2],
     )
     # And fill the results.
     # NOTE: casts are to help out mypy.
