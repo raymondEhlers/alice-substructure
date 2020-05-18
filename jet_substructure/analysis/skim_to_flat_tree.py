@@ -55,14 +55,6 @@ class Calculation:
             self._restricted_splittings: substructure_methods.JetSplittingArray = self.input_splittings[self.indices]
         return self._restricted_splittings
 
-    #@property
-    #def absolute_splittings_index(self) -> UprootArray[int]:
-    #    try:
-    #        return self._absolute_splittings_index
-    #    except AttributeError:
-    #        self._absolute_splittings_index: UprootArray[int] = self.input_splittings_indices[self.indices]
-    #    return self._restricted_splittings
-
     @property
     def n_jets(self) -> int:
         """ Number of jets. """
@@ -334,17 +326,18 @@ def calculate_and_skim_embedding(  # noqa: C901
     if create_friend_tree:
         # Extract eta-phi of jets.
         output_filename = Path(str(output_filename.with_suffix("")) + "_friend.root")
-        for prefix, jets in zip(prefixes, [masked_true_jets, masked_det_level_jets, masked_hybrid_jets]):
-            jet_four_vec = jets.constituents.four_vectors().sum()
-            grooming_results[f"jet_eta_{prefix}"] = jet_four_vec.eta
-            grooming_results[f"jet_phi_{prefix}"] = jet_four_vec.phi
-
+        # As the skim is re-run, values are generally transitioned to the standard tree the next time it's generated.
     else:
         grooming_results["scale_factor"] = np.ones_like(true_jets.jet_pt[mask]) * scale_factor
         # Add jet pt for all prefixes.
         grooming_results["jet_pt_true"] = masked_true_jets.jet_pt
         grooming_results["jet_pt_det_level"] = masked_det_level_jets.jet_pt
         grooming_results["jet_pt_hybrid"] = masked_hybrid_jets.jet_pt
+        # Add jet eta phi.
+        for prefix, jets in zip(prefixes, [masked_true_jets, masked_det_level_jets, masked_hybrid_jets]):
+            jet_four_vec = jets.constituents.four_vectors().sum()
+            grooming_results[f"jet_eta_{prefix}"] = jet_four_vec.eta
+            grooming_results[f"jet_phi_{prefix}"] = jet_four_vec.phi
 
         # Perform our calculations.
         functions = _define_calculation_functions(dataset, iterative_splittings=iterative_splittings)
