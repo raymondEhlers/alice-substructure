@@ -67,7 +67,7 @@ class Calculation:
     def n_jets(self) -> int:
         """ Number of jets. """
         # We flatten the splittings because there may be jets (and consequently splittings) which aren't selected
-        # at all due to the grooming (such as a z cut). Thus, we use the selected splittings dirctly.
+        # at all due to the grooming (such as a z cut). Thus, we use the selected splittings directly.
         return len(self.splittings.flatten())
 
     def __getitem__(self, mask: np.ndarray) -> Calculation:
@@ -87,6 +87,7 @@ class Calculation:
             input_splittings_indices=self.input_splittings_indices[mask],
             values=self.values[mask],
             indices=self.indices[mask],
+            possible_indices=self.possible_indices[mask],
         )
 
 
@@ -372,11 +373,21 @@ def calculate_and_skim_embedding(  # noqa: C901
                 ("det_level", det_level_jets_calculation),
                 ("hybrid", hybrid_jets_calculation),
             ]:
+                # Calculate splitting number for the appropriate cases.
                 groomed_splittings = calculation.splittings
-                splitting_number = calculate_splitting_number(
+                # Number of splittings until the selected splitting, irrespective of the grooming conditions.
+                n_to_split = calculate_splitting_number(
                     all_splittings=calculation.input_jets.splittings,
                     selected_splittings=groomed_splittings,
+                    # Need all splitting indices (unrestricted by any possible grooming selections).
                     restricted_splittings_indices=calculation.input_splittings_indices,
+                )
+                # Number of splittings which pass the grooming conditions until the selected splitting.
+                n_groomed_to_split = calculate_splitting_number(
+                    all_splittings=calculation.input_jets.splittings,
+                    selected_splittings=groomed_splittings,
+                    # Need the indices that correspond to the splittings that pass the grooming.
+                    restricted_splittings_indices=calculation.possible_indices,
                 )
 
                 # We pad with the UNFILLED_VALUE constant to account for any calculations that don't find a splitting.
@@ -385,8 +396,11 @@ def calculate_and_skim_embedding(  # noqa: C901
                     delta_R=groomed_splittings.delta_R.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
                     z=groomed_splittings.z.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
                     kt=groomed_splittings.kt.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
-                    # Splitting number is already flattened.
-                    n=splitting_number,
+                    # All of the numbers are already flattened. 0 means untagged.
+                    n_to_split=n_to_split,
+                    n_groomed_to_split=n_groomed_to_split,
+                    # Number of splittings which pass the grooming condition. For SoftDrop, this is n_sd.
+                    n_passed_grooming=calculation.possible_indices.counts,
                 )
                 grooming_results.update(grooming_result.asdict(prefix=prefix))
 
