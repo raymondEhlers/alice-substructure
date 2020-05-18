@@ -44,6 +44,8 @@ class Calculation:
     input_splittings_indices: UprootArray[int] = attr.ib()
     values: UprootArray[float] = attr.ib()
     indices: UprootArray[int] = attr.ib()
+    # If there's no additional grooming selection, then this will be identical to input_splittings_indices.
+    possible_indices: UprootArray[int] = attr.ib()
 
     @property
     def splittings(self) -> substructure_methods.JetSplittingArray:
@@ -53,23 +55,20 @@ class Calculation:
             self._restricted_splittings: substructure_methods.JetSplittingArray = self.input_splittings[self.indices]
         return self._restricted_splittings
 
-    @property
-    def absolute_splittings_index(self) -> UprootArray[int]:
-        try:
-            return self._absolute_splittings_index
-        except AttributeError:
-            self._absolute_splittings_index: UprootArray[int] = self.input_splittings_indices[self.indices]
-        return self._restricted_splittings
+    #@property
+    #def absolute_splittings_index(self) -> UprootArray[int]:
+    #    try:
+    #        return self._absolute_splittings_index
+    #    except AttributeError:
+    #        self._absolute_splittings_index: UprootArray[int] = self.input_splittings_indices[self.indices]
+    #    return self._restricted_splittings
 
     @property
     def n_jets(self) -> int:
-        """ Number of jets.
-
-        Need to determine all jets which are accepted in the jet pt range.
-        Otherwise, those which may fail (such as with a z_cutoff) may not get
-        the proper normalization.
-        """
-        return len(self.input_jets)
+        """ Number of jets. """
+        # We flatten the splittings because there may be jets (and consequently splittings) which aren't selected
+        # at all due to the grooming (such as a z cut). Thus, we use the selected splittings dirctly.
+        return len(self.splittings.flatten())
 
     def __getitem__(self, mask: np.ndarray) -> Calculation:
         """ Mask the stored values, returning a new object. """
@@ -97,7 +96,10 @@ class GroomingResultForTree:
     delta_R: np.ndarray = attr.ib()
     z: np.ndarray = attr.ib()
     kt: np.ndarray = attr.ib()
-    n: np.ndarray = attr.ib()
+    n_to_split: np.ndarray = attr.ib()
+    n_groomed_to_split: np.ndarray = attr.ib()
+    # For SoftDrop, this is equivalent to n_sd.
+    n_passed_grooming: np.ndarray = attr.ib()
 
     def asdict(self, prefix: str) -> Iterable[Tuple[str, np.ndarray]]:
         for k, v in attr.asdict(self, recurse=False).items():
@@ -107,35 +109,9 @@ class GroomingResultForTree:
             yield "_".join([self.grooming_method, prefix, k]), v
 
 
-# def define_splitting_branches(prefix: str, grooming_method: str) -> Dict[str, np.dtype]:
-#    return {
-#        f"{prefix}_{grooming_method}_R": np.float32,
-#        f"{prefix}_{grooming_method}_z": np.float32,
-#        f"{prefix}_{grooming_method}_kt": np.float32,
-#        f"{prefix}_{grooming_method}_n": np.float32,
-#    }
-#
-# def branches_for_prefix(prefix: str, grooming_methods: Sequence[str]) -> Dict[str, np.dtype]:
-#    branches = {
-#        f"{prefix}_jet_pt",
-#    }
-#    for grooming_method in grooming_methods:
-#        branches.update(define_splitting_branches(prefix=prefix, grooming_method=grooming_method))
-#
-#    return branches
-
-
-def _soft_drop_wrapper(
-    splittings: substructure_methods.JetSplittingArray, z_cutoff: float
-) -> Tuple[UprootArray[float], UprootArray[int]]:
-    """ Wrap SD calculation to drop n_sd so it fits in the same ouput as the other calculations. """
-    values, n_sd, indices = splittings.soft_drop(z_cutoff=z_cutoff)
-    return values, indices
-
-
-def _define_calculation_funcs(
+def _define_calculation_functions(
     dataset: analysis_objects.Dataset, iterative_splittings: bool,
-) -> Dict[str, functools.partial[Tuple[UprootArray[float], UprootArray[int]]]]:
+) -> Dict[str, functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]]]:
     """ Define the calculation functions of interest.
 
     Note:
@@ -145,7 +121,7 @@ def _define_calculation_funcs(
     Args:
         dataset: Dataset properties necessary to fully specify the calculations.
     Returns:
-        dynamical_z, dynamical_kt, dynamical_time, leading_kt, leading_kt z>0.2, leading_kt z>0.4, SD z>0.2, SD z>0.4,
+        dynamical_z, dynamical_kt, dynamical_time, leading_kt, leading_kt z>0.2, leading_kt z>0.4, SD z>0.2, SD z>0.4
     """
     functions = {
         "dynamical_z": functools.partial(substructure_methods.JetSplittingArray.dynamical_z, R=dataset.settings.jet_R),
@@ -162,8 +138,12 @@ def _define_calculation_funcs(
     # TODO: This currently only works for iterative splittings...
     #       Calculating recursive is way harder in any array-like manner.
     if iterative_splittings:
-        functions["soft_drop_z_cut_02"] = functools.partial(_soft_drop_wrapper, z_cutoff=0.2)
-        functions["soft_drop_z_cut_04"] = functools.partial(_soft_drop_wrapper, z_cutoff=0.4)
+        functions["soft_drop_z_cut_02"] = functools.partial(
+            substructure_methods.JetSplittingArray.soft_drop, z_cutoff=0.2
+        )
+        functions["soft_drop_z_cut_04"] = functools.partial(
+            substructure_methods.JetSplittingArray.soft_drop, z_cutoff=0.4
+        )
     return functions
 
 
@@ -188,6 +168,7 @@ def calculate_splitting_number(
     all_splittings: substructure_methods.JetSplittingArray,
     selected_splittings: substructure_methods.JetSplittingArray,
     restricted_splittings_indices: UprootArray[int],
+    debug: bool = False,
 ) -> np.ndarray:
     # logger.debug("Calculating splitting number")
     # Setup
@@ -222,6 +203,9 @@ def calculate_splitting_number(
             restricted_splittings_indices.ones_like() * parent_index.pad(1).fillna(-2).flatten()
         )
         accept_mask = (parent_repeated_to_be_same_shape == restricted_splittings_indices).any()
+
+        if debug:
+            IPython.start_ipython(user_ns=locals())
         # In the case that the parent_index of our splitting is in the selected splittings,
         # and it hasn't gotten to the origin, we can finally increment our count.
         # NOTE: Need to pad, fill, and flatten to match the shape of the accept_mask (which is just an ndarray mask)
@@ -362,7 +346,7 @@ def calculate_and_skim_embedding(  # noqa: C901
         grooming_results["jet_pt_hybrid"] = masked_hybrid_jets.jet_pt
 
         # Perform our calculations.
-        functions = _define_calculation_funcs(dataset, iterative_splittings=iterative_splittings)
+        functions = _define_calculation_functions(dataset, iterative_splittings=iterative_splittings)
         for func_name, func in functions.items():
             true_jets_calculation = Calculation(
                 masked_true_jets,
@@ -525,9 +509,9 @@ def calculate_and_skim_data(
     # Select everything by default.
     mask = np.ones_like(all_jets[0].jet_pt) > 0
 
+    # Special selections for pythia.
     # Apparently I can get pt hard < 5. Which is bizarre. Filter these out when applicable.
     if dataset.collision_system == "pythia":
-        # App
         mask = mask & (tree["ptHard"] >= 5.0)
 
     masked_jets: Dict[
@@ -569,16 +553,35 @@ def calculate_and_skim_data(
         )
 
     # Perform our calculations.
-    functions = _define_calculation_funcs(dataset, iterative_splittings=iterative_splittings)
+    functions = _define_calculation_functions(dataset, iterative_splittings=iterative_splittings)
     for func_name, func in functions.items():
         for prefix, jets in masked_jets.items():
-            calculation = Calculation(jets[0], jets[1], jets[2], *func(jets[1]),)
+            # Setup
+            debug = False
+            # if func_name == "leading_kt_z_cut_02":
+            #    debug = True
 
+            # Perform the grooming calculation
+            values, indices, possible_indices = func(jets[1])
+            calculation = Calculation(jets[0], jets[1], jets[2], values, indices, possible_indices)
+
+            # Calculate splitting number for the appropriate cases.
             groomed_splittings = calculation.splittings
-            splitting_number = calculate_splitting_number(
+            # Number of splittings until the selected splitting, irrespective of the grooming conditions.
+            n_to_split = calculate_splitting_number(
                 all_splittings=calculation.input_jets.splittings,
                 selected_splittings=groomed_splittings,
+                # Need all splitting indices (unrestricted by any possible grooming selections).
                 restricted_splittings_indices=calculation.input_splittings_indices,
+                debug=debug,
+            )
+            # Number of splittings which pass the grooming conditions until the selected splitting.
+            n_groomed_to_split = calculate_splitting_number(
+                all_splittings=calculation.input_jets.splittings,
+                selected_splittings=groomed_splittings,
+                # Need the indices that correspond to the splittings that pass the grooming.
+                restricted_splittings_indices=calculation.possible_indices,
+                debug=debug,
             )
 
             # We pad with the UNFILLED_VALUE constant to account for any calculations that don't find a splitting.
@@ -587,8 +590,11 @@ def calculate_and_skim_data(
                 delta_R=groomed_splittings.delta_R.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
                 z=groomed_splittings.z.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
                 kt=groomed_splittings.kt.pad(1).fillna(substructure_methods.UNFILLED_VALUE).flatten(),
-                # Splitting number is already flattened.
-                n=splitting_number,
+                # All of the numbers are already flattened. 0 means untagged.
+                n_to_split=n_to_split,
+                n_groomed_to_split=n_groomed_to_split,
+                # Number of splittings which pass the grooming condition. For SoftDrop, this is n_sd.
+                n_passed_grooming=calculation.possible_indices.counts,
             )
             grooming_results.update(grooming_result.asdict(prefix=prefix))
 
