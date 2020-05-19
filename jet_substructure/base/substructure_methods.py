@@ -504,6 +504,17 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
                     jet_constituents[constituents_indices.flatten(axis=1)].flatten(),
                 ),
             )
+            # And convert back to JetConstituentArray. Without this, it will just appear as a JaggedArray.
+            # Can't wait until I can use awkward1!
+            # NOTE: May not be the most performant, but fine for now.
+            # NOTE: All of the type ignores are because I don't wnat to deal with passing through the
+            #       attributes through the UprrotArray type.
+            subjet_constituents = JetConstituentArray.from_jagged(
+                subjet_constituents.pt,  # type: ignore
+                subjet_constituents.eta,  # type: ignore
+                subjet_constituents.phi,  # type: ignore
+                subjet_constituents.global_index,  # type: ignore
+            )
 
         return cast(
             _T_SubjetArray,
