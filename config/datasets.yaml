@@ -79,6 +79,7 @@ datasets:
     pythia:
         dataset:
             name: "LHC18b8"
+            #name: "LHC18b8_tracking_eff_systematic"
             branches:
                 - "data.fJetPt"
                 - "data.fJetConstituents.fPt"
@@ -132,6 +133,34 @@ datasets:
                 - "matched.fSubjets.fPartOfIterativeSplitting"
                 - "matched.fSubjets.fSplittingNodeIndex"
                 - "matched.fSubjets.fConstituentIndices"
+    toy_true_pythia_splittings_iterative_allTrueSplittings_delta_R_010:
+        dataset:
+            name: "toy_true_pythia_splittings_iterative_allTrueSplittings_delta_R_010"
+            branches:
+                - "pythia.fJetPt"
+                - "pythia.fJetConstituents.fPt"
+                - "pythia.fJetConstituents.fEta"
+                - "pythia.fJetConstituents.fPhi"
+                - "pythia.fJetConstituents.fGlobalIndex"
+                - "pythia.fJetSplittings.fKt"
+                - "pythia.fJetSplittings.fDeltaR"
+                - "pythia.fJetSplittings.fZ"
+                - "pythia.fJetSplittings.fParentIndex"
+                - "pythia.fSubjets.fPartOfIterativeSplitting"
+                - "pythia.fSubjets.fSplittingNodeIndex"
+                - "pythia.fSubjets.fConstituentIndices"
+                - "true.fJetPt"
+                - "true.fJetConstituents.fPt"
+                - "true.fJetConstituents.fEta"
+                - "true.fJetConstituents.fPhi"
+                - "true.fJetConstituents.fGlobalIndex"
+                - "true.fJetSplittings.fKt"
+                - "true.fJetSplittings.fDeltaR"
+                - "true.fJetSplittings.fZ"
+                - "true.fJetSplittings.fParentIndex"
+                - "true.fSubjets.fPartOfIterativeSplitting"
+                - "true.fSubjets.fSplittingNodeIndex"
+                - "true.fSubjets.fConstituentIndices"
     toy_true_pythia_splittings_iterative_allTrueSplittings_delta_R_040:
         dataset:
             name: "toy_true_pythia_splittings_iterative_allTrueSplittings_delta_R_040"
@@ -160,9 +189,9 @@ datasets:
                 - "true.fSubjets.fPartOfIterativeSplitting"
                 - "true.fSubjets.fSplittingNodeIndex"
                 - "true.fSubjets.fConstituentIndices"
-    toy_true_hybrid_splittings_iterative_allTrueSplittings_delta_R_040:
+    toy_true_hybrid_splittings_iterative_allTrueSplittings_delta_R_010:
         dataset:
-            name: "toy_true_hybrid_splittings_iterative_allTrueSplittings_delta_R_040"
+            name: "toy_true_hybrid_splittings_iterative_allTrueSplittings_delta_R_010"
             branches:
                 - "data.fJetPt"
                 - "data.fJetConstituents.fPt"
@@ -188,9 +217,9 @@ datasets:
                 - "true.fSubjets.fPartOfIterativeSplitting"
                 - "true.fSubjets.fSplittingNodeIndex"
                 - "true.fSubjets.fConstituentIndices"
-    toy_true_hybrid_splittings:
+    toy_true_hybrid_splittings_iterative_allTrueSplittings_delta_R_040:
         dataset:
-            name: "toy_true_hybrid_splittings"
+            name: "toy_true_hybrid_splittings_iterative_allTrueSplittings_delta_R_040"
             branches:
                 - "data.fJetPt"
                 - "data.fJetConstituents.fPt"
@@ -489,6 +518,36 @@ available_datasets:
             - "trains/pythia/2110/AnalysisResults.woSDD.04.chunk2.root"
             - "trains/pythia/2110/AnalysisResults.woSDD.04.chunk3.root"
             - "trains/pythia/2110/AnalysisResults.woSDD.05.repaired.root"
+    LHC18b8_tracking_eff_systematic:
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
+        scale_factors:
+            1: 58.00527468613671
+            2: 17.67470831194542
+            3: 8.357048603687566
+            4: 3.0713658591081145
+            5: 1.0609227505278298
+            6: 0.40801668735078317
+            7: 0.12362516407295125
+            8: 0.04297488452339165
+            9: 0.018117547233000686
+            10: 0.00610001995674786
+            11: 0.002482513632682732
+            12: 0.0009117104316916845
+            13: 0.00046473940537093944
+            14: 0.00021916255764405283
+            15: 0.00010824358405191276
+            16: 5.7815536795655006e-05
+            17: 3.158440740876129e-05
+            18: 1.713238096557385e-05
+            19: 9.283287104530695e-06
+            20: 1.2891215788990406e-05
+        # We don't separate pythia pt hard bins by train number, but it's required by the config,
+        # so we just include an empty list.
+        train_number_to_pt_hard_bin: {}
+        jet_R: 0.4
+        files:
+            - "trains/pythia/2161/run-by-run/*/*.root"
     toy:
         tree_name: "pythiaHybridTree"
         jet_R: 0.4
@@ -515,18 +574,87 @@ available_datasets:
         tree_name: "trueHybridSplittingsTree"
         jet_R: 0.4
         files: *toyFiles
+    toy_true_pythia_splittings_iterative_allTrueSplittings_delta_R_010:
+        tree_name: "truePythiaSplittingsTree"
+        jet_R: 0.8
+        files: &toyFilesR010
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_001_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_002_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_003_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_004_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_005_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_006_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_007_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_008_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_009_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_010_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_011_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_012_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_013_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_014_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_015_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_016_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_017_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_018_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_019_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_020_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_021_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_022_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_023_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_024_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
+            - "toy/output/126781/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_025_jetR080_partonDeltaRMax010_iterative_splittings_charged_underlyingEvent_ptHatMin_50.root"
     toy_true_pythia_splittings_iterative_allTrueSplittings_delta_R_040:
         tree_name: "truePythiaSplittingsTree"
         jet_R: 0.8
-        files: &toyFilesDeltaR040
-            - "toyInput/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_001_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_70.root"
-            - "toyInput/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_002_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_70.root"
-            - "toyInput/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_003_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_70.root"
-            - "toyInput/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_004_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_70.root"
+        files: &toyFilesR040
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_01_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_02_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_03_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_04_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_05_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_06_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_07_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_08_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_09_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_10_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_11_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_12_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_13_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_14_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_15_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_16_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_17_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_18_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_19_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/126829/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_20_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_21_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_22_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_23_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_24_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_25_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_26_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_27_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_28_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_29_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_30_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_31_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_32_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_33_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_34_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_35_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_36_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_37_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_38_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_39_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+            - "toy/output/132088/merge/pythia+thermal_substructure_toy_antikt_08_tune_5_seed_40_jetR080_partonDeltaRMax040_iterative_splittings_charged_underlyingEvent_ptHatMin_80.root"
+    toy_true_hybrid_splittings_iterative_allTrueSplittings_delta_R_010:
+        tree_name: "trueHybridSplittingsTree"
+        jet_R: 0.8
+        files: *toyFilesR010
     toy_true_hybrid_splittings_iterative_allTrueSplittings_delta_R_040:
         tree_name: "trueHybridSplittingsTree"
         jet_R: 0.8
-        files: *toyFilesDeltaR040
+        files: *toyFilesR040
     runMacro:
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeTree_PythiaDef_NoSub_Incl"
         jet_R: 0.4
