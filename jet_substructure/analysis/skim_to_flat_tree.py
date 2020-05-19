@@ -267,7 +267,8 @@ def prong_matching(
     """ Performs prong matching for the provided collections.
 
     Note:
-        1 is properly matched, 2 is mistagged (leading -> subleading or subleading -> leading), 3 is untagged (failed).
+        0 is there were insufficient constituents to form a splitting, 1 is properly matched, 2 is mistagged
+        (leading -> subleading or subleading -> leading), 3 is untagged (failed).
 
     Args:
         measured_like_jets_calculation: Grooming calculation for measured-like jets (hybrid for hybrid-det level matching).
@@ -469,6 +470,7 @@ def calculate_and_skim_embedding(  # noqa: C901
                 grooming_results.update(grooming_result.asdict(prefix=prefix))
 
             # Hybrid-det level matching.
+            # We match using distance here because the labels don't align anymore due to the subtraction mixing the labels.
             hybrid_det_level_matching_results = prong_matching(
                 measured_like_jets_calculation=hybrid_jets_calculation,
                 measured_like_jets_label="hybrid",
@@ -479,6 +481,8 @@ def calculate_and_skim_embedding(  # noqa: C901
             )
             grooming_results.update(hybrid_det_level_matching_results)
             # Det level-true matching
+            # We match using labels here because otherwise the reconstruction can cause the particles to move
+            # enough that they may not match within a particular distance.
             det_level_true_matching_results = prong_matching(
                 measured_like_jets_calculation=det_level_jets_calculation,
                 measured_like_jets_label="det_level",
