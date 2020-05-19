@@ -270,6 +270,7 @@ def split_tree(
     filenames: Sequence[Union[str, Path]],
     tree_name: str = "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
     number_of_chunks: int = -1,
+    chunk_size: float = 200e6,
 ) -> Dict[Path, List[Path]]:
     """ Split tree into a given number of chunks.
 
@@ -287,6 +288,8 @@ def split_tree(
         tree_name: Name of the tree to split. Default: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
         number_of_chunks: Number of chunks to split the file into. Pass -1 to auto calculate the number of
             chunks (ie keeping each file before 1.25 GB). Default: -1.
+        chunk_size: Size of the chunks in bytes. Only considered if auto calculating the number of
+            chunks. Default: 200e6 (200 MB) (driven by memory requirements on the cluster).
 
     Returns:
         Filenames of the chunked files.
@@ -296,10 +299,10 @@ def split_tree(
     # Skip files which were already repaired.
     validated_filenames = [f for f in validated_filenames if "repaired" not in str(f) and "chunk" not in str(f)]
     # Automatically calculate the number of chunks, with the intention of keeping all
-    # files below (approximately) 1.25 GB.
+    # files below (approximately) chunk_size.
     auto_calculate_number_of_chunks = False
     if number_of_chunks < 0:
-        logger.info("Automatically calculating chunk size")
+        logger.info(f"Automatically calculating number of chunks for chunk size < {int(chunk_size / 1e6)} MB")
         auto_calculate_number_of_chunks = True
 
     # Setup
@@ -320,8 +323,7 @@ def split_tree(
             # Determine number of chunks if requested.
             if auto_calculate_number_of_chunks:
                 size = Path(filename).stat().st_size
-                # Close enough to 1.25 GB
-                number_of_chunks = int(np.ceil(size / 1.25e9))
+                number_of_chunks = int(np.ceil(size / chunk_size))
 
             # Setup input tree
             input_file = ROOT.TFile(str(filename), "READ")
@@ -388,11 +390,15 @@ def split_tree_entry_point() -> None:
         "--treeName",
         default="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
         type=str,
+        help="Name of the tree to split",
     )
-    parser.add_argument("-n", "--nChunks", default=-1, type=int)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-n", "--nChunks", default=-1, type=int, help="Number of chunks. Default: -1, which then uses the chunk size.")
+    # Default to approximately 200 MB chunks (in bytes).
+    group.add_argument("-s", "--chunkSize", default=200e6, type=float, help="Chunk size in bytes. Default: 200e6 (200 MB)")
     args = parser.parse_args()
 
-    output_filenames = split_tree(filenames=args.filenames, tree_name=args.treeName, number_of_chunks=args.nChunks)
+    output_filenames = split_tree(filenames=args.filenames, tree_name=args.treeName, number_of_chunks=args.nChunks, chunk_size=args.chunkSize)
 
     import pprint
 
