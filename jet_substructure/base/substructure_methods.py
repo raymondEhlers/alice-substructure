@@ -1028,11 +1028,14 @@ class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):  # type
             Substructure jet array wrapping all of the arrays.
         """
         logger.debug("Creating substructure jet arrays.")
+        constituent_index = tree.get(f"{prefix}.fJetConstituents.fID", None)
+        if constituent_index is None:
+            constituent_index = tree[f"{prefix}.fJetConstituents.fGlobalIndex"]
         constituents = JetConstituentArray.from_jagged(
             tree[f"{prefix}.fJetConstituents.fPt"],
             tree[f"{prefix}.fJetConstituents.fEta"],
             tree[f"{prefix}.fJetConstituents.fPhi"],
-            tree[f"{prefix}.fJetConstituents.fGlobalIndex"],
+            constituent_index,
         )
         logger.debug("Done with constructing constituents")
         splittings = JetSplittingArray.from_jagged(
