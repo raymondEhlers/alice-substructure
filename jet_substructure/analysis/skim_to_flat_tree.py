@@ -550,7 +550,7 @@ def calculate_and_skim_data(
         scale_factors[21] = scale_factors[20]
 
         pt_hard_bins = tree["ptHardBin"][mask]
-        print(np.unique(pt_hard_bins))
+        logger.debug(f"Pt hard bins contained in the file: {np.unique(pt_hard_bins)}")
         grooming_results.update(
             {
                 "scale_factor": np.array([scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
