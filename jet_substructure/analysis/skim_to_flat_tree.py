@@ -19,8 +19,8 @@ import enlighten
 import IPython
 import numpy as np
 import uproot
-from pathos.multiprocessing import ProcessingPool as Pool
 from pachyderm import yaml
+from pathos.multiprocessing import ProcessingPool as Pool
 
 from jet_substructure.analysis import analyze_tree
 from jet_substructure.base import analysis_objects, data_manager, helpers, substructure_methods
@@ -416,6 +416,10 @@ def calculate_and_skim_embedding(  # noqa: C901
             jet_four_vec = jets.constituents.four_vectors().sum()
             grooming_results[f"jet_eta_{prefix}"] = jet_four_vec.eta
             grooming_results[f"jet_phi_{prefix}"] = jet_four_vec.phi
+        # Leading track
+        grooming_results["leading_track_true"] = masked_true_jets.leading_track_pt
+        grooming_results["leading_track_det_level"] = masked_det_level_jets.leading_track_pt
+        grooming_results["leading_track_hybrid"] = masked_hybrid_jets.leading_track_pt
 
         # Perform our calculations.
         functions = _define_calculation_functions(dataset, iterative_splittings=iterative_splittings)
