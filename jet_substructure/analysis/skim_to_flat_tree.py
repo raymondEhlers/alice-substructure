@@ -256,6 +256,73 @@ def calculate_splitting_number(
 #    #    ...
 
 
+def prong_matching(
+    measured_like_jets_calculation: Calculation,
+    measured_like_jets_label: str,
+    generator_like_jets_calculation: Calculation,
+    generator_like_jets_label: str,
+    grooming_method: str,
+    match_using_distance: bool = True,
+) -> Dict[str, np.ndarray]:
+    """ Performs prong matching for the provided collections.
+
+    Note:
+        1 is properly matched, 2 is mistagged (leading -> subleading or subleading -> leading), 3 is untagged (failed).
+
+    Args:
+        measured_like_jets_calculation: Grooming calculation for measured-like jets (hybrid for hybrid-det level matching).
+        measured_like_jets_label: Label for measured jets (hybrid for hybrid-det level matching).
+        generator_like_jets_calculation: Grooming calculation for generator-like jets (det level for hybrid-det level matching).
+        generator_like_jets_label: Label for generator jets (det_level for hybrid-det level matching).
+        grooming_method: Name of the grooming method.
+        match_using_distance: If True, match using distance. Otherwise, match using the stored label.
+    Returns:
+        Matching and subleading matching values.
+    """
+    # Need to mask for calculations which have no indices (ie didn't find any that met criteria.
+    mask = (generator_like_jets_calculation.indices.counts != 0) & (measured_like_jets_calculation.indices.counts != 0)
+    try:
+        masked_generator_like_jets_calculation = generator_like_jets_calculation[mask]
+        masked_measured_like_jets_calculation = measured_like_jets_calculation[mask]
+    except IndexError as e:
+        logger.warning(e)
+        IPython.start_ipython(user_ns=locals())
+
+    # Matching
+    grooming_results = {}
+    logger.info(f"Performing {measured_like_jets_label}-{generator_like_jets_label} matching for {grooming_method}")
+    leading_matching, subleading_matching = analyze_tree.determine_matched_jets(
+        hybrid_inputs=analysis_objects.FillHistogramInput(
+            jets=masked_measured_like_jets_calculation.input_jets,
+            splittings=masked_measured_like_jets_calculation.input_splittings,
+            values=masked_measured_like_jets_calculation.values,
+            indices=masked_measured_like_jets_calculation.indices,
+        ),
+        matched_inputs=analysis_objects.FillHistogramInput(
+            jets=masked_generator_like_jets_calculation.input_jets,
+            splittings=masked_generator_like_jets_calculation.input_splittings,
+            values=masked_generator_like_jets_calculation.values,
+            indices=masked_generator_like_jets_calculation.indices,
+        ),
+        match_using_distance=match_using_distance,
+    )
+    # Store leading, subleading matches
+    for label, matching in [("leading", leading_matching), ("subleading", subleading_matching)]:
+        # We'll store the output in an array, and then store that in the overall output with a mask
+        # We need the additional mask because we can't perform matching for every jet (single particle jets, etc).
+        output = np.zeros(len(generator_like_jets_calculation.input_jets), dtype=np.int)
+        matching_output = np.zeros(len(masked_generator_like_jets_calculation.input_jets), dtype=np.int)
+        matching_output[matching.properly] = 1
+        matching_output[matching.mistag] = 2
+        matching_output[matching.failed] = 3
+        output[mask] = matching_output
+        grooming_results[
+            f"{grooming_method}_{measured_like_jets_label}_{generator_like_jets_label}_matching_{label}"
+        ] = output
+
+    return grooming_results
+
+
 def calculate_and_skim_embedding(  # noqa: C901
     tree: data_manager.Tree,
     dataset: analysis_objects.Dataset,
@@ -397,53 +464,40 @@ def calculate_and_skim_embedding(  # noqa: C901
                 )
                 grooming_results.update(grooming_result.asdict(prefix=prefix))
 
-            # Need to mask for calculations which have no indices (ie didn't find any that met criteria.
-            mask = (det_level_jets_calculation.indices.counts != 0) & (hybrid_jets_calculation.indices.counts != 0)
-            try:
-                masked_det_level_jets_calculation = det_level_jets_calculation[mask]
-                masked_hybrid_jets_calculation = hybrid_jets_calculation[mask]
-            except IndexError as e:
-                logger.warning(e)
-                IPython.start_ipython(user_ns=locals())
-
-            # Matching
-            # Perform hybrid-detector level matching.
-            logger.info(f"Performing hybrid-det level matching for {func_name}")
-            leading_matching, subleading_matching = analyze_tree.determine_matched_jets(
-                hybrid_inputs=analysis_objects.FillHistogramInput(
-                    jets=masked_hybrid_jets_calculation.input_jets,
-                    splittings=masked_hybrid_jets_calculation.input_splittings,
-                    values=masked_hybrid_jets_calculation.values,
-                    indices=masked_hybrid_jets_calculation.indices,
-                ),
-                matched_inputs=analysis_objects.FillHistogramInput(
-                    jets=masked_det_level_jets_calculation.input_jets,
-                    splittings=masked_det_level_jets_calculation.input_splittings,
-                    values=masked_det_level_jets_calculation.values,
-                    indices=masked_det_level_jets_calculation.indices,
-                ),
+            # Hybrid-det level matching.
+            hybrid_det_level_matching_results = prong_matching(
+                measured_like_jets_calculation=hybrid_jets_calculation,
+                measured_like_jets_label="hybrid",
+                generator_like_jets_calculation=det_level_jets_calculation,
+                generator_like_jets_label="det_level",
+                grooming_method=func_name,
+                match_using_distance=True,
             )
-            # Store leading, subleading matches
-            for label, matching in [("leading", leading_matching), ("subleading", subleading_matching)]:
-                # We'll store the output in an array, and then store that in the overall output with a mask
-                # We need the additional mask because we can't perform matching for every jet (single particle jets, etc).
-                output = np.zeros(len(det_level_jets_calculation.input_jets), dtype=np.int)
-                matching_output = np.zeros(len(masked_det_level_jets_calculation.input_jets), dtype=np.int)
-                matching_output[matching.properly] = 1
-                matching_output[matching.mistag] = 2
-                matching_output[matching.failed] = 3
-                output[mask] = matching_output
-                grooming_results[f"{func_name}_hybrid_detector_matching_{label}"] = output
-
-            # Add part-det matching using distance.
+            grooming_results.update(hybrid_det_level_matching_results)
+            # Det level-true matching
+            det_level_true_matching_results = prong_matching(
+                measured_like_jets_calculation=det_level_jets_calculation,
+                measured_like_jets_label="det_level",
+                generator_like_jets_calculation=true_jets_calculation,
+                generator_like_jets_label="true",
+                grooming_method=func_name,
+                match_using_distance=False,
+            )
+            grooming_results.update(det_level_true_matching_results)
 
             # Look for leading kt just because it's easier to understand conceptually.
-            if draw_example_splittings and func_name == "leading_kt" and (leading_matching.properly & subleading_matching.failed).any():  # type: ignore
+            hybrid_det_level_leading_matching = grooming_results["{func_name}_hybrid_det_level_matching_leading"]
+            hybrid_det_level_subleading_matching = grooming_results["{func_name}_hybrid_det_level_matching_subleading"]
+            if (
+                draw_example_splittings
+                and func_name == "leading_kt"
+                and (hybrid_det_level_leading_matching.properly & hybrid_det_level_subleading_matching.failed).any()
+            ):
                 from jet_substructure.analysis import draw_splitting
 
                 # Find a sufficiently interesting jet (ie high enough pt)
                 mask_jets_of_interest = (
-                    (leading_matching.properly & subleading_matching.failed)
+                    (hybrid_det_level_leading_matching.properly & hybrid_det_level_subleading_matching.failed)
                     & (masked_hybrid_jets.jet_pt > 80)
                     & (det_level_jets_calculation.splittings.kt > 10).flatten()
                 )
