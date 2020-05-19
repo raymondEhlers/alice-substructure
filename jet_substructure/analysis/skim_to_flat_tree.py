@@ -500,8 +500,8 @@ def calculate_and_skim_embedding(  # noqa: C901
             grooming_results.update(det_level_true_matching_results)
 
             # Look for leading kt just because it's easier to understand conceptually.
-            hybrid_det_level_leading_matching = grooming_results["{func_name}_hybrid_det_level_matching_leading"]
-            hybrid_det_level_subleading_matching = grooming_results["{func_name}_hybrid_det_level_matching_subleading"]
+            hybrid_det_level_leading_matching = grooming_results[f"{func_name}_hybrid_det_level_matching_leading"]
+            hybrid_det_level_subleading_matching = grooming_results[f"{func_name}_hybrid_det_level_matching_subleading"]
             if (
                 draw_example_splittings
                 and func_name == "leading_kt"
