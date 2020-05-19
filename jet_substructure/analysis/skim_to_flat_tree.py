@@ -750,7 +750,7 @@ def parse_arguments() -> Tuple[str, List[Path], bool]:
     args = parser.parse_args()
     # Validation for filenames
     filenames = [Path(f) for f in args.filenames]
-    return args.dataset_name, filenames, args.recursiveSplittings
+    return args.datasetName, filenames, args.recursiveSplittings
 
 
 def skim_entry_point() -> None:
