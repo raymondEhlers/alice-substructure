@@ -1178,13 +1178,17 @@ def _plot_toy(
     # print(f"x_bin_widths: {x_bin_widths.size}")
     # print(f"y_bin_widths: {y_bin_widths.size}")
     # print(f"bin_widths size: {bin_widths.size}")
-    h /= bin_widths
+    #h /= bin_widths
 
     # Determine the normalization range
     z_axis_range = {
         "vmin": h.values[h.values > 0].min(),
         "vmax": h.values.max(),
     }
+    #z_axis_range = {
+    #    "vmin": 1e-2,
+    #    "vmax": h.values.max(),
+    #}
     # if technique == "inclusive":
     #    z_axis_range = {
     #        "vmin": 10e-3,
@@ -1201,13 +1205,13 @@ def _plot_toy(
     text = identifier.display_str(jet_pt_label=data_label)
     text += "\n" + hists.title
     ax.text(
-        0.95,
-        0.95,
+        0.05,
+        0.05,
         text,
         transform=ax.transAxes,
-        horizontalalignment="right",
-        verticalalignment="top",
-        multialignment="right",
+        horizontalalignment="left",
+        verticalalignment="bottom",
+        multialignment="left",
     )
 
     # Presentation
@@ -1246,8 +1250,8 @@ def toy(
     label = label_map[data_prefix]
     kt_label = PlotConfig(
         name="kt",
-        x_label=r"$k_{\text{T}}^{\text{hardest graph}}\:(\text{GeV}/c)$",
-        y_label=r"$k_{\text{T}}^{\text{" + label + r"}}\:(\text{GeV}/c)$",
+        x_label=r"$\log{k_{\text{T}}^{\text{hardest graph}}\:(\text{GeV}/c)}$",
+        y_label=r"$\log{k_{\text{T}}^{\text{" + label + r"}}\:(\text{GeV}/c)}$",
     )
     z_label = PlotConfig(
         name="z",
