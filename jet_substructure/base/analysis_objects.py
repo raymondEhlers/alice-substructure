@@ -532,7 +532,7 @@ class SubstructureToyHists(SubstructureHistsBase):
             iterative_splittings=iterative_splittings,
             n_jets=0,
             values=bh.Histogram(values_axis, values_axis, storage=bh.storage.Weight()),
-            kt=bh.Histogram(bh.axis.Regular(50, -5, 5), bh.axis.Regular(50, -5, 5), storage=bh.storage.Weight()),
+            kt=bh.Histogram(bh.axis.Regular(100, -5, 5), bh.axis.Regular(100, -5, 5), storage=bh.storage.Weight()),
             z=bh.Histogram(z_axis, z_axis, storage=bh.storage.Weight()),
             delta_R=bh.Histogram(delta_R_axis, delta_R_axis, storage=bh.storage.Weight()),
             theta=bh.Histogram(theta_axis, theta_axis, storage=bh.storage.Weight()),
