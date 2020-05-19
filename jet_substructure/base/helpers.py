@@ -344,7 +344,7 @@ def split_tree(
                 if number_of_chunks == 1:
                     new_filename = filename.with_name(f"{filename.stem}.repaired.root")
                 else:
-                    new_filename = filename.with_name(f"{filename.stem}.chunk{n+1}.root")
+                    new_filename = filename.with_name(f"{filename.stem}.chunk{n+1:02}.root")
                 output_filenames[filename].append(new_filename)
                 new_file = ROOT.TFile(str(new_filename), "RECREATE")
                 new_tree = input_tree.CloneTree(0)
