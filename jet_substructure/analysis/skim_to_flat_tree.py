@@ -360,11 +360,12 @@ def calculate_and_skim_embedding(  # noqa: C901
         return False
 
     ## Do the calculations
-    mask = (
-        (true_jets.constituents.counts > 1)
-        & (det_level_jets.constituents.counts > 1)
-        & (hybrid_jets.constituents.counts > 1)
-    )
+    # Do not mask on the number of constituents. This would prevent tagged <-> untagged migrations in the response.
+    # mask = (
+    #    (true_jets.constituents.counts > 1)
+    #    & (det_level_jets.constituents.counts > 1)
+    #    & (hybrid_jets.constituents.counts > 1)
+    # )
     # Require that we have jets that aren't dominated by hybrid jets.
     # It's super important to be ">=". That allows the leading jet in the hybrid to be the same
     # as the leading jet in the true (which would be good - we've probably found the right jet).
@@ -372,7 +373,10 @@ def calculate_and_skim_embedding(  # noqa: C901
     #       We're just applying it again to be certain.
     # NOTE: As of 7 May 2020, we skip this cut at the analysis level, so it's super important to
     #       apply it here.
-    mask = mask & (det_level_jets.constituents.max_pt >= hybrid_jets.constituents.max_pt)
+    # NOTE: As of 19 May 2019, we disable this cut event though it's not applied at the analysis level.
+    #       This will allow L+L to study this at the analysis level.
+    # mask = mask & (det_level_jets.constituents.max_pt >= hybrid_jets.constituents.max_pt)
+    mask = np.ones_like(hybrid_jets.jet_pt) > 0
 
     # Mask the jets
     masked_true_jets, masked_true_jet_splittings, masked_true_jet_splittings_indices = _select_and_retrieve_splittings(
@@ -792,7 +796,7 @@ if __name__ == "__main__":
         iterative_splittings=iterative_splittings,
         calculate_and_skim_func=calculate_and_skim_embedding,
         number_of_cores=number_of_cores,
-        additional_kwargs_for_analysis={"create_friend_tree": True, "draw_example_splittings": False},
+        additional_kwargs_for_analysis={"create_friend_tree": False, "draw_example_splittings": False},
     )
     # Run PbPb
     # run(
