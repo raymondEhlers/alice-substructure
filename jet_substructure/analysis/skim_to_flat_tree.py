@@ -20,6 +20,7 @@ import IPython
 import numpy as np
 import uproot
 from pathos.multiprocessing import ProcessingPool as Pool
+from pachyderm import yaml
 
 from jet_substructure.analysis import analyze_tree
 from jet_substructure.base import analysis_objects, data_manager, helpers, substructure_methods
@@ -348,9 +349,14 @@ def calculate_and_skim_embedding(  # noqa: C901
     output_dir.mkdir(parents=True, exist_ok=True)
     output_filename = output_dir / f"{tree.filename.stem}_{iterative_splittings_label}_splittings.root"
 
-    train_number = tree.filename.parent.name
+    # Use the train configuration to extract the train number and pt hard bin, which are used to get the scale factor.
+    y = yaml.yaml()
+    with open(tree.filename.parent / "config.yaml", "r") as f:
+        train_config = y.load(f)
+    train_number = train_config["number"]
+    pt_hard_bin = train_config["pt_hard_bin"]
+    logger.debug(f"Extracted train number: {train_number}, pt hard bin: {pt_hard_bin}")
     analysis_settings = cast(analysis_objects.PtHardAnalysisSettings, dataset.settings)
-    pt_hard_bin = analysis_settings.train_number_to_pt_hard_bin[int(train_number)]
     scale_factor = analysis_settings.scale_factors[pt_hard_bin]
 
     # Actual setup.
@@ -705,7 +711,7 @@ def run(
         output_base=Path("output"),
         settings_class=settings_class_map.get(collision_system, analysis_objects.AnalysisSettings),
         # NOTE: This value is irrelevant for the skim...
-        z_cutoff=0.2,
+        z_cutoff=-5,
     )
 
     dm = data_manager.IterateTrees(
