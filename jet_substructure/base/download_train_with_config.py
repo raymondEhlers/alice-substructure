@@ -4,20 +4,19 @@
 
 """
 
-from pathlib import Path
-from typing import List, Tuple
-
-import ruamel.yaml
-import pachyderm.alice.utils as alice_utils
 import subprocess
 import xml.etree.ElementTree as ET
+from pathlib import Path
+
+import pachyderm.alice.utils as alice_utils
+from pachyderm import yaml
 
 
 _possible_merging_stages = ["merged", "Stage_1", "Stage_2", "Stage_5"]
 
-y = ruamel.yaml.YAML(typ="rt")
+y = yaml.yaml()
 
-#for run_number in range(5696, 5706):
+# for run_number in range(5696, 5706):
 #    # It failed...
 #    if run_number == 5704:
 #        continue
@@ -65,7 +64,9 @@ for train_number in range(5897, 5902):
         stage_to_download = child_info["stage_to_download"]
         # Validation
         if stage_to_download not in _possible_merging_stages:
-            raise ValueError(f"Invalid last successful merging stage. Provided: {stage_to_download}. Possible values: {_possible_merging_stages}")
+            raise ValueError(
+                f"Invalid last successful merging stage. Provided: {stage_to_download}. Possible values: {_possible_merging_stages}"
+            )
         # Child label (such as LHC18q)
         child_label = child_info.get("name", child_name)
         # Validation
@@ -83,11 +84,12 @@ for train_number in range(5897, 5902):
             print(f"Downloading {stage_to_download}.xml file: alien://{alien_xml_file} to {local_xml_file}")
             process = subprocess.run(
                 ["alien_cp", f"alien://{str(alien_xml_file)}", str(local_xml_file)],
-                stdout = subprocess.PIPE, stderr = subprocess.PIPE
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
 
             # Open local XML file
-            tree = ET.parse(local_xml_file)
+            tree = ET.parse(str(local_xml_file))
             root = tree.getroot()
             collection = root[0]
             # Extract the filenames
@@ -97,13 +99,13 @@ for train_number in range(5897, 5902):
                     alien_file = lfn.replace("root_archive.zip", "AnalysisResults.root")
                     label = int(node.attrib["name"])
                     local_file = local_train_dir / f"AnalysisResults.{child_label}.{label:02}.root"
-                    #print(f"Adding alien://{alien_file} : {local_file}")
+                    # print(f"Adding alien://{alien_file} : {local_file}")
                     output[str(alien_file)] = str(local_file)
-                    #print(f"Downloading alien://{alien_file} to {local_file}")
-                    #process = subprocess.run(
+                    # print(f"Downloading alien://{alien_file} to {local_file}")
+                    # process = subprocess.run(
                     #    ["alien_cp", f"alien://{str(alien_file)}", str(local_file)],
                     #    stdout = subprocess.PIPE, stderr = subprocess.PIPE
-                    #)
+                    # )
                 except IndexError:
                     pass
 

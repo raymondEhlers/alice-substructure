@@ -9,10 +9,12 @@ import logging
 import queue
 from typing import List
 
-import ruamel.yaml
+from pachyderm import yaml
 from pachyderm.alice import download
 
+
 logger = logging.getLogger(__name__)
+
 
 def create_file_pairs() -> List[download.FilePair]:
     """ Create file pairs.
@@ -20,7 +22,7 @@ def create_file_pairs() -> List[download.FilePair]:
     YAML file is of the form:
     alien_file: local_file
     """
-    y = ruamel.yaml.YAML(typ="rt")
+    y = yaml.yaml()
     with open("files_to_download.yaml", "r") as f:
         file_list_input = y.load(f)
 
@@ -40,6 +42,5 @@ if __name__ == "__main__":
 
     # Setup the queue and filler, and then start downloading.
     q: download.FilePairQueue = queue.Queue()
-    queue_filler = download.FileListDownloadFiller(pairs = file_pairs, q = q)
-    download.download(queue_filler = queue_filler, q = q)
-
+    queue_filler = download.FileListDownloadFiller(pairs=file_pairs, q=q)
+    download.download(queue_filler=queue_filler, q=q)
