@@ -24,7 +24,7 @@ datasets:
                 - "data.fJetConstituents.fPt"
                 - "data.fJetConstituents.fEta"
                 - "data.fJetConstituents.fPhi"
-                - "data.fJetConstituents.fGlobalIndex"
+                - "data.fJetConstituents.fID"
                 - "data.fJetSplittings.fKt"
                 - "data.fJetSplittings.fDeltaR"
                 - "data.fJetSplittings.fZ"
@@ -37,7 +37,7 @@ datasets:
                 - "matched.fJetConstituents.fPt"
                 - "matched.fJetConstituents.fEta"
                 - "matched.fJetConstituents.fPhi"
-                - "matched.fJetConstituents.fGlobalIndex"
+                - "matched.fJetConstituents.fID"
                 - "matched.fJetSplittings.fKt"
                 - "matched.fJetSplittings.fDeltaR"
                 - "matched.fJetSplittings.fZ"
@@ -50,7 +50,7 @@ datasets:
                 - "det_level.fJetConstituents.fPt"
                 - "det_level.fJetConstituents.fEta"
                 - "det_level.fJetConstituents.fPhi"
-                - "det_level.fJetConstituents.fGlobalIndex"
+                - "det_level.fJetConstituents.fID"
                 - "det_level.fJetSplittings.fKt"
                 - "det_level.fJetSplittings.fDeltaR"
                 - "det_level.fJetSplittings.fZ"
@@ -342,27 +342,7 @@ available_datasets:
             18: 3.0036e-06
             19: 1.61604e-06
             20: 2.0978e-06
-        train_number_to_pt_hard_bin:
-            5517: 1
-            5518: 2
-            5519: 3
-            5520: 4
-            5521: 5
-            5522: 6
-            5523: 7
-            5524: 8
-            5525: 9
-            5526: 10
-            5527: 11
-            5528: 12
-            5529: 13
-            5530: 14
-            5531: 15
-            5532: 16
-            5533: 17
-            5534: 18
-            5535: 19
-            5536: 20
+        train_number_to_pt_hard_bin: {}
         files:
             ## Cached files on SSD
             # Group 1
