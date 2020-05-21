@@ -21,9 +21,9 @@ def add_files_from_xml_file(
 ) -> Dict[str, str]:
     output = {}
     # Download the XML file...
-    print(f"Downloading {alien_xml_file.name} file: alien://{alien_xml_file} to {local_xml_file}")
+    print(f"Downloading {alien_xml_file.name} file: {alien_xml_file} to file://{local_xml_file}")
     subprocess.run(
-        ["alien_cp", f"alien://{str(alien_xml_file)}", str(local_xml_file)],
+        ["alien_cp", str(alien_xml_file), f"file://{str(local_xml_file)}"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -61,7 +61,7 @@ def download() -> None:
     y = yaml.yaml()
 
     output = {}
-    for train_number in range(5897, 5902):
+    for train_number in range(5902, 5903):
         print(f"Processing train {train_number}")
         local_train_dir = Path(str(train_number))
         config_filename = local_train_dir / "config.yaml"
@@ -130,23 +130,27 @@ def download() -> None:
                     # Example: /alice/data/2018/LHC18r/000296934/pass1/PWGJE/Jets_EMC_PbPb/5902_20200515-1910_child_1
                     manual_dir = (
                         Path("/alice/data/2018/")
-                        / child_label
+                        / f"LHC{child_label}"
                         / f"000{run_number}"
                         / "pass1"
                         / PWG
                         / train_name
                         / likely_child_directory
                     )
-                    alien_xml_file = manual_dir / f"{manual_stage_to_download}.xml"
-                    local_xml_file = local_train_dir / f"{run_number}_{manual_stage_to_download}_{child_name}.xml"
-                    result = add_files_from_xml_file(
-                        alien_xml_file=alien_xml_file,
-                        local_xml_file=local_xml_file,
-                        local_train_dir=local_train_dir,
-                        child_label=child_label,
-                        additional_label=str(run_number),
-                    )
-                    output.update(result)
+                    if manual_stage_to_download == "merged":
+                        local_file = local_train_dir / f"AnalysisResults.{child_label}.{run_number}.root"
+                        output[str(manual_dir / "AnalysisResults.root")] = str(local_file)
+                    else:
+                        alien_xml_file = manual_dir / f"{manual_stage_to_download}.xml"
+                        local_xml_file = local_train_dir / f"{run_number}_{manual_stage_to_download}_{child_name}.xml"
+                        result = add_files_from_xml_file(
+                            alien_xml_file=alien_xml_file,
+                            local_xml_file=local_xml_file,
+                            local_train_dir=local_train_dir,
+                            child_label=child_label,
+                            additional_label=str(run_number),
+                        )
+                        output.update(result)
             else:
                 alien_xml_file = alien_dir / f"{stage_to_download}.xml"
                 local_xml_file = local_train_dir / f"{stage_to_download}_{child_name}.xml"
