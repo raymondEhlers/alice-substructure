@@ -47,7 +47,26 @@ def relative_error(*inputs: ErrorInput) -> np.ndarray:
     return np.sqrt(relative_error_squared)
 
 
-def get_unfolded_pp_data_leticia(grooming_method: str) -> Result:
+def select_hist_in_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelector) -> binned_data.BinnedData:
+    bin_center_mask = (hist.axes[0].bin_centers >= x_range.min) & (hist.axes[0].bin_centers <= x_range.max)
+    first_bin_edge = np.where(bin_center_mask)[0][0]
+    last_bin_edge = -1 * np.where(bin_center_mask[::-1])[0][0]
+
+    # Handle metadata
+    metadata = {}
+    for k, v in hist.metadata.items():
+        if isinstance(v, AsymmetricErrors):
+            metadata[k] = AsymmetricErrors(low=v.low[bin_center_mask], high=v.high[bin_center_mask],)
+
+    return binned_data.BinnedData(
+        axes=[hist.axes[0].bin_edges[first_bin_edge:last_bin_edge]],
+        values=hist.values[bin_center_mask],
+        variances=hist.variances[bin_center_mask],
+        metadata=metadata,
+    )
+
+
+def get_unfolded_pp_data_leticia(grooming_method: str, x_range: helpers.RangeSelector) -> Result:
     # Map to Leticia's filenames.
     grooming_method_map = {
         "dynamical_kt": "dynamickt",
@@ -72,8 +91,12 @@ def get_unfolded_pp_data_leticia(grooming_method: str) -> Result:
     # The y errors are asymmetric.
     data.metadata["y_systematic_errors"] = AsymmetricErrors(low=systematics.yerrorslow, high=systematics.yerrorshigh)
 
+    # Only keep the data within the selected range.
+    data = select_hist_in_range(hist=data, x_range=x_range)
+
     # Next, get pythia (for conveience, we've just stored it in the same file. Later we can do better).
     pythia = binned_data.BinnedData.from_existing_data(f["true1"])
+    pythia = select_hist_in_range(hist=pythia, x_range=x_range)
 
     return Result(data=data, pythia=pythia)
 
@@ -92,6 +115,7 @@ def plot_comparison_pythia(
         # Setup
         style = grooming_styles[grooming_method]
         result = hists[grooming_method]
+        plotting_last_method = grooming_method == grooming_methods[-1]
 
         # Plot options
         kwargs = {
@@ -115,42 +139,63 @@ def plot_comparison_pythia(
             **kwargs,
         )
         # TODO: Error box via pachyderm.plot
+        y_systematic_errors = result.data.metadata["y_systematic_errors"]
+        pachyderm.plot.error_boxes(
+            ax=ax,
+            x_data=result.data.axes[0].bin_centers,
+            y_data=result.data.values,
+            x_errors=result.data.axes[0].bin_widths / 2,
+            y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+            color=style.color,
+            linewidth=0,
+            # label = "Background", color = plot_base.AnalysisColors.fit,
+        )
 
         # Pythia comparison. Use the compare style
         pythia_style = grooming_styles[f"{grooming_method}_compare"]
 
-        # For the z > 0.2 case, pythia has a bin at < 0. So we need to mask that out.
-        # NOTE: This isn't a general solution! At all!
         pythia = result.pythia
-        if (pythia.axes[0].bin_centers < 0).any():
-            pythia = binned_data.BinnedData(
-                axes=[pythia.axes[0].bin_edges[1:]], values=pythia.values[1:], variances=pythia.variances[1:],
-            )
 
         # Plot options
-        kwargs = {
-            "markerfacecolor": "white" if pythia_style.fillstyle == "none" else pythia_style.color,
-            "alpha": 1 if pythia_style.fillstyle == "none" else 0.8,
-        }
-        if pythia_style.fillstyle != "none":
-            kwargs["markeredgewidth"] = 0
+        # kwargs = {
+        #    "markerfacecolor": "white" if pythia_style.fillstyle == "none" else pythia_style.color,
+        #    "alpha": 1 if pythia_style.fillstyle == "none" else 0.8,
+        # }
+        # if pythia_style.fillstyle != "none":
+        #    kwargs["markeredgewidth"] = 0
 
+        # ax.errorbar(
+        #    pythia.axes[0].bin_centers,
+        #    pythia.values,
+        #    # yerr=pythia.errors,
+        #    # xerr=pythia.axes[0].bin_widths / 2,
+        #    color=pythia_style.color,
+        #    # marker=pythia_style.marker,
+        #    fillstyle=pythia_style.fillstyle,
+        #    # linestyle="",
+        #    linewidth=3,
+        #    #label=f"Pythia, {pythia_style.label}",
+        #    label="Pythia 8 Monash 2013" if plotting_last_method else None,
+        #    zorder=pythia_style.zorder,
+        #    alpha=0.7,
+        # )
         ax.errorbar(
             pythia.axes[0].bin_centers,
             pythia.values,
             # yerr=pythia.errors,
             # xerr=pythia.axes[0].bin_widths / 2,
-            color=pythia_style.color,
-            # marker=pythia_style.marker,
-            fillstyle=pythia_style.fillstyle,
+            color=style.color,
+            # marker=style.marker,
+            fillstyle=style.fillstyle,
             # linestyle="",
             linewidth=3,
-            label=f"Pythia, {pythia_style.label}",
+            # label=f"Pythia, {pythia_style.label}",
+            label="Pythia 8 Monash 2013" if plotting_last_method else None,
             zorder=pythia_style.zorder,
             alpha=0.7,
         )
 
-        # TODO: Ratio
+        # TODO: Systematic errors for ratios.
         ratio = pythia / result.data
         ax_ratio.errorbar(
             ratio.axes[0].bin_centers,
@@ -191,10 +236,11 @@ def run() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # First, retrieve the have the grooming methods.
-    dynamical_kt = get_unfolded_pp_data_leticia(grooming_method="dynamical_kt")
-    dynamical_time = get_unfolded_pp_data_leticia(grooming_method="dynamical_time")
-    leading_kt = get_unfolded_pp_data_leticia(grooming_method="leading_kt")
-    leading_kt_z_cut_02 = get_unfolded_pp_data_leticia(grooming_method="leading_kt_z_cut_02")
+    x_range = helpers.RangeSelector(0.5, 8)
+    dynamical_kt = get_unfolded_pp_data_leticia(grooming_method="dynamical_kt", x_range=x_range)
+    dynamical_time = get_unfolded_pp_data_leticia(grooming_method="dynamical_time", x_range=x_range)
+    leading_kt = get_unfolded_pp_data_leticia(grooming_method="leading_kt", x_range=x_range)
+    leading_kt_z_cut_02 = get_unfolded_pp_data_leticia(grooming_method="leading_kt_z_cut_02", x_range=x_range)
     hists = {
         "dynamical_kt": dynamical_kt,
         "dynamical_time": dynamical_time,
