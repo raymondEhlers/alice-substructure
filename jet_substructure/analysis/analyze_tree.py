@@ -606,9 +606,10 @@ def _determine_matching_types(
     # NOTE: We use the sum of the constituents pt here because this is the convention.
     #       This is handled differently than for finding the leading subjet.
     if (shared_constituents_pts > matched_subjets.constituents.pt.sum()).any():
-        logger.warning("Constituent pts are greater than the subjet pts...")
-        IPython.embed()
-        raise ValueError("Constituent pts are greater than the subjet pts...")
+        mask_excess = shared_constituents_pts > matched_subjets.constituents.pt.sum()
+        logger.warning(f"Constituent pts are greater than the subjet pts. Fraction: {np.count_nonzero(mask_excess) / len(mask_excess)}")
+        #IPython.embed()
+        #raise ValueError("Constituent pts are greater than the subjet pts...")
 
     matched = (shared_constituents_pts / matched_subjets.constituents.pt.sum()) > 0.5
     return cast(UprootArray[bool], matched)
