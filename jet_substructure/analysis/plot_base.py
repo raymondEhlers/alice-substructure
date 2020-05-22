@@ -29,14 +29,14 @@ matplotlib.rcParams["ytick.right"] = True
 matplotlib.rcParams["ytick.minor.right"] = True
 
 
-_label_to_display_string: Dict[str, Dict[str, str]] = {
+label_to_display_string: Dict[str, Dict[str, str]] = {
     "ALICE": dict(work_in_progress="ALICE Work in Progress", preliminary="ALICE Preliminary", final="ALICE",),
     "collision_system": dict(
-        PbPb=r"$Pb--Pb \sqrt{s_{\text{NN}}} = 5.02$ TeV",
-        embedPythia=r"$PYTHIA \bigotimes {main_system} Pb--Pb$",
-        pp_5=r"$pp \sqrt{s_{\text{NN}}} = 5.02$ TeV",
+        PbPb=r"$Pb--Pb\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
+        embedPythia=r"$PYTHIA \bigotimes {main_system} Pb--Pb\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
+        pp_5TeV=r"$\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
     ),
-    "jets": {"R0{i}": fr"$\text{{anti}}-k_{{\text{{T}}}} charged jets R=0.{i}" for i in range(1, 7)},
+    "jets": {f"R0{i}": fr"$\text{{anti-}}k_{{\text{{T}}}}\:\text{{charged jets}}\:R=0.{i}$" for i in range(1, 7)},
 }
 
 

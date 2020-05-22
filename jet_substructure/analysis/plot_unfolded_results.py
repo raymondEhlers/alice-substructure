@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, Sequence
 
 import attr
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
@@ -20,8 +21,6 @@ from jet_substructure.base import helpers
 
 
 logger = logging.getLogger(__name__)
-
-pachyderm.plot.configure()
 
 
 @attr.s
@@ -102,10 +101,7 @@ def get_unfolded_pp_data_leticia(grooming_method: str, x_range: helpers.RangeSel
 
 
 def plot_comparison_pythia(
-    hists: Dict[str, binned_data.BinnedData],
-    grooming_methods: Sequence[str],
-    plot_config: pb.PlotConfig,
-    output_dir: Path,
+    hists: Dict[str, Result], grooming_methods: Sequence[str], plot_config: pb.PlotConfig, output_dir: Path,
 ) -> None:
     # Setup
     fig, (ax, ax_ratio) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
@@ -138,7 +134,7 @@ def plot_comparison_pythia(
             zorder=style.zorder,
             **kwargs,
         )
-        # TODO: Error box via pachyderm.plot
+        # Systematic errors.
         y_systematic_errors = result.data.metadata["y_systematic_errors"]
         pachyderm.plot.error_boxes(
             ax=ax,
@@ -215,6 +211,9 @@ def plot_comparison_pythia(
 
     # Apply the PlotConfig
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
+    # A few additional tweaks.
+    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
+    ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=0.2))
 
     # filename = f"{plot_config.name}_{jet_pt_bin}{grooming_methods_filename_label}_{identifiers}_iterative_splittings"
     filename = f"{plot_config.name}"
@@ -222,9 +221,7 @@ def plot_comparison_pythia(
     plt.close(fig)
 
 
-def plot_comparison(
-    hists: Dict[str, binned_data.BinnedData], grooming_methods: Sequence[str], comparison_grooming_method: str
-) -> None:
+def plot_comparison(hists: Dict[str, Result], grooming_methods: Sequence[str], comparison_grooming_method: str) -> None:
     ...
     fig, ax = plt.subplots(figsize=(8, 6))
 
@@ -251,7 +248,11 @@ def run() -> None:
     logger.info(locals())
     # import IPython; IPython.embed()
 
-    text = "text"
+    jet_pt_bin = helpers.RangeSelector(60, 80)
+    text = pb.label_to_display_string["ALICE"]["preliminary"]
+    text += "\n" + pb.label_to_display_string["collision_system"]["pp_5TeV"]
+    text += "\n" + pb.label_to_display_string["jets"]["R04"]
+    text += "\n" + fr"${jet_pt_bin.display_str(label='ch')}\:\text{{GeV}}/c$"
     plot_comparison_pythia(
         hists=hists,
         grooming_methods=list(hists.keys()),
@@ -264,20 +265,20 @@ def run() -> None:
                         "y",
                         label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
                         log=True,
+                        range=(7e-3, 1),
                     ),
                     text=pb.TextConfig(x=0.96, y=0.96, text=text),
-                    # legend=pb.LegendConfig(location="lower left"),
-                    legend=pb.LegendConfig(location="center right"),
+                    legend=pb.LegendConfig(location="lower left", anchor=(0.02, 0.02)),
                 ),
                 # Ratio.
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
-                        pb.AxisConfig("y", label="Pythia/data", range=(0.5, 1.5)),
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.1, 8.6)),
+                        pb.AxisConfig("y", label="Pythia/data", range=(0.65, 1.35)),
                     ]
                 ),
             ],
-            figure=pb.Figure(edge_padding={"left": 0.12}),
+            figure=pb.Figure(edge_padding={"left": 0.12, "top": 0.975, "right": 0.975}),
         ),
         output_dir=output_dir,
     )
