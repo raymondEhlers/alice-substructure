@@ -118,8 +118,19 @@ class LegendConfig:
     font_size: Optional[float] = attr.ib(default=None)
     ncol: Optional[float] = attr.ib(default=1)
 
-    def apply(self, ax: matplotlib.axes.Axes) -> None:
+    def apply(
+        self,
+        ax: matplotlib.axes.Axes,
+        legend_handles: Optional[Sequence[matplotlib.container.ErrorbarContainer]] = None,
+        legend_labels: Optional[Sequence[str]] = None,
+    ) -> None:
         if self.location:
+            kwargs = {}
+            if legend_handles:
+                kwargs["handles"] = legend_handles
+            if legend_labels:
+                kwargs["labels"] = legend_labels
+
             ax.legend(
                 loc=self.location,
                 bbox_to_anchor=self.anchor,
@@ -130,6 +141,7 @@ class LegendConfig:
                 fontsize=self.font_size,
                 frameon=False,
                 ncol=self.ncol,
+                **kwargs,
             )
 
 
@@ -145,7 +157,12 @@ class Panel:
     text: Optional[TextConfig] = attr.ib(default=None)
     legend: LegendConfig = attr.ib(default=None)
 
-    def apply(self, ax: matplotlib.axes.Axes) -> None:
+    def apply(
+        self,
+        ax: matplotlib.axes.Axes,
+        legend_handles: Optional[Sequence[matplotlib.container.ErrorbarContainer]] = None,
+        legend_labels: Optional[Sequence[str]] = None,
+    ) -> None:
         # Axes
         for axis in self.axes:
             axis.apply(ax)
@@ -154,7 +171,7 @@ class Panel:
             self.text.apply(ax)
         # Legend
         if self.legend is not None:
-            self.legend.apply(ax)
+            self.legend.apply(ax, legend_handles=legend_handles, legend_labels=legend_labels)
 
 
 @attr.s
@@ -198,6 +215,8 @@ class PlotConfig:
         fig: matplotlib.figure.Figure,
         ax: Optional[matplotlib.axes.Axes] = None,
         axes: Optional[Sequence[matplotlib.axes.Axes]] = None,
+        legend_handles: Optional[Sequence[matplotlib.container.ErrorbarContainer]] = None,
+        legend_labels: Optional[Sequence[str]] = None,
     ) -> None:
         # Validation
         if ax is None and axes is None:
@@ -217,7 +236,7 @@ class PlotConfig:
         # Finally, we can actually apply the stored properties.
         # Apply panels to the axes.
         for ax, panel in zip(axes, self.panels):
-            panel.apply(ax)
+            panel.apply(ax, legend_handles=legend_handles, legend_labels=legend_labels)
         # Figure
         self.figure.apply(fig)
 
