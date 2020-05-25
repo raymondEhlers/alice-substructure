@@ -13,6 +13,7 @@ embedPythia = "jet_substructure.analysis.analyze_tree:embed_pythia_entry_point"
 splitTree = "jet_substructure.base.helpers:split_tree_entry_point"
 mergeROOTFiles = "jet_substructure.base.helpers:merge_ROOT_files_entry_point"
 skimDataset = "jet_substructure.analysis.skim_to_flat_tree:skim_entry_point"
+processEmbeddingSkim = "jet_substructure.analysis.data_frame:process_embedding_skim_entry_point"
 
 [tool.poetry.dependencies]
 python = "^3.6.1"
@@ -48,7 +49,7 @@ networkx = "^2.4"
 
 [tool.isort]
 known_standard_library = ["setuptools", "typing_extensions"]
-known_third_party = ["IPython", "ROOT", "attr", "awkward", "boost_histogram", "enlighten", "h5py", "matplotlib", "numpy", "pachyderm", "pandas", "pathos", "seaborn", "uproot", "uproot_methods"]
+known_third_party = ["IPython", "ROOT", "attr", "awkward", "boost_histogram", "dill", "enlighten", "h5py", "matplotlib", "numpy", "pachyderm", "pandas", "pathos", "seaborn", "uproot", "uproot_methods"]
 known_first_party = []
 line_length = 120
 # Meaning a grouped grid of imports

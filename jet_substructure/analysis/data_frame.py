@@ -5,14 +5,18 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+from __future__ import annotations
+
+import argparse
 import functools
 import gzip
 import itertools
 import logging
 import pickle
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Sequence
+from typing import Dict, List, Mapping, Optional, Sequence
 
+import attr
 import boost_histogram as bh
 import dill
 import enlighten
@@ -27,7 +31,85 @@ from jet_substructure.base import analysis_objects, data_manager, helpers, skim_
 logger = logging.getLogger(__name__)
 
 
-def merge_hists(a: Dict[str, bh.Histogram], b: Dict[str, bh.Histogram]) -> Dict[str, bh.Histogram]:
+_matching_name_to_axis_value: Dict[str, int] = {
+    "all": 0,
+    "pure": 1,
+    "leading_untagged_subleading_correct": 2,
+    "leading_correct_subleading_untagged": 3,
+    "leading_untagged_subleading_mistag": 4,
+    "leading_mistag_subleading_untagged": 5,
+    "swap": 6,
+    "both_untagged": 7,
+}
+
+## NOTE: Order is changed here to match from before!!
+# _matching_name_to_axis_value: Dict[str, int] = {
+#    "all": 0,
+#    "pure": 1,
+#    "leading_untagged_subleading_correct": 2,
+#    "swap": 6,
+#    "leading_untagged_subleading_mistag": 4,
+#    "leading_correct_subleading_untagged": 3,
+#    "leading_mistag_subleading_untagged": 5,
+#    "both_untagged": 7,
+# }
+
+
+def _set_output_filename(instance: "SkimDataset", attribute: attr.Attribute[str], value: str) -> None:
+    if value == "":
+        value = instance.collision_system
+    if instance.prefix:
+        value = f"{value}_{instance.prefix}"
+    setattr(instance, attribute.name, value)
+
+
+@attr.s
+class SkimDataset:
+    collision_system: str = attr.ib()
+    train_numbers: List[int] = attr.ib()
+    prefix: str = attr.ib(default="")
+    hists: Dict[str, bh.Histogram] = attr.ib(factory=dict)
+    _output_filename_identifier: str = attr.ib(default="", validator=_set_output_filename)
+    merged_skim: bool = attr.ib(default=False)
+    _path_list: List[Path] = attr.ib(factory=list)
+
+    @property
+    def path_list(self) -> List[Path]:
+        if self._path_list:
+            input_path_list = self._path_list
+        else:
+            base_path = Path("trains") / self.collision_system / "{train_number}"
+            if self.merged_skim:
+                base_path = base_path / "merged" / "*.root"
+            else:
+                base_path = base_path / "*_iterative_splittings.root"
+            input_path_list = [
+                Path(str(base_path).format(train_number=train_number)) for train_number in self.train_numbers
+            ]
+        path_list = data_manager._ensure_and_expand_paths(
+            input_path_list,
+            # [
+            #    #Path("trains/embedPythia/5903/skim/merged/*.root")
+            #    Path("trains/embedPythia/5903/skim/merged/AnalysisResults.merged.01.root")
+            # ]
+        )
+        return path_list
+
+    @property
+    def output_path(self) -> Path:
+        return Path("output") / self.collision_system / "skim"
+
+    @property
+    def output_filename(self) -> Path:
+        return self.output_path / f"{self._output_filename_identifier}.pgz"
+
+    def load_hists(self) -> bool:
+        with gzip.GzipFile(self.output_filename, "r") as f:
+            self.hists = dill.load(f)
+        return True
+
+
+def _merge_hists(a: Dict[str, bh.Histogram], b: Dict[str, bh.Histogram]) -> Dict[str, bh.Histogram]:
     """ Merge hists stored in a file.
 
     """
@@ -74,31 +156,37 @@ def dask_df_from_delayed() -> None:
 
 
 # def df_from_file(filenames: Sequence[Path], branches: Sequence[str]):
-def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequence[Path], output_dir: Optional[Path] = None) -> None:  # noqa: 901
+def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Path]) -> None:  # noqa: 901
     # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
     from pathlib import Path  # noqa: F401
-    # Validation
-    if output_dir is None:
-        output_dir = Path(f"output/embedPythia/skim")
 
     data_frames = uproot.pandas.iterate(
-        path=path_list,
+        path=dataset.path_list,
         treepath="tree",
         namedecode="utf-8",
         # Apparently I forgot to rename the prefixes for eta, data, so I account for that here and when I access the values.
-        branches=["scale_factor", "*true*", "*det_level*", "*hybrid*", "jet_eta_data", "jet_phi_data", "jet_eta_detLevel", "jet_phi_detLevel"],
+        branches=[
+            "scale_factor",
+            "*true*",
+            "*det_level*",
+            "*hybrid*",
+            "jet_eta_data",
+            "jet_phi_data",
+            "jet_eta_detLevel",
+            "jet_phi_detLevel",
+        ],
         reportpath=True,
         # Otherwise, we can't really count how many steps it's going to take...
-        #entrysteps=float("inf"),
+        # entrysteps=float("inf"),
     )
     # NOTE: One needs to be careful here if iterating over many files. The friends may not match up in the entries!!
-    #data_frames_friends = uproot.pandas.iterate(
+    # data_frames_friends = uproot.pandas.iterate(
     #    path=path_list_friends,
     #    treepath="tree",
     #    namedecode="utf-8",
     #    branches=["*matched*", "*detLevel*", "*data*"],
     #    reportpath=True,
-    #)
+    # )
 
     # NOPE! Still too big...
     # df = pd.concat(data_frames, axis=1, copy=False)
@@ -121,16 +209,6 @@ def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequenc
         skim_analysis_objects.ResponseType(measured_like="hybrid", generator_like="true"),
         skim_analysis_objects.ResponseType(measured_like="det_level", generator_like="true"),
     ]
-    _matching_name_to_axis_value: Dict[str, int] = {
-        "all": 0,
-        "pure": 1,
-        "leading_untagged_subleading_correct": 2,
-        "leading_correct_subleading_untagged": 3,
-        "leading_untagged_subleading_mistag": 4,
-        "leading_mistag_subleading_untagged": 5,
-        "swap": 6,
-        "both_untagged": 7,
-    }
     hists = {}
     for grooming_method in grooming_methods:
         for matching_type in _matching_name_to_axis_value:
@@ -243,18 +321,20 @@ def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequenc
 
     progress_manager = enlighten.Manager()
     # NOTE: Careful with this counter! It may not be correct if we are iterating over chunks in a file.
-    with progress_manager.counter(total=len(path_list), desc="Analyzing", unit="tree", leave=True) as tree_counter:
-        #for (df_path, df), (df_friend_path, df_friend) in tree_counter(zip(data_frames, data_frames_friends)):
+    with progress_manager.counter(
+        total=len(dataset.path_list), desc="Analyzing", unit="tree", leave=True
+    ) as tree_counter:
+        # for (df_path, df), (df_friend_path, df_friend) in tree_counter(zip(data_frames, data_frames_friends)):
         for df_path, df in tree_counter(data_frames):
             logger.debug(f"Processing df from {df_path}")
             # Merge the friends together.
             # Rename friends columns because I forgot to rename earlier.
-            #df_friend = df_friend.rename(
+            # df_friend = df_friend.rename(
             #    columns=lambda s: s.replace("matched", "true")
             #    .replace("data", "hybrid")
             #    .replace("detLevel", "det_level")
-            #)
-            #df = pd.concat([df, df_friend], axis=1)
+            # )
+            # df = pd.concat([df, df_friend], axis=1)
 
             # Setup
             hybrid_jet_pt_mask = (df["jet_pt_hybrid"] > 40) & (df["jet_pt_hybrid"] < 120)
@@ -415,10 +495,9 @@ def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequenc
     progress_manager.stop()
 
     # Write the hists
-    output_dir = Path(f"output/embedPythia/skim")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    pkl_filename = output_dir / "embedded.pgz"
-    with gzip.GzipFile(pkl_filename, "w") as pkl_file:
+    dataset.output_path.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Saving hists to {dataset.output_filename}")
+    with gzip.GzipFile(dataset.output_filename, "w") as pkl_file:
         dill.dump(hists, pkl_file)
 
 
@@ -507,20 +586,15 @@ def _fill_grooming_hists(
     )
 
 
-def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: str, output_dir: Optional[Path] = None) -> None:  # noqa: 901
-    # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
-    from pathlib import Path  # noqa: F401
-    # Validation
-    if output_dir is None:
-        output_dir = Path(f"output/{collision_system}/skim")
-
+def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
     # Setup
     jet_R = 0.4
+    prefix = dataset.prefix
     branches = [f"*{prefix}*"]
-    if collision_system in ["pythia", "embedPythia"]:
+    if dataset.collision_system in ["pythia", "embedPythia"]:
         branches.append("scale_factor")
     data_frames = uproot.pandas.iterate(
-        path=path_list, treepath="tree", namedecode="utf-8", branches=branches, reportpath=True,
+        path=dataset.path_list, treepath="tree", namedecode="utf-8", branches=branches, reportpath=True,
     )
 
     # TODO: Define grooming methods better?
@@ -589,7 +663,9 @@ def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: 
         )
 
     progress_manager = enlighten.Manager()
-    with progress_manager.counter(total=len(path_list), desc="Analyzing", unit="tree", leave=True) as tree_counter:
+    with progress_manager.counter(
+        total=len(dataset.path_list), desc="Analyzing", unit="tree", leave=True
+    ) as tree_counter:
         for df_path, df in tree_counter(data_frames):
             logger.info(f"Processing df from {df_path}")
             # Setup
@@ -622,11 +698,81 @@ def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: 
     progress_manager.stop()
 
     # Write the hists
-    output_dir.mkdir(parents=True, exist_ok=True)
-    pkl_filename = output_dir / f"{collision_system}.pgz"
+    dataset.output_path.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Saving hists to {dataset.output_filename}")
+    with gzip.GzipFile(dataset.output_filename, "w") as pkl_file:
+        dill.dump(hists, pkl_file)
+
+
+# def run_embed_pythia(run_response: bool = True) -> None:
+#    collision_system = "embedPythia"
+#    path_list = data_manager._ensure_and_expand_paths(
+#        [
+#            Path("trains/embedPythia/588*/skim/*_iterative_splittings.root"),
+#            Path("trains/embedPythia/589*/skim/*_iterative_splittings.root"),
+#            Path("trains/embedPythia/590*/skim/*_iterative_splittings.root"),
+#        ]
+#    )
+#    path_list_friends = data_manager._ensure_and_expand_paths(
+#        [
+#            #Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
+#            #Path("trains/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
+#        ]
+#    )
+#    if run_response:
+#        for train_number in range(5903, 5904):
+#            logger.info(f"Processing train number {train_number}")
+#            path_list = data_manager._ensure_and_expand_paths(
+#                [
+#                    #Path("trains/embedPythia/5903/skim/merged/*.root")
+#                    Path("trains/embedPythia/5903/skim/merged/AnalysisResults.merged.01.root")
+#                ]
+#            )
+#            print(path_list)
+#            df_from_file_embedding(path_list=path_list, path_list_friends=path_list_friends, output_dir=Path(f"output/{collision_system}/skim/{train_number}"))
+#
+#        # Marge and write the data hists
+#        embedding_hists = functools.reduce(merge_hists, [dill.load(gzip.GzipFile(f"output/{collision_system}/skim/{train_number}/embedded.pgz", "r")) for train_number in range(5884, 5904)])
+#        pkl_filename = Path(f"output/{collision_system}/skim/embedded.pgz")
+#        logger.info(f"Saving hists to {pkl_filename}")
+#        with gzip.GzipFile(pkl_filename, "w") as pkl_file:
+#            dill.dump(embedding_hists, pkl_file)
+#
+#    for train_number in range(5904, 5904):
+#        logger.info(f"Processing train number {train_number}")
+#        path_list = data_manager._ensure_and_expand_paths(
+#            [
+#                Path(f"trains/embedPythia/{train_number}/skim/*_iterative_splittings.root"),
+#            ]
+#        )
+#        df_from_file_data(
+#            collision_system=collision_system, path_list=path_list, prefix="hybrid", output_dir=Path(f"output/{collision_system}/skim/{train_number}")
+#        )
+#
+#    # Marge and write the data hists
+#    hists = functools.reduce(merge_hists, [pickle.load(gzip.GzipFile(f"output/{collision_system}/skim/{train_number}/{collision_system}.pgz", "r")) for train_number in range(5884, 5904)])  # type: ignore
+#    pkl_filename = Path(f"output/{collision_system}/skim/{collision_system}.pgz")
+#    logger.info(f"Saving hists to {pkl_filename}")
+#    with gzip.GzipFile(pkl_filename, "w") as pkl_file:
+#        pickle.dump(hists, pkl_file)  # type: ignore
+
+
+def merge_output(train_numbers: Sequence[int], output_filename: Path, output_path: Path) -> Path:
+    filename = output_filename.with_suffix("").name
+    # embedding_hists = functools.reduce(merge_hists, [dill.load(gzip.GzipFile(f"output/{collision_system}/skim/{train_number}/embedded.pgz", "r")) for train_number in train_numbers])
+    hists = functools.reduce(
+        _merge_hists,
+        [
+            dill.load(gzip.GzipFile(f"{output_path}/{train_number}/{filename}.pgz", "r"))
+            for train_number in train_numbers
+        ],
+    )
+    pkl_filename = output_path / "{filename}.pgz"
     logger.info(f"Saving hists to {pkl_filename}")
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
-        pickle.dump(hists, pkl_file)  # type: ignore
+        dill.dump(hists, pkl_file)
+
+    return pkl_filename
 
 
 def output_dir_f(output_dir: Path, identifier: str) -> Path:
@@ -662,17 +808,6 @@ def plot_all() -> None:
         "leading_kt_z_cut_02_first_split",
         "leading_kt_z_cut_04_first_split",
     ]
-    # NOTE: Order is changed here to match from before!!
-    _matching_name_to_axis_value: Dict[str, int] = {
-        "all": 0,
-        "pure": 1,
-        "leading_untagged_subleading_correct": 2,
-        "swap": 6,
-        "leading_untagged_subleading_mistag": 4,
-        "leading_correct_subleading_untagged": 3,
-        "leading_mistag_subleading_untagged": 5,
-        "both_untagged": 7,
-    }
 
     # NOTE: Intentionally skipping the f-string here. We want to format it later!
     base_dir = Path("output/{identifier}/skim")
@@ -705,6 +840,48 @@ def plot_all() -> None:
     user_ns.update({"output_dir_f": output_dir_f})
     IPython.start_ipython(user_ns=user_ns)
 
+
+def run_plot(datasets: Mapping[str, SkimDataset], remerge: bool = False) -> None:
+    # Setup
+    # TODO: Consolidate
+    grooming_methods = [
+        "dynamical_z",
+        "dynamical_kt",
+        "dynamical_time",
+        "leading_kt",
+        "leading_kt_z_cut_02",
+        "leading_kt_z_cut_04",
+        "soft_drop_z_cut_02",
+        "soft_drop_z_cut_04",
+    ]
+    direct_comparison_grooming_methods = [
+        "leading_kt_z_cut_02_first_split",
+        "leading_kt_z_cut_04_first_split",
+    ]
+
+    # Load datasets (and merge if necessary)
+    for dataset in datasets.values():
+        if not dataset.output_filename.exists() or remerge:
+            merge_output(
+                train_numbers=dataset.train_numbers,
+                output_filename=dataset.output_filename,
+                output_path=dataset.output_path,
+            )
+        dataset.load_hists()
+
+    # Add some helpful imports and definitions
+    from importlib import reload  # noqa: F401
+
+    try:
+        # May not want to import if developing.
+        from jet_substructure.analysis import plot_from_skim  # noqa: F401
+    except SyntaxError:
+        logger.info("Couldn't load plot_from_skim due to syntax error. You need to load it.")
+
+    user_ns = locals()
+    user_ns.update({"output_dir_f": output_dir_f})
+    IPython.start_ipython(user_ns=user_ns)
+
     # Plotting
     # plot_from_skim.plot_residuals_by_matching_type(
     #     hists=hists, grooming_methods=grooming_methods, matching_types=list(_matching_name_to_axis_value.keys()), output_dir=output_dir
@@ -716,74 +893,89 @@ def plot_all() -> None:
     # plot_from_skim.plot_compare_kt(hists=hists, data_hists=data_hists[0], grooming_methods=grooming_methods, output_dir=output_dir)
 
 
-def run_embed_pythia(run_response: bool = True) -> None:
-    collision_system = "embedPythia"
-    path_list = data_manager._ensure_and_expand_paths(
-        [
-            Path("trains/embedPythia/588*/skim/*_iterative_splittings.root"),
-            Path("trains/embedPythia/589*/skim/*_iterative_splittings.root"),
-            Path("trains/embedPythia/590*/skim/*_iterative_splittings.root"),
-        ]
-    )
-    path_list_friends = data_manager._ensure_and_expand_paths(
-        [
-            #Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
-            #Path("trains/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
-        ]
-    )
-    if run_response:
-        for train_number in range(5903, 5904):
-            logger.info(f"Processing train number {train_number}")
-            path_list = data_manager._ensure_and_expand_paths(
-                [
-                    #Path("trains/embedPythia/5903/skim/merged/*.root")
-                    Path("trains/embedPythia/5903/skim/merged/AnalysisResults.merged.01.root")
-                ]
-            )
-            print(path_list)
-            df_from_file_embedding(path_list=path_list, path_list_friends=path_list_friends, output_dir=Path(f"output/{collision_system}/skim/{train_number}"))
+def define_embedding_datasets(
+    train_number: Optional[int] = None, train_numbers: Optional[Sequence[int]] = None
+) -> Dict[str, SkimDataset]:
+    if train_number is None and train_numbers is None:
+        raise ValueError("Must pass either train number or train_numbers")
+    if train_numbers is None:
+        # Help out mypy
+        assert train_number is not None
+        train_numbers = [train_number]
+    # Validation
+    train_numbers = list(train_numbers)
 
-        # Marge and write the data hists
-        embedding_hists = functools.reduce(merge_hists, [dill.load(gzip.GzipFile(f"output/{collision_system}/skim/{train_number}/embedded.pgz", "r")) for train_number in range(5884, 5904)])
-        pkl_filename = Path(f"output/{collision_system}/skim/embedded.pgz")
-        logger.info(f"Saving hists to {pkl_filename}")
-        with gzip.GzipFile(pkl_filename, "w") as pkl_file:
-            dill.dump(embedding_hists, pkl_file)
-
-    for train_number in range(5904, 5904):
-        logger.info(f"Processing train number {train_number}")
-        path_list = data_manager._ensure_and_expand_paths(
-            [
-                Path(f"trains/embedPythia/{train_number}/skim/*_iterative_splittings.root"),
-            ]
+    datasets = {
+        "embedPythia_response": SkimDataset(
+            collision_system="embedPythia",
+            train_numbers=train_numbers,
+            merged_skim=True,
+            output_filename_identifier="embedding",
+        ),
+    }
+    # Could analyze any of these prefixes for the embedded.
+    for prefix in ["hybrid", "det_level", "true"]:
+        datasets[f"embedPythia_{prefix}"] = SkimDataset(
+            collision_system="embedPythia", train_numbers=train_numbers, merged_skim=True, prefix=prefix,
         )
-        df_from_file_data(
-            collision_system=collision_system, path_list=path_list, prefix="hybrid", output_dir=Path(f"output/{collision_system}/skim/{train_number}")
-        )
-
-    # Marge and write the data hists
-    hists = functools.reduce(merge_hists, [pickle.load(gzip.GzipFile(f"output/{collision_system}/skim/{train_number}/{collision_system}.pgz", "r")) for train_number in range(5884, 5904)])  # type: ignore
-    pkl_filename = Path(f"output/{collision_system}/skim/{collision_system}.pgz")
-    logger.info(f"Saving hists to {pkl_filename}")
-    with gzip.GzipFile(pkl_filename, "w") as pkl_file:
-        pickle.dump(hists, pkl_file)  # type: ignore
+    return datasets
 
 
-if __name__ == "__main__":
+def process_embedding_skim_entry_point() -> None:
+    """ Entry point for processing the skim.
+
+    Args:
+        None. It can be configured through command line arguments.
+
+    Returns:
+        None.
+    """
+    helpers.setup_logging()
+    parser = argparse.ArgumentParser(description=f"Processed the skimmed dataset.")
+    parser.add_argument("-t", "--trainNumber", required=True, type=int, help="Embedding train number to process.")
+    args = parser.parse_args()
+
+    embedding_datasets = define_embedding_datasets(train_number=args.trainNumber)
+
+    # Process
+    # Response
+    df_from_file_embedding(
+        dataset=embedding_datasets["embedPythia_response"], path_list_friends=[],
+    )
+    # Hybrid
+    df_from_file_data(dataset=embedding_datasets["embedPythia_hybrid"],)
+
+    logger.info("Done!")
+
+
+def run() -> None:
     helpers.setup_logging()
     plot_only = False
-    if not plot_only:
-        df_from_file_data(
+    # Define possible datasets
+    datasets = {
+        "PbPb": SkimDataset(
             collision_system="PbPb",
-            path_list=data_manager._ensure_and_expand_paths(
-                [Path("trains/PbPb/5537/skim/*_iterative_splittings.root")]
-            ),
+            # TODO: improve this when time allows to accept single values....
+            train_numbers=[5863],
             prefix="data",
+        ),
+    }
+    datasets.update(define_embedding_datasets(train_numbers=list(range(5884, 5904))))
+
+    if not plot_only:
+        df_from_file_data(dataset=datasets["PbPb"],)
+        # run_embed_pythia(run_response=True)
+        df_from_file_data(dataset=datasets["embedPythia_hybrid"],)
+        df_from_file_embedding(
+            dataset=datasets["embedPythia_response"], path_list_friends=[],
         )
-        run_embed_pythia(run_response=True)
         # df_from_file_data(collision_system="pythia")
         # dask_df_from_file()
         # dask_df_from_delayed()
         # map_reduce_pandas_concat()
 
-    plot_all()
+    run_plot(datasets=datasets)
+
+
+if __name__ == "__main__":
+    run()
