@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Dict, Mapping, Optional, Sequence
 
 import boost_histogram as bh
+import dill
 import enlighten
 import IPython
 import numpy as np
@@ -24,6 +25,15 @@ from jet_substructure.base import analysis_objects, data_manager, helpers, skim_
 
 
 logger = logging.getLogger(__name__)
+
+
+def merge_hists(a: Dict[str, bh.Histogram], b: Dict[str, bh.Histogram]) -> Dict[str, bh.Histogram]:
+    """ Merge hists stored in a file.
+
+    """
+    for k in b:
+        a[k] += b[k]
+    return a
 
 
 def dask_df_from_file() -> None:
@@ -64,26 +74,31 @@ def dask_df_from_delayed() -> None:
 
 
 # def df_from_file(filenames: Sequence[Path], branches: Sequence[str]):
-def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequence[Path]) -> None:  # noqa: 901
+def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequence[Path], output_dir: Optional[Path] = None) -> None:  # noqa: 901
     # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
     from pathlib import Path  # noqa: F401
+    # Validation
+    if output_dir is None:
+        output_dir = Path(f"output/embedPythia/skim")
 
     data_frames = uproot.pandas.iterate(
         path=path_list,
         treepath="tree",
         namedecode="utf-8",
-        branches=["scale_factor", "*true*", "*det_level*", "*hybrid*"],
+        # Apparently I forgot to rename the prefixes for eta, data, so I account for that here and when I access the values.
+        branches=["scale_factor", "*true*", "*det_level*", "*hybrid*", "jet_eta_data", "jet_phi_data", "jet_eta_detLevel", "jet_phi_detLevel"],
         reportpath=True,
+        # Otherwise, we can't really count how many steps it's going to take...
+        #entrysteps=float("inf"),
     )
-    data_frames_friends = uproot.pandas.iterate(
-        path=path_list_friends,
-        treepath="tree",
-        namedecode="utf-8",
-        branches=["*matched*", "*detLevel*", "*data*"],
-        reportpath=True,
-    )
-    # for df in data_frames:
-    #    IPython.embed()
+    # NOTE: One needs to be careful here if iterating over many files. The friends may not match up in the entries!!
+    #data_frames_friends = uproot.pandas.iterate(
+    #    path=path_list_friends,
+    #    treepath="tree",
+    #    namedecode="utf-8",
+    #    branches=["*matched*", "*detLevel*", "*data*"],
+    #    reportpath=True,
+    #)
 
     # NOPE! Still too big...
     # df = pd.concat(data_frames, axis=1, copy=False)
@@ -227,25 +242,27 @@ def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequenc
             )
 
     progress_manager = enlighten.Manager()
+    # NOTE: Careful with this counter! It may not be correct if we are iterating over chunks in a file.
     with progress_manager.counter(total=len(path_list), desc="Analyzing", unit="tree", leave=True) as tree_counter:
-        for (df_path, df), (df_friend_path, df_friend) in tree_counter(zip(data_frames, data_frames_friends)):
+        #for (df_path, df), (df_friend_path, df_friend) in tree_counter(zip(data_frames, data_frames_friends)):
+        for df_path, df in tree_counter(data_frames):
             logger.debug(f"Processing df from {df_path}")
             # Merge the friends together.
             # Rename friends columns because I forgot to rename earlier.
-            df_friend = df_friend.rename(
-                columns=lambda s: s.replace("matched", "true")
-                .replace("data", "hybrid")
-                .replace("detLevel", "det_level")
-            )
-            df = pd.concat([df, df_friend], axis=1)
+            #df_friend = df_friend.rename(
+            #    columns=lambda s: s.replace("matched", "true")
+            #    .replace("data", "hybrid")
+            #    .replace("detLevel", "det_level")
+            #)
+            #df = pd.concat([df, df_friend], axis=1)
 
             # Setup
             hybrid_jet_pt_mask = (df["jet_pt_hybrid"] > 40) & (df["jet_pt_hybrid"] < 120)
             # And finally process
             for grooming_method in grooming_methods:
 
-                matching_leading = df[f"{grooming_method}_hybrid_detector_matching_leading"]
-                matching_subleading = df[f"{grooming_method}_hybrid_detector_matching_subleading"]
+                matching_leading = df[f"{grooming_method}_hybrid_det_level_matching_leading"]
+                matching_subleading = df[f"{grooming_method}_hybrid_det_level_matching_subleading"]
 
                 matching_selections = analysis_objects.MatchingSelections(
                     leading=analysis_objects.MatchingResult(
@@ -315,8 +332,8 @@ def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequenc
                 masked_df = df[hybrid_jet_pt_mask]
                 # We convert from pd.Series to ndarray because the pd.Series conversions seem a bit odd at times.
                 distances = np.sqrt(
-                    (masked_df["jet_eta_hybrid"] - masked_df["jet_eta_det_level"]) ** 2
-                    + (masked_df["jet_phi_hybrid"] - masked_df["jet_phi_det_level"]) ** 2
+                    (masked_df["jet_eta_data"] - masked_df["jet_eta_detLevel"]) ** 2
+                    + (masked_df["jet_phi_data"] - masked_df["jet_phi_detLevel"]) ** 2
                 ).to_numpy()
                 for matching_type in _matching_name_to_axis_value:
                     mask = matching_selections[matching_type]
@@ -345,7 +362,7 @@ def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequenc
                     # Distances were only calculated for hybrid jets, so we don't need to reapply the hybrid jet pt cut here.
                     # Just apply the matching mask to the distances.
                     hists[f"{grooming_method}_hybrid_det_level_distance_matching_type_{matching_type}"].fill(
-                        distances[mask].to_numpy(), weight=masked_df["scale_factor"].to_numpy()
+                        distances[mask[hybrid_jet_pt_mask]], weight=masked_df["scale_factor"].to_numpy()
                     )
 
                     for response_type in response_types:
@@ -369,7 +386,7 @@ def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequenc
                         )
                     # Response with matching distance for leading_correct_subleading_untagged
                     if matching_type == "leading_correct_subleading_untagged":
-                        distance_mask = distances[mask & hybrid_jet_pt_mask] < 0.05
+                        distance_mask = distances[mask[hybrid_jet_pt_mask]] < 0.05
                         # kt
                         hists[
                             f"{grooming_method}_hybrid_det_level_kt_response_matching_type_leading_correct_subleading_untagged_distance_less_than_005"
@@ -402,7 +419,7 @@ def df_from_file_embedding(path_list: Sequence[Path], path_list_friends: Sequenc
     output_dir.mkdir(parents=True, exist_ok=True)
     pkl_filename = output_dir / "embedded.pgz"
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
-        pickle.dump(hists, pkl_file)  # type: ignore
+        dill.dump(hists, pkl_file)
 
 
 def map_reduce_pandas_concat() -> None:
@@ -472,16 +489,30 @@ def _fill_grooming_hists(
         masked_df[f"{grooming_method_for_df}_{prefix}_z"].to_numpy(),
         weight=masked_df["scale_factor"].to_numpy(),
     )
-    hists[f"{grooming_method}_{prefix}_n{suffix}"].fill(
+    hists[f"{grooming_method}_{prefix}_n_to_split{suffix}"].fill(
         masked_df[f"jet_pt_{prefix}"].to_numpy(),
-        masked_df[f"{grooming_method_for_df}_{prefix}_n"].to_numpy(),
+        masked_df[f"{grooming_method_for_df}_{prefix}_n_to_split"].to_numpy(),
+        weight=masked_df["scale_factor"].to_numpy(),
+    )
+    hists[f"{grooming_method}_{prefix}_n_groomed_to_split{suffix}"].fill(
+        masked_df[f"jet_pt_{prefix}"].to_numpy(),
+        masked_df[f"{grooming_method_for_df}_{prefix}_n_groomed_to_split"].to_numpy(),
+        weight=masked_df["scale_factor"].to_numpy(),
+    )
+    # Number of splittings which pass the grooming condition. For SoftDrop, this is n_sd.
+    hists[f"{grooming_method}_{prefix}_n_passed_grooming{suffix}"].fill(
+        masked_df[f"jet_pt_{prefix}"].to_numpy(),
+        masked_df[f"{grooming_method_for_df}_{prefix}_n_passed_grooming"].to_numpy(),
         weight=masked_df["scale_factor"].to_numpy(),
     )
 
 
-def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: str) -> None:  # noqa: 901
+def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: str, output_dir: Optional[Path] = None) -> None:  # noqa: 901
     # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
     from pathlib import Path  # noqa: F401
+    # Validation
+    if output_dir is None:
+        output_dir = Path(f"output/{collision_system}/skim")
 
     # Setup
     jet_R = 0.4
@@ -525,7 +556,13 @@ def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: 
         hists[f"{grooming_method}_{prefix}_z"] = bh.Histogram(
             jet_pt_axis, bh.axis.Regular(21, -0.025, 0.5), storage=bh.storage.Weight(),
         )
-        hists[f"{grooming_method}_{prefix}_n"] = bh.Histogram(
+        hists[f"{grooming_method}_{prefix}_n_to_split"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_{prefix}_n_groomed_to_split"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_{prefix}_n_passed_grooming"] = bh.Histogram(
             jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
         )
         # High kt
@@ -541,14 +578,20 @@ def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: 
         hists[f"{grooming_method}_{prefix}_z_high_kt"] = bh.Histogram(
             jet_pt_axis, bh.axis.Regular(21, -0.025, 0.5), storage=bh.storage.Weight(),
         )
-        hists[f"{grooming_method}_{prefix}_n_high_kt"] = bh.Histogram(
+        hists[f"{grooming_method}_{prefix}_n_to_split_high_kt"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_{prefix}_n_groomed_to_split_high_kt"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
+        )
+        hists[f"{grooming_method}_{prefix}_n_passed_grooming_high_kt"] = bh.Histogram(
             jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
         )
 
     progress_manager = enlighten.Manager()
     with progress_manager.counter(total=len(path_list), desc="Analyzing", unit="tree", leave=True) as tree_counter:
         for df_path, df in tree_counter(data_frames):
-            logger.debug(f"Processing df from {df_path}")
+            logger.info(f"Processing df from {df_path}")
             # Setup
             # Add scale_factor weight as 1 if it's not included. This way, we can always weight from the
             # scale factor of the masked_df.
@@ -564,7 +607,7 @@ def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: 
                 _fill_grooming_hists(masked_df=masked_df, grooming_method=grooming_method, hists=hists, prefix=prefix)
 
             # Direct comparison plots
-            mask = jet_pt_mask & (df[f"{grooming_method}_{prefix}_n"] <= 1)
+            mask = jet_pt_mask & (df[f"{grooming_method}_{prefix}_n_passed_grooming"] <= 1)
             masked_df = df[mask]
             for grooming_method in direct_comparison_grooming_methods:
                 _fill_grooming_hists(masked_df=masked_df, grooming_method=grooming_method, hists=hists, prefix=prefix)
@@ -579,9 +622,9 @@ def df_from_file_data(collision_system: str, path_list: Sequence[Path], prefix: 
     progress_manager.stop()
 
     # Write the hists
-    output_dir = Path(f"output/{collision_system}/skim")
     output_dir.mkdir(parents=True, exist_ok=True)
     pkl_filename = output_dir / f"{collision_system}.pgz"
+    logger.info(f"Saving hists to {pkl_filename}")
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
         pickle.dump(hists, pkl_file)  # type: ignore
 
@@ -674,23 +717,56 @@ def plot_all() -> None:
 
 
 def run_embed_pythia(run_response: bool = True) -> None:
+    collision_system = "embedPythia"
     path_list = data_manager._ensure_and_expand_paths(
         [
-            Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings.root"),
-            Path("trains/embedPythia/55*/skim/*_iterative_splittings.root"),
+            Path("trains/embedPythia/588*/skim/*_iterative_splittings.root"),
+            Path("trains/embedPythia/589*/skim/*_iterative_splittings.root"),
+            Path("trains/embedPythia/590*/skim/*_iterative_splittings.root"),
         ]
     )
     path_list_friends = data_manager._ensure_and_expand_paths(
         [
-            Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
-            Path("trains/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
+            #Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
+            #Path("trains/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
         ]
     )
     if run_response:
-        df_from_file_embedding(path_list=path_list, path_list_friends=path_list_friends)
-    df_from_file_data(
-        collision_system="embedPythia", path_list=path_list, prefix="hybrid",
-    )
+        for train_number in range(5903, 5904):
+            logger.info(f"Processing train number {train_number}")
+            path_list = data_manager._ensure_and_expand_paths(
+                [
+                    #Path("trains/embedPythia/5903/skim/merged/*.root")
+                    Path("trains/embedPythia/5903/skim/merged/AnalysisResults.merged.01.root")
+                ]
+            )
+            print(path_list)
+            df_from_file_embedding(path_list=path_list, path_list_friends=path_list_friends, output_dir=Path(f"output/{collision_system}/skim/{train_number}"))
+
+        # Marge and write the data hists
+        embedding_hists = functools.reduce(merge_hists, [dill.load(gzip.GzipFile(f"output/{collision_system}/skim/{train_number}/embedded.pgz", "r")) for train_number in range(5884, 5904)])
+        pkl_filename = Path(f"output/{collision_system}/skim/embedded.pgz")
+        logger.info(f"Saving hists to {pkl_filename}")
+        with gzip.GzipFile(pkl_filename, "w") as pkl_file:
+            dill.dump(embedding_hists, pkl_file)
+
+    for train_number in range(5904, 5904):
+        logger.info(f"Processing train number {train_number}")
+        path_list = data_manager._ensure_and_expand_paths(
+            [
+                Path(f"trains/embedPythia/{train_number}/skim/*_iterative_splittings.root"),
+            ]
+        )
+        df_from_file_data(
+            collision_system=collision_system, path_list=path_list, prefix="hybrid", output_dir=Path(f"output/{collision_system}/skim/{train_number}")
+        )
+
+    # Marge and write the data hists
+    hists = functools.reduce(merge_hists, [pickle.load(gzip.GzipFile(f"output/{collision_system}/skim/{train_number}/{collision_system}.pgz", "r")) for train_number in range(5884, 5904)])  # type: ignore
+    pkl_filename = Path(f"output/{collision_system}/skim/{collision_system}.pgz")
+    logger.info(f"Saving hists to {pkl_filename}")
+    with gzip.GzipFile(pkl_filename, "w") as pkl_file:
+        pickle.dump(hists, pkl_file)  # type: ignore
 
 
 if __name__ == "__main__":
@@ -704,7 +780,7 @@ if __name__ == "__main__":
             ),
             prefix="data",
         )
-        run_embed_pythia(run_response=False)
+        run_embed_pythia(run_response=True)
         # df_from_file_data(collision_system="pythia")
         # dask_df_from_file()
         # dask_df_from_delayed()
