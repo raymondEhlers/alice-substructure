@@ -330,15 +330,15 @@ def split_tree(
             logger.debug(f"Keys in input_file: {list(input_file.GetListOfKeys())}")
             input_tree = input_file.Get(tree_name)
 
-            number_of_entires = input_tree.GetEntries()
+            number_of_entries = input_tree.GetEntries()
             logger.info(
-                f"File: {filename}: Total of {number_of_entires} in the tree. Splitting into {number_of_chunks} chunk(s)."
+                f"File: {filename}: Total of {number_of_entries} in the tree. Splitting into {number_of_chunks} chunk(s)."
             )
 
             output_filenames[filename] = []
             for n in range(number_of_chunks):
-                start = int((number_of_entires / number_of_chunks) * n)
-                end = int((number_of_entires / number_of_chunks) * (n + 1))
+                start = int((number_of_entries / number_of_chunks) * n)
+                end = int((number_of_entries / number_of_chunks) * (n + 1))
 
                 # If we have only 1 chunk, then we're just trying to repair the file.
                 if number_of_chunks == 1:
@@ -402,4 +402,68 @@ def split_tree_entry_point() -> None:
 
     import pprint
 
+    logger.info(f"File output: {pprint.pformat(output_filenames)}")
+
+
+def merge_ROOT_files(dir: Path, n_merged_files: int = 5) -> Dict[Path, List[Path]]:
+    # Setup.
+    merged_dir = dir / "merged"
+    merged_dir.mkdir(parents=True, exist_ok=True)
+
+    # Setup
+    # Delayed import since we may not want this as a hard dependency in such a base module.
+    import enlighten
+
+    # Delayed import because we want to depend on ROOT as little as possible.
+    import ROOT
+
+    # Just in case we enable multithreading later.
+    ROOT.ROOT.EnableImplicitMT()
+
+    # To get started, we need to know which files are of interest.
+    output_filenames: Dict[Path, List[Path]] = {}
+    input_files = list(dir.glob("*.root"))
+    progress_manager = enlighten.get_manager()
+
+    with progress_manager.counter(total=n_merged_files, desc="Merging", unit="file") as file_counter:
+        for n in file_counter(range(n_merged_files)):
+            # Setup
+            start = int((len(input_files) / n_merged_files) * n)
+            end = int((len(input_files) / n_merged_files) * (n + 1))
+            # n+1 so we start indexing at 0.
+            output_filename = merged_dir / f"AnalysisResults.merged.{n+1:02}.root"
+            output_filenames[output_filename] = []
+
+            merger = ROOT.TFileMerger()
+            merger.OutputFile(str(output_filename))
+            for filename in input_files[start:end]:
+                output_filenames[output_filename].append(filename)
+                # False turns off the cp progress bar.
+                merger.AddFile(str(filename), False)
+            merger.Merge()
+
+    return output_filenames
+
+
+def merge_ROOT_files_entry_point() -> None:
+    """ Entry point for merging ROOT files into groups.
+
+    Args:
+        None. It can be configured through command line arguments.
+
+    Returns:
+        None.
+    """
+    setup_logging()
+    parser = argparse.ArgumentParser(description=f"Merge files into groups.")
+
+    parser.add_argument("-d", "--directory", required=True, type=Path, help="Directory containing the ROOT files to merge.")
+    parser.add_argument("-n", "--nGroups", default=-5, type=int, help="Number of groups (ie. output files). Default: 5")
+    args = parser.parse_args()
+
+    output_filenames = merge_ROOT_files(dir=args.directory, n_merged_files=args.nGroups)
+
+    import pprint
+
+    logger.info("Done!")
     logger.info(f"File output: {pprint.pformat(output_filenames)}")
