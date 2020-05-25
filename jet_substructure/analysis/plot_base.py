@@ -254,6 +254,12 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
     # Setup
     styles = {}
 
+    greens = sns.color_palette(f"Greens_d", 4)
+    purples = sns.color_palette(f"Purples_d", 3)
+    reds = sns.color_palette(f"Reds_d", 3)
+    greys = sns.color_palette(f"Greys_r", 5)
+    blues = sns.color_palette(f"Blues_r", 3)
+    oranges = sns.color_palette(f"Oranges_r", 3)
     for label in ["", "_compare"]:
         if label == "":
             # These are our main colors.
@@ -273,24 +279,16 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
                 color=dynamical_grooming_colors[0], marker=markers[0], fillstyle="full", label="$z$Drop", zorder=10
             ),
             f"dynamical_kt{label}": GroomingMethodStyle(
-                color=dynamical_grooming_colors[1],
-                marker=markers[0],
-                fillstyle="full",
-                label=r"$k_{\text{T}}$Drop",
-                zorder=10,
+                color=greens[1], marker=markers[0], fillstyle="full", label=r"$k_{\text{T}}$Drop", zorder=10,
             ),
             f"dynamical_time{label}": GroomingMethodStyle(
-                color=dynamical_grooming_colors[2], marker=markers[0], fillstyle="full", label=r"timeDrop", zorder=10
+                color=reds[1], marker=markers[2], fillstyle="full", label=r"timeDrop", zorder=10
             ),
             f"leading_kt{label}": GroomingMethodStyle(
-                color=leading_kt_colors[1],
-                marker=markers[0],
-                fillstyle="full",
-                label=r"Leading $k_{\text{T}}$",
-                zorder=10,
+                color=purples[1], marker=markers[1], fillstyle="full", label=r"Leading $k_{\text{T}}$", zorder=10,
             ),
             f"leading_kt_z_cut_02{label}": GroomingMethodStyle(
-                color=leading_kt_colors[1],
+                color=blues[1],
                 marker=markers[1],
                 fillstyle="none",
                 label=r"Leading $k_{\text{T}}$ $z > 0.2$",
