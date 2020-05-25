@@ -933,9 +933,13 @@ def process_embedding_skim_entry_point() -> None:
     helpers.setup_logging()
     parser = argparse.ArgumentParser(description=f"Processed the skimmed dataset.")
     parser.add_argument("-t", "--trainNumber", required=True, type=int, help="Embedding train number to process.")
+    parser.add_argument("-f", "--filename", required=True, type=str, help="Filename to process.")
     args = parser.parse_args()
 
     embedding_datasets = define_embedding_datasets(train_number=args.trainNumber)
+    # This is a hack, but it's easy right now...
+    for dataset in embedding_datasets.values():
+        dataset._path_list = [Path(args.filename)]
 
     # Process
     # Response
