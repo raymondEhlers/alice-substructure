@@ -30,10 +30,15 @@ matplotlib.rcParams["ytick.minor.right"] = True
 
 
 label_to_display_string: Dict[str, Dict[str, str]] = {
-    "ALICE": dict(work_in_progress="ALICE Work in Progress", preliminary="ALICE Preliminary", final="ALICE",),
+    "ALICE": dict(
+        work_in_progress="ALICE Work in Progress",
+        preliminary="ALICE Preliminary",
+        final="ALICE",
+        simulation="ALICE Simulation",
+    ),
     "collision_system": dict(
-        PbPb=r"$Pb--Pb\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
-        embedPythia=r"$PYTHIA \bigotimes {main_system} Pb--Pb\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
+        PbPb=r"$\text{Pb--Pb}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
+        embedPythia=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
         pp_5TeV=r"$\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
     ),
     "jets": {f"R0{i}": fr"$\text{{anti-}}k_{{\text{{T}}}}\:\text{{charged jets}}\:R=0.{i}$" for i in range(1, 7)},
@@ -82,6 +87,7 @@ class TextConfig:
     x: float = attr.ib()
     y: float = attr.ib()
     alignment: str = attr.ib(default=None)
+    color: str = attr.ib(default="black")
 
     def apply(self, ax: matplotlib.axes.Axes) -> None:
         # Some reasonable defaults
@@ -103,6 +109,7 @@ class TextConfig:
             self.x,
             self.y,
             self.text,
+            color=self.color,
             # We always want to place using normalized coordinates.
             # In the rare case that we don't want to, we can place by hand.
             transform=ax.transAxes,
