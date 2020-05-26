@@ -42,7 +42,13 @@ class ErrorInput:
 
 
 def relative_error(*inputs: ErrorInput) -> np.ndarray:
-    relative_error_squared = reduce(lambda x: (x.error / x.value) ** 2, inputs)  # type: ignore
+    if len(inputs) == 0:
+        raise ValueError("Must pass at least one ErrorInput")
+    if len(inputs) > 1:
+        relative_error_squared = reduce(lambda x, y: ((x.error / x.value) ** 2) + ((y.error / y.value) ** 2), inputs)  # type: ignore
+    else:
+        relative_error_squared = (inputs[0].error / inputs[0].value) ** 2
+    # import IPython; IPython.embed()
     return np.sqrt(relative_error_squared)
 
 
@@ -191,8 +197,8 @@ def plot_comparison_pythia(
             alpha=0.7,
         )
 
-        # TODO: Systematic errors for ratios.
         ratio = pythia / result.data
+        # Ratio + statistical error bars
         ax_ratio.errorbar(
             ratio.axes[0].bin_centers,
             ratio.values,
@@ -204,6 +210,35 @@ def plot_comparison_pythia(
             linestyle="",
             zorder=style.zorder,
             **kwargs,
+        )
+        # Systematic errors.
+        y_relative_error_low = relative_error(
+            ErrorInput(value=result.data.values, error=result.data.metadata["y_systematic_errors"].low)
+        )
+        y_relative_error_high = relative_error(
+            ErrorInput(value=result.data.values, error=result.data.metadata["y_systematic_errors"].high)
+        )
+        # Sanity check
+        test_relative_y_error_low = np.sqrt((result.data.metadata["y_systematic_errors"].low / result.data.values) ** 2)
+        test_relative_y_error_high = np.sqrt(
+            (result.data.metadata["y_systematic_errors"].high / result.data.values) ** 2
+        )
+        np.testing.assert_allclose(y_relative_error_low, test_relative_y_error_low)
+        np.testing.assert_allclose(y_relative_error_high, test_relative_y_error_high)
+        # From error prop, pythia has no systematic error, so we just convert the relative errors.
+        ratio.metadata["y_systematic_errors"] = AsymmetricErrors(
+            low=y_relative_error_low * ratio.values, high=y_relative_error_high * ratio.values,
+        )
+        y_systematic_errors = ratio.metadata["y_systematic_errors"]
+        pachyderm.plot.error_boxes(
+            ax=ax_ratio,
+            x_data=ratio.axes[0].bin_centers,
+            y_data=ratio.values,
+            x_errors=ratio.axes[0].bin_widths / 2,
+            y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+            color=style.color,
+            linewidth=0,
+            # label = "Background", color = plot_base.AnalysisColors.fit,
         )
 
     # Reference value for ratio
@@ -282,6 +317,36 @@ def run() -> None:
         ),
         output_dir=output_dir,
     )
+    for grooming_method in hists.keys():
+        plot_comparison_pythia(
+            hists=hists,
+            grooming_methods=[grooming_method],
+            plot_config=pb.PlotConfig(
+                name=f"kt_pythia_{grooming_method}",
+                panels=[
+                    # Main axis.
+                    pb.Panel(
+                        axes=pb.AxisConfig(
+                            "y",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                            log=True,
+                            range=(7e-3, 1),
+                        ),
+                        text=pb.TextConfig(x=0.96, y=0.96, text=text),
+                        legend=pb.LegendConfig(location="lower left", anchor=(0.02, 0.02)),
+                    ),
+                    # Ratio.
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.1, 8.6)),
+                            pb.AxisConfig("y", label="Pythia/data", range=(0.65, 1.35)),
+                        ]
+                    ),
+                ],
+                figure=pb.Figure(edge_padding={"left": 0.12, "top": 0.975, "right": 0.975}),
+            ),
+            output_dir=output_dir,
+        )
     plot_comparison(hists=hists, grooming_methods=list(hists.keys()), comparison_grooming_method="leading_kt")
 
 
