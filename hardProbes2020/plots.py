@@ -198,7 +198,7 @@ def plot_subjet_matching(
         # f"Plotting {label} {response_type} response for {grooming_method}, {matching_type}, hybrid: {hybrid_jet_pt_bin}"
         f"Plotting subjet matching for {grooming_method}, hybrid: {hybrid_jet_pt_bin}"
     )
-    grooming_styles = pb.define_grooming_styles()
+    # grooming_styles = pb.define_grooming_styles()
 
     # Finish setup
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -411,6 +411,7 @@ def plot_lund_plane(
     jet_pt_bin: helpers.RangeSelector,
     plot_config: pb.PlotConfig,
     output_dir: Path,
+    extension: str = "pdf",
 ) -> None:
     # Setup
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -448,7 +449,7 @@ def plot_lund_plane(
 
     # Save and cleanup
     filename = f"{plot_config.name}_{jet_pt_bin}_iterative_splittings"
-    fig.savefig(output_dir / f"{filename}.pdf")
+    fig.savefig(output_dir / f"{filename}.{extension}")
     plt.close(fig)
 
 
@@ -459,6 +460,7 @@ def plot_n_groomed_to_split(
     high_kt: bool,
     plot_config: pb.PlotConfig,
     output_dir: Path,
+    extension: str = "pdf",
 ) -> None:
     # Setup
     logger.debug(
@@ -486,7 +488,7 @@ def plot_n_groomed_to_split(
 
         kwargs = {
             "markerfacecolor": "white" if style.fillstyle == "none" else style.color,
-            "alpha": 1 if style.fillstyle == "none" else 0.8,
+            "alpha": 1 if style.fillstyle == "none" else 0.9,
         }
         if style.fillstyle != "none":
             kwargs["markeredgewidth"] = 0
@@ -502,6 +504,7 @@ def plot_n_groomed_to_split(
             linestyle="",
             label=style.label,
             zorder=style.zorder,
+            **kwargs,
         )
 
     # Labeling and presentation
@@ -511,7 +514,73 @@ def plot_n_groomed_to_split(
     filename = f"{plot_config.name}_iterative_splittings"
     if high_kt:
         filename += "_high_kt"
-    fig.savefig(output_dir / f"{filename}.pdf")
+    fig.savefig(output_dir / f"{filename}.{extension}")
+    plt.close(fig)
+
+
+def plot_n_to_split(
+    hists: Dict[str, Dict[str, binned_data.BinnedData]],
+    grooming_methods: Sequence[str],
+    jet_pt_bin: helpers.RangeSelector,
+    high_kt: bool,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+    extension: str = "pdf",
+) -> None:
+    # Setup
+    logger.debug(
+        # f"Plotting {label} {response_type} response for {grooming_method}, {matching_type}, hybrid: {hybrid_jet_pt_bin}"
+        f"Plotting n_grooming_to_split for {grooming_methods}, jet pt: {jet_pt_bin}"
+    )
+    if high_kt:
+        logger.debug("High kt")
+    grooming_styles = pb.define_grooming_styles()
+
+    # Finish setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    for grooming_method in grooming_methods:
+        # Convert again so we get a copy.
+        name = "hNToSplit"
+        if high_kt:
+            name += "HighKt"
+        bh_hist = hists[grooming_method][name].to_boost_histogram()
+        h = binned_data.BinnedData.from_existing_data(bh_hist[: bh.loc(12)])
+
+        h /= h.axes[0].bin_widths
+        h /= np.sum(h.values)
+
+        style = grooming_styles[grooming_method]
+
+        kwargs = {
+            "markerfacecolor": "white" if style.fillstyle == "none" else style.color,
+            "alpha": 1 if style.fillstyle == "none" else 0.9,
+        }
+        if style.fillstyle != "none":
+            kwargs["markeredgewidth"] = 0
+
+        ax.errorbar(
+            h.axes[0].bin_centers,
+            h.values,
+            yerr=h.errors,
+            xerr=h.axes[0].bin_widths / 2,
+            color=style.color,
+            marker=style.marker,
+            fillstyle=style.fillstyle,
+            linestyle="",
+            label=style.label,
+            zorder=style.zorder,
+            **kwargs,
+        )
+
+    # Labeling and presentation
+    plot_config.apply(fig=fig, ax=ax)
+
+    # Store and cleanup
+    filename = f"{plot_config.name}_iterative_splittings"
+    if high_kt:
+        filename += "_high_kt"
+    fig.savefig(output_dir / f"{filename}.{extension}")
     plt.close(fig)
 
 
@@ -525,6 +594,8 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
     jet_pt_bin = helpers.RangeSelector(min=60, max=80)
 
     for grooming_method in grooming_methods:
+        # TEMP
+        continue
         grooming_method_label = grooming_styles[grooming_method].label
         text = pb.label_to_display_string["ALICE"]["simulation"]
         text += "\n" + pb.label_to_display_string["collision_system"]["pythia_5TeV"]
@@ -592,6 +663,50 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
         output_dir=output_dir,
     )
 
+    text = pb.label_to_display_string["ALICE"]["simulation"]
+    text += "\n" + pb.label_to_display_string["collision_system"]["pythia_5TeV"]
+    text += "\n" + f"${jet_pt_bin.display_str(label='part')}$"
+    plot_n_to_split(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        jet_pt_bin=jet_pt_bin,
+        high_kt=False,
+        plot_config=pb.PlotConfig(
+            name="n_to_split_pythia_part",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label=r"$n_{\text{split}}$"),
+                    pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$"),
+                ],
+                text=pb.TextConfig(x=0.97, y=0.97, text=text),
+                legend=pb.LegendConfig(location="center right"),
+            ),
+            figure=pb.Figure(edge_padding=dict(left=0.12)),
+        ),
+        output_dir=output_dir,
+    )
+
+    text += "\n" + r"$k_{\text{T}}^{\text{part}} > 5\:\text{GeV}/c$"
+    plot_n_to_split(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        jet_pt_bin=jet_pt_bin,
+        high_kt=True,
+        plot_config=pb.PlotConfig(
+            name="n_to_split_pythia_part",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label=r"$n_{\text{split}}$"),
+                    pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$"),
+                ],
+                text=pb.TextConfig(x=0.97, y=0.97, text=text),
+                legend=pb.LegendConfig(location="center right"),
+            ),
+            # figure=pb.Figure(edge_padding=dict(right=1.01)),
+        ),
+        output_dir=output_dir,
+    )
+
 
 def load_pythia_hists(grooming_methods: Sequence[str]) -> Dict[str, Dict[str, binned_data.BinnedData]]:
     hists_full = {}
@@ -620,6 +735,8 @@ if __name__ == "__main__":
     # plot(grooming_method="dynamical_time", output_dir=output_dir)
 
     # Pythia
+    output_dir = Path("output/pythia")
+    output_dir.mkdir(parents=True, exist_ok=True)
     # plot_pythia(grooming_methods=["leading_kt"], output_dir=output_dir)
     plot_pythia(
         grooming_methods=["leading_kt", "leading_kt_z_cut_02", "dynamical_kt", "dynamical_time"], output_dir=output_dir
