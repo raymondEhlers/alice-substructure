@@ -39,9 +39,16 @@ label_to_display_string: Dict[str, Dict[str, str]] = {
     "collision_system": dict(
         PbPb=r"$\text{Pb--Pb}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
         embedPythia=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
-        pp_5TeV=r"$\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
+        pp_5TeV=r"$\text{pp}\;\sqrt{s} = 5.02$ TeV",
+        pp_5TeV_NN=r"$\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
+        pythia_5TeV=r"$\text{PYTHIA8}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
     ),
-    "jets": {f"R0{i}": fr"$\text{{anti-}}k_{{\text{{T}}}}\:\text{{charged jets}}\:R=0.{i}$" for i in range(1, 7)},
+    "jets": {
+        f"R0{i}": (
+            r"$\text{anti-}k_{\text{T}}\:\text{charged jets}$" + "\n" + f"$R=0.{i}," + r"\:|\eta_{\text{jet}}| < 0.5$"
+        )
+        for i in range(1, 7)
+    },
 }
 
 
@@ -86,8 +93,9 @@ class TextConfig:
     text: str = attr.ib()
     x: float = attr.ib()
     y: float = attr.ib()
-    alignment: str = attr.ib(default=None)
-    color: str = attr.ib(default="black")
+    alignment: Optional[str] = attr.ib(default=None)
+    color: Optional[str] = attr.ib(default="black")
+    font_size: Optional[float] = attr.ib(default=None)
 
     def apply(self, ax: matplotlib.axes.Axes) -> None:
         # Some reasonable defaults
@@ -110,6 +118,7 @@ class TextConfig:
             self.y,
             self.text,
             color=self.color,
+            fontsize=self.font_size,
             # We always want to place using normalized coordinates.
             # In the rare case that we don't want to, we can place by hand.
             transform=ax.transAxes,

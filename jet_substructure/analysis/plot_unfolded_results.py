@@ -192,7 +192,7 @@ def plot_comparison_pythia(
             # linestyle="",
             linewidth=3,
             # label=f"Pythia, {pythia_style.label}",
-            label="Pythia 8 Monash 2013" if plotting_last_method else None,
+            label="PYTHIA8 Monash 2013" if plotting_last_method else None,
             zorder=pythia_style.zorder,
             alpha=0.7,
         )
@@ -424,8 +424,11 @@ def run() -> None:
     output_dir = Path("output/pp/unfolding/leticia/plot")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # First, retrieve the have the grooming methods.
+    # Configuration
+    text_font_size = 22
     x_range = helpers.RangeSelector(0.5, 8)
+
+    # First, retrieve the have the grooming methods.
     dynamical_kt = get_unfolded_pp_data_leticia(grooming_method="dynamical_kt", x_range=x_range)
     dynamical_time = get_unfolded_pp_data_leticia(grooming_method="dynamical_time", x_range=x_range)
     leading_kt = get_unfolded_pp_data_leticia(grooming_method="leading_kt", x_range=x_range)
@@ -459,14 +462,14 @@ def run() -> None:
                         log=True,
                         range=(7e-3, 1),
                     ),
-                    text=pb.TextConfig(x=0.96, y=0.96, text=text),
+                    text=pb.TextConfig(x=0.975, y=0.96, text=text, font_size=text_font_size),
                     legend=pb.LegendConfig(location="lower left", anchor=(0.02, 0.02)),
                 ),
                 # Ratio.
                 pb.Panel(
                     axes=[
                         pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.1, 8.6)),
-                        pb.AxisConfig("y", label="Pythia/data", range=(0.65, 1.35)),
+                        pb.AxisConfig("y", label="PYTHIA/data", range=(0.65, 1.35)),
                     ]
                 ),
             ],
@@ -475,6 +478,15 @@ def run() -> None:
         output_dir=output_dir,
     )
     for grooming_method in hists.keys():
+        single_grooming_method_text = text
+        if grooming_method == "leading_kt_z_cut_02":
+            # Add tagged fraction
+            single_grooming_method_text += (
+                "\n"
+                + r"$f_{\text{tagged}}^{\text{PYTHIA}} = 0.89$"
+                + "\n"
+                + r"$f_{\text{tagged}}^{\text{data}} = 0.84$"
+            )
         plot_comparison_pythia(
             hists=hists,
             grooming_methods=[grooming_method],
@@ -489,14 +501,14 @@ def run() -> None:
                             log=True,
                             range=(7e-3, 1),
                         ),
-                        text=pb.TextConfig(x=0.96, y=0.96, text=text),
+                        text=pb.TextConfig(x=0.975, y=0.96, text=single_grooming_method_text, font_size=text_font_size),
                         legend=pb.LegendConfig(location="lower left", anchor=(0.02, 0.02)),
                     ),
                     # Ratio.
                     pb.Panel(
                         axes=[
                             pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.1, 8.6)),
-                            pb.AxisConfig("y", label="Pythia/data", range=(0.65, 1.35)),
+                            pb.AxisConfig("y", label="PYTHIA/data", range=(0.65, 1.35)),
                         ]
                     ),
                 ],
@@ -519,7 +531,7 @@ def run() -> None:
                         log=True,
                         range=(7e-3, 1),
                     ),
-                    text=pb.TextConfig(x=0.96, y=0.96, text=text),
+                    text=pb.TextConfig(x=0.975, y=0.96, text=text, font_size=text_font_size),
                     legend=pb.LegendConfig(location="lower left", anchor=(0.02, 0.02)),
                 ),
                 # Ratio.
