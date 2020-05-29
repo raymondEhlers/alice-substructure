@@ -60,10 +60,11 @@ class AxisConfig:
     label: str = attr.ib(default="")
     log: bool = attr.ib(default=False)
     range: Tuple[Optional[float], Optional[float]] = attr.ib(default=None)
+    font_size: Optional[float] = attr.ib(default=None)
 
     def apply(self, ax: matplotlib.axes.Axes) -> None:
         if self.label:
-            getattr(ax, f"set_{self.axis}label")(self.label)
+            getattr(ax, f"set_{self.axis}label")(self.label, fontsize=self.font_size)
         if self.log:
             getattr(ax, f"set_{self.axis}scale")("log")
             # Probably need to increase the number of ticks for a log axis. We just assume that's the case.
@@ -130,6 +131,7 @@ class LegendConfig:
     anchor: Optional[Tuple[float, float]] = attr.ib(default=None)
     font_size: Optional[float] = attr.ib(default=None)
     ncol: Optional[float] = attr.ib(default=1)
+    marker_label_spacing: Optional[float] = attr.ib(default=None)
 
     def apply(
         self,
@@ -151,9 +153,10 @@ class LegendConfig:
                 # to ensure that we have accurate placement.
                 borderaxespad=(0 if self.anchor else None),
                 borderpad=(0 if self.anchor else None),
-                fontsize=self.font_size,
                 frameon=False,
+                fontsize=self.font_size,
                 ncol=self.ncol,
+                handletextpad=self.marker_label_spacing,
                 **kwargs,
             )
 

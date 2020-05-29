@@ -442,7 +442,7 @@ def plot_lund_plane(
     mesh = ax.pcolormesh(
         h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
     )
-    fig.colorbar(mesh, pad=0.02)
+    fig.colorbar(mesh, pad=0.02, label="Prob. density")
 
     # Apply the PlotConfig
     plot_config.apply(fig=fig, ax=ax)
@@ -624,17 +624,20 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
                 name=f"lund_plane_pythia_part_{grooming_method}",
                 panels=pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$\log{(1/\Delta R)}$"),
-                        pb.AxisConfig("y", label=r"$\log{(k_{\text{T}})}$"),
+                        pb.AxisConfig("x", label=r"$\log{(1/\Delta R)}$", font_size=20),
+                        pb.AxisConfig("y", label=r"$\log{(k_{\text{T}})}$", font_size=20),
                     ],
                     text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=20),
                 ),
-                figure=pb.Figure(edge_padding=dict(right=1.01)),
+                # figure=pb.Figure(edge_padding=dict(right=1.01)),
+                figure=pb.Figure(edge_padding=dict(right=0.99)),
             ),
             output_dir=output_dir,
             extension=extension,
         )
 
+    # TODO: Probably should merge these functions with the n_split. If nothing else,
+    #       the styling needs to be updated to match it.
     text = pb.label_to_display_string["ALICE"]["simulation"]
     text += "\n" + pb.label_to_display_string["collision_system"]["pythia_5TeV"]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
@@ -697,11 +700,15 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
             name="n_to_split_pythia_part",
             panels=pb.Panel(
                 axes=[
-                    pb.AxisConfig("x", label=r"$n_{\text{split}}$"),
-                    pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{split}}$"),
+                    pb.AxisConfig("x", label=r"$n_{\text{split}}$", font_size=text_font_size),
+                    pb.AxisConfig(
+                        "y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{split}}$", font_size=text_font_size
+                    ),
                 ],
                 text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
-                legend=pb.LegendConfig(anchor=(0.98, 0.54), location="upper right"),
+                legend=pb.LegendConfig(
+                    anchor=(0.98, 0.54), location="upper right", font_size=20, marker_label_spacing=0.1
+                ),
             ),
             # figure=pb.Figure(edge_padding=dict(left=0.12)),
         ),
@@ -719,11 +726,15 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
             name="n_to_split_pythia_part",
             panels=pb.Panel(
                 axes=[
-                    pb.AxisConfig("x", label=r"$n_{\text{split}}$"),
-                    pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{split}}$"),
+                    pb.AxisConfig("x", label=r"$n_{\text{split}}$", font_size=text_font_size),
+                    pb.AxisConfig(
+                        "y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{split}}$", font_size=text_font_size
+                    ),
                 ],
                 text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
-                legend=pb.LegendConfig(anchor=(0.98, 0.54), location="upper right"),
+                legend=pb.LegendConfig(
+                    anchor=(0.98, 0.54), location="upper right", font_size=20, marker_label_spacing=0.1
+                ),
             ),
             # figure=pb.Figure(edge_padding=dict(right=1.01)),
         ),
