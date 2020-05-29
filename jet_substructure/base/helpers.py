@@ -245,7 +245,7 @@ class RangeSelector:
         return f"jetPt_{self.min}_{self.max}"
 
     def display_str(self, label: str = "") -> str:
-        return fr"{self.min} < p_{{\text{{T,jet}}}}^{{\text{{{label}}}}} < {self.max}"
+        return fr"{self.min} < p_{{\text{{T,ch jet}}}}^{{\text{{{label}}}}} < {self.max}"
 
 
 def expand_wildcards_in_filenames(paths: Sequence[Path]) -> List[Path]:
@@ -393,12 +393,18 @@ def split_tree_entry_point() -> None:
         help="Name of the tree to split",
     )
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("-n", "--nChunks", default=-1, type=int, help="Number of chunks. Default: -1, which then uses the chunk size.")
+    group.add_argument(
+        "-n", "--nChunks", default=-1, type=int, help="Number of chunks. Default: -1, which then uses the chunk size."
+    )
     # Default to approximately 200 MB chunks (in bytes).
-    group.add_argument("-s", "--chunkSize", default=200e6, type=float, help="Chunk size in bytes. Default: 200e6 (200 MB)")
+    group.add_argument(
+        "-s", "--chunkSize", default=200e6, type=float, help="Chunk size in bytes. Default: 200e6 (200 MB)"
+    )
     args = parser.parse_args()
 
-    output_filenames = split_tree(filenames=args.filenames, tree_name=args.treeName, number_of_chunks=args.nChunks, chunk_size=args.chunkSize)
+    output_filenames = split_tree(
+        filenames=args.filenames, tree_name=args.treeName, number_of_chunks=args.nChunks, chunk_size=args.chunkSize
+    )
 
     import pprint
 
@@ -457,7 +463,9 @@ def merge_ROOT_files_entry_point() -> None:
     setup_logging()
     parser = argparse.ArgumentParser(description=f"Merge files into groups.")
 
-    parser.add_argument("-d", "--directory", required=True, type=Path, help="Directory containing the ROOT files to merge.")
+    parser.add_argument(
+        "-d", "--directory", required=True, type=Path, help="Directory containing the ROOT files to merge."
+    )
     parser.add_argument("-n", "--nGroups", default=-5, type=int, help="Number of groups (ie. output files). Default: 5")
     args = parser.parse_args()
 

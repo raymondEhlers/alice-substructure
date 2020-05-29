@@ -630,7 +630,7 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
                     text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=20),
                 ),
                 # figure=pb.Figure(edge_padding=dict(right=1.01)),
-                figure=pb.Figure(edge_padding=dict(right=0.99)),
+                figure=pb.Figure(edge_padding=dict(right=0.99, bottom=0.11)),
             ),
             output_dir=output_dir,
             extension=extension,
