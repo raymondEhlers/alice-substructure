@@ -45,8 +45,8 @@ label_to_display_string: Dict[str, Dict[str, str]] = {
         pythia_5TeV_NN=r"$\text{PYTHIA8}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
     ),
     "jets": {f"R0{i}": (f"$R=0.{i}," + r"\:|\eta_{\text{jet}}| < 0.5$") for i in range(1, 7)},
-    "jets_general": r"$\text{anti-}k_{\text{T}}\:\text{charged jets}$",
 }
+label_to_display_string["jets"]["general"] = r"$\text{Anti-}k_{\text{T}}\:\text{charged jets}$"
 
 
 def _validate_axis_name(instance: "AxisConfig", attribute: attr.Attribute[str], value: str) -> None:

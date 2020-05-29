@@ -610,12 +610,12 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
         grooming_method_label = grooming_styles[grooming_method].label
         text = pb.label_to_display_string["ALICE"]["simulation"]
         text += "\n" + pb.label_to_display_string["collision_system"]["pythia_5TeV"]
-        text += "\n" + pb.label_to_display_string["jets_general"]
+        text += "\n" + pb.label_to_display_string["jets"]["general"]
         text += " " + pb.label_to_display_string["jets"]["R04"]
         text += "\n" + fr"${jet_pt_bin.display_str(label='part')}\:\text{{GeV}}/c$"
         # text += "\n" + f"{grooming_method_label} iterative splittings"
         text += "\n" + "Iterative splittings"
-        text += "\n" + grooming_method_label
+        text += "\n" + fr"$\textbf{{{grooming_method_label}}}$"
         plot_lund_plane(
             hists=hists[grooming_method],
             grooming_method=grooming_method,
@@ -637,7 +637,7 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
 
     text = pb.label_to_display_string["ALICE"]["simulation"]
     text += "\n" + pb.label_to_display_string["collision_system"]["pythia_5TeV"]
-    text += "\n" + pb.label_to_display_string["jets_general"]
+    text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"]["R04"]
     text += "\n" + fr"${jet_pt_bin.display_str(label='part')}\:\text{{GeV}}/c$"
     plot_n_groomed_to_split(
@@ -650,7 +650,7 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
             panels=pb.Panel(
                 axes=[
                     pb.AxisConfig("x", label=r"$n_{\text{groomed,split}}$"),
-                    pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$"),
+                    pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{groomed,split}}$"),
                 ],
                 text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
                 legend=pb.LegendConfig(anchor=(0.98, 0.54), location="upper right"),
@@ -672,7 +672,7 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
             panels=pb.Panel(
                 axes=[
                     pb.AxisConfig("x", label=r"$n_{\text{groomed,split}}$"),
-                    pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$"),
+                    pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{groomed,split}}$"),
                 ],
                 text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
                 legend=pb.LegendConfig(anchor=(0.98, 0.54), location="upper right"),
@@ -685,7 +685,7 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
 
     text = pb.label_to_display_string["ALICE"]["simulation"]
     text += "\n" + pb.label_to_display_string["collision_system"]["pythia_5TeV"]
-    text += "\n" + pb.label_to_display_string["jets_general"]
+    text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"]["R04"]
     text += "\n" + fr"${jet_pt_bin.display_str(label='part')}\:\text{{GeV}}/c$"
     plot_n_to_split(
@@ -698,7 +698,7 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
             panels=pb.Panel(
                 axes=[
                     pb.AxisConfig("x", label=r"$n_{\text{split}}$"),
-                    pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$"),
+                    pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{split}}$"),
                 ],
                 text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
                 legend=pb.LegendConfig(anchor=(0.98, 0.54), location="upper right"),
@@ -720,7 +720,7 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
             panels=pb.Panel(
                 axes=[
                     pb.AxisConfig("x", label=r"$n_{\text{split}}$"),
-                    pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$"),
+                    pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{split}}$"),
                 ],
                 text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
                 legend=pb.LegendConfig(anchor=(0.98, 0.54), location="upper right"),
