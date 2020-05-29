@@ -446,6 +446,7 @@ def run() -> None:
     jet_pt_bin = helpers.RangeSelector(60, 80)
     text = pb.label_to_display_string["ALICE"]["preliminary"]
     text += "\n" + pb.label_to_display_string["collision_system"]["pp_5TeV"]
+    text += "\n" + pb.label_to_display_string["jets_general"]
     text += "\n" + pb.label_to_display_string["jets"]["R04"]
     text += "\n" + fr"${jet_pt_bin.display_str(label='ch')}\:\text{{GeV}}/c$"
     plot_comparison_pythia(

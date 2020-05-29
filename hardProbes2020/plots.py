@@ -131,7 +131,7 @@ def plot_1D_comparison(
 
     style = grooming_styles[grooming_method]
     for hist, label, marker, fillstyle in [
-        (h_hybrid, "Embedded Pythia", "o", "full"),
+        (h_hybrid, "Embedded PYTHIA", "o", "full"),
         (h_det_level, "PYTHIA Det. Level", "s", "none"),
     ]:
         # Setup
@@ -447,6 +447,13 @@ def plot_lund_plane(
     # Apply the PlotConfig
     plot_config.apply(fig=fig, ax=ax)
 
+    # Add the grooming method separately (one possibility, but not used currently).
+    # Just for conveneice to get the grooming label right...
+    # grooming_styles = pb.define_grooming_styles()
+    # grooming_method_label = grooming_styles[grooming_method].label
+    # grooming_method_text = pb.TextConfig(x=0.03, y=0.03, text=f"{grooming_method_label} iterative splittings", font_size=20)
+    # grooming_method_text.apply(ax=ax)
+
     # Save and cleanup
     filename = f"{plot_config.name}_{jet_pt_bin}_iterative_splittings"
     fig.savefig(output_dir / f"{filename}.{extension}")
@@ -479,7 +486,9 @@ def plot_n_groomed_to_split(
         name = "hNGroomedToSplit"
         if high_kt:
             name += "HighKt"
-        h = binned_data.BinnedData.from_existing_data(hists[grooming_method][name])
+        # Truncate at 12 to focus on the interesting part.
+        bh_hist = hists[grooming_method][name].to_boost_histogram()
+        h = binned_data.BinnedData.from_existing_data(bh_hist[: bh.loc(12)])
 
         h /= h.axes[0].bin_widths
         h /= np.sum(h.values)
@@ -544,6 +553,7 @@ def plot_n_to_split(
         name = "hNToSplit"
         if high_kt:
             name += "HighKt"
+        # Truncate at 12 to focus on the interesting part.
         bh_hist = hists[grooming_method][name].to_boost_histogram()
         h = binned_data.BinnedData.from_existing_data(bh_hist[: bh.loc(12)])
 
@@ -591,16 +601,21 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
     grooming_styles = pb.define_grooming_styles()
 
     # Setup
+    # Careful: "eps" may not work properly. Perhaps due to the text labels?
+    extension = "pdf"
+    text_font_size = 22
     jet_pt_bin = helpers.RangeSelector(min=60, max=80)
 
     for grooming_method in grooming_methods:
-        # TEMP
-        continue
         grooming_method_label = grooming_styles[grooming_method].label
         text = pb.label_to_display_string["ALICE"]["simulation"]
         text += "\n" + pb.label_to_display_string["collision_system"]["pythia_5TeV"]
-        text += "\n" + f"{grooming_method_label} iterative splittings"
-        text += "\n" + f"${jet_pt_bin.display_str(label='part')}$"
+        text += "\n" + pb.label_to_display_string["jets_general"]
+        text += " " + pb.label_to_display_string["jets"]["R04"]
+        text += "\n" + fr"${jet_pt_bin.display_str(label='part')}\:\text{{GeV}}/c$"
+        # text += "\n" + f"{grooming_method_label} iterative splittings"
+        text += "\n" + "Iterative splittings"
+        text += "\n" + grooming_method_label
         plot_lund_plane(
             hists=hists[grooming_method],
             grooming_method=grooming_method,
@@ -612,16 +627,19 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
                         pb.AxisConfig("x", label=r"$\log{(1/\Delta R)}$"),
                         pb.AxisConfig("y", label=r"$\log{(k_{\text{T}})}$"),
                     ],
-                    text=pb.TextConfig(x=0.97, y=0.97, text=text),
+                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=20),
                 ),
                 figure=pb.Figure(edge_padding=dict(right=1.01)),
             ),
             output_dir=output_dir,
+            extension=extension,
         )
 
     text = pb.label_to_display_string["ALICE"]["simulation"]
     text += "\n" + pb.label_to_display_string["collision_system"]["pythia_5TeV"]
-    text += "\n" + f"${jet_pt_bin.display_str(label='part')}$"
+    text += "\n" + pb.label_to_display_string["jets_general"]
+    text += "\n" + pb.label_to_display_string["jets"]["R04"]
+    text += "\n" + fr"${jet_pt_bin.display_str(label='part')}\:\text{{GeV}}/c$"
     plot_n_groomed_to_split(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -634,12 +652,13 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
                     pb.AxisConfig("x", label=r"$n_{\text{groomed,split}}$"),
                     pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$"),
                 ],
-                text=pb.TextConfig(x=0.97, y=0.97, text=text),
-                legend=pb.LegendConfig(location="center right"),
+                text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
+                legend=pb.LegendConfig(anchor=(0.98, 0.54), location="upper right"),
             ),
-            figure=pb.Figure(edge_padding=dict(left=0.12)),
+            # figure=pb.Figure(edge_padding=dict(left=0.12)),
         ),
         output_dir=output_dir,
+        extension=extension,
     )
 
     text += "\n" + r"$k_{\text{T}}^{\text{part}} > 5\:\text{GeV}/c$"
@@ -655,17 +674,20 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
                     pb.AxisConfig("x", label=r"$n_{\text{groomed,split}}$"),
                     pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$"),
                 ],
-                text=pb.TextConfig(x=0.97, y=0.97, text=text),
-                legend=pb.LegendConfig(location="center right"),
+                text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
+                legend=pb.LegendConfig(anchor=(0.98, 0.54), location="upper right"),
             ),
             # figure=pb.Figure(edge_padding=dict(right=1.01)),
         ),
         output_dir=output_dir,
+        extension=extension,
     )
 
     text = pb.label_to_display_string["ALICE"]["simulation"]
     text += "\n" + pb.label_to_display_string["collision_system"]["pythia_5TeV"]
-    text += "\n" + f"${jet_pt_bin.display_str(label='part')}$"
+    text += "\n" + pb.label_to_display_string["jets_general"]
+    text += "\n" + pb.label_to_display_string["jets"]["R04"]
+    text += "\n" + fr"${jet_pt_bin.display_str(label='part')}\:\text{{GeV}}/c$"
     plot_n_to_split(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -678,12 +700,13 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
                     pb.AxisConfig("x", label=r"$n_{\text{split}}$"),
                     pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$"),
                 ],
-                text=pb.TextConfig(x=0.97, y=0.97, text=text),
-                legend=pb.LegendConfig(location="center right"),
+                text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
+                legend=pb.LegendConfig(anchor=(0.98, 0.54), location="upper right"),
             ),
-            figure=pb.Figure(edge_padding=dict(left=0.12)),
+            # figure=pb.Figure(edge_padding=dict(left=0.12)),
         ),
         output_dir=output_dir,
+        extension=extension,
     )
 
     text += "\n" + r"$k_{\text{T}}^{\text{part}} > 5\:\text{GeV}/c$"
@@ -699,12 +722,13 @@ def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
                     pb.AxisConfig("x", label=r"$n_{\text{split}}$"),
                     pb.AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$"),
                 ],
-                text=pb.TextConfig(x=0.97, y=0.97, text=text),
-                legend=pb.LegendConfig(location="center right"),
+                text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
+                legend=pb.LegendConfig(anchor=(0.98, 0.54), location="upper right"),
             ),
             # figure=pb.Figure(edge_padding=dict(right=1.01)),
         ),
         output_dir=output_dir,
+        extension=extension,
     )
 
 
