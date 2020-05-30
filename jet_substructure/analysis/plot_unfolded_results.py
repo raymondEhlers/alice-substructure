@@ -347,6 +347,11 @@ def plot_comparison(
         #    alpha=0.7,
         # )
 
+        # Ratio plot
+        # Skip the ratio plot if we're comparison against itself (since it's trivially at 1).
+        if grooming_method == comparison_grooming_method:
+            continue
+
         ratio = result.data / ratio_reference_hist.data
         # Ratio + statistical error bars
         ax_ratio.errorbar(
@@ -462,19 +467,29 @@ def run() -> None:
                         label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
                         log=True,
                         range=(7e-3, 1),
+                        font_size=text_font_size,
                     ),
                     text=pb.TextConfig(x=0.975, y=0.96, text=text, font_size=text_font_size),
-                    legend=pb.LegendConfig(location="lower left", anchor=(0.02, 0.02)),
+                    legend=pb.LegendConfig(
+                        location="lower left", anchor=(0.02, 0.02), font_size=19, marker_label_spacing=0.2
+                    ),
                 ),
                 # Ratio.
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.1, 8.6)),
-                        pb.AxisConfig("y", label="PYTHIA/data", range=(0.65, 1.35)),
+                        pb.AxisConfig(
+                            "x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.1, 8.6), font_size=text_font_size
+                        ),
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$\frac{\text{PYTHIA}}{\text{data}}$",
+                            range=(0.65, 1.35),
+                            font_size=text_font_size,
+                        ),
                     ]
                 ),
             ],
-            figure=pb.Figure(edge_padding={"left": 0.12, "top": 0.975, "right": 0.975}),
+            figure=pb.Figure(edge_padding={"left": 0.13, "bottom": 0.115, "top": 0.975, "right": 0.975}),
         ),
         output_dir=output_dir,
     )
@@ -501,19 +516,35 @@ def run() -> None:
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
                             range=(7e-3, 1),
+                            font_size=text_font_size,
                         ),
                         text=pb.TextConfig(x=0.975, y=0.96, text=single_grooming_method_text, font_size=text_font_size),
-                        legend=pb.LegendConfig(location="lower left", anchor=(0.02, 0.02)),
+                        legend=pb.LegendConfig(
+                            location="lower left",
+                            anchor=(0.02, 0.02),
+                            font_size=text_font_size,
+                            marker_label_spacing=0.2,
+                        ),
                     ),
                     # Ratio.
                     pb.Panel(
                         axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.1, 8.6)),
-                            pb.AxisConfig("y", label="PYTHIA/data", range=(0.65, 1.35)),
+                            pb.AxisConfig(
+                                "x",
+                                label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                                range=(-0.1, 8.6),
+                                font_size=text_font_size,
+                            ),
+                            pb.AxisConfig(
+                                "y",
+                                label=r"$\frac{\text{PYTHIA}}{\text{data}}$",
+                                range=(0.65, 1.35),
+                                font_size=text_font_size,
+                            ),
                         ]
                     ),
                 ],
-                figure=pb.Figure(edge_padding={"left": 0.12, "top": 0.975, "right": 0.975}),
+                figure=pb.Figure(edge_padding={"left": 0.13, "bottom": 0.115, "top": 0.975, "right": 0.975}),
             ),
             output_dir=output_dir,
         )
@@ -531,19 +562,29 @@ def run() -> None:
                         label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
                         log=True,
                         range=(7e-3, 1),
+                        font_size=text_font_size,
                     ),
                     text=pb.TextConfig(x=0.975, y=0.96, text=text, font_size=text_font_size),
-                    legend=pb.LegendConfig(location="lower left", anchor=(0.02, 0.02)),
+                    legend=pb.LegendConfig(
+                        location="lower left", anchor=(0.02, 0.02), font_size=text_font_size, marker_label_spacing=0.2
+                    ),
                 ),
                 # Ratio.
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.1, 8.6)),
-                        pb.AxisConfig("y", label=r"Data/Leading $k_{\text{T}}$", range=(0.5, 1.5)),
+                        pb.AxisConfig(
+                            "x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.1, 8.6), font_size=text_font_size
+                        ),
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$\frac{\text{Data}}{\text{Leading}\:k_{\text{T}}}$",
+                            range=(0.5, 1.5),
+                            font_size=text_font_size,
+                        ),
                     ]
                 ),
             ],
-            figure=pb.Figure(edge_padding={"left": 0.12, "top": 0.975, "right": 0.975}),
+            figure=pb.Figure(edge_padding={"left": 0.13, "bottom": 0.115, "top": 0.975, "right": 0.975}),
         ),
         output_dir=output_dir,
     )
