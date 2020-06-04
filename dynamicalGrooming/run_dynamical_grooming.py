@@ -1007,7 +1007,6 @@ def run_dynamical_grooming_embedding(
     partLevelJetCont = dynamical_grooming.GetJetContainer(3)
     partLevelJetCont.SetMaxTrackPt(1000)
     dynamical_grooming.SetUseNewCentralityEstimation(True)
-    # dynamical_grooming.SetJetPtThreshold(20)
     dynamical_grooming.SetJetPtThreshold(20)
     dynamical_grooming.SetCutDoubleCounts(False)
     dynamical_grooming.SetCheckResolution(True)
@@ -1019,6 +1018,56 @@ def run_dynamical_grooming_embedding(
     dynamical_grooming.SetDetLevelJetsOn(True)
     dynamical_grooming.SetStoreRecursiveJetSplittings(True)
     dynamical_grooming.Initialize()
+
+    # Hardest kt cross check task.
+    hardest_kt = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.AddTaskJetHardestKt(
+        "hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
+        "hybridLevelJets_AKTChargedR040_tracks_pT0150_E_scheme",
+        "detLevelJets_AKTChargedR040_tracks_pT0150_E_scheme",
+        "partLevelJets_AKTChargedR040_mcparticles_pT0000_E_scheme",
+        0.4,
+        "Rho",
+        "tracksSubR04",
+        "tracks",
+        "mcparticles",
+        "",
+        "mcparticles",
+        "TPC",
+        "V0M",
+        physics_selection,
+        ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kDetEmbPartPythia,
+        ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kEventSub,
+        ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kInclusive,
+        0,
+        0,
+        0.6,
+        ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kSecondOrder,
+        "Raw",
+    )
+    cont = hardest_kt.GetJetContainer(0)
+    cont.SetRhoName("Rho")
+    cont.SetRhoMassName("RhoMass")
+    cont.SetJetRadius(0.4)
+    cont.SetJetAcceptanceType(ROOT.AliJetContainer.kTPCfid)
+    cont.SetMaxTrackPt(100)
+
+    detLevelJetCont = hardest_kt.GetJetContainer(2)
+    detLevelJetCont.SetMaxTrackPt(100)
+
+    partLevelJetCont = hardest_kt.GetJetContainer(3)
+    partLevelJetCont.SetMaxTrackPt(1000)
+    hardest_kt.SetUseNewCentralityEstimation(True)
+    hardest_kt.SetJetPtThreshold(20)
+    hardest_kt.SetCutDoubleCounts(False)
+    hardest_kt.SetCheckResolution(True)
+    hardest_kt.SelectCollisionCandidates(physics_selection)
+    hardest_kt.SetNeedEmcalGeom(False)
+    hardest_kt.SetMinCentrality(30)
+    hardest_kt.SetMaxCentrality(50)
+    hardest_kt.SetMinFractionShared(0.5)
+    hardest_kt.SetDetLevelJetsOn(True)
+    hardest_kt.SetHardCutoff(0.2)
+    hardest_kt.Initialize()
 
     # Setup L+L substructure task.
     ll_substructure = _run_add_task_macro(
