@@ -881,7 +881,7 @@ def plot_all() -> None:
         logger.info("Couldn't load plot_from_skim due to syntax error. You need to load it.")
 
     user_ns = locals()
-    user_ns.update({"output_dir_f": output_dir_f})
+    user_ns.update({"output_dir_f": output_dir_f, "Path": Path})
     IPython.start_ipython(user_ns=user_ns)
 
 
@@ -1006,15 +1006,15 @@ def process_embedding_skim_entry_point() -> None:
 
 def run() -> None:
     helpers.setup_logging()
-    plot_only = False
+    plot_only = True
     # Define possible datasets
     datasets = {
-        #"PbPb": SkimDataset(
+        # "PbPb": SkimDataset(
         #    collision_system="PbPb",
         #    # TODO: improve this when time allows to accept single values....
         #    train_numbers=[5863],
         #    prefix="data",
-        #),
+        # ),
         "pythia_data": SkimDataset(
             collision_system="pythia",
             # TODO: improve this when time allows to accept single values....
@@ -1028,7 +1028,7 @@ def run() -> None:
             prefix="matched",
         ),
     }
-    #datasets.update(define_embedding_datasets(train_numbers=list(range(5884, 5904))))
+    # datasets.update(define_embedding_datasets(train_numbers=list(range(5884, 5904))))
 
     if not plot_only:
         #df_from_file_data(dataset=datasets["PbPb"],)

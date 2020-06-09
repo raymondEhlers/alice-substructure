@@ -685,6 +685,9 @@ def calculate_and_skim_data(
             # Store the results.
             grooming_results.update(grooming_result.asdict(prefix=prefix))
 
+            # if func_name == "leading_kt":
+            #     IPython.embed()
+
     branches = {k: v.dtype for k, v in grooming_results.items()}
     logger.info(f"Writing skim to {output_filename}")
     with uproot.recreate(output_filename) as output_file:
@@ -813,19 +816,12 @@ if __name__ == "__main__":
     number_of_cores = 1
 
     # Run embedding
-    run(
-        collision_system="embedPythia",
-        iterative_splittings=iterative_splittings,
-        calculate_and_skim_func=calculate_and_skim_embedding,
-        number_of_cores=number_of_cores,
-        additional_kwargs_for_analysis={"create_friend_tree": False, "draw_example_splittings": False},
-    )
-    # Run PbPb
     # run(
-    #    collision_system="PbPb",
+    #    collision_system="embedPythia",
     #    iterative_splittings=iterative_splittings,
-    #    calculate_and_skim_func=calculate_and_skim_data,
+    #    calculate_and_skim_func=calculate_and_skim_embedding,
     #    number_of_cores=number_of_cores,
+    #    additional_kwargs_for_analysis={"create_friend_tree": False, "draw_example_splittings": False},
     # )
     # Run pp
     # run(
@@ -834,13 +830,19 @@ if __name__ == "__main__":
     #    calculate_and_skim_func=calculate_and_skim_data,
     #    number_of_cores=number_of_cores,
     # )
-    # Run pythia
+    # Run PbPb
     # run(
-    #   collision_system="pythia",
-    #   iterative_splittings=iterative_splittings,
-    #   # mypy apparently doesn't handle adding arguments, even with callable protocols...
-    #   # We only get away with this because the prefixes are optional.
-    #   calculate_and_skim_func=calculate_and_skim_data,
-    #   number_of_cores=number_of_cores,
-    #   additional_kwargs_for_analysis={"prefixes": ["data", "matched"]},
+    #    collision_system="PbPb",
+    #    iterative_splittings=iterative_splittings,
+    #    calculate_and_skim_func=calculate_and_skim_data,
+    #    number_of_cores=number_of_cores,
     # )
+    run(
+        collision_system="pythia",
+        iterative_splittings=iterative_splittings,
+        # mypy apparently doesn't handle adding arguments, even with callable protocols...
+        # We only get away with this because the prefixes are optional.
+        calculate_and_skim_func=calculate_and_skim_data,
+        number_of_cores=number_of_cores,
+        additional_kwargs_for_analysis={"prefixes": ["data", "matched"]},
+    )

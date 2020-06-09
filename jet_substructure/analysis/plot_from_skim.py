@@ -625,7 +625,7 @@ def plot_response_by_matching_type(
                             ),
                         ],
                         text=TextConfig(x=0.03, y=0.97, text=text),
-                        legend=LegendConfig(location="upper left", font_size=14),
+                        # legend=LegendConfig(location="upper left", font_size=14),
                     ),
                     figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
                 ),
@@ -646,7 +646,7 @@ def plot_response_by_matching_type(
                             AxisConfig("y", label=fr"$R^{{\text{{ {generator_like_label} }}}}$"),
                         ],
                         text=TextConfig(x=0.03, y=0.97, text=text),
-                        legend=LegendConfig(location="upper left", font_size=14),
+                        # legend=LegendConfig(location="upper left", font_size=14),
                     ),
                     figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
                 ),
@@ -1226,6 +1226,7 @@ def compare_grooming_methods_for_substructure_prod(
 
     """
     jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+    prefix = "hybrid"
 
     # TODO: Comprehensive ALICE labeling.
     text = "Iterative splittings"
@@ -1235,7 +1236,7 @@ def compare_grooming_methods_for_substructure_prod(
         hists=hists,
         grooming_methods=grooming_methods,
         attr_name="kt",
-        prefix="data",
+        prefix=prefix,
         jet_pt_bin=jet_pt_bin,
         set_zero_to_nan=False,
         plot_config=PlotConfig(
@@ -1259,7 +1260,7 @@ def compare_grooming_methods_for_substructure_prod(
         hists=hists,
         grooming_methods=grooming_methods,
         attr_name="delta_R",
-        prefix="data",
+        prefix=prefix,
         jet_pt_bin=jet_pt_bin,
         set_zero_to_nan=False,
         plot_config=PlotConfig(
@@ -1281,7 +1282,7 @@ def compare_grooming_methods_for_substructure_prod(
         hists=hists,
         grooming_methods=grooming_methods,
         attr_name="z",
-        prefix="data",
+        prefix=prefix,
         jet_pt_bin=jet_pt_bin,
         set_zero_to_nan=True,
         plot_config=PlotConfig(
@@ -1303,7 +1304,7 @@ def compare_grooming_methods_for_substructure_prod(
         hists=hists,
         grooming_methods=grooming_methods,
         attr_name="n",
-        prefix="data",
+        prefix=prefix,
         jet_pt_bin=jet_pt_bin,
         set_zero_to_nan=False,
         plot_config=PlotConfig(
@@ -1326,7 +1327,7 @@ def compare_grooming_methods_for_substructure_prod(
         hists=hists,
         grooming_methods=grooming_methods,
         attr_name="kt_high_kt",
-        prefix="data",
+        prefix=prefix,
         jet_pt_bin=jet_pt_bin,
         set_zero_to_nan=False,
         plot_config=PlotConfig(
@@ -1350,7 +1351,7 @@ def compare_grooming_methods_for_substructure_prod(
         hists=hists,
         grooming_methods=grooming_methods,
         attr_name="delta_R_high_kt",
-        prefix="data",
+        prefix=prefix,
         jet_pt_bin=jet_pt_bin,
         set_zero_to_nan=False,
         plot_config=PlotConfig(
@@ -1372,7 +1373,7 @@ def compare_grooming_methods_for_substructure_prod(
         hists=hists,
         grooming_methods=grooming_methods,
         attr_name="z_high_kt",
-        prefix="data",
+        prefix=prefix,
         jet_pt_bin=jet_pt_bin,
         set_zero_to_nan=True,
         plot_config=PlotConfig(
@@ -1390,27 +1391,27 @@ def compare_grooming_methods_for_substructure_prod(
         output_dir=output_dir,
     )
 
-    _plot_compare_grooming_methods_for_attribute(
-        hists=hists,
-        grooming_methods=grooming_methods,
-        attr_name="n_high_kt",
-        prefix="data",
-        jet_pt_bin=jet_pt_bin,
-        set_zero_to_nan=False,
-        plot_config=PlotConfig(
-            name="number_to_split_high_kt_grooming_methods",
-            panels=Panel(
-                axes=[
-                    AxisConfig("x", label=r"$n$"),
-                    AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$", log=False),
-                ],
-                text=TextConfig(x=0.97, y=0.97, text=text),
-                legend=LegendConfig(location="upper right", font_size=14),
-            ),
-            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
-        ),
-        output_dir=output_dir,
-    )
+    # _plot_compare_grooming_methods_for_attribute(
+    #    hists=hists,
+    #    grooming_methods=grooming_methods,
+    #    attr_name="n_high_kt",
+    #    prefix=prefix,
+    #    jet_pt_bin=jet_pt_bin,
+    #    set_zero_to_nan=False,
+    #    plot_config=PlotConfig(
+    #        name="number_to_split_high_kt_grooming_methods",
+    #        panels=Panel(
+    #            axes=[
+    #                AxisConfig("x", label=r"$n$"),
+    #                AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$", log=False),
+    #            ],
+    #            text=TextConfig(x=0.97, y=0.97, text=text),
+    #            legend=LegendConfig(location="upper right", font_size=14),
+    #        ),
+    #        figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+    #    ),
+    #    output_dir=output_dir,
+    # )
 
 
 def _plot_compare_grooming_methods_for_attribute_data_embed(
@@ -1747,6 +1748,83 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     # Ratio.
                     Panel(axes=[AxisConfig("x", label=r"$n$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
                 ],
+            ),
+            output_dir=output_dir,
+        )
+
+
+def _plot_lund_plane(
+    hists: Mapping[str, bh.Histogram],
+    grooming_method: str,
+    prefix: str,
+    jet_pt_bin: helpers.RangeSelector,
+    plot_config: PlotConfig,
+    output_dir: Path,
+) -> None:
+    # Setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+    logger.info(f"Plotting lund plane for {grooming_method}")
+
+    #    jet_pt_axis, bh.axis.Regular(100, 0, 5), bh.axis.Regular(100, -5.0, 5.0), storage=bh.storage.Weight(),
+    # )
+
+    bh_hist = hists[f"{grooming_method}_{prefix}_lund_plane"]
+    h = binned_data.BinnedData.from_existing_data(bh_hist[bh.loc(60) : bh.loc(80) : bh.sum, :, :])  # noqa: E203
+
+    import IPython
+
+    IPython.embed()
+
+    # Scale by bin width
+    x_bin_widths, y_bin_widths = np.meshgrid(*h.axes.bin_widths)
+    bin_widths = x_bin_widths * y_bin_widths
+    # print(f"x_bin_widths: {x_bin_widths.size}")
+    # print(f"y_bin_widths: {y_bin_widths.size}")
+    # print(f"bin_widths size: {bin_widths.size}")
+    h /= bin_widths
+    # Scale by njets.
+    h /= np.sum(h.values)
+
+    # Determine the normalization range
+    z_axis_range = {
+        "vmin": h.values[h.values > 0].min(),
+        "vmax": h.values.max(),
+    }
+
+    # Make the plot
+    mesh = ax.pcolormesh(
+        h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+    )
+    fig.colorbar(mesh, pad=0.02)
+
+    # Apply the PlotConfig
+    plot_config.apply(fig=fig, ax=ax)
+
+    # Save and cleanup
+    filename = f"{plot_config.name}_{jet_pt_bin}_part_level_{jet_pt_bin}_iterative_splittings"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def lund_plane(hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path,) -> None:
+    true_jet_pt_bin = helpers.RangeSelector(min=60, max=80)
+    for grooming_method in grooming_methods:
+        text = ""
+        _plot_lund_plane(
+            hists=hists,
+            grooming_method=grooming_method,
+            prefix="matched",
+            jet_pt_bin=true_jet_pt_bin,
+            plot_config=PlotConfig(
+                name="lund_plane_pythia_part_{grooming_method}",
+                panels=Panel(
+                    axes=[
+                        AxisConfig("x", label=r"$\log{(1/\Delta R)}$"),
+                        AxisConfig("y", label=r"$\log{(k_{\text{T}})}$"),
+                    ],
+                    text=TextConfig(x=0.96, y=0.96, text=text),
+                    # legend=LegendConfig(location="upper right", anchor=(0.96, 0.73)),
+                ),
             ),
             output_dir=output_dir,
         )
