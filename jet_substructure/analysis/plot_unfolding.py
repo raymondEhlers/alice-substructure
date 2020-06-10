@@ -375,8 +375,8 @@ class InputFile:
         return f"unfolding_{self.identifier}.root"
 
 
-def setup(input_file: InputFile) -> Tuple[Dict[str, binned_data.BinnedData], Path]:
-    base_dir = Path("output") / "unfolding"
+def setup(input_file: InputFile, collision_system: str) -> Tuple[Dict[str, binned_data.BinnedData], Path]:
+    base_dir = Path("output") / collision_system / "unfolding"
     input_filename = base_dir / input_file.filename
     output_dir = base_dir / input_file.substructure_variable / input_file.identifier
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -406,16 +406,16 @@ def setup(input_file: InputFile) -> Tuple[Dict[str, binned_data.BinnedData], Pat
     return hists, output_dir
 
 
-def run() -> None:
+def run(collision_system: str) -> None:
     for input_file in [
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="test"),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="test", smeared_input=True),
-        InputFile("kt", "leading_kt_z_cut_04", suffix="test"),
-        InputFile("kt", "leading_kt_z_cut_04", suffix="test", smeared_input=True),
+        InputFile("kt", "leading_kt_z_cut_02", suffix="test"),
+        InputFile("kt", "leading_kt_z_cut_02", suffix="test", smeared_input=True),
+        # InputFile("kt", "leading_kt_z_cut_04", suffix="test"),
+        # InputFile("kt", "leading_kt_z_cut_04", suffix="test", smeared_input=True),
         # InputFile("kt", "leading_kt_z_cut_04", suffix="test", pure_matches=True),
         # InputFile("kt", "leading_kt_z_cut_04", suffix="test", pure_matches=True, smeared_input=True),
     ]:
-        hists, output_dir = setup(input_file=input_file)
+        hists, output_dir = setup(input_file=input_file, collision_system=collision_system)
 
         # with sns.color_palette("GnBu_d", n_colors=11):
         with sns.color_palette("Paired", n_colors=11):
@@ -663,12 +663,12 @@ def run() -> None:
         # plot_response_matrix(hists["responseUnscaled"], "response", output_dir)
 
 
-def run_delta_R() -> None:
+def run_delta_R(collision_system: str) -> None:
     for input_file in [
         InputFile("delta_R", "leading_kt_z_cut_04", suffix="test"),
         InputFile("delta_R", "leading_kt_z_cut_04", suffix="test", smeared_input=True),
     ]:
-        hists, output_dir = setup(input_file=input_file)
+        hists, output_dir = setup(input_file=input_file, collision_system=collision_system)
 
         # with sns.color_palette("GnBu_d", n_colors=11):
         with sns.color_palette("Paired", n_colors=11):
@@ -843,6 +843,7 @@ if __name__ == "__main__":
     # Quiet down the matplotlib logging
     logging.getLogger("matplotlib").setLevel(logging.INFO)
     logging.getLogger("pachyderm.histogram").setLevel(logging.INFO)
+    collision_system = "PbPb"
 
     # Enable ticks on all sides
     # Unfortunately, some of this is overriding the pachyderm plotting style.
@@ -852,5 +853,5 @@ if __name__ == "__main__":
     # matplotlib.rcParams["ytick.right"] = True
     # matplotlib.rcParams["ytick.minor.right"] = True
 
-    run()
-    run_delta_R()
+    run(collision_system=collision_system)
+    # run_delta_R(collision_system=collision_system)
