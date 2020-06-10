@@ -281,6 +281,7 @@ def prong_matching(
     Returns:
         Matching and subleading matching values.
     """
+    # We can only perform matching if there are selected splittings.
     # Need to mask for calculations which have no indices (ie didn't find any that met criteria.
     mask = (generator_like_jets_calculation.indices.counts != 0) & (measured_like_jets_calculation.indices.counts != 0)
     try:
@@ -313,7 +314,7 @@ def prong_matching(
         # We'll store the output in an array, and then store that in the overall output with a mask
         # We need the additional mask because we can't perform matching for every jet (single particle jets, etc).
         output = np.zeros(len(generator_like_jets_calculation.input_jets), dtype=np.int)
-        matching_output = np.zeros(len(masked_generator_like_jets_calculation.input_jets), dtype=np.int)
+        matching_output = np.zeros(len(matching.properly), dtype=np.int)
         matching_output[matching.properly] = 1
         matching_output[matching.mistag] = 2
         matching_output[matching.failed] = 3
@@ -675,6 +676,13 @@ def calculate_and_skim_data(
                 # Number of splittings which pass the grooming condition. For SoftDrop, this is n_sd.
                 n_passed_grooming=calculation.possible_indices.counts,
             )
+            # Cross check
+            mask = grooming_result.kt < 0
+            logger.info(
+                f"Tagged fraction for {prefix}: {func_name}: {1 - (len(grooming_result.kt[mask])/(len(grooming_result.kt)))}"
+            )
+
+            # Store the results.
             grooming_results.update(grooming_result.asdict(prefix=prefix))
 
     branches = {k: v.dtype for k, v in grooming_results.items()}
@@ -819,12 +827,20 @@ if __name__ == "__main__":
     #    calculate_and_skim_func=calculate_and_skim_data,
     #    number_of_cores=number_of_cores,
     # )
+    # Run pp
     # run(
-    #    collision_system="pythia",
+    #    collision_system="pp",
     #    iterative_splittings=iterative_splittings,
-    #    # mypy apparently doesn't handle adding arguments, even with callable protocols...
-    #    # We only get away with this because the prefixes are optional.
     #    calculate_and_skim_func=calculate_and_skim_data,
     #    number_of_cores=number_of_cores,
-    #    additional_kwargs_for_analysis={"prefixes": ["data", "matched"]},
+    # )
+    # Run pythia
+    # run(
+    #   collision_system="pythia",
+    #   iterative_splittings=iterative_splittings,
+    #   # mypy apparently doesn't handle adding arguments, even with callable protocols...
+    #   # We only get away with this because the prefixes are optional.
+    #   calculate_and_skim_func=calculate_and_skim_data,
+    #   number_of_cores=number_of_cores,
+    #   additional_kwargs_for_analysis={"prefixes": ["data", "matched"]},
     # )
