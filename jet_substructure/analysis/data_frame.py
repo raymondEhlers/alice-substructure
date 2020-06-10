@@ -78,11 +78,11 @@ class SkimDataset:
         if self._path_list:
             input_path_list = self._path_list
         else:
-            base_path = Path("trains") / self.collision_system / "{train_number}"
+            base_path = Path("trains") / self.collision_system / "{train_number}" / "skim"
             if self.merged_skim:
                 base_path = base_path / "merged" / "*.root"
             else:
-                base_path = base_path / "*_iterative_splittings.root"
+                base_path = base_path / "*_iterative_splittings*.root"
             input_path_list = [
                 Path(str(base_path).format(train_number=train_number)) for train_number in self.train_numbers
             ]
@@ -97,7 +97,10 @@ class SkimDataset:
 
     @property
     def output_path(self) -> Path:
-        return Path("output") / self.collision_system / "skim"
+        base = Path("output") / self.collision_system / "skim"
+        if len(self.train_numbers) == 1:
+            base = base / str(self.train_numbers[0])
+        return base
 
     @property
     def output_filename(self) -> Path:
@@ -338,6 +341,9 @@ def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Pat
 
             # Setup
             hybrid_jet_pt_mask = (df["jet_pt_hybrid"] > 40) & (df["jet_pt_hybrid"] < 120)
+            # Add in the double counting cut into the jet pt mask (because we always want to apply it
+            # along side the jet pt cut)
+            hybrid_jet_pt_mask = hybrid_jet_pt_mask & (df["leading_track_det_level"] >= df["leading_track_hybrid"])
             # And finally process
             for grooming_method in grooming_methods:
 
@@ -593,6 +599,9 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
     branches = [f"*{prefix}*"]
     if dataset.collision_system in ["pythia", "embedPythia"]:
         branches.append("scale_factor")
+    if dataset.collision_system == "embedPythia":
+        branches.append("leading_track_det_level")
+        branches.append("leading_track_hybrid")
     data_frames = uproot.pandas.iterate(
         path=dataset.path_list, treepath="tree", namedecode="utf-8", branches=branches, reportpath=True,
     )
@@ -639,6 +648,10 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
         hists[f"{grooming_method}_{prefix}_n_passed_grooming"] = bh.Histogram(
             jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
         )
+        # Lund plane
+        hists[f"{grooming_method}_{prefix}_lund_plane"] = bh.Histogram(
+            jet_pt_axis, bh.axis.Regular(100, 0, 5), bh.axis.Regular(100, -5.0, 5.0), storage=bh.storage.Weight(),
+        )
         # High kt
         hists[f"{grooming_method}_{prefix}_kt_high_kt"] = bh.Histogram(
             jet_pt_axis, bh.axis.Regular(26, -1, 25), storage=bh.storage.Weight(),
@@ -676,11 +689,22 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
             # Jet pt bin
             jet_pt_bin = helpers.RangeSelector(min=40, max=120)
             jet_pt_mask = jet_pt_bin.mask_array(df[f"jet_pt_{prefix}"])
+            # Add double counting cut for embedPythia
+            if dataset.collision_system == "embedPythia":
+                jet_pt_mask = jet_pt_mask & (df["leading_track_det_level"] >= df["leading_track_hybrid"])
 
             # Standard grooming method plots
             masked_df = df[jet_pt_mask]
             for grooming_method in grooming_methods:
                 _fill_grooming_hists(masked_df=masked_df, grooming_method=grooming_method, hists=hists, prefix=prefix)
+
+            # Lund plane
+            hists[f"{grooming_method}_{prefix}_lund_plane"].fill(
+                masked_df[f"jet_pt_{prefix}"].to_numpy(),
+                np.log(1.0 / masked_df[f"{grooming_method}_{prefix}_delta_R"].to_numpy()),
+                np.log(masked_df[f"{grooming_method}_{prefix}_kt"].to_numpy()),
+                weight=masked_df["scale_factor"].to_numpy(),
+            )
 
             # Direct comparison plots
             mask = jet_pt_mask & (df[f"{grooming_method}_{prefix}_n_passed_grooming"] <= 1)
@@ -757,17 +781,37 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
 #        pickle.dump(hists, pkl_file)  # type: ignore
 
 
-def merge_output(train_numbers: Sequence[int], output_filename: Path, output_path: Path) -> Path:
+def merge_output(train_numbers: Sequence[int], output_filename: Path, output_path: Path, prefix: str = "") -> Path:
     filename = output_filename.with_suffix("").name
+    # Have to remore the prefix if it's there because I made a typo when creating the files
+    logger.debug(f"prefix: {prefix}")
+    search_filename = filename
+    if prefix:
+        search_filename = search_filename.replace(f"_{prefix}", "")
     # embedding_hists = functools.reduce(merge_hists, [dill.load(gzip.GzipFile(f"output/{collision_system}/skim/{train_number}/embedded.pgz", "r")) for train_number in train_numbers])
-    hists = functools.reduce(
-        _merge_hists,
-        [
-            dill.load(gzip.GzipFile(f"{output_path}/{train_number}/{filename}.pgz", "r"))
-            for train_number in train_numbers
-        ],
-    )
-    pkl_filename = output_path / "{filename}.pgz"
+    files = []
+    for train_number in train_numbers:
+        files.extend(list((Path(output_path) / str(train_number)).glob(f"{search_filename}_*.pgz")))
+    logger.info(f"filename: {filename}")
+    logger.info(f"files: {files}")
+    first_filename = files[0]
+    with gzip.GzipFile(first_filename, "r") as f:
+        hists = dill.load(f)
+    for f in files[1:3]:
+        logger.debug(f"Handling file {f}")
+        with gzip.GzipFile(first_filename, "r") as f:
+            temp_hists = dill.load(f)
+            for k, v in temp_hists.items():
+                hists[k] += v
+        del temp_hists
+    #hists = functools.reduce(
+    #    _merge_hists,
+    #    (
+    #        dill.load(gzip.GzipFile(f, "r"))
+    #        for f in files
+    #    ),
+    #)
+    pkl_filename = output_path / f"{filename}.pgz"
     logger.info(f"Saving hists to {pkl_filename}")
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
         dill.dump(hists, pkl_file)
@@ -866,6 +910,7 @@ def run_plot(datasets: Mapping[str, SkimDataset], remerge: bool = False) -> None
                 train_numbers=dataset.train_numbers,
                 output_filename=dataset.output_filename,
                 output_path=dataset.output_path,
+                prefix=dataset.prefix,
             )
         dataset.load_hists()
 
@@ -894,6 +939,7 @@ def run_plot(datasets: Mapping[str, SkimDataset], remerge: bool = False) -> None
 
 
 def define_embedding_datasets(
+    output_identifier: str = "",
     train_number: Optional[int] = None, train_numbers: Optional[Sequence[int]] = None
 ) -> Dict[str, SkimDataset]:
     if train_number is None and train_numbers is None:
@@ -905,18 +951,24 @@ def define_embedding_datasets(
     # Validation
     train_numbers = list(train_numbers)
 
+    output_identifier_full = "embedding"
+    if output_identifier:
+        output_identifier_full = output_identifier_full + f"_{output_identifier}"
     datasets = {
         "embedPythia_response": SkimDataset(
             collision_system="embedPythia",
             train_numbers=train_numbers,
             merged_skim=True,
-            output_filename_identifier="embedding",
+            output_filename_identifier=output_identifier_full,
         ),
     }
     # Could analyze any of these prefixes for the embedded.
+    output_identifier_full = "embedPythia"
+    if output_identifier:
+        output_identifier_full = output_identifier_full + f"_{output_identifier}"
     for prefix in ["hybrid", "det_level", "true"]:
         datasets[f"embedPythia_{prefix}"] = SkimDataset(
-            collision_system="embedPythia", train_numbers=train_numbers, merged_skim=True, prefix=prefix,
+            collision_system="embedPythia", train_numbers=train_numbers, merged_skim=True, prefix=prefix, output_filename_identifier=output_identifier_full
         )
     return datasets
 
@@ -936,7 +988,7 @@ def process_embedding_skim_entry_point() -> None:
     parser.add_argument("-f", "--filename", required=True, type=str, help="Filename to process.")
     args = parser.parse_args()
 
-    embedding_datasets = define_embedding_datasets(train_number=args.trainNumber)
+    embedding_datasets = define_embedding_datasets(train_number=args.trainNumber, output_identifier=Path(args.filename).with_suffix("").name)
     # This is a hack, but it's easy right now...
     for dataset in embedding_datasets.values():
         dataset._path_list = [Path(args.filename)]
@@ -947,7 +999,7 @@ def process_embedding_skim_entry_point() -> None:
         dataset=embedding_datasets["embedPythia_response"], path_list_friends=[],
     )
     # Hybrid
-    df_from_file_data(dataset=embedding_datasets["embedPythia_hybrid"],)
+    df_from_file_data(dataset=embedding_datasets["embedPythia_hybrid"])
 
     logger.info("Done!")
 
@@ -957,23 +1009,36 @@ def run() -> None:
     plot_only = False
     # Define possible datasets
     datasets = {
-        "PbPb": SkimDataset(
-            collision_system="PbPb",
+        #"PbPb": SkimDataset(
+        #    collision_system="PbPb",
+        #    # TODO: improve this when time allows to accept single values....
+        #    train_numbers=[5863],
+        #    prefix="data",
+        #),
+        "pythia_data": SkimDataset(
+            collision_system="pythia",
             # TODO: improve this when time allows to accept single values....
-            train_numbers=[5863],
+            train_numbers=[2110],
             prefix="data",
         ),
+        "pythia_matched": SkimDataset(
+            collision_system="pythia",
+            # TODO: improve this when time allows to accept single values....
+            train_numbers=[2110],
+            prefix="matched",
+        ),
     }
-    datasets.update(define_embedding_datasets(train_numbers=list(range(5884, 5904))))
+    #datasets.update(define_embedding_datasets(train_numbers=list(range(5884, 5904))))
 
     if not plot_only:
-        df_from_file_data(dataset=datasets["PbPb"],)
+        #df_from_file_data(dataset=datasets["PbPb"],)
         # run_embed_pythia(run_response=True)
-        df_from_file_data(dataset=datasets["embedPythia_hybrid"],)
-        df_from_file_embedding(
-            dataset=datasets["embedPythia_response"], path_list_friends=[],
-        )
-        # df_from_file_data(collision_system="pythia")
+        #df_from_file_data(dataset=datasets["embedPythia_hybrid"],)
+        #df_from_file_embedding(
+        #    dataset=datasets["embedPythia_response"], path_list_friends=[],
+        #)
+        df_from_file_data(dataset=datasets["pythia_matched"],)
+        df_from_file_data(dataset=datasets["pythia_data"],)
         # dask_df_from_file()
         # dask_df_from_delayed()
         # map_reduce_pandas_concat()
