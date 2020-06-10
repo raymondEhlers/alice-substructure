@@ -1008,7 +1008,7 @@ def run_dynamical_grooming_embedding(
     partLevelJetCont.SetMaxTrackPt(1000)
     dynamical_grooming.SetUseNewCentralityEstimation(True)
     dynamical_grooming.SetJetPtThreshold(20)
-    dynamical_grooming.SetCutDoubleCounts(False)
+    dynamical_grooming.SetCutDoubleCounts(True)
     dynamical_grooming.SetCheckResolution(True)
     dynamical_grooming.SelectCollisionCandidates(physics_selection)
     dynamical_grooming.SetNeedEmcalGeom(False)
@@ -1066,6 +1066,7 @@ def run_dynamical_grooming_embedding(
     hardest_kt.SetMaxCentrality(50)
     hardest_kt.SetMinFractionShared(0.5)
     hardest_kt.SetDetLevelJetsOn(True)
+    hardest_kt.SetEnableSubjetMatching(True)
     hardest_kt.SetHardCutoff(0.2)
     hardest_kt.Initialize()
 
