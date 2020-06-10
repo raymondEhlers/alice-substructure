@@ -258,6 +258,8 @@ datasets:
                 - "data.fJetSplittings.fDeltaR"
                 - "data.fJetSplittings.fZ"
                 - "data.fJetSplittings.fParentIndex"
+                # For cross check of iterative splittings identification.
+                - "data.fJetSplittings.fIterativeSplitting"
                 - "data.fSubjets.fPartOfIterativeSplitting"
                 - "data.fSubjets.fSplittingNodeIndex"
                 - "data.fSubjets.fConstituentIndices"
@@ -270,6 +272,8 @@ datasets:
                 - "matched.fJetSplittings.fDeltaR"
                 - "matched.fJetSplittings.fZ"
                 - "matched.fJetSplittings.fParentIndex"
+                # For cross check of iterative splittings identification.
+                - "matched.fJetSplittings.fIterativeSplitting"
                 - "matched.fSubjets.fPartOfIterativeSplitting"
                 - "matched.fSubjets.fSplittingNodeIndex"
                 - "matched.fSubjets.fConstituentIndices"
@@ -636,7 +640,8 @@ available_datasets:
         jet_R: 0.8
         files: *toyFilesR040
     runMacro:
-        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeTree_PythiaDef_NoSub_Incl"
+        #tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeTree_PythiaDef_NoSub_Incl"
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
         jet_R: 0.4
         files:
             - "dynamicalGrooming/AnalysisResults.root"
