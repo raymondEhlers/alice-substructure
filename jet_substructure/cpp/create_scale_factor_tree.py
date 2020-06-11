@@ -31,26 +31,27 @@ def scale_factor_tree(filename: Path) -> None:
     # argmax will return the index of the first instance of True.
     pt_hard_bin = (h_cross_section.values != 0).argmax(axis=0)
 
-    # Sanity check
-    np.testing.assert_allclose(np.sum(h_cross_section.values), h_cross_section_uproot._fEntries)
-
-    scale_factor = (h_cross_section.values[pt_hard_bin] * np.sum(h_cross_section.values)) / h_n_trials.values[
-        pt_hard_bin
-    ]
+    # The cross section is a profile hist, but we just read the raw values with uproot + binned_data. Consequently, the values
+    # aren't scaled down by the number of entries in that bin (as already performed by ROOT), so we just take the
+    # cross section / n_trials
+    scale_factor = h_cross_section.values[pt_hard_bin] / h_n_trials.values[pt_hard_bin]
+    logger.debug(f"Scale factor: {scale_factor}")
 
     # Get number of entries in the tree to determine
     n_entries = uproot.tree.numentries(
-        input_file,
-        "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl",
+        str(filename),
+        "AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
     )
+    logger.debug(f"n entries: {n_entries}")
 
-    output_filename = str(filename.with_suffix("")) + "_scale_factor.root"
+    output_filename = filename.parent / "scale_factor" / filename.name
+    output_filename.parent.mkdir(exist_ok=True, parents=True)
     logger.info(f"Writing scale_factor to {output_filename}")
     branches = {"scale_factor": np.float32}
     with uproot.recreate(output_filename) as output_file:
         output_file["tree"] = uproot.newtree(branches)
         # Write all of the calculations
-        output_file["tree"].extend(scale_factor * np.ones(n_entries))
+        output_file["tree"].extend({"scale_factor" : scale_factor * np.ones(n_entries)})
 
 
 if __name__ == "__main__":
