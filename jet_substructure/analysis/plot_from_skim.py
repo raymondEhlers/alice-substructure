@@ -1481,8 +1481,8 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
                 ax_ratio.errorbar(
                     ratio.axes[0].bin_centers,
                     ratio.values,
-                    yerr=h.errors,
-                    xerr=h.axes[0].bin_widths / 2,
+                    yerr=ratio.errors,
+                    xerr=ratio.axes[0].bin_widths / 2,
                     color=style.color,
                     marker=style.marker,
                     fillstyle=style.fillstyle,
