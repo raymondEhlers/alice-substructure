@@ -71,10 +71,12 @@ def _plot_subjet_matching(
     axis_parameter: str,
     grooming_method: str,
     matching_types: Sequence[str],
+    hist_suffix: str,
     hybrid_jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
     output_dir: Path,
     min_hybrid_kt: float = 0,
+    rdf_plots: bool = False,
 ) -> None:
     fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -84,26 +86,42 @@ def _plot_subjet_matching(
         "pure": "Pure matches",
         "leading_untagged_subleading_correct": "Leading unmatched, subleading matched",
         "leading_correct_subleading_untagged": "Leading matched, subleading unmatched",
+        "leading_correct_subleading_mistag": "Leading matched, subleading in leading",
+        "leading_mistag_subleading_correct": "Leading in subleading, subleading matched",
         "leading_untagged_subleading_mistag": "Leading unmatched, subleading in leading",
         "leading_mistag_subleading_untagged": "Leading in subleading, subleading unmatched",
         "swap": "Swaps",
         "both_untagged": "Leading, subleading unmatched",
     }
 
-    normalization = _project_matching(
-        bh_hist=hists[f"{grooming_method}_hybrid_det_level_kt_response_matching_type_all"], axis_to_keep=axis_to_keep
-    )
+    if rdf_plots:
+        hist_name = f"{grooming_method}_hybrid_det_level_matching_all"
+        if hist_suffix:
+            hist_name += f"_{hist_suffix}"
+        normalization = binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5)])
+    else:
+        normalization = _project_matching(
+            bh_hist=hists[f"{grooming_method}_hybrid_det_level_kt_response_matching_type_all"],
+            axis_to_keep=axis_to_keep,
+        )
 
+    values = np.zeros_like(normalization.values)
     for matching_type in matching_types:
         if matching_type == "all":
             continue
         logger.debug(
-            f"Plotting {axis_parameter} residual for {grooming_method}, {matching_type}, min_hybrid_kt: {min_hybrid_kt}"
+            f"Plotting {axis_parameter} residual for {grooming_method}, {matching_type}, min_hybrid_kt: {min_hybrid_kt}, hist_suffix: {hist_suffix}"
         )
-        h = _project_matching(
-            hists[f"{grooming_method}_hybrid_det_level_kt_response_matching_type_{matching_type}"],
-            axis_to_keep=axis_to_keep,
-        )
+        if rdf_plots:
+            hist_name = f"{grooming_method}_hybrid_det_level_matching_{matching_type}"
+            if hist_suffix:
+                hist_name += f"_{hist_suffix}"
+            h = binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5)])
+        else:
+            h = _project_matching(
+                hists[f"{grooming_method}_hybrid_det_level_kt_response_matching_type_{matching_type}"],
+                axis_to_keep=axis_to_keep,
+            )
 
         h /= normalization
         ax.errorbar(
@@ -116,21 +134,12 @@ def _plot_subjet_matching(
             label=matching_type_label_map[matching_type],
         )
 
-    # Labeling
-    text = "Iterative splittings"
-    text += "\n" + f"${helpers.RangeSelector(40, 120).display_str(label='hybrid')}$"
-    text += "\n" + " ".join(grooming_method.split("_")).capitalize()
-    ax.text(
-        0.975,
-        0.55,
-        text,
-        transform=ax.transAxes,
-        horizontalalignment="right",
-        verticalalignment="center",
-        multialignment="right",
-    )
+        # Check normalization
+        values += h.values
 
-    # Presentation
+    logger.debug(f"values: {values}")
+
+    # Presentation and labeling
     # Axis labels
     x_axis_label = fr"${axis_parameter[0]}" + r"_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$"
     ax.set_xlabel(x_axis_label)
@@ -138,29 +147,80 @@ def _plot_subjet_matching(
     plot_config.apply(fig=fig, axes=[ax])
 
     # Store and reset
-    fig.savefig(
-        output_dir
-        / f"{plot_config.name}_{axis_parameter}_hybrid_{hybrid_jet_pt_bin}_{grooming_method}_single_figure.pdf"
-    )
+    filename = f"{plot_config.name}_{axis_parameter}_hybrid_{hybrid_jet_pt_bin}_{grooming_method}_single_figure"
+    if hist_suffix:
+        filename += f"_{hist_suffix}"
+    fig.savefig(output_dir / f"{filename}.pdf")
     plt.close(fig)
 
 
 def plot_prong_matching(
     hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], matching_types: Sequence[str], output_dir: Path
 ) -> None:
+    # Setup
     hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+    # Just for labeling
+    grooming_styling = define_grooming_styles()
+
     for grooming_method in grooming_methods:
+        text = "Iterative splittings"
+        text += "\n" + f"${helpers.RangeSelector(40, 120).display_str(label='hybrid')}$"
+        text += "\n" + grooming_styling[grooming_method].label
         _plot_subjet_matching(
             hists=hists,
+            axis_parameter="pt",
             grooming_method=grooming_method,
             matching_types=matching_types,
-            axis_parameter="pt",
+            hist_suffix="",
             hybrid_jet_pt_bin=hybrid_jet_pt_bin,
             plot_config=PlotConfig(
                 name="subjet_matching",
                 panels=Panel(
                     axes=[AxisConfig("y", label="Tagging Fraction", log=True, range=(1e-3, 10))],
                     legend=LegendConfig(location="upper left", ncol=2, font_size=14),
+                    text=TextConfig(x=0.975, y=0.8, text=text),
+                ),
+                figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
+            ),
+            output_dir=output_dir,
+        )
+        # n_to_split < 3
+        text_n_to_split_less_than_3 = text
+        text_n_to_split_less_than_3 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{hybrid}}}} < 3$"
+        _plot_subjet_matching(
+            hists=hists,
+            axis_parameter="pt",
+            grooming_method=grooming_method,
+            matching_types=matching_types,
+            hist_suffix="data_n_to_split_less_than_3",
+            hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+            plot_config=PlotConfig(
+                name="subjet_matching",
+                panels=Panel(
+                    axes=[AxisConfig("y", label="Tagging Fraction", log=True, range=(1e-3, 10))],
+                    legend=LegendConfig(location="upper left", ncol=2, font_size=14),
+                    text=TextConfig(x=0.975, y=0.8, text=text_n_to_split_less_than_3),
+                ),
+                figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
+            ),
+            output_dir=output_dir,
+        )
+        # n to split > 4
+        text_n_to_split_greater_than_4 = text
+        text_n_to_split_greater_than_4 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{hybrid}}}} > 4$"
+        _plot_subjet_matching(
+            hists=hists,
+            axis_parameter="pt",
+            grooming_method=grooming_method,
+            matching_types=matching_types,
+            hist_suffix="data_n_to_split_greater_than_4",
+            hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+            plot_config=PlotConfig(
+                name="subjet_matching",
+                panels=Panel(
+                    axes=[AxisConfig("y", label="Tagging Fraction", log=True, range=(1e-3, 10))],
+                    legend=LegendConfig(location="upper left", ncol=2, font_size=14),
+                    text=TextConfig(x=0.975, y=0.8, text=text_n_to_split_greater_than_4),
                 ),
                 figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
             ),
@@ -534,27 +594,37 @@ def _plot_response_by_matching_type(
     grooming_method: str,
     response_type: skim_analysis_objects.ResponseType,
     matching_types: Sequence[str],
+    matching_level: str,
+    hist_suffix: str,
     hybrid_jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
     output_dir: Path,
+    rdf_plots: bool = False,
 ) -> None:
     for matching_type in matching_types:
         logger.debug(
-            f"Plotting {label} {response_type} response for {grooming_method}, {matching_type}, hybrid: {hybrid_jet_pt_bin}"
+            f"Plotting {label} {response_type} response for {grooming_method}, {matching_type}, matching level: {matching_level}, hybrid: {hybrid_jet_pt_bin}, hist_suffix: {hist_suffix}"
         )
 
         matches_label = " ".join(matching_type.split("_")).capitalize()
-        bh_input_hist = hists[f"{grooming_method}_{response_type}_{label}_response_matching_type_{matching_type}"]
+        hist_name = f"{grooming_method}_{response_type}_{label}_response_{matching_level}_matching_type_{matching_type}"
+        if hist_suffix:
+            hist_name += f"_{hist_suffix}"
+        bh_input_hist = hists[hist_name]
         h_input = binned_data.BinnedData.from_existing_data(bh_input_hist)
 
         # Select the variables (for the example of kt)
         # Axes: hybrid_pt, hybrid_kt, det_level_pt, det_level_kt
         # NOTE: We already applied the 40 < hybrid jet pt < 120 cut, so it doesn't need an additional selection.
-        h = binned_data.BinnedData(
-            axes=[h_input.axes[1], h_input.axes[3]],
-            values=np.sum(h_input.values, axis=(0, 2)),
-            variances=np.sum(h_input.variances, axis=(0, 2)),
-        )
+        if rdf_plots:
+            # For RDF skim
+            h = h_input
+        else:
+            h = binned_data.BinnedData(
+                axes=[h_input.axes[1], h_input.axes[3]],
+                values=np.sum(h_input.values, axis=(0, 2)),
+                variances=np.sum(h_input.variances, axis=(0, 2)),
+            )
 
         # Normalize the response.
         normalization_values = h.values.sum(axis=0, keepdims=True)
@@ -581,11 +651,18 @@ def _plot_response_by_matching_type(
         # Labeling and presentation
         # Help out mypy...
         assert plot_config.panels[0].text is not None
+        original_text = plot_config.panels[0].text.text
         plot_config.panels[0].text.text += "\n" + matches_label + " matches"
         plot_config.apply(fig=fig, ax=ax)
+        # Restore the proper text after adding the matching label and plotting it.
+        plot_config.panels[0].text.text = original_text
 
         # Store and cleanup
-        filename = f"{plot_config.name}_iterative_splittings_{grooming_method}_matching_type_{matching_type}"
+        filename = (
+            f"{plot_config.name}_iterative_splittings_{grooming_method}_{matching_level}_matching_type_{matching_type}"
+        )
+        if hist_suffix:
+            filename += f"_{hist_suffix}"
         fig.savefig(output_dir / f"{filename}.pdf")
         plt.close(fig)
 
@@ -596,62 +673,150 @@ def plot_response_by_matching_type(
     response_types: Sequence[skim_analysis_objects.ResponseType],
     matching_types: Sequence[str],
     output_dir: Path,
+    rdf_plots: bool = True,
 ) -> None:
+    # Setup
     hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
-    for grooming_method in grooming_methods:
-        for response_type in response_types:
-            # Improve the display of labels (such as "det_level" -> "det"
-            measured_like_label = response_type.measured_like.replace("_level", "")
-            generator_like_label = response_type.generator_like.replace("_level", "")
-            text = "Iterative splittings"
-            text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
-            text += "\n" + " ".join(grooming_method.split("_")).capitalize()
-            _plot_response_by_matching_type(
-                hists=hists,
-                label="kt",
-                grooming_method=grooming_method,
-                response_type=response_type,
-                matching_types=matching_types,
-                hybrid_jet_pt_bin=hybrid_jet_pt_bin,
-                plot_config=PlotConfig(
-                    name=f"response_kt_{response_type}",
-                    panels=Panel(
-                        axes=[
-                            AxisConfig(
-                                "x", label=fr"$k_{{\text{{T}}}}^{{\text{{{measured_like_label}}}}}\:(\text{{GeV}}/c)$"
-                            ),
-                            AxisConfig(
-                                "y", label=fr"$k_{{\text{{T}}}}^{{\text{{{generator_like_label}}}}}\:(\text{{GeV}}/c)$"
-                            ),
-                        ],
-                        text=TextConfig(x=0.03, y=0.97, text=text),
-                        # legend=LegendConfig(location="upper left", font_size=14),
+    # Just for labeling
+    grooming_styling = define_grooming_styles()
+
+    for matching_level, measured_like_prefix in [
+        ("hybrid_det_level", "data"),
+        # ("det_level_true", "det_level")
+    ]:
+        for grooming_method in grooming_methods:
+            for response_type in response_types:
+                # Improve the display of labels (such as "det_level" -> "det"
+                measured_like_label = response_type.measured_like.replace("_level", "")
+                generator_like_label = response_type.generator_like.replace("_level", "")
+                text = "Iterative splittings"
+                text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+                text += "\n" + grooming_styling[grooming_method].label
+                _plot_response_by_matching_type(
+                    hists=hists,
+                    label="kt",
+                    grooming_method=grooming_method,
+                    response_type=response_type,
+                    matching_types=matching_types,
+                    matching_level=matching_level,
+                    hist_suffix="",
+                    hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                    plot_config=PlotConfig(
+                        name=f"response_kt_{response_type}",
+                        panels=Panel(
+                            axes=[
+                                AxisConfig(
+                                    "x",
+                                    label=fr"$k_{{\text{{T}}}}^{{\text{{{measured_like_label}}}}}\:(\text{{GeV}}/c)$",
+                                ),
+                                AxisConfig(
+                                    "y",
+                                    label=fr"$k_{{\text{{T}}}}^{{\text{{{generator_like_label}}}}}\:(\text{{GeV}}/c)$",
+                                ),
+                            ],
+                            text=TextConfig(x=0.03, y=0.97, text=text),
+                            # legend=LegendConfig(location="upper left", font_size=14),
+                        ),
+                        figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
                     ),
-                    figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
-                ),
-                output_dir=output_dir,
-            )
-            _plot_response_by_matching_type(
-                hists=hists,
-                label="delta_R",
-                grooming_method=grooming_method,
-                response_type=response_type,
-                matching_types=matching_types,
-                hybrid_jet_pt_bin=hybrid_jet_pt_bin,
-                plot_config=PlotConfig(
-                    name=f"response_delta_R_{response_type}",
-                    panels=Panel(
-                        axes=[
-                            AxisConfig("x", label=fr"$R^{{\text{{ {measured_like_label} }}}}$"),
-                            AxisConfig("y", label=fr"$R^{{\text{{ {generator_like_label} }}}}$"),
-                        ],
-                        text=TextConfig(x=0.03, y=0.97, text=text),
-                        # legend=LegendConfig(location="upper left", font_size=14),
+                    output_dir=output_dir,
+                    rdf_plots=rdf_plots,
+                )
+                # n_to_split < 3
+                text_n_to_split_less_than_3 = text
+                text_n_to_split_less_than_3 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{{measured_like_label}}}}} < 3$"
+                _plot_response_by_matching_type(
+                    hists=hists,
+                    label="kt",
+                    grooming_method=grooming_method,
+                    response_type=response_type,
+                    matching_types=matching_types,
+                    matching_level=matching_level,
+                    hist_suffix=f"{measured_like_prefix}_n_to_split_less_than_3",
+                    hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                    plot_config=PlotConfig(
+                        name=f"response_kt_{response_type}",
+                        panels=Panel(
+                            axes=[
+                                AxisConfig(
+                                    "x",
+                                    label=fr"$k_{{\text{{T}}}}^{{\text{{{measured_like_label}}}}}\:(\text{{GeV}}/c)$",
+                                ),
+                                AxisConfig(
+                                    "y",
+                                    label=fr"$k_{{\text{{T}}}}^{{\text{{{generator_like_label}}}}}\:(\text{{GeV}}/c)$",
+                                ),
+                            ],
+                            text=TextConfig(x=0.03, y=0.97, text=text_n_to_split_less_than_3),
+                            # legend=LegendConfig(location="upper left", font_size=14),
+                        ),
+                        figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
                     ),
-                    figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
-                ),
-                output_dir=output_dir,
-            )
+                    output_dir=output_dir,
+                    rdf_plots=rdf_plots,
+                )
+                # n_to_split > 4
+                text_n_to_split_greater_than_4 = text
+                text_n_to_split_greater_than_4 += (
+                    "\n" + fr"$n_{{\text{{split}}}}^{{\text{{{measured_like_label}}}}} > 4$"
+                )
+                _plot_response_by_matching_type(
+                    hists=hists,
+                    label="kt",
+                    grooming_method=grooming_method,
+                    response_type=response_type,
+                    matching_types=matching_types,
+                    matching_level=matching_level,
+                    hist_suffix=f"{measured_like_prefix}_n_to_split_greater_than_4",
+                    hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                    plot_config=PlotConfig(
+                        name=f"response_kt_{response_type}",
+                        panels=Panel(
+                            axes=[
+                                AxisConfig(
+                                    "x",
+                                    label=fr"$k_{{\text{{T}}}}^{{\text{{{measured_like_label}}}}}\:(\text{{GeV}}/c)$",
+                                ),
+                                AxisConfig(
+                                    "y",
+                                    label=fr"$k_{{\text{{T}}}}^{{\text{{{generator_like_label}}}}}\:(\text{{GeV}}/c)$",
+                                ),
+                            ],
+                            text=TextConfig(x=0.03, y=0.97, text=text_n_to_split_greater_than_4),
+                            # legend=LegendConfig(location="upper left", font_size=14),
+                        ),
+                        figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
+                    ),
+                    output_dir=output_dir,
+                    rdf_plots=rdf_plots,
+                )
+                # Skip for RDF plots because they don't contain the delta_R response.
+                if rdf_plots:
+                    continue
+
+                _plot_response_by_matching_type(
+                    hists=hists,
+                    label="delta_R",
+                    grooming_method=grooming_method,
+                    response_type=response_type,
+                    matching_types=matching_types,
+                    hist_suffix="",
+                    matching_level=matching_level,
+                    hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                    plot_config=PlotConfig(
+                        name=f"response_delta_R_{response_type}",
+                        panels=Panel(
+                            axes=[
+                                AxisConfig("x", label=fr"$R^{{\text{{ {measured_like_label} }}}}$"),
+                                AxisConfig("y", label=fr"$R^{{\text{{ {generator_like_label} }}}}$"),
+                            ],
+                            text=TextConfig(x=0.03, y=0.97, text=text),
+                            # legend=LegendConfig(location="upper left", font_size=14),
+                        ),
+                        figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
+                    ),
+                    output_dir=output_dir,
+                )
 
 
 def _plot_kt_comparison(
@@ -1519,6 +1684,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
     embed_hists: Mapping[str, bh.Histogram],
     grooming_methods: Sequence[str],
     output_dir: Path,
+    rdf_plots: bool = False,
 ) -> None:
     """ Compare grooming methods for PbPb vs embedded.
 
@@ -1671,7 +1837,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     # Ratio.
                     Panel(
                         axes=[
-                            AxisConfig("x", label=r"$n_{\text{groomed,split}}$"),
+                            AxisConfig("x", label=r"$n_{\text{groomed,split}}$", range=(-0.9, 10)),
                             AxisConfig("y", label="Pb--Pb/Hybrid"),
                         ]
                     ),
@@ -1711,8 +1877,9 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
         )
 
         # High kt comparison
-        # For now, we don't have the high kt in the RDF skim, so we skip
-        continue
+        # We don't have the high kt in the RDF skim, so we skip it.
+        if rdf_plots:
+            continue
 
         _plot_compare_grooming_methods_for_attribute_data_embed(
             hists=hists,
