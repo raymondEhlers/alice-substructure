@@ -304,7 +304,7 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
                 color=purples[1], marker=markers[1], fillstyle="full", label=r"Leading $k_{\text{T}}$", zorder=10,
             ),
             f"leading_kt_z_cut_02{label}": GroomingMethodStyle(
-                color=blues[1],
+                color=blues[1] if not label else purples[1],
                 marker=markers[1],
                 fillstyle="none",
                 label=r"Leading $k_{\text{T}}$ $z > 0.2$",

@@ -1520,7 +1520,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
     grooming_methods: Sequence[str],
     output_dir: Path,
 ) -> None:
-    """
+    """ Compare grooming methods for PbPb vs embedded.
 
     """
     jet_pt_bin = helpers.RangeSelector(min=40, max=120)
@@ -1530,7 +1530,10 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
 
     hists = [
         PlotHists(hists=data_hists, prefix="data", identifier="PbPb", display_label="Pb--Pb",),
-        PlotHists(hists=embed_hists, prefix="hybrid", identifier="hybrid", display_label="Hybrid",),
+        # For the standard skim (probably to be adapted).
+        # PlotHists(hists=embed_hists, prefix="hybrid", identifier="hybrid", display_label="Hybrid",),
+        # For the RDF skim
+        PlotHists(hists=embed_hists, prefix="data", identifier="hybrid", display_label="Hybrid",),
     ]
     for grooming_method in grooming_methods:
         _plot_compare_grooming_methods_for_attribute_data_embed(
@@ -1538,7 +1541,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             attr_name="kt",
             grooming_methods=[grooming_method],
             jet_pt_bin=jet_pt_bin,
-            set_zero_to_nan=False,
+            set_zero_to_nan=True,
             plot_config=PlotConfig(
                 name="kt_grooming_methods",
                 panels=[
@@ -1556,7 +1559,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     Panel(
                         axes=[
                             AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
-                            AxisConfig("y", label="Pb--Pb/Hybrid", range=(-0.2, 10)),
+                            AxisConfig("y", label="Pb--Pb/Hybrid", range=(-0.2, 6)),
                         ]
                     ),
                 ],
@@ -1586,7 +1589,12 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                         legend=LegendConfig(location="upper left", anchor=(0.02, 0.79)),
                     ),
                     # Ratio.
-                    Panel(axes=[AxisConfig("x", label=r"$\Delta R$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
+                    Panel(
+                        axes=[
+                            AxisConfig("x", label=r"$\Delta R$"),
+                            AxisConfig("y", label="Pb--Pb/Hybrid", range=(0, 2)),
+                        ]
+                    ),
                 ],
             ),
             output_dir=output_dir,
@@ -1609,16 +1617,20 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     ),
                     # Ratio.
                     Panel(
-                        axes=[AxisConfig("x", label=r"$z$", range=(0, 0.51)), AxisConfig("y", label="Pb--Pb/Hybrid")]
+                        axes=[
+                            AxisConfig("x", label=r"$z$", range=(0, 0.51)),
+                            AxisConfig("y", label="Pb--Pb/Hybrid", range=(0.5, 1.5)),
+                        ]
                     ),
                 ],
+                figure=Figure(edge_padding={"left": 0.12}),
             ),
             output_dir=output_dir,
         )
 
         _plot_compare_grooming_methods_for_attribute_data_embed(
             hists=hists,
-            attr_name="n",
+            attr_name="n_to_split",
             grooming_methods=[grooming_method],
             jet_pt_bin=jet_pt_bin,
             set_zero_to_nan=False,
@@ -1627,18 +1639,81 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                 panels=[
                     # Main axis.
                     Panel(
-                        axes=[AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$")],
+                        axes=[AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{split}}$")],
                         text=TextConfig(x=0.96, y=0.96, text=text),
                         legend=LegendConfig(location="upper right", anchor=(0.96, 0.79)),
                     ),
                     # Ratio.
-                    Panel(axes=[AxisConfig("x", label=r"$n$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
+                    Panel(axes=[AxisConfig("x", label=r"$n_{\text{split}}$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
+                ],
+                figure=Figure(edge_padding={"left": 0.12}),
+            ),
+            output_dir=output_dir,
+        )
+
+        _plot_compare_grooming_methods_for_attribute_data_embed(
+            hists=hists,
+            attr_name="n_groomed_to_split",
+            grooming_methods=[grooming_method],
+            jet_pt_bin=jet_pt_bin,
+            set_zero_to_nan=True,
+            plot_config=PlotConfig(
+                name="number_groomed_to_split_grooming_methods",
+                panels=[
+                    # Main axis.
+                    Panel(
+                        axes=[
+                            AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{groomed,split}}$"),
+                        ],
+                        text=TextConfig(x=0.96, y=0.96, text=text),
+                        legend=LegendConfig(location="upper right", anchor=(0.96, 0.79)),
+                    ),
+                    # Ratio.
+                    Panel(
+                        axes=[
+                            AxisConfig("x", label=r"$n_{\text{groomed,split}}$"),
+                            AxisConfig("y", label="Pb--Pb/Hybrid"),
+                        ]
+                    ),
                 ],
             ),
             output_dir=output_dir,
         )
 
+        _plot_compare_grooming_methods_for_attribute_data_embed(
+            hists=hists,
+            attr_name="n_passed_grooming",
+            grooming_methods=[grooming_method],
+            jet_pt_bin=jet_pt_bin,
+            set_zero_to_nan=False,
+            plot_config=PlotConfig(
+                name="n_passed_grooming_grooming_methods",
+                panels=[
+                    # Main axis.
+                    Panel(
+                        axes=[
+                            AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{passed grooming}}$"),
+                        ],
+                        text=TextConfig(x=0.96, y=0.96, text=text),
+                        legend=LegendConfig(location="upper right", anchor=(0.96, 0.79)),
+                    ),
+                    # Ratio.
+                    Panel(
+                        axes=[
+                            AxisConfig("x", label=r"$n_{\text{passed grooming}}$"),
+                            AxisConfig("y", label="Pb--Pb/Hybrid"),
+                        ]
+                    ),
+                ],
+                figure=Figure(edge_padding={"left": 0.12}),
+            ),
+            output_dir=output_dir,
+        )
+
         # High kt comparison
+        # For now, we don't have the high kt in the RDF skim, so we skip
+        continue
+
         _plot_compare_grooming_methods_for_attribute_data_embed(
             hists=hists,
             attr_name="kt_high_kt",
