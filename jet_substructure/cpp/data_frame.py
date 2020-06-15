@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import List
+from typing import Any, List, Optional, Tuple
 
 from pathlib import Path
 
@@ -12,6 +12,124 @@ from jet_substructure.base import data_manager, helpers
 
 
 logger = logging.getLogger(__name__)
+
+# Typing helpers
+RDF = Any
+RootHist = Any
+
+
+def matching_hists(df: RDF, grooming_method: str, hist_suffix: str,
+                   general_selection: str, matching_level: str = "hybrid_det_level", det_level_axis: Optional[Tuple[int, float, float]] = None) -> List[RootHist]:
+    # Validation
+    if det_level_axis is None:
+        det_level_axis = (150, 0, 150)
+
+    # Setup
+    hists = []
+    matching_map: Dict[str, str] = {
+        "all": "",
+        "pure":
+            f"{grooming_method}_{matching_level}_matching_leading == 1"
+            f" && {grooming_method}_{matching_level}_matching_subleading == 1",
+        "leading_untagged_subleading_correct":
+            f"{grooming_method}_{matching_level}_matching_leading == 3"
+            f" && {grooming_method}_{matching_level}_matching_subleading == 1",
+        "leading_correct_subleading_untagged":
+            f"{grooming_method}_{matching_level}_matching_leading == 1"
+            f" && {grooming_method}_{matching_level}_matching_subleading == 3",
+        "leading_correct_subleading_mistag":
+            f"{grooming_method}_{matching_level}_matching_leading == 1"
+            f" && {grooming_method}_{matching_level}_matching_subleading == 2",
+        "leading_mistag_subleading_correct":
+            f"{grooming_method}_{matching_level}_matching_leading == 2"
+            f" && {grooming_method}_{matching_level}_matching_subleading == 1",
+        "leading_untagged_subleading_mistag":
+            f"{grooming_method}_{matching_level}_matching_leading == 3"
+            f" && {grooming_method}_{matching_level}_matching_subleading == 2",
+        "leading_mistag_subleading_untagged":
+            f"{grooming_method}_{matching_level}_matching_leading == 2"
+            f" && {grooming_method}_{matching_level}_matching_subleading == 3",
+        "swap":
+            f"{grooming_method}_{matching_level}_matching_leading == 2"
+            f" && {grooming_method}_{matching_level}_matching_subleading == 2",
+        "both_untagged":
+            f"{grooming_method}_{matching_level}_matching_leading == 3"
+            f" && {grooming_method}_{matching_level}_matching_subleading == 3",
+    }
+
+    # First, apply the general selection
+    if general_selection:
+        df = df.Filter(general_selection)
+
+    for matching_type, selection in matching_map.items():
+        # Empty string will break the filter, so we need to only apply it if there is a valid selection.
+        if selection:
+            df_selection = df.Filter(selection)
+        else:
+            df_selection = df
+
+        # Matching
+        name = f"{grooming_method}_{matching_level}_matching_{matching_type}"
+        if hist_suffix:
+            name += f"_{hist_suffix}"
+        h_matching = df_selection.Histo1D(
+            (
+                name, name,
+                *det_level_axis
+            ),
+            "det_level_jet_pt",
+            "scale_factor",
+        )
+        hists.append(h_matching)
+        # Hybrid-true
+        name = f"{grooming_method}_hybrid_true_kt_response_{matching_level}_matching_type_{matching_type}"
+        if hist_suffix:
+            name += f"_{hist_suffix}"
+        kt_hybrid_true_response = df_selection.Histo2D(
+            (
+                name, name,
+                26, -1, 25,
+                26, -1, 25,
+            ),
+            f"{grooming_method}_data_kt",
+            f"{grooming_method}_matched_kt",
+            "scale_factor",
+        )
+        hists.append(kt_hybrid_true_response)
+        # Hybrid-det level
+        if "hybrid" in matching_level:
+            name = f"{grooming_method}_hybrid_det_level_kt_response_{matching_level}_matching_type_{matching_type}"
+            if hist_suffix:
+                name += f"_{hist_suffix}"
+            kt_hybrid_det_level_response = df_selection.Histo2D(
+                (
+                    name, name,
+                    26, -1, 25,
+                    26, -1, 25,
+                ),
+                f"{grooming_method}_data_kt",
+                f"{grooming_method}_det_level_kt",
+                "scale_factor",
+            )
+            hists.append(kt_hybrid_det_level_response)
+        # Det-level true
+        if "true" in matching_level:
+            name = f"{grooming_method}_det_level_true_kt_response_{matching_level}_matching_type_{matching_type}"
+            if hist_suffix:
+                name += f"_{hist_suffix}"
+            kt_det_level_true_response = df_selection.Histo2D(
+                (
+                    name, name,
+                    26, -1, 25,
+                    26, -1, 25,
+                ),
+                f"{grooming_method}_det_level_kt",
+                f"{grooming_method}_matched_kt",
+                "scale_factor",
+            )
+            hists.append(kt_det_level_true_response)
+
+    return hists
 
 
 def run(collision_system: str, train_numbers: List[int], tree_name: str) -> None:
@@ -137,8 +255,8 @@ def run(collision_system: str, train_numbers: List[int], tree_name: str) -> None
         # Hybrid-det level
         kt_hybrid_det_level_response = df.Histo2D(
             (
-                f"{grooming_method}_hybrid_det_level_kt_response_matching_type_all",
-                f"{grooming_method}_hybrid_det_level_kt_response_matching_type_all",
+                f"{grooming_method}_hybrid_det_level_kt_response",
+                f"{grooming_method}_hybrid_det_level_kt_response",
                 26, -1, 25,
                 26, -1, 25,
             ),
@@ -150,8 +268,8 @@ def run(collision_system: str, train_numbers: List[int], tree_name: str) -> None
         # Hybrid-true
         kt_hybrid_true_response = df.Histo2D(
             (
-                f"{grooming_method}_hybrid_true_kt_response_matching_type_all",
-                f"{grooming_method}_hybrid_true_kt_response_matching_type_all",
+                f"{grooming_method}_hybrid_true_kt_response",
+                f"{grooming_method}_hybrid_true_kt_response",
                 26, -1, 25,
                 26, -1, 25,
             ),
@@ -163,8 +281,8 @@ def run(collision_system: str, train_numbers: List[int], tree_name: str) -> None
         # Det-level true
         kt_det_level_true_response = df.Histo2D(
             (
-                f"{grooming_method}_det_level_true_kt_response_matching_type_all",
-                f"{grooming_method}_det_level_true_kt_response_matching_type_all",
+                f"{grooming_method}_det_level_true_kt_response",
+                f"{grooming_method}_det_level_true_kt_response",
                 26, -1, 25,
                 26, -1, 25,
             ),
@@ -174,11 +292,10 @@ def run(collision_system: str, train_numbers: List[int], tree_name: str) -> None
         )
         hists.append(kt_det_level_true_response)
 
-        # Matching and matching dependent responses.
+        # Debug code for the RDF Filtering.
         # We explicitly require splittings at both the det level and hybrid level.
         # From here, we require a splitting at det level.
-        # This excludes matching_leading and matching_subleading == 0.
-        df = df.Filter(f"{grooming_method}_det_level_n_passed_grooming > 0 && {grooming_method}_data_n_passed_grooming > 0")
+        #df = df.Filter(f"{grooming_method}_det_level_n_passed_grooming > 0 && {grooming_method}_data_n_passed_grooming > 0")
         #extra = df.Filter(f"{grooming_method}_hybrid_det_level_matching_leading == 1 && {grooming_method}_hybrid_det_level_matching_subleading == 2").Count()
         #logger.debug(f"Extra: {extra.GetValue()}")
 
@@ -196,104 +313,63 @@ def run(collision_system: str, train_numbers: List[int], tree_name: str) -> None
         #for selection, values in counts.items():
         #    logger.info(f"Selection: {selection}: {values.GetValue()}")
 
-        # Matching and response
-        det_level_axis = (150, 0, 150)
-        h_hybrid_det_matching_all = df.Histo1D(
-            (
-                f"{grooming_method}_hybrid_det_level_matching_all",
-                f"{grooming_method}_hybrid_det_level_matching_all",
-                *det_level_axis
-            ),
-            "det_level_jet_pt",
-            "scale_factor",
-        )
-        hists.append(h_hybrid_det_matching_all)
-
-        matching_map: Dict[str, str] = {
-            "pure":
-                f"{grooming_method}_hybrid_det_level_matching_leading == 1"
-                f" && {grooming_method}_hybrid_det_level_matching_subleading == 1",
-            "leading_untagged_subleading_correct":
-                f"{grooming_method}_hybrid_det_level_matching_leading == 3"
-                f" && {grooming_method}_hybrid_det_level_matching_subleading == 1",
-            "leading_correct_subleading_untagged":
-                f"{grooming_method}_hybrid_det_level_matching_leading == 1"
-                f" && {grooming_method}_hybrid_det_level_matching_subleading == 3",
-            "leading_correct_subleading_mistag":
-                f"{grooming_method}_hybrid_det_level_matching_leading == 1"
-                f" && {grooming_method}_hybrid_det_level_matching_subleading == 2",
-            "leading_mistag_subleading_correct":
-                f"{grooming_method}_hybrid_det_level_matching_leading == 2"
-                f" && {grooming_method}_hybrid_det_level_matching_subleading == 1",
-            "leading_untagged_subleading_mistag":
-                f"{grooming_method}_hybrid_det_level_matching_leading == 3"
-                f" && {grooming_method}_hybrid_det_level_matching_subleading == 2",
-            "leading_mistag_subleading_untagged":
-                f"{grooming_method}_hybrid_det_level_matching_leading == 2"
-                f" && {grooming_method}_hybrid_det_level_matching_subleading == 3",
-            "swap":
-                f"{grooming_method}_hybrid_det_level_matching_leading == 2"
-                f" && {grooming_method}_hybrid_det_level_matching_subleading == 2",
-            "both_untagged":
-                f"{grooming_method}_hybrid_det_level_matching_leading == 3"
-                f" && {grooming_method}_hybrid_det_level_matching_subleading == 3",
+        # Matching and matching dependent responses.
+        matching_level_map = {
+            "hybrid_det_level": ("data", "det_level"),
+            "det_level_true": ("det_level", "matched"),
         }
-        for matching_type, selection in matching_map.items():
-            df_selection = df.Filter(selection)
-            # Matching
-            h_matching = df_selection.Histo1D(
-                (
-                    f"{grooming_method}_hybrid_det_level_matching_{matching_type}",
-                    f"{grooming_method}_hybrid_det_level_matching_{matching_type}",
-                    *det_level_axis
-                ),
-                "det_level_jet_pt",
-                "scale_factor",
+        for matching_level, (measured_like_label, generator_like_label) in matching_level_map.items():
+            # We explicitly require splittings at both the det level (generator-like) and hybrid level (measured-like).
+            # This excludes matching_leading and matching_subleading == 0.
+            df_selection = df.Filter(f"{grooming_method}_{measured_like_label}_n_passed_grooming > 0 && {grooming_method}_{generator_like_label}_n_passed_grooming > 0")
+            # No selection
+            hists.extend(
+                matching_hists(
+                    df=df_selection, grooming_method=grooming_method, hist_suffix="", general_selection="", matching_level=matching_level,
+                )
             )
-            hists.append(h_matching)
-            # Hybrid-det level
-            kt_hybrid_det_level_response = df_selection.Histo2D(
-                (
-                    f"{grooming_method}_hybrid_det_level_kt_response_matching_type_{matching_type}",
-                    f"{grooming_method}_hybrid_det_level_kt_response_matching_type_{matching_type}",
-                    26, -1, 25,
-                    26, -1, 25,
-                ),
-                f"{grooming_method}_data_kt",
-                f"{grooming_method}_det_level_kt",
-                "scale_factor",
+            # n_groomed_to_split > 1
+            hists.extend(
+                matching_hists(
+                    df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_groomed_to_split_greater_than_1", general_selection = f"{grooming_method}_{measured_like_label}_n_groomed_to_split > 1",
+                    matching_level=matching_level,
+                )
             )
-            hists.append(kt_hybrid_det_level_response)
-            # Hybrid-true
-            kt_hybrid_true_response = df_selection.Histo2D(
-                (
-                    f"{grooming_method}_hybrid_true_kt_response_matching_type_{matching_type}",
-                    f"{grooming_method}_hybrid_true_kt_response_matching_type_{matching_type}",
-                    26, -1, 25,
-                    26, -1, 25,
-                ),
-                f"{grooming_method}_data_kt",
-                f"{grooming_method}_matched_kt",
-                "scale_factor",
+            # n_groomed_to_split < 2
+            hists.extend(
+                matching_hists(
+                    df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_groomed_to_split_less_than_2", general_selection = f"{grooming_method}_{measured_like_label}_n_groomed_to_split < 2",
+                    matching_level=matching_level,
+                )
             )
-            hists.append(kt_hybrid_true_response)
-            # Det-level true
-            kt_det_level_true_response = df_selection.Histo2D(
-                (
-                    f"{grooming_method}_det_level_true_kt_response_matching_type_{matching_type}",
-                    f"{grooming_method}_det_level_true_kt_response_matching_type_{matching_type}",
-                    26, -1, 25,
-                    26, -1, 25,
-                ),
-                f"{grooming_method}_det_level_kt",
-                f"{grooming_method}_matched_kt",
-                "scale_factor",
+            # n_to_split > 4
+            hists.extend(
+                matching_hists(
+                    df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_to_split_greater_than_4", general_selection = f"{grooming_method}_{measured_like_label}_n_to_split > 4",
+                    matching_level=matching_level,
+                )
             )
-            hists.append(kt_det_level_true_response)
+            # n_to_split < 3
+            hists.extend(
+                matching_hists(
+                    df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_to_split_less_than_3", general_selection = f"{grooming_method}_{measured_like_label}_n_to_split < 3",
+                    matching_level=matching_level,
+                )
+            )
+
+    # If we want to save the dot graph. Unfortunately, it won't really be so insightful because we create many branches for the histograms.
+    #ROOT.RDF.SaveGraph(df)
 
     # TODO: Disentangle response output...
     logger.info(f"Creating output file for {collision_system}, {grooming_method}, {prefix}")
-    output_filename = Path("output") / collision_system / "RDF" / f"{grooming_method}_{prefix}.root"
+    # Add the train dir into the output path name if we're processing single pt hard bins for embed pythia.
+    # It's frustrating that this is necessary, but so it's ROOT - what else is new?
+    base_filename = Path("output") / collision_system / "RDF"
+    if len(train_numbers) == 1 and collision_system == "embedPythia":
+        base_filename = base_filename / str(train_numbers[0])
+    base_filename.mkdir(parents=True, exist_ok=True)
+    output_filename = base_filename / f"{grooming_method}_{prefix}.root"
+
     output = ROOT.TFile(str(output_filename), "RECREATE")
     output.cd()
     for h in hists:
@@ -305,6 +381,24 @@ def run(collision_system: str, train_numbers: List[int], tree_name: str) -> None
     output.Close()
 
     logger.info("Done!")
+
+
+def embed_pythia_entry_point() -> None:
+    """ Allow processing one pt hard bin at a time.
+
+    Why? Because RDF has awful performance for jitted filter statements. See: https://root-forum.cern.ch/t/rdataframe-is-very-slow-for-many-histograms/37875/15
+    """
+    parser = argparse.ArgumentParser(description=f"Skim cross-check task using ROOT RDF.")
+
+    parser.add_argument("-t", "--trainNumber", type=int)
+    args = parser.parse_args()
+
+    run(
+        collision_system="embedPythia",
+        train_numbers=[args.trainNumber],
+        #train_numbers=list(range(6007, 6008)),
+        tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+    )
 
 
 if __name__ == "__main__":
