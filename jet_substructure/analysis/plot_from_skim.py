@@ -155,7 +155,11 @@ def _plot_subjet_matching(
 
 
 def plot_prong_matching(
-    hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], matching_types: Sequence[str], output_dir: Path
+    hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    matching_types: Sequence[str],
+    output_dir: Path,
+    rdf_plots: bool,
 ) -> None:
     # Setup
     hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
@@ -183,16 +187,17 @@ def plot_prong_matching(
                 figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
             ),
             output_dir=output_dir,
+            rdf_plots=rdf_plots,
         )
         # n_to_split < 3
         text_n_to_split_less_than_3 = text
-        text_n_to_split_less_than_3 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{hybrid}}}} < 3$"
+        text_n_to_split_less_than_3 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{det}}}} < 3$"
         _plot_subjet_matching(
             hists=hists,
             axis_parameter="pt",
             grooming_method=grooming_method,
             matching_types=matching_types,
-            hist_suffix="data_n_to_split_less_than_3",
+            hist_suffix="det_level_n_to_split_less_than_3",
             hybrid_jet_pt_bin=hybrid_jet_pt_bin,
             plot_config=PlotConfig(
                 name="subjet_matching",
@@ -204,16 +209,17 @@ def plot_prong_matching(
                 figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
             ),
             output_dir=output_dir,
+            rdf_plots=rdf_plots,
         )
         # n to split > 4
         text_n_to_split_greater_than_4 = text
-        text_n_to_split_greater_than_4 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{hybrid}}}} > 4$"
+        text_n_to_split_greater_than_4 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{det}}}} > 4$"
         _plot_subjet_matching(
             hists=hists,
             axis_parameter="pt",
             grooming_method=grooming_method,
             matching_types=matching_types,
-            hist_suffix="data_n_to_split_greater_than_4",
+            hist_suffix="det_level_n_to_split_greater_than_4",
             hybrid_jet_pt_bin=hybrid_jet_pt_bin,
             plot_config=PlotConfig(
                 name="subjet_matching",
@@ -225,6 +231,7 @@ def plot_prong_matching(
                 figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
             ),
             output_dir=output_dir,
+            rdf_plots=rdf_plots,
         )
 
 
@@ -680,9 +687,9 @@ def plot_response_by_matching_type(
     # Just for labeling
     grooming_styling = define_grooming_styles()
 
-    for matching_level, measured_like_prefix in [
-        ("hybrid_det_level", "data"),
-        # ("det_level_true", "det_level")
+    for matching_level, generator_like_prefix in [
+        ("hybrid_det_level", "det_level"),
+        # ("det_level_true", "true")
     ]:
         for grooming_method in grooming_methods:
             for response_type in response_types:
@@ -724,7 +731,7 @@ def plot_response_by_matching_type(
                 )
                 # n_to_split < 3
                 text_n_to_split_less_than_3 = text
-                text_n_to_split_less_than_3 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{{measured_like_label}}}}} < 3$"
+                text_n_to_split_less_than_3 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{{generator_like_label}}}}} < 3$"
                 _plot_response_by_matching_type(
                     hists=hists,
                     label="kt",
@@ -732,7 +739,7 @@ def plot_response_by_matching_type(
                     response_type=response_type,
                     matching_types=matching_types,
                     matching_level=matching_level,
-                    hist_suffix=f"{measured_like_prefix}_n_to_split_less_than_3",
+                    hist_suffix=f"{generator_like_prefix}_n_to_split_less_than_3",
                     hybrid_jet_pt_bin=hybrid_jet_pt_bin,
                     plot_config=PlotConfig(
                         name=f"response_kt_{response_type}",
@@ -758,7 +765,7 @@ def plot_response_by_matching_type(
                 # n_to_split > 4
                 text_n_to_split_greater_than_4 = text
                 text_n_to_split_greater_than_4 += (
-                    "\n" + fr"$n_{{\text{{split}}}}^{{\text{{{measured_like_label}}}}} > 4$"
+                    "\n" + fr"$n_{{\text{{split}}}}^{{\text{{{generator_like_label}}}}} > 4$"
                 )
                 _plot_response_by_matching_type(
                     hists=hists,
@@ -767,7 +774,7 @@ def plot_response_by_matching_type(
                     response_type=response_type,
                     matching_types=matching_types,
                     matching_level=matching_level,
-                    hist_suffix=f"{measured_like_prefix}_n_to_split_greater_than_4",
+                    hist_suffix=f"{generator_like_prefix}_n_to_split_greater_than_4",
                     hybrid_jet_pt_bin=hybrid_jet_pt_bin,
                     plot_config=PlotConfig(
                         name=f"response_kt_{response_type}",
