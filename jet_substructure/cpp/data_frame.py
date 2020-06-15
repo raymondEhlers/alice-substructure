@@ -175,8 +175,26 @@ def run(collision_system: str, train_numbers: List[int], tree_name: str) -> None
         hists.append(kt_det_level_true_response)
 
         # Matching and matching dependent responses.
+        # We explicitly require splittings at both the det level and hybrid level.
         # From here, we require a splitting at det level.
-        df = df.Filter(f"{grooming_method}_det_level_n_passed_grooming > 0")
+        # This excludes matching_leading and matching_subleading == 0.
+        df = df.Filter(f"{grooming_method}_det_level_n_passed_grooming > 0 && {grooming_method}_data_n_passed_grooming > 0")
+        #extra = df.Filter(f"{grooming_method}_hybrid_det_level_matching_leading == 1 && {grooming_method}_hybrid_det_level_matching_subleading == 2").Count()
+        #logger.debug(f"Extra: {extra.GetValue()}")
+
+        # Matrix of possible counts values.
+        #counts = {}
+        #for leading_value in range(-1, 4):
+        #    for subleading_value in range(-1, 4):
+        #        counts[
+        #            f"{grooming_method}_hybrid_det_level_matching_leading == {leading_value}"
+        #            f" && {grooming_method}_hybrid_det_level_matching_subleading == {subleading_value}"
+        #        ] = 0
+        #for selection in counts:
+        #    counts[selection] = df.Filter(selection).Count()
+        ## Get the values:
+        #for selection, values in counts.items():
+        #    logger.info(f"Selection: {selection}: {values.GetValue()}")
 
         # Matching and response
         det_level_axis = (150, 0, 150)
@@ -192,31 +210,33 @@ def run(collision_system: str, train_numbers: List[int], tree_name: str) -> None
         hists.append(h_hybrid_det_matching_all)
 
         matching_map: Dict[str, str] = {
-            "pure": f"{grooming_method}_hybrid_det_level_matching_leading == 1 &&"
-                    f"{grooming_method}_hybrid_det_level_matching_subleading == 1",
+            "pure":
+                f"{grooming_method}_hybrid_det_level_matching_leading == 1"
+                f" && {grooming_method}_hybrid_det_level_matching_subleading == 1",
             "leading_untagged_subleading_correct":
-                f"{grooming_method}_hybrid_det_level_matching_leading != 1 &&"
-                f"{grooming_method}_hybrid_det_level_matching_leading != 2 &&"
-                f"{grooming_method}_hybrid_det_level_matching_subleading == 1",
+                f"{grooming_method}_hybrid_det_level_matching_leading == 3"
+                f" && {grooming_method}_hybrid_det_level_matching_subleading == 1",
             "leading_correct_subleading_untagged":
-                f"{grooming_method}_hybrid_det_level_matching_leading == 1 &&"
-                f"{grooming_method}_hybrid_det_level_matching_subleading != 1 &&"
-                f"{grooming_method}_hybrid_det_level_matching_subleading != 2",
+                f"{grooming_method}_hybrid_det_level_matching_leading == 1"
+                f" && {grooming_method}_hybrid_det_level_matching_subleading == 3",
+            "leading_correct_subleading_mistag":
+                f"{grooming_method}_hybrid_det_level_matching_leading == 1"
+                f" && {grooming_method}_hybrid_det_level_matching_subleading == 2",
+            "leading_mistag_subleading_correct":
+                f"{grooming_method}_hybrid_det_level_matching_leading == 2"
+                f" && {grooming_method}_hybrid_det_level_matching_subleading == 1",
             "leading_untagged_subleading_mistag":
-                f"{grooming_method}_hybrid_det_level_matching_leading != 1 &&"
-                f"{grooming_method}_hybrid_det_level_matching_leading != 2 &&"
-                f"{grooming_method}_hybrid_det_level_matching_subleading == 2",
+                f"{grooming_method}_hybrid_det_level_matching_leading == 3"
+                f" && {grooming_method}_hybrid_det_level_matching_subleading == 2",
             "leading_mistag_subleading_untagged":
-                f"{grooming_method}_hybrid_det_level_matching_leading == 2 &&"
-                f"{grooming_method}_hybrid_det_level_matching_subleading != 1 &&"
-                f"{grooming_method}_hybrid_det_level_matching_subleading != 2",
-            "swap": f"{grooming_method}_hybrid_det_level_matching_leading == 2 &&"
-                    f"{grooming_method}_hybrid_det_level_matching_subleading == 2",
+                f"{grooming_method}_hybrid_det_level_matching_leading == 2"
+                f" && {grooming_method}_hybrid_det_level_matching_subleading == 3",
+            "swap":
+                f"{grooming_method}_hybrid_det_level_matching_leading == 2"
+                f" && {grooming_method}_hybrid_det_level_matching_subleading == 2",
             "both_untagged":
-                f"{grooming_method}_hybrid_det_level_matching_leading != 1 &&"
-                f"{grooming_method}_hybrid_det_level_matching_leading != 2 &&"
-                f"{grooming_method}_hybrid_det_level_matching_subleading != 1 &&"
-                f"{grooming_method}_hybrid_det_level_matching_subleading != 2",
+                f"{grooming_method}_hybrid_det_level_matching_leading == 3"
+                f" && {grooming_method}_hybrid_det_level_matching_subleading == 3",
         }
         for matching_type, selection in matching_map.items():
             df_selection = df.Filter(selection)
@@ -292,7 +312,7 @@ if __name__ == "__main__":
     run(
         collision_system="embedPythia",
         train_numbers=list(range(5988, 6008)),
-        #train_numbers=list(range(5988, 5991)),
+        #train_numbers=list(range(6007, 6008)),
         tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
     )
     run(
