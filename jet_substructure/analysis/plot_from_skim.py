@@ -1385,13 +1385,16 @@ def _plot_compare_grooming_methods_for_attribute(
 
 
 def compare_grooming_methods_for_substructure_prod(
-    hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path
+    hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    prefix: str,
+    output_dir: Path,
+    rdf_plots: bool = False,
 ) -> None:
     """
 
     """
     jet_pt_bin = helpers.RangeSelector(min=40, max=120)
-    prefix = "hybrid"
 
     # TODO: Comprehensive ALICE labeling.
     text = "Iterative splittings"
@@ -1468,7 +1471,7 @@ def compare_grooming_methods_for_substructure_prod(
     _plot_compare_grooming_methods_for_attribute(
         hists=hists,
         grooming_methods=grooming_methods,
-        attr_name="n",
+        attr_name="n_to_split",
         prefix=prefix,
         jet_pt_bin=jet_pt_bin,
         set_zero_to_nan=False,
@@ -1476,8 +1479,8 @@ def compare_grooming_methods_for_substructure_prod(
             name="number_to_split_grooming_methods",
             panels=Panel(
                 axes=[
-                    AxisConfig("x", label=r"$n$"),
-                    AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n$", log=False),
+                    AxisConfig("x", label=r"$n_{\text{split}}$"),
+                    AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{split}}$"),
                 ],
                 text=TextConfig(x=0.97, y=0.97, text=text),
                 legend=LegendConfig(location="center right", font_size=14),
@@ -1486,6 +1489,54 @@ def compare_grooming_methods_for_substructure_prod(
         ),
         output_dir=output_dir,
     )
+
+    _plot_compare_grooming_methods_for_attribute(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        attr_name="n_groomed_to_split",
+        prefix=prefix,
+        jet_pt_bin=jet_pt_bin,
+        set_zero_to_nan=False,
+        plot_config=PlotConfig(
+            name="number_groomed_to_split_grooming_methods",
+            panels=Panel(
+                axes=[
+                    AxisConfig("x", label=r"$n_{\text{groomed,split}}$"),
+                    AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{groomed,split}}$"),
+                ],
+                text=TextConfig(x=0.97, y=0.97, text=text),
+                legend=LegendConfig(location="center right", font_size=14),
+            ),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+        ),
+        output_dir=output_dir,
+    )
+
+    _plot_compare_grooming_methods_for_attribute(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        attr_name="n_passed_grooming",
+        prefix=prefix,
+        jet_pt_bin=jet_pt_bin,
+        set_zero_to_nan=False,
+        plot_config=PlotConfig(
+            name="n_passed_grooming_grooming_methods",
+            panels=Panel(
+                axes=[
+                    AxisConfig("x", label=r"$n_{\text{passed grooming}}$"),
+                    AxisConfig("y", label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}n_{\text{passed grooming}}$"),
+                ],
+                text=TextConfig(x=0.97, y=0.97, text=text),
+                legend=LegendConfig(location="center right", font_size=14),
+            ),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+        ),
+        output_dir=output_dir,
+    )
+
+    # We don't have any high kt selections for the RDF plots
+    if rdf_plots:
+        return
 
     # High kt comparison
     _plot_compare_grooming_methods_for_attribute(
