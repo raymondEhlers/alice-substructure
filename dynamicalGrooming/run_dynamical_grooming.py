@@ -385,7 +385,7 @@ def run_dynamical_grooming(
         constUtil.SetUseExternalBkg(True)
         constUtil.SetRhoName("Rho")
         constUtil.SetRhomName("Rhomass")
-        constUtil.SetMaxDelR(0.8)
+        constUtil.SetMaxDelR(0.25)
 
     # Particle level jet finder
     if analysis_mode in [AnalysisMode.pythia, AnalysisMode.embedPythia]:
