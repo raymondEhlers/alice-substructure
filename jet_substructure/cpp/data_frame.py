@@ -132,7 +132,7 @@ def matching_hists(df: RDF, grooming_method: str, hist_suffix: str,
     return hists
 
 
-def run(collision_system: str, train_numbers: List[int], tree_name: str) -> None:
+def run(collision_system: str, train_numbers: List[int], tree_name: str, prefix: str) -> None:
     # Delay ROOT import so we don't explicitly rely on it.
     import ROOT
 
@@ -144,9 +144,10 @@ def run(collision_system: str, train_numbers: List[int], tree_name: str) -> None
     # Parameters
     jet_R = 0.4
     grooming_method = "leading_kt_z_cut_02"
-    prefix = "data"
 
-    base_path = Path("trains/") / collision_system / "{train_number}/AnalysisResults.*.root"
+    #base_path = Path("trains/") / collision_system / "{train_number}/AnalysisResults.*.root"
+    # TODO: Fix this bullshit!
+    base_path = Path("../../clusterfs4/rehlers/substructure/trains/") / collision_system / "{train_number}/AnalysisResults.*.root"
     filenames = data_manager._ensure_and_expand_paths(
         [Path(str(base_path).format(train_number=train_number)) for train_number in train_numbers]
     )
@@ -328,31 +329,32 @@ def run(collision_system: str, train_numbers: List[int], tree_name: str) -> None
                     df=df_selection, grooming_method=grooming_method, hist_suffix="", general_selection="", matching_level=matching_level,
                 )
             )
-            # n_groomed_to_split > 1
-            hists.extend(
-                matching_hists(
-                    df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_groomed_to_split_greater_than_1", general_selection = f"{grooming_method}_{measured_like_label}_n_groomed_to_split > 1",
-                    matching_level=matching_level,
-                )
-            )
-            # n_groomed_to_split < 2
-            hists.extend(
-                matching_hists(
-                    df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_groomed_to_split_less_than_2", general_selection = f"{grooming_method}_{measured_like_label}_n_groomed_to_split < 2",
-                    matching_level=matching_level,
-                )
-            )
+            # For now, we skip because it slows down RDF to have more hists...
+            ## n_groomed_to_split > 1
+            #hists.extend(
+            #    matching_hists(
+            #        df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_groomed_to_split_greater_than_1", general_selection = f"{grooming_method}_{measured_like_label}_n_groomed_to_split > 1",
+            #        matching_level=matching_level,
+            #    )
+            #)
+            ## n_groomed_to_split < 2
+            #hists.extend(
+            #    matching_hists(
+            #        df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_groomed_to_split_less_than_2", general_selection = f"{grooming_method}_{measured_like_label}_n_groomed_to_split < 2",
+            #        matching_level=matching_level,
+            #    )
+            #)
             # n_to_split > 4
             hists.extend(
                 matching_hists(
-                    df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_to_split_greater_than_4", general_selection = f"{grooming_method}_{measured_like_label}_n_to_split > 4",
+                    df=df_selection, grooming_method=grooming_method, hist_suffix = f"{generator_like_label}_n_to_split_greater_than_4", general_selection = f"{grooming_method}_{generator_like_label}_n_to_split > 4",
                     matching_level=matching_level,
                 )
             )
             # n_to_split < 3
             hists.extend(
                 matching_hists(
-                    df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_to_split_less_than_3", general_selection = f"{grooming_method}_{measured_like_label}_n_to_split < 3",
+                    df=df_selection, grooming_method=grooming_method, hist_suffix = f"{generator_like_label}_n_to_split_less_than_3", general_selection = f"{grooming_method}_{generator_like_label}_n_to_split < 3",
                     matching_level=matching_level,
                 )
             )
@@ -397,7 +399,8 @@ def embed_pythia_entry_point() -> None:
         collision_system="embedPythia",
         train_numbers=[args.trainNumber],
         #train_numbers=list(range(6007, 6008)),
-        tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+        prefix="hybrid",
     )
 
 
@@ -407,11 +410,15 @@ if __name__ == "__main__":
         collision_system="embedPythia",
         train_numbers=list(range(5988, 6008)),
         #train_numbers=list(range(6007, 6008)),
-        tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        #train_numbers=list(range(5988, 5989)),
+        tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+        #prefix="det_level",
+        prefix="data",
     )
     run(
         collision_system="PbPb",
         train_numbers=[5987],
-        tree_name="AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
+        tree_name="AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl",
+        prefix="data",
     )
 
