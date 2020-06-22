@@ -1,0 +1,19 @@
+---
+train: "Jets_EMC_PbPb"
+number: 6016
+dataset: "LHC18{q,r}"
+aliphysics_tag: "vAN-20200618_ROOT6-1"
+embedded_dataset: "LHC19f4"
+pt_hard_bin: 14
+alien_output_info:
+    child_1:
+        name: "LHC18r"
+        stage_to_download: "merged"
+    child_2:
+        name: "LHC18q"
+        stage_to_download: "merged"
+status: |
+    "Simplified task which recorded the leading kt z > 0.2 splittings in embedded pythia. This allows for a cross check with our more"
+    " complicated task which records all splittings. Nominal settings. Doesn't include the double counting cut, so it needs to be applied offline."
+    " Includes search for where the untagged subjets end up (inside or outside the hybrid jet). Only running a subset of pt hard bins for now."
+    " Utilizies label based matching for hybrid <-> det level subjets."
