@@ -366,16 +366,24 @@ np.testing.assert_allclose(
 # np.testing.assert_allclose(cross_check_df["leading_kt_z_cut_02_hybrid_det_level_matching_leading"].to_numpy(), mine_df["leading_kt_z_cut_02_hybrid_det_level_matching_leading"])
 for matching_type in ["hybrid_det_level", "det_level_true"]:
     for subjet_type in ["leading", "subleading"]:
+        # print(f'cross_check: {cross_check_df[f"leading_kt_z_cut_02_{matching_type}_matching_{subjet_type}"]}')
+        # print(f'mine: {mine_df[f"leading_kt_z_cut_02_{matching_type}_matching_{subjet_type}"]}')
         for value in [1, 2, 3]:
             print(f"Matching type: {matching_type}, subjet_type: {subjet_type}, value: {value}")
-            np.testing.assert_allclose(
-                cross_check_df[f"leading_kt_z_cut_02_{matching_type}_matching_{subjet_type}"][
-                    cross_check_df[f"leading_kt_z_cut_02_{matching_type}_matching_{subjet_type}"] == value
-                ].to_numpy(),
-                mine_df[f"leading_kt_z_cut_02_{matching_type}_matching_{subjet_type}"][
-                    mine_df[f"leading_kt_z_cut_02_{matching_type}_matching_{subjet_type}"] == value
-                ].to_numpy(),
-            )
+            try:
+                np.testing.assert_allclose(
+                    cross_check_df[f"leading_kt_z_cut_02_{matching_type}_matching_{subjet_type}"][
+                        cross_check_df[f"leading_kt_z_cut_02_{matching_type}_matching_{subjet_type}"] == value
+                    ].to_numpy(),
+                    mine_df[f"leading_kt_z_cut_02_{matching_type}_matching_{subjet_type}"][
+                        mine_df[f"leading_kt_z_cut_02_{matching_type}_matching_{subjet_type}"] == value
+                    ].to_numpy(),
+                )
+            except AssertionError as e:
+                print(f'cross_check: {cross_check_df[f"leading_kt_z_cut_02_{matching_type}_matching_{subjet_type}"]}')
+                print(f'mine: {mine_df[f"leading_kt_z_cut_02_{matching_type}_matching_{subjet_type}"]}')
+                print(e)
+                # Continue from here so we can check the rest...
 
 
 # rg z cut 04.
