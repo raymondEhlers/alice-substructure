@@ -216,12 +216,11 @@ void RunUnfolding(const bool hybridAsInputData = false)
 
   switch (unfoldingType) {
     case UnfoldingType_t::kt:
-      //smearedJetPtBins = {40, 50, 60, 80, 100, 120};
       smearedJetPtBins = {40, 50, 60, 70, 90, 120};
       trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
-      // NOTE: (0, 1) is the untagged bin.
-      smearedSplittingVariableBins = {0.5, 1, 2, 3, 4, 5, 7, 10, 15};
-      minSmearedSplittingVariable = 1.0;
+      // NOTE: (0.5, minSmearedSplittingVariable) is the untagged bin.
+      smearedSplittingVariableBins = {0.5, 3, 4, 5, 7, 10, 15};
+      minSmearedSplittingVariable = 3.0;
       // NOTE: (-0.05, 0) is the untagged bin.
       trueSplittingVariableBins = {-0.05, 0, 1, 2, 3, 4, 5, 7, 10, 15, 100};
       break;
@@ -288,11 +287,11 @@ void RunUnfolding(const bool hybridAsInputData = false)
     if (*dataJetPt < smearedJetPtBins[0] || *dataJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
       continue;
     }
-    // Substructure variable cut. TODO: This only works for kt!!
+    // Substructure variable cut. TODO: This only works for kt because untagged bin isn't at 0.75 - fix for the others!!
     double dataSubstructureVariableValue = *dataSubstructureVariable;
     if (dataSubstructureVariableValue < 0) {
       // Assign to the untagged bin.
-      dataSubstructureVariableValue = 0.5;
+      dataSubstructureVariableValue = 0.75;
     }
     else {
       if (dataSubstructureVariableValue < minSmearedSplittingVariable || dataSubstructureVariableValue > smearedSplittingVariableBins[smearedSplittingVariableBins.size() - 1]) {
