@@ -111,35 +111,39 @@ TH2D* CorrelationHist(const TMatrixD& cov, const char* name, const char* title, 
 //double GetScaleFactor(std::shared_ptr<TFile> f)
 double GetScaleFactor(TFile * f)
 {
-    // Retrieve the embedding helper to extract the cross section and ntrials.
-    // Code adapted from Leticia.
-    //auto task = dynamic_cast<TList*>(f->Get("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_Raw_EventSub_Incl"));
-    auto task = dynamic_cast<TList*>(f->Get("AliAnalysisTaskEmcalEmbeddingHelper_histos"));
+  // Retrieve the embedding helper to extract the cross section and ntrials.
+  //auto task = dynamic_cast<TList*>(f->Get("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_Raw_EventSub_Incl"));
+  auto task = dynamic_cast<TList*>(f->Get("AliAnalysisTaskEmcalEmbeddingHelper_histos"));
 
-    auto hcross = dynamic_cast<TProfile*>(task->FindObject("fHistXsection"));
-    auto htrials = dynamic_cast<TH1D*>(task->FindObject("fHistTrials"));
+  auto hcross = dynamic_cast<TProfile*>(task->FindObject("fHistXsection"));
+  auto htrials = dynamic_cast<TH1D*>(task->FindObject("fHistTrials"));
 
-    //std::cout << "hcross=" << hcross << ", htrials=" << htrials << "\n";
+  //std::cout << "hcross=" << hcross << ", htrials=" << htrials << "\n";
 
-    int ptHardBin = 0;
-    for (Int_t i = 1; i <= htrials->GetXaxis()->GetNbins(); i++) {
-        if (htrials->GetBinContent(i) != 0) {
-            ptHardBin = i;
-        }
-    }
-    double scaleFactor = hcross->Integral(ptHardBin, ptHardBin) / htrials->Integral(ptHardBin, ptHardBin);
-    // Needs a -1 to offset for the bin counting.
-    std::cout << f->GetName() << ": ptHardBin=" << (ptHardBin - 1) << ", scaleFactor=" << scaleFactor;
+  int ptHardBin = 0;
+  for (Int_t i = 1; i <= htrials->GetXaxis()->GetNbins(); i++) {
+      if (htrials->GetBinContent(i) != 0) {
+          ptHardBin = i;
+      }
+  }
+  // Code adapted from Leticia.
+  // The values don't seem to be correct...
+  /*double scaleFactor = hcross->Integral(ptHardBin, ptHardBin) / htrials->Integral(ptHardBin, ptHardBin);
+  // Needs a -1 to offset for the bin counting.
+  std::cout << f->GetName() << ": ptHardBin=" << (ptHardBin - 1) << ", scaleFactor=" << scaleFactor;*/
 
-    // These values seem more reasonable...
-    double crossSection = hcross->GetBinContent(ptHardBin) * hcross->GetEntries();
-    double nTrials = htrials->GetBinContent(ptHardBin);
-    scaleFactor = crossSection / nTrials;
-    std::cout << ", alternative scale factor=" << scaleFactor << "\n";
+  // These values seem more reasonable...
+  double crossSection = hcross->GetBinContent(ptHardBin) * hcross->GetEntries();
+  double nTrials = htrials->GetBinContent(ptHardBin);
+  double scaleFactor = crossSection / nTrials;
+  std::cout << f->GetName() << ": ptHardBin=" << (ptHardBin - 1) << ", scaleFactor=" << scaleFactor << "\n";
 
-    return scaleFactor;
+  return scaleFactor;
 }
 
+/**
+ * Substructure unfolding variable.
+ */
 enum UnfoldingType_t {
   kt = 0,
   zg = 1,
