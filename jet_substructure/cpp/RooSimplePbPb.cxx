@@ -217,16 +217,18 @@ void RunUnfolding(const bool hybridAsInputData = false)
   std::vector<double> smearedSplittingVariableBins;
   std::vector<double> trueSplittingVariableBins;
   double minSmearedSplittingVariable = 0.;
+  double smearedUntaggedBinValue = -0.025;
 
   switch (unfoldingType) {
     case UnfoldingType_t::kt:
       smearedJetPtBins = {40, 50, 60, 70, 90, 120};
       trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
       // NOTE: (0.5, minSmearedSplittingVariable) is the untagged bin.
-      smearedSplittingVariableBins = {0.5, 3, 4, 5, 7, 10, 15};
       minSmearedSplittingVariable = 3.0;
-      // NOTE: (-0.05, 0) is the untagged bin.
-      trueSplittingVariableBins = {-0.05, 0, 1, 2, 3, 4, 5, 7, 10, 15, 100};
+      smearedUntaggedBinValue = 2.5;
+      smearedSplittingVariableBins = {2, 3, 4, 5, 7, 10, 15};
+      // NOTE: (-0.05, 0.5) is the untagged bin.
+      trueSplittingVariableBins = {-0.05, 0.5, 1, 2, 3, 4, 5, 7, 10, 15, 100};
       break;
     case UnfoldingType_t::zg:
       // This is for z_cut > 0.2
@@ -291,11 +293,11 @@ void RunUnfolding(const bool hybridAsInputData = false)
     if (*dataJetPt < smearedJetPtBins[0] || *dataJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
       continue;
     }
-    // Substructure variable cut. TODO: This only works for kt because untagged bin isn't at 0.75 - fix for the others!!
+    // Substructure variable cut.
     double dataSubstructureVariableValue = *dataSubstructureVariable;
     if (dataSubstructureVariableValue < 0) {
       // Assign to the untagged bin.
-      dataSubstructureVariableValue = 0.75;
+      dataSubstructureVariableValue = smearedUntaggedBinValue;
     }
     else {
       if (dataSubstructureVariableValue < minSmearedSplittingVariable || dataSubstructureVariableValue > smearedSplittingVariableBins[smearedSplittingVariableBins.size() - 1]) {
