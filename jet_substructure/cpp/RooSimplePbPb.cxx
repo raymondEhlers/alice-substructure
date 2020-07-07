@@ -223,12 +223,12 @@ void RunUnfolding(const bool hybridAsInputData = false)
     case UnfoldingType_t::kt:
       smearedJetPtBins = {40, 50, 60, 70, 90, 120};
       trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
-      // NOTE: (0.5, minSmearedSplittingVariable) is the untagged bin.
+      // NOTE: (smearedSplittingVariableBins[0], minSmearedSplittingVariable[1]) is the untagged bin.
       minSmearedSplittingVariable = 3.0;
       smearedUntaggedBinValue = 2.5;
       smearedSplittingVariableBins = {2, 3, 4, 5, 7, 10, 15};
-      // NOTE: (-0.05, 0.5) is the untagged bin.
-      trueSplittingVariableBins = {-0.05, 0.5, 1, 2, 3, 4, 5, 7, 10, 15, 100};
+      // NOTE: (-0.05, 0) is the untagged bin.
+      trueSplittingVariableBins = {-0.05, 0, 1, 2, 3, 4, 5, 7, 10, 15, 100};
       break;
     case UnfoldingType_t::zg:
       // This is for z_cut > 0.2
