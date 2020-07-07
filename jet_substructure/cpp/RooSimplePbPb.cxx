@@ -391,11 +391,11 @@ void RunUnfolding(const bool hybridAsInputData = false)
     if (*hybridJetPt < smearedJetPtBins[0] || *hybridJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
       continue;
     }
-    // Also cut on hybrid substructure variable. TODO: This only works for kt!!!
+    // Also cut on hybrid substructure variable.
     double hybridSubstructureVariableValue = *hybridSubstructureVariable;
     if (hybridSubstructureVariableValue < 0) {
       // Assign to the untagged bin.
-      hybridSubstructureVariableValue = 0.5;
+      hybridSubstructureVariableValue = smearedUntaggedBinValue;
     }
     else {
       if (hybridSubstructureVariableValue < minSmearedSplittingVariable || hybridSubstructureVariableValue > smearedSplittingVariableBins[smearedSplittingVariableBins.size() - 1]) {
