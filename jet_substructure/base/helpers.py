@@ -214,7 +214,7 @@ class RangeSelector:
         Args:
             df: Data to be used to define the mask. May be a pandas DataFrame or output from loading arrays
                 via uproot.
-            attribute_name: Name of the attrbute (column) to be used in the mask.
+            attribute_name: Name of the attribute (column) to be used in the mask.
         Returns:
             Mask of the df for the attribute values within the stored range.
         """
@@ -246,6 +246,38 @@ class RangeSelector:
 
     def display_str(self, label: str = "") -> str:
         return fr"{self.min} < p_{{\text{{T,ch jet}}}}^{{\text{{{label}}}}} < {self.max}"
+
+
+@attr.s(frozen=True)
+class JetPtRange(RangeSelector):
+    ...
+
+
+@attr.s(frozen=True)
+class KtRange(RangeSelector):
+    def __str__(self) -> str:
+        return f"kt_{self.min}_{self.max}"
+
+    def display_str(self, label: str = "") -> str:
+        return fr"{self.min} < k_{{\text{{T}}}}^{{\text{{{label}}}}} < {self.max}"
+
+
+@attr.s(frozen=True)
+class RgRange(RangeSelector):
+    def __str__(self) -> str:
+        return f"deltaR_{self.min}_{self.max}"
+
+    def display_str(self, label: str = "") -> str:
+        return fr"{self.min} < {{\Delta R}}^{{\text{{{label}}}}} < {self.max}"
+
+
+@attr.s(frozen=True)
+class ZgRange(RangeSelector):
+    def __str__(self) -> str:
+        return f"zg_{self.min}_{self.max}"
+
+    def display_str(self, label: str = "") -> str:
+        return fr"{self.min} < z_{{\text{{g}}}}^{{\text{{{label}}}}} < {self.max}"
 
 
 def expand_wildcards_in_filenames(paths: Sequence[Path]) -> List[Path]:

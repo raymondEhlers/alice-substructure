@@ -355,6 +355,8 @@ def plot_efficiency(
 class InputFile:
     substructure_variable: str = attr.ib()
     grooming_method: str = attr.ib()
+    var_range: helpers.RangeSelector = attr.ib()
+    pt_range: helpers.RangeSelector = attr.ib()
     smeared_input: bool = attr.ib(default=False)
     pure_matches: bool = attr.ib(default=False)
     suffix: str = attr.ib(default="")
@@ -362,6 +364,8 @@ class InputFile:
     @property
     def identifier(self) -> str:
         name = f"{self.substructure_variable}_grooming_method_{self.grooming_method}"
+        name += f"_{self.var_range}"
+        name += f"_{self.pt_range}"
         if self.smeared_input:
             name += "_hybrid_as_input"
         if self.pure_matches:
@@ -408,8 +412,14 @@ def setup(input_file: InputFile, collision_system: str) -> Tuple[Dict[str, binne
 
 def run(collision_system: str) -> None:
     for input_file in [
-        InputFile("kt", "leading_kt_z_cut_02", suffix="kt_3_10_pt_30_120"),
-        InputFile("kt", "leading_kt_z_cut_02", suffix="kt_3_10_pt_30_120", smeared_input=True),
+        InputFile("kt", "leading_kt_z_cut_02", var_range=helpers.KtRange(3, 10), pt_range=helpers.JetPtRange(30, 120)),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            var_range=helpers.KtRange(3, 10),
+            pt_range=helpers.JetPtRange(30, 120),
+            smeared_input=True,
+        ),
         # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to10"),
         # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to10", smeared_input=True),
         # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to12"),
@@ -679,8 +689,21 @@ def run(collision_system: str) -> None:
 
 def run_delta_R(collision_system: str) -> None:
     for input_file in [
-        InputFile("delta_R", "leading_kt_z_cut_04", suffix="test"),
-        InputFile("delta_R", "leading_kt_z_cut_04", suffix="test", smeared_input=True),
+        InputFile(
+            "delta_R",
+            "leading_kt_z_cut_04",
+            var_range=helpers.RgRange(0, 0.4),
+            pt_range=helpers.JetPtRange(40, 120),
+            suffix="test",
+        ),
+        InputFile(
+            "delta_R",
+            "leading_kt_z_cut_04",
+            var_range=helpers.RgRange(0, 0.4),
+            pt_range=helpers.JetPtRange(40, 120),
+            suffix="test",
+            smeared_input=True,
+        ),
     ]:
         hists, output_dir = setup(input_file=input_file, collision_system=collision_system)
 
