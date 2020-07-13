@@ -408,8 +408,22 @@ def setup(input_file: InputFile, collision_system: str) -> Tuple[Dict[str, binne
 
 def run(collision_system: str) -> None:
     for input_file in [
-        InputFile("kt", "leading_kt_z_cut_02", suffix="test"),
-        InputFile("kt", "leading_kt_z_cut_02", suffix="test", smeared_input=True),
+        InputFile("kt", "leading_kt_z_cut_02", suffix="kt_3_10_pt_30_120"),
+        InputFile("kt", "leading_kt_z_cut_02", suffix="kt_3_10_pt_30_120", smeared_input=True),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to10"),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to10", smeared_input=True),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to12"),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to12", smeared_input=True),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="minKt2"),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="minKt2", smeared_input=True),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="minKt3"),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="minKt3", smeared_input=True),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt2to13"),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt2to13", smeared_input=True),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to13"),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to13", smeared_input=True),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="test", pure_matches=True),
+        # InputFile("kt", "leading_kt_z_cut_02", suffix="test", pure_matches=True, smeared_input=True),
         # InputFile("kt", "leading_kt_z_cut_04", suffix="test"),
         # InputFile("kt", "leading_kt_z_cut_04", suffix="test", smeared_input=True),
         # InputFile("kt", "leading_kt_z_cut_04", suffix="test", pure_matches=True),
@@ -452,7 +466,7 @@ def run(collision_system: str) -> None:
                                     label=fr"Ratio to iter {n_iter_for_ratio}"
                                     if n_iter_for_ratio > 0
                                     else "Ratio to true",
-                                    range=(0, 2),
+                                    range=(0.5, 1.5),
                                 ),
                             ],
                         ),
@@ -493,7 +507,7 @@ def run(collision_system: str) -> None:
                                     label=fr"Ratio to iter {n_iter_for_ratio}"
                                     if n_iter_for_ratio > 0
                                     else "Ratio to true",
-                                    range=(0, 2),
+                                    range=(0.5, 1.5),
                                 ),
                             ],
                         ),
@@ -531,7 +545,7 @@ def run(collision_system: str) -> None:
                                     label=fr"Ratio to iter {n_iter_for_ratio}"
                                     if n_iter_for_ratio > 0
                                     else "Ratio to true",
-                                    range=(0, 2),
+                                    range=(0.5, 1.5),
                                 ),
                             ],
                         ),
@@ -567,7 +581,7 @@ def run(collision_system: str) -> None:
                                 pb.AxisConfig(
                                     "y",
                                     label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
-                                    range=(0, 2),
+                                    range=(0.5, 1.5),
                                 ),
                             ],
                         ),
@@ -602,7 +616,7 @@ def run(collision_system: str) -> None:
                                 pb.AxisConfig(
                                     "y",
                                     label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
-                                    range=(0, 2),
+                                    range=(0.5, 1.5),
                                 ),
                             ],
                         ),
@@ -695,7 +709,7 @@ def run_delta_R(collision_system: str) -> None:
                         pb.Panel(
                             axes=[
                                 pb.AxisConfig("x", label=r"$\Delta R$"),
-                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
+                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0.5, 1.5)),
                             ],
                         ),
                     ],
@@ -730,7 +744,7 @@ def run_delta_R(collision_system: str) -> None:
                         pb.Panel(
                             axes=[
                                 pb.AxisConfig("x", label=r"$\Delta R$"),
-                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
+                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0.5, 1.5)),
                             ],
                         ),
                     ],
@@ -761,7 +775,7 @@ def run_delta_R(collision_system: str) -> None:
                         pb.Panel(
                             axes=[
                                 pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
-                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0, 2)),
+                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0.5, 1.5)),
                             ],
                         ),
                     ],
@@ -792,7 +806,7 @@ def run_delta_R(collision_system: str) -> None:
                                 pb.AxisConfig(
                                     "y",
                                     label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
-                                    range=(0, 2),
+                                    range=(0.5, 1.5),
                                 ),
                             ],
                         ),
@@ -827,7 +841,7 @@ def run_delta_R(collision_system: str) -> None:
                                 pb.AxisConfig(
                                     "y",
                                     label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
-                                    range=(0, 2),
+                                    range=(0.5, 1.5),
                                 ),
                             ],
                         ),
