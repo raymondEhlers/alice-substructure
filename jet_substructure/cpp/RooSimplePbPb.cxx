@@ -174,40 +174,18 @@ void RunUnfolding(const bool hybridAsInputData = false)
 
   // Setup
   // Unfolding type
-  UnfoldingType_t unfoldingType = UnfoldingType_t::kt;
-  std::string substructureVariableName = unfoldingTypeNames.at(unfoldingType);
+  const UnfoldingType_t unfoldingType = UnfoldingType_t::kt;
   // Grooming method
   const std::string groomingMethod = "leading_kt_z_cut_02";
   // If true, use pure matches
   const bool usePureMatches = false;
   // Unfolding settings
   RooUnfold::ErrorTreatment errorTreatment = RooUnfold::kCovariance;
-  // Determine output filename
-  std::string outputFilename = "unfolding_";
-  outputFilename += substructureVariableName;
-  outputFilename += "_grooming_method_";
-  outputFilename += groomingMethod;
-  if (hybridAsInputData == true) {
-    outputFilename += "_hybrid_as_input";
-  }
-  if (usePureMatches == true) {
-    outputFilename += "_pureMatches";
-  }
-  outputFilename += "_test.root";
-  // And put it in an output directory to keep it managable.
+  // Untagged bin below
+  const bool untaggedBinBelowRange = true;
+  // Determine the base output filename and directory
+  std::string outputFilename = "unfolding";
   std::string outputDir = "output/PbPb/unfolding";
-  gSystem->mkdir(outputDir.c_str(), true);
-  outputFilename = outputDir + "/" + outputFilename;
-  std::cout << "\n*********** Settings ***********\n" << std::boolalpha
-       << "Unfolding for: " << substructureVariableName << "\n"
-       << "Grooming method: " << groomingMethod << "\n"
-       << "Hybrid as input data: " << hybridAsInputData << "\n"
-       << "Use pure matches in the response: " << usePureMatches << "\n"
-       << "output filename: " << outputFilename << "\n"
-       << "********************************\n\n";
-
-  // Configuration (not totally clear if this actually does anything...)
-  ROOT::EnableImplicitMT();
 
   //***************************************************
 
@@ -216,16 +194,18 @@ void RunUnfolding(const bool hybridAsInputData = false)
   std::vector<double> trueJetPtBins;
   std::vector<double> smearedSplittingVariableBins;
   std::vector<double> trueSplittingVariableBins;
+  // Untagged bin properties
   double minSmearedSplittingVariable = 0.;
+  double maxSmearedSplittingVariable = 100.;
   double smearedUntaggedBinValue = -0.025;
+  std::string untaggedBinDescription = "";
+  // Set to true if the untagged bin values are set explicitly. Must be done for all four values!
+  bool explicitlySetUntaggedBinValues = false;
 
   switch (unfoldingType) {
     case UnfoldingType_t::kt:
       smearedJetPtBins = {40, 50, 60, 70, 90, 120};
       trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
-      // NOTE: (smearedSplittingVariableBins[0], minSmearedSplittingVariable[1]) is the untagged bin.
-      minSmearedSplittingVariable = 3.0;
-      smearedUntaggedBinValue = 2.5;
       smearedSplittingVariableBins = {2, 3, 4, 5, 7, 10, 15};
       // NOTE: (-0.05, 0) is the untagged bin.
       trueSplittingVariableBins = {-0.05, 0, 1, 2, 3, 4, 5, 7, 10, 15, 100};
@@ -249,6 +229,63 @@ void RunUnfolding(const bool hybridAsInputData = false)
       throw std::runtime_error("Must specify an unfolding type.");
       break;
   }
+
+  // Should be set to true if they're explicitly set in the configuration above.
+  if (explicitlySetUntaggedBinValues == false) {
+    auto lastBin = smearedSplittingVariableBins.size() - 1;
+    if (untaggedBinBelowRange) {
+      minSmearedSplittingVariable = smearedSplittingVariableBins[1];
+      maxSmearedSplittingVariable = smearedSplittingVariableBins[lastBin];
+      smearedUntaggedBinValue = (smearedSplittingVariableBins[1] - smearedSplittingVariableBins[0]) / 2 + smearedSplittingVariableBins[0];
+      untaggedBinDescription = std::to_string(static_cast<int>(smearedSplittingVariableBins[0])) + "_" + static_cast<int>(smearedSplittingVariableBins[1]);
+    }
+    else {
+      smearedUntaggedBinValue = (smearedSplittingVariableBins[lastBin] - smearedSplittingVariableBins[lastBin - 1]) / 2 + smearedSplittingVariableBins[lastBin - 1];
+      minSmearedSplittingVariable = smearedSplittingVariableBins[0];
+      maxSmearedSplittingVariable = smearedSplittingVariableBins[lastBin - 1];
+      untaggedBinDescription = std::to_string(static_cast<int>(smearedSplittingVariableBins[lastBin - 1])) + "_" + static_cast<int>(smearedSplittingVariableBins[lastBin]);
+    }
+  }
+
+  // Determine the final configuration (which is based on the binning).
+  std::string substructureVariableName = unfoldingTypeNames.at(unfoldingType);
+  // Final determination and setup for the output directory and filename.
+  gSystem->mkdir(outputDir.c_str(), true);
+  // Determine the filename based on the options.
+  outputFilename += "_" + substructureVariableName;
+  outputFilename += "_grooming_method_";
+  outputFilename += groomingMethod;
+  // Binning information.
+  // Used std::string and std::to_string at times to coerce the type to a string so we can keep adding.
+  // kt
+  outputFilename += "_smeared_" + substructureVariableName + "_" + static_cast<int>(minSmearedSplittingVariable) + "_" + static_cast<int>(maxSmearedSplittingVariable);
+  // Untagged bin information.
+  outputFilename += "_untagged_" + substructureVariableName + "_" + untaggedBinDescription;
+  // pt. (use std::to_string to coerce the type to a string so we can keep adding).
+  outputFilename += "_smeared_pt_" + std::to_string(static_cast<int>(smearedJetPtBins[0])) + "_" + static_cast<int>(smearedJetPtBins[smearedJetPtBins.size() - 1]);
+
+  // Options
+  if (hybridAsInputData == true) {
+    outputFilename += "_hybrid_as_input";
+  }
+  if (usePureMatches == true) {
+    outputFilename += "_pureMatches";
+  }
+  outputFilename = outputDir + "/" + outputFilename + ".root";
+
+  // Print the configuration
+  std::cout << "\n*********** Settings ***********\n" << std::boolalpha
+       << "Unfolding for: " << substructureVariableName << "\n"
+       << "Grooming method: " << groomingMethod << "\n"
+       << "Hybrid as input data: " << hybridAsInputData << "\n"
+       << "Use pure matches in the response: " << usePureMatches << "\n"
+       << "output filename: " << outputFilename << "\n"
+       << "********************************\n\n";
+
+  std::exit(0);
+
+  // Configuration (not totally clear if this actually does anything for this script...)
+  ROOT::EnableImplicitMT();
 
   // the raw correlation (ie. data)
   TH2D h2raw("r", "raw", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
@@ -300,7 +337,7 @@ void RunUnfolding(const bool hybridAsInputData = false)
       dataSubstructureVariableValue = smearedUntaggedBinValue;
     }
     else {
-      if (dataSubstructureVariableValue < minSmearedSplittingVariable || dataSubstructureVariableValue > smearedSplittingVariableBins[smearedSplittingVariableBins.size() - 1]) {
+      if (dataSubstructureVariableValue < minSmearedSplittingVariable || dataSubstructureVariableValue > maxSmearedSplittingVariable) {
         continue;
       }
     }
@@ -398,7 +435,7 @@ void RunUnfolding(const bool hybridAsInputData = false)
       hybridSubstructureVariableValue = smearedUntaggedBinValue;
     }
     else {
-      if (hybridSubstructureVariableValue < minSmearedSplittingVariable || hybridSubstructureVariableValue > smearedSplittingVariableBins[smearedSplittingVariableBins.size() - 1]) {
+      if (hybridSubstructureVariableValue < minSmearedSplittingVariable || hybridSubstructureVariableValue > maxSmearedSplittingVariable) {
         continue;
       }
     }
