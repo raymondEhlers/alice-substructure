@@ -63,6 +63,23 @@ TH2D* CorrelationHistPt(const TMatrixD& cov, const char* name, const char* title
   return h;
 }
 
+TH2D* CorrelationHist(const TMatrixD& cov, const char* name, const char* title, Double_t lo, Double_t hi, Double_t lon,
+           Double_t hin)
+{
+  Int_t nb = cov.GetNrows();
+  Int_t na = cov.GetNcols();
+  std::cout << nb << " " << na << "\n";
+  TH2D* h = new TH2D(name, title, nb, 0, nb, na, 0, na);
+  h->SetAxisRange(-1.0, 1.0, "Z");
+  for (int i = 0; i < na; i++)
+    for (int j = 0; j < nb; j++) {
+      Double_t Viijj = cov(i, i) * cov(j, j);
+      if (Viijj > 0.0)
+        h->SetBinContent(i + 1, j + 1, cov(i, j) / sqrt(Viijj));
+    }
+  return h;
+}
+
 void Normalize2D(TH2* h)
 {
   Int_t nbinsYtmp = h->GetNbinsY();
@@ -87,28 +104,17 @@ void Normalize2D(TH2* h)
   }
 }
 
-TH2D* CorrelationHist(const TMatrixD& cov, const char* name, const char* title, Double_t lo, Double_t hi, Double_t lon,
-           Double_t hin)
-{
-  Int_t nb = cov.GetNrows();
-  Int_t na = cov.GetNcols();
-  std::cout << nb << " " << na << "\n";
-  TH2D* h = new TH2D(name, title, nb, 0, nb, na, 0, na);
-  h->SetAxisRange(-1.0, 1.0, "Z");
-  for (int i = 0; i < na; i++)
-    for (int j = 0; j < nb; j++) {
-      Double_t Viijj = cov(i, i) * cov(j, j);
-      if (Viijj > 0.0)
-        h->SetBinContent(i + 1, j + 1, cov(i, j) / sqrt(Viijj));
-    }
-  return h;
-}
-
 //==============================================================================
 // Example Unfolding
 //==============================================================================
 
-//double GetScaleFactor(std::shared_ptr<TFile> f)
+/**
+ * Determine pt hard scale factor of the currently open file.
+ *
+ * @param[in] f Current file.
+ *
+ * @returns Pt hard scale factor.
+ */
 double GetScaleFactor(TFile * f)
 {
   // Retrieve the embedding helper to extract the cross section and ntrials.
@@ -282,8 +288,6 @@ void RunUnfolding(const bool hybridAsInputData = false)
        << "output filename: " << outputFilename << "\n"
        << "********************************\n\n";
 
-  std::exit(0);
-
   // Configuration (not totally clear if this actually does anything for this script...)
   ROOT::EnableImplicitMT();
 
@@ -400,12 +404,11 @@ void RunUnfolding(const bool hybridAsInputData = false)
   while (mcReader.Next()) {
     // Check if the file changed.
     if (treeNumber < embeddedChain.GetTreeNumber()) {
-        // File changed. Update the scale factor.
-        //auto f = std::shared_ptr<TFile>(embeddedChain.GetFile());
-        auto f = embeddedChain.GetFile();
-        scaleFactor = GetScaleFactor(f);
-        // Update the tree number so we hold onto the scale factor until the next time we need to update.
-        treeNumber = embeddedChain.GetTreeNumber();
+      // File changed. Update the scale factor.
+      auto f = embeddedChain.GetFile();
+      scaleFactor = GetScaleFactor(f);
+      // Update the tree number so we hold onto the scale factor until the next time we need to update.
+      treeNumber = embeddedChain.GetTreeNumber();
     }
     // Ensure that we are in the right true pt and substructure variable range.
     if (*trueJetPt > trueJetPtBins[trueJetPtBins.size() - 1]) {
@@ -416,7 +419,7 @@ void RunUnfolding(const bool hybridAsInputData = false)
     }
     // Double counting cut
     if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
-        continue;
+      continue;
     }
 
     // Full efficiency hists.
