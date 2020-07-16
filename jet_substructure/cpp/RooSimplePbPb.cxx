@@ -109,6 +109,79 @@ void Normalize2D(TH2* h)
 //==============================================================================
 
 /**
+ * Perform the actual unfolding.
+ *
+ * We separate this functionality so that we can run the unfolding with different input spectra for the same
+ * response, such as the when we used the hybrid as the smeared input as a trivial closure.
+ *
+ * @param[in] response Roounfold response.
+ * @param[in] h2true True spectra. Only used for binning, so retrieved as a const.
+ * @param[in] inputSpectra Input spectra to be unfolded (for example, data). Spectra could be 2D: pt + kt (or Rg, etc...)
+ * @param[in] errorTreatment Roounfold error treatment.
+ * @param[in] fout ROOT output file. It's never called explicitly, but I like to pass it because we're implicitly writing to it.
+ * @param[in] tag Tag to be prepended to all histograms generated in the unfolding. Default: "".
+ * @param[in] nIter Number of iterations. Default: 10.
+ */
+void Unfold(RooUnfoldResponse & response, const TH2D & h2true, TH2D & inputSpectra, RooUnfold::ErrorTreatment errorTreatment, TFile * fout, std::string tag = "", const int nIter = 10)
+{
+  std::cout << "\n=======================================================\n";
+  std::cout << "Unfolding for tag \"" << tag << "\".\n";
+  // Determine the tag. If we have a non-empty tag, we append it to all of the histograms.
+  if (tag != "") {
+    tag += "_";
+  }
+
+  for (int jar = 1; jar < nIter; jar++) {
+    Int_t iter = jar;
+    std::cout << "iteration" << iter << "\n";
+    std::cout << "==============Unfold h1=====================\n";
+
+    // Setup the response for unfolding, and then unfold.
+    RooUnfoldBayes unfold(&response, &inputSpectra, iter);
+    TH2D* hunf = dynamic_cast<TH2D*>(unfold.Hreco(errorTreatment));
+
+    // FOLD BACK
+    TH1* hfold = response.ApplyToTruth(hunf, "");
+
+    TH2D* htempUnf = dynamic_cast<TH2D*>(hunf->Clone("htempUnf"));
+    htempUnf->SetName(TString::Format("%sBayesian_Unfoldediter%d", tag.c_str(), iter));
+
+    TH2D* htempFold = dynamic_cast<TH2D*>(hfold->Clone("htempFold"));
+    htempFold->SetName(TString::Format("%sBayesian_Foldediter%d", tag.c_str(), iter));
+
+    htempUnf->Write();
+    htempFold->Write();
+
+    /// HERE I GET THE COVARIANCE MATRIX/////
+
+    if (iter == 8) {
+      TMatrixD covmat = unfold.Ereco((RooUnfold::ErrorTreatment)RooUnfold::kCovariance);
+      for (Int_t k = 0; k < h2true.GetNbinsX(); k++) {
+        TH2D* hCorr = dynamic_cast<TH2D*>(CorrelationHistShape(covmat, TString::Format("%scorr%d", tag.c_str(), k), "Covariance matrix",
+                             h2true.GetNbinsX(), h2true.GetNbinsY(), k));
+        TH2D* covshape = dynamic_cast<TH2D*>(hCorr->Clone("covshape"));
+        covshape->SetName(TString::Format("%spearsonmatrix_iter%d_binshape%d", tag.c_str(), iter, k));
+        covshape->SetDrawOption("colz");
+        covshape->Write();
+      }
+
+      for (Int_t k = 0; k < h2true.GetNbinsY(); k++) {
+        TH2D* hCorr = dynamic_cast<TH2D*>(CorrelationHistPt(covmat, TString::Format("%scorr%dpt", tag.c_str(), k), "Covariance matrix",
+                            h2true.GetNbinsX(), h2true.GetNbinsY(), k));
+        TH2D* covpt = dynamic_cast<TH2D*>(hCorr->Clone("covpt"));
+        covpt->SetName(TString::Format("%spearsonmatrix_iter%d_binpt%d", tag.c_str(), iter, k));
+        covpt->SetDrawOption("colz");
+        covpt->Write();
+      }
+    }
+  }
+
+  std::cout << "=======================================================\n";
+}
+
+
+
+/**
  * Determine pt hard scale factor of the currently open file.
  *
  * @param[in] f Current file.
@@ -156,13 +229,11 @@ enum UnfoldingType_t {
   rg = 2
 };
 
-
 /**
  * Unfolding for a specified substructure variable. Most settings must be changed inside of the function...
  *
- * @param[in] hybridAsInputData If true, use hybrid as input data refolding test.
  */
-void RunUnfolding(const bool hybridAsInputData = false)
+void RunUnfolding()
 {
 #ifdef __CINT__
   gSystem->Load("libRooUnfold");
@@ -268,12 +339,9 @@ void RunUnfolding(const bool hybridAsInputData = false)
   // Untagged bin information.
   outputFilename += "_untagged_" + substructureVariableName + "_" + untaggedBinDescription;
   // pt. (use std::to_string to coerce the type to a string so we can keep adding).
-  outputFilename += "_smeared_pt_" + std::to_string(static_cast<int>(smearedJetPtBins[0])) + "_" + static_cast<int>(smearedJetPtBins[smearedJetPtBins.size() - 1]);
+  outputFilename += "_smeared_jetPt_" + std::to_string(static_cast<int>(smearedJetPtBins[0])) + "_" + static_cast<int>(smearedJetPtBins[smearedJetPtBins.size() - 1]);
 
   // Options
-  if (hybridAsInputData == true) {
-    outputFilename += "_hybrid_as_input";
-  }
   if (usePureMatches == true) {
     outputFilename += "_pureMatches";
   }
@@ -283,7 +351,8 @@ void RunUnfolding(const bool hybridAsInputData = false)
   std::cout << "\n*********** Settings ***********\n" << std::boolalpha
        << "Unfolding for: " << substructureVariableName << "\n"
        << "Grooming method: " << groomingMethod << "\n"
-       << "Hybrid as input data: " << hybridAsInputData << "\n"
+       << "Untagged bin description: " << untaggedBinDescription << "\n"
+       << "Use untagged bin below bins: " << untaggedBinBelowRange << "\n"
        << "Use pure matches in the response: " << usePureMatches << "\n"
        << "output filename: " << outputFilename << "\n"
        << "********************************\n\n";
@@ -302,8 +371,6 @@ void RunUnfolding(const bool hybridAsInputData = false)
   TH2D h2true("true", "true", trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
   // full true correlation (without cuts)
   TH2D h2fulleff("truef", "truef", trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
-
-  //TH2D hcovariance("covariance", "covariance", 10, 0., 1., 10, 0, 1.);
 
   TH2D* effnum = dynamic_cast<TH2D*>(h2fulleff.Clone("effnum"));
   TH2D* effdenom = dynamic_cast<TH2D*>(h2fulleff.Clone("effdenom"));
@@ -351,7 +418,7 @@ void RunUnfolding(const bool hybridAsInputData = false)
   // Setup response tree.
   TChain embeddedChain("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl");
   // We are specific on the filenames to avoid the friend trees.
-  // It appears that it can only handle one * per call. So we have to enuemrate each train.
+  // It appears that it can only handle one * per call. So we have to enumerate each train.
   //embeddedChain.Add("temp_cache/embedPythia/55*/skim/*_iterative_splittings.root");
   embeddedChain.Add("trains/embedPythia/5988/*.root");
   embeddedChain.Add("trains/embedPythia/5989/*.root");
@@ -489,50 +556,12 @@ void RunUnfolding(const bool hybridAsInputData = false)
   h2true.SetName("true");
   h2true.Write();
   h2fulleff.Write();
-  for (int jar = 1; jar < 10; jar++) {
-    Int_t iter = jar;
-    std::cout << "iteration" << iter << "\n";
-    std::cout << "==============Unfold h1====================="
-         << "\n";
 
-    // Allow for the possibility of using the hybrid as input data for closure.
-    RooUnfoldBayes unfold(&response, (hybridAsInputData ? &h2smeared : &h2raw), iter); // OR
-    TH2D* hunf = (TH2D*)unfold.Hreco(errorTreatment);
-    // FOLD BACK
-    TH1* hfold = response.ApplyToTruth(hunf, "");
-
-    TH2D* htempUnf = (TH2D*)hunf->Clone("htempUnf");
-    htempUnf->SetName(Form("Bayesian_Unfoldediter%d", iter));
-
-    TH2D* htempFold = (TH2D*)hfold->Clone("htempFold");
-    htempFold->SetName(Form("Bayesian_Foldediter%d", iter));
-
-    htempUnf->Write();
-    htempFold->Write();
-
-    /// HERE I GET THE COVARIANCE MATRIX/////
-
-    if (iter == 8) {
-      TMatrixD covmat = unfold.Ereco((RooUnfold::ErrorTreatment)RooUnfold::kCovariance);
-      for (Int_t k = 0; k < h2true.GetNbinsX(); k++) {
-        TH2D* hCorr = (TH2D*)CorrelationHistShape(covmat, Form("corr%d", k), "Covariance matrix",
-                             h2true.GetNbinsX(), h2true.GetNbinsY(), k);
-        TH2D* covshape = (TH2D*)hCorr->Clone("covshape");
-        covshape->SetName(Form("pearsonmatrix_iter%d_binshape%d", iter, k));
-        covshape->SetDrawOption("colz");
-        covshape->Write();
-      }
-
-      for (Int_t k = 0; k < h2true.GetNbinsY(); k++) {
-        TH2D* hCorr = (TH2D*)CorrelationHistPt(covmat, Form("corr%dpt", k), "Covariance matrix",
-                            h2true.GetNbinsX(), h2true.GetNbinsY(), k);
-        TH2D* covpt = (TH2D*)hCorr->Clone("covpt");
-        covpt->SetName(Form("pearsonmatrix_iter%d_binpt%d", iter, k));
-        covpt->SetDrawOption("colz");
-        covpt->Write();
-      }
-    }
-  }
+  // Unfold the standard spectra.
+  int nIter = 10;
+  Unfold(response, h2true, h2raw, errorTreatment, fout, "", nIter);
+  // Unfold with the hybrid as the smeared input for a trivial closure.
+  Unfold(response, h2true, h2smeared, errorTreatment, fout, "hybridAsInput", nIter);
 
   // Cleanup
   fout->Close();
@@ -541,10 +570,7 @@ void RunUnfolding(const bool hybridAsInputData = false)
 #ifndef __CINT__
 int RooSimplePbPb()
 {
-  // Run both with and without hybrid as input.
-  // I do it everytime as a cross check, so I might as well just do it automatically.
-  RunUnfolding(false);
-  RunUnfolding(true);
+  RunUnfolding();
   return 0;
 } // Main program when run stand-alone
 #endif
