@@ -92,6 +92,7 @@ def plot_unfolded(
     efficiency_func: Callable[[Mapping[str, binned_data.BinnedData], helpers.RangeSelector], binned_data.BinnedData],
     n_iter_for_ratio: int,
     true_bin: helpers.RangeSelector,
+    tag: str,
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
@@ -116,7 +117,10 @@ def plot_unfolded(
 
     # Determine ratio denominator.
     if n_iter_for_ratio > 0:
-        selected_n_iter_hist = projection_func(hists[f"Bayesian_Unfoldediter{n_iter_for_ratio}"], true_bin)
+        hist_name = f"Bayesian_Unfoldediter{n_iter_for_ratio}"
+        if tag:
+            hist_name = f"{tag}_{hist_name}"
+        selected_n_iter_hist = projection_func(hists[hist_name], true_bin)
         selected_n_iter_hist = _normalize_hist(selected_n_iter_hist)
         h_ratio_denominator = selected_n_iter_hist
     else:
@@ -124,7 +128,10 @@ def plot_unfolded(
 
     for i in range(1, 10):
         # Retrieve the hist and normalize it properly.
-        hist = projection_func(hists[f"Bayesian_Unfoldediter{i}"], true_bin)
+        hist_name = f"Bayesian_Unfoldediter{i}"
+        if tag:
+            hist_name = f"{tag}_{hist_name}"
+        hist = projection_func(hists[hist_name], true_bin)
         hist = _normalize_hist(hist)
 
         ax_upper.errorbar(
@@ -203,7 +210,10 @@ def plot_unfolded(
     # Label and layout
     plot_config.apply(fig=fig, axes=[ax_upper, ax_lower])
 
-    fig.savefig(output_dir / f"{plot_config.name}.pdf")
+    figure_name = f"{plot_config.name}.pdf"
+    if tag:
+        figure_name = f"{tag}_{figure_name}"
+    fig.savefig(output_dir / figure_name)
     plt.close(fig)
 
 
@@ -221,6 +231,7 @@ def plot_refolded(
     projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
     smeared_input: bool,
     measured_bin: helpers.RangeSelector,
+    tag: str,
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
@@ -264,7 +275,10 @@ def plot_refolded(
     ratio_denominator = hist_smeared if smeared_input else hist_raw
     for i in range(1, 10):
         # Convert
-        hist = projection_func(hists[f"Bayesian_Foldediter{i}"], measured_bin)
+        hist_name = f"Bayesian_Foldediter{i}"
+        if tag:
+            hist_name = f"{tag}_{hist_name}"
+        hist = projection_func(hists[hist_name], measured_bin)
         hist = _normalize_refolded(hist)
         ax_upper.errorbar(
             hist.axes[0].bin_centers,
@@ -308,7 +322,10 @@ def plot_refolded(
     # Label and layout
     plot_config.apply(fig=fig, axes=[ax_upper, ax_lower])
 
-    fig.savefig(output_dir / f"{plot_config.name}.pdf")
+    figure_name = f"{plot_config.name}.pdf"
+    if tag:
+        figure_name = f"{tag}_{figure_name}"
+    fig.savefig(output_dir / figure_name)
     plt.close(fig)
 
 
@@ -355,8 +372,9 @@ def plot_efficiency(
 class InputFile:
     substructure_variable: str = attr.ib()
     grooming_method: str = attr.ib()
-    var_range: helpers.RangeSelector = attr.ib()
-    pt_range: helpers.RangeSelector = attr.ib()
+    smeared_var_range: helpers.RangeSelector = attr.ib()
+    smeared_untagged_var: helpers.RangeSelector = attr.ib()
+    smeared_pt_range: helpers.RangeSelector = attr.ib()
     smeared_input: bool = attr.ib(default=False)
     pure_matches: bool = attr.ib(default=False)
     suffix: str = attr.ib(default="")
@@ -364,10 +382,11 @@ class InputFile:
     @property
     def identifier(self) -> str:
         name = f"{self.substructure_variable}_grooming_method_{self.grooming_method}"
-        name += f"_{self.var_range}"
-        name += f"_{self.pt_range}"
-        if self.smeared_input:
-            name += "_hybrid_as_input"
+        name += f"_smeared_{self.smeared_var_range}"
+        name += f"_untagged_{self.smeared_untagged_var}"
+        name += f"_smeared_{self.smeared_pt_range}"
+        # if self.smeared_input:
+        #    name += "_hybrid_as_input"
         if self.pure_matches:
             name += "_pureMatches"
         if self.suffix:
@@ -412,12 +431,30 @@ def setup(input_file: InputFile, collision_system: str) -> Tuple[Dict[str, binne
 
 def run(collision_system: str) -> None:
     for input_file in [
-        InputFile("kt", "leading_kt_z_cut_02", var_range=helpers.KtRange(3, 10), pt_range=helpers.JetPtRange(30, 120)),
+        # InputFile(
+        #    "kt", "leading_kt_z_cut_02", smeared_var_range=helpers.KtRange(3, 10),
+        #    smeared_untagged_var=helpers.KtRange(2, 3), smeared_pt_range=helpers.JetPtRange(30, 120)),
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 10),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(30, 120),
+        #    smeared_input=True,
+        # ),
         InputFile(
             "kt",
             "leading_kt_z_cut_02",
-            var_range=helpers.KtRange(3, 10),
-            pt_range=helpers.JetPtRange(30, 120),
+            smeared_var_range=helpers.KtRange(3, 15),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 15),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
             smeared_input=True,
         ),
         # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to10"),
@@ -441,6 +478,10 @@ def run(collision_system: str) -> None:
     ]:
         hists, output_dir = setup(input_file=input_file, collision_system=collision_system)
 
+        tag = ""
+        if input_file.smeared_input:
+            tag = "hybridAsInput"
+
         # with sns.color_palette("GnBu_d", n_colors=11):
         with sns.color_palette("Paired", n_colors=11):
             n_iter_for_ratio = -1
@@ -452,6 +493,7 @@ def run(collision_system: str) -> None:
                 efficiency_func=_efficiency_kt,
                 n_iter_for_ratio=n_iter_for_ratio,
                 true_bin=helpers.RangeSelector(60, 80),
+                tag=tag,
                 plot_config=pb.PlotConfig(
                     name=f"unfolded_{input_file.substructure_variable}_true_pt_60_80",
                     panels=[
@@ -493,6 +535,7 @@ def run(collision_system: str) -> None:
                 efficiency_func=_efficiency_kt,
                 n_iter_for_ratio=n_iter_for_ratio,
                 true_bin=helpers.RangeSelector(40, 120),
+                tag=tag,
                 plot_config=pb.PlotConfig(
                     name=f"unfolded_{input_file.substructure_variable}_true_pt_40_120",
                     panels=[
@@ -533,6 +576,7 @@ def run(collision_system: str) -> None:
                 efficiency_func=_efficiency_pt,
                 n_iter_for_ratio=n_iter_for_ratio,
                 true_bin=helpers.RangeSelector(0, 25),
+                tag=tag,
                 plot_config=pb.PlotConfig(
                     name="unfolded_pt",
                     panels=[
@@ -570,6 +614,7 @@ def run(collision_system: str) -> None:
                 projection_func=_project_kt,
                 smeared_input=input_file.smeared_input,
                 measured_bin=helpers.RangeSelector(40, 120),
+                tag=tag,
                 plot_config=pb.PlotConfig(
                     name=f"refolded_{input_file.substructure_variable}",
                     panels=[
@@ -605,6 +650,7 @@ def run(collision_system: str) -> None:
                 projection_func=_project_pt,
                 smeared_input=input_file.smeared_input,
                 measured_bin=helpers.RangeSelector(1, 15),
+                tag=tag,
                 plot_config=pb.PlotConfig(
                     name="refolded_pt",
                     panels=[
@@ -692,20 +738,27 @@ def run_delta_R(collision_system: str) -> None:
         InputFile(
             "delta_R",
             "leading_kt_z_cut_04",
-            var_range=helpers.RgRange(0, 0.4),
-            pt_range=helpers.JetPtRange(40, 120),
+            smeared_var_range=helpers.RgRange(0, 0.4),
+            smeared_untagged_var=helpers.RgRange(-0.005, 0),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
             suffix="test",
         ),
         InputFile(
             "delta_R",
             "leading_kt_z_cut_04",
-            var_range=helpers.RgRange(0, 0.4),
-            pt_range=helpers.JetPtRange(40, 120),
+            smeared_var_range=helpers.RgRange(0, 0.4),
+            smeared_untagged_var=helpers.RgRange(-0.005, 0),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
             suffix="test",
             smeared_input=True,
         ),
     ]:
+        # Setup
         hists, output_dir = setup(input_file=input_file, collision_system=collision_system)
+
+        tag = ""
+        if input_file.smeared_input:
+            tag = "hybridAsInput"
 
         # with sns.color_palette("GnBu_d", n_colors=11):
         with sns.color_palette("Paired", n_colors=11):
@@ -718,6 +771,7 @@ def run_delta_R(collision_system: str) -> None:
                 efficiency_func=_efficiency_kt,
                 n_iter_for_ratio=n_iter_for_ratio,
                 true_bin=helpers.RangeSelector(60, 80),
+                tag=tag,
                 plot_config=pb.PlotConfig(
                     name=f"unfolded_{input_file.substructure_variable}_true_pt_60_80",
                     panels=[
@@ -748,6 +802,7 @@ def run_delta_R(collision_system: str) -> None:
                 efficiency_func=_efficiency_kt,
                 n_iter_for_ratio=n_iter_for_ratio,
                 true_bin=helpers.RangeSelector(40, 120),
+                tag=tag,
                 plot_config=pb.PlotConfig(
                     name=f"unfolded_{input_file.substructure_variable}_true_pt_40_120",
                     panels=[
@@ -781,6 +836,7 @@ def run_delta_R(collision_system: str) -> None:
                 efficiency_func=_efficiency_pt,
                 n_iter_for_ratio=n_iter_for_ratio,
                 true_bin=helpers.RangeSelector(0, 0.6),
+                tag=tag,
                 plot_config=pb.PlotConfig(
                     name="unfolded_pt",
                     panels=[
@@ -812,6 +868,7 @@ def run_delta_R(collision_system: str) -> None:
                 projection_func=_project_kt,
                 smeared_input=input_file.smeared_input,
                 measured_bin=helpers.RangeSelector(40, 120),
+                tag=tag,
                 plot_config=pb.PlotConfig(
                     name=f"refolded_{input_file.substructure_variable}",
                     panels=[
@@ -843,6 +900,7 @@ def run_delta_R(collision_system: str) -> None:
                 projection_func=_project_pt,
                 smeared_input=input_file.smeared_input,
                 measured_bin=helpers.RangeSelector(0, 0.35),
+                tag=tag,
                 plot_config=pb.PlotConfig(
                     name="refolded_pt",
                     panels=[
