@@ -431,17 +431,87 @@ def setup(input_file: InputFile, collision_system: str) -> Tuple[Dict[str, binne
 
 def run(collision_system: str) -> None:
     for input_file in [
-        # InputFile(
-        #    "kt", "leading_kt_z_cut_02", smeared_var_range=helpers.KtRange(3, 10),
-        #    smeared_untagged_var=helpers.KtRange(2, 3), smeared_pt_range=helpers.JetPtRange(30, 120)),
-        # InputFile(
-        #    "kt",
-        #    "leading_kt_z_cut_02",
-        #    smeared_var_range=helpers.KtRange(3, 10),
-        #    smeared_untagged_var=helpers.KtRange(2, 3),
-        #    smeared_pt_range=helpers.JetPtRange(30, 120),
-        #    smeared_input=True,
-        # ),
+        # 3-10, 30-120
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+            smeared_input=True,
+        ),
+        # 3-10, 40-120
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            smeared_input=True,
+        ),
+        # 3-11, 30-120
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 11),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 11),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+            smeared_input=True,
+        ),
+        # 3-11, 40-120
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 11),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 11),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            smeared_input=True,
+        ),
+        # 3-15, 30-120
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 15),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 15),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+            smeared_input=True,
+        ),
+        # 3-15, 40-120
         InputFile(
             "kt",
             "leading_kt_z_cut_02",
@@ -457,24 +527,6 @@ def run(collision_system: str) -> None:
             smeared_pt_range=helpers.JetPtRange(40, 120),
             smeared_input=True,
         ),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to10"),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to10", smeared_input=True),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to12"),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to12", smeared_input=True),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="minKt2"),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="minKt2", smeared_input=True),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="minKt3"),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="minKt3", smeared_input=True),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt2to13"),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt2to13", smeared_input=True),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to13"),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="kt3to13", smeared_input=True),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="test", pure_matches=True),
-        # InputFile("kt", "leading_kt_z_cut_02", suffix="test", pure_matches=True, smeared_input=True),
-        # InputFile("kt", "leading_kt_z_cut_04", suffix="test"),
-        # InputFile("kt", "leading_kt_z_cut_04", suffix="test", smeared_input=True),
-        # InputFile("kt", "leading_kt_z_cut_04", suffix="test", pure_matches=True),
-        # InputFile("kt", "leading_kt_z_cut_04", suffix="test", pure_matches=True, smeared_input=True),
     ]:
         hists, output_dir = setup(input_file=input_file, collision_system=collision_system)
 
