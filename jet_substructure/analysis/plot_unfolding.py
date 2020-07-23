@@ -368,6 +368,104 @@ def plot_efficiency(
     plt.close(fig)
 
 
+def plot_select_iteration(
+    hists: Mapping[str, binned_data.BinnedData],
+    projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
+    max_iter: int,
+    true_bin: helpers.RangeSelector,
+    tag: str,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+) -> None:
+    """ Plot selected iteration.
+
+    """
+    logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
+    # Setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    hist_reg = binned_data.BinnedData(
+        axes=[np.linspace(1.5, 7.5, 7)], values=np.zeros(max_iter - 2 - 1), variances=np.ones(max_iter - 2 - 1),
+    )
+    hist_stat = binned_data.BinnedData(
+        axes=[np.linspace(1.5, 7.5, 7)], values=np.zeros(max_iter - 2 - 1), variances=np.ones(max_iter - 2 - 1),
+    )
+    hist_total = binned_data.BinnedData(
+        axes=[np.linspace(1.5, 7.5, 7)], values=np.zeros(max_iter - 2 - 1), variances=np.ones(max_iter - 2 - 1),
+    )
+
+    for i, iter in enumerate(range(2, max_iter - 1)):
+        # Current iteration
+        hist_name = f"Bayesian_Unfoldediter{iter}"
+        if tag:
+            hist_name = f"{tag}_{hist_name}"
+        current_iter_hist = projection_func(hists[hist_name], true_bin)
+        # Previous iter hist
+        hist_name = f"Bayesian_Unfoldediter{iter-1}"
+        if tag:
+            hist_name = f"{tag}_{hist_name}"
+        previous_iter_hist = projection_func(hists[hist_name], true_bin)
+        # Iter + 2 hist
+        hist_name = f"Bayesian_Unfoldediter{iter+2}"
+        if tag:
+            hist_name = f"{tag}_{hist_name}"
+        forward_iter_hist = projection_func(hists[hist_name], true_bin)
+
+        # hist = _normalize_hist(hist)
+        # Calculate and store regularization error
+        regularization_value = np.sum(
+            np.maximum(
+                np.abs(previous_iter_hist.values - current_iter_hist.values),
+                np.abs(forward_iter_hist.values - current_iter_hist.values),
+            )
+            / current_iter_hist.values
+        )
+        hist_reg.values[i] = regularization_value
+        # Calculate and store stat error
+        stat_value = np.sum(current_iter_hist.errors / current_iter_hist.values)
+        hist_stat.values[i] = stat_value
+
+        # Total
+        hist_total.values[i] = np.sqrt(regularization_value ** 2 + stat_value ** 2)
+
+    # Plot the total errors
+    ax.errorbar(
+        hist_total.axes[0].bin_centers,
+        hist_total.values,
+        xerr=hist_total.axes[0].bin_widths / 2,
+        label=f"Total",
+        marker="o",
+        linestyle="",
+    )
+    # The regularization errors
+    ax.errorbar(
+        hist_reg.axes[0].bin_centers,
+        hist_reg.values,
+        xerr=hist_reg.axes[0].bin_widths / 2,
+        label=f"Regularization",
+        marker="o",
+        linestyle="",
+    )
+    # Plot the stat errors
+    ax.errorbar(
+        hist_stat.axes[0].bin_centers,
+        hist_stat.values,
+        xerr=hist_stat.axes[0].bin_widths / 2,
+        label=f"Statistical",
+        marker="o",
+        linestyle="",
+    )
+
+    # Label and layout
+    plot_config.apply(fig=fig, ax=ax)
+
+    figure_name = f"{plot_config.name}.pdf"
+    if tag:
+        figure_name = f"{tag}_{figure_name}"
+    fig.savefig(output_dir / figure_name)
+    plt.close(fig)
+
+
 @attr.s
 class InputFile:
     substructure_variable: str = attr.ib()
@@ -431,6 +529,22 @@ def setup(input_file: InputFile, collision_system: str) -> Tuple[Dict[str, binne
 
 def run(collision_system: str) -> None:
     for input_file in [
+        # 2-10, 30-120
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(2, 10),
+            smeared_untagged_var=helpers.KtRange(1, 2),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(2, 10),
+            smeared_untagged_var=helpers.KtRange(1, 2),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+            smeared_input=True,
+        ),
         # 3-10, 30-120
         InputFile(
             "kt",
@@ -732,6 +846,28 @@ def run(collision_system: str) -> None:
                 ),
                 output_dir=output_dir,
             )
+
+        jet_pt_for_text = helpers.JetPtRange(60, 80)
+        text = f"${jet_pt_for_text.display_str(label='true')}$"
+        plot_select_iteration(
+            hists=hists,
+            projection_func=_project_kt,
+            max_iter=9,
+            true_bin=helpers.JetPtRange(60, 80),
+            tag=tag,
+            plot_config=pb.PlotConfig(
+                name=f"select_iteration_{input_file.substructure_variable}_true_pt_60_80",
+                panels=pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label="Iteration"),
+                        pb.AxisConfig("y", label="Summed Error", range=(0, None)),
+                    ],
+                    legend=pb.LegendConfig(location="upper right"),
+                    text=pb.TextConfig(text, 0.03, 0.03),
+                ),
+            ),
+            output_dir=output_dir,
+        )
 
         plot_efficiency(
             hists=hists,
