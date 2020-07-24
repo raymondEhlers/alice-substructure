@@ -10,6 +10,7 @@ from typing import Callable, Dict, Mapping, Sequence, Tuple
 
 import attr
 import boost_histogram as bh
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -384,14 +385,16 @@ def plot_select_iteration(
     # Setup
     fig, ax = plt.subplots(figsize=(8, 6))
 
+    # -2 because we go two above, and then -1 because we start at 2
+    n_bins = max_iter - 2 - 1
     hist_reg = binned_data.BinnedData(
-        axes=[np.linspace(1.5, 7.5, 7)], values=np.zeros(max_iter - 2 - 1), variances=np.ones(max_iter - 2 - 1),
+        axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)], values=np.zeros(n_bins), variances=np.ones(n_bins),
     )
     hist_stat = binned_data.BinnedData(
-        axes=[np.linspace(1.5, 7.5, 7)], values=np.zeros(max_iter - 2 - 1), variances=np.ones(max_iter - 2 - 1),
+        axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)], values=np.zeros(n_bins), variances=np.ones(n_bins),
     )
     hist_total = binned_data.BinnedData(
-        axes=[np.linspace(1.5, 7.5, 7)], values=np.zeros(max_iter - 2 - 1), variances=np.ones(max_iter - 2 - 1),
+        axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)], values=np.zeros(n_bins), variances=np.ones(n_bins),
     )
 
     for i, iter in enumerate(range(2, max_iter - 1)):
@@ -458,6 +461,8 @@ def plot_select_iteration(
 
     # Label and layout
     plot_config.apply(fig=fig, ax=ax)
+    # Additional tweaks
+    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=2.0))
 
     figure_name = f"{plot_config.name}.pdf"
     if tag:
@@ -473,6 +478,7 @@ class InputFile:
     smeared_var_range: helpers.RangeSelector = attr.ib()
     smeared_untagged_var: helpers.RangeSelector = attr.ib()
     smeared_pt_range: helpers.RangeSelector = attr.ib()
+    n_iter_compare: int = attr.ib(default=4)
     smeared_input: bool = attr.ib(default=False)
     pure_matches: bool = attr.ib(default=False)
     suffix: str = attr.ib(default="")
@@ -529,13 +535,15 @@ def setup(input_file: InputFile, collision_system: str) -> Tuple[Dict[str, binne
 
 def run(collision_system: str) -> None:
     for input_file in [
-        # 2-10, 30-120
+        ##################### kt smeared = 2-10 ##########################
+        # 2-10, 1-2, 30-120
         InputFile(
             "kt",
             "leading_kt_z_cut_02",
             smeared_var_range=helpers.KtRange(2, 10),
             smeared_untagged_var=helpers.KtRange(1, 2),
             smeared_pt_range=helpers.JetPtRange(30, 120),
+            n_iter_compare=7,
         ),
         InputFile(
             "kt",
@@ -543,15 +551,72 @@ def run(collision_system: str) -> None:
             smeared_var_range=helpers.KtRange(2, 10),
             smeared_untagged_var=helpers.KtRange(1, 2),
             smeared_pt_range=helpers.JetPtRange(30, 120),
+            n_iter_compare=7,
             smeared_input=True,
         ),
-        # 3-10, 30-120
+        # 2-10, 1-2, 40-120
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(2, 10),
+            smeared_untagged_var=helpers.KtRange(1, 2),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(2, 10),
+            smeared_untagged_var=helpers.KtRange(1, 2),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+            smeared_input=True,
+        ),
+        # 2-10, 10-13, 30-120
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(2, 10),
+            smeared_untagged_var=helpers.KtRange(10, 13),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+            n_iter_compare=7,
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(2, 10),
+            smeared_untagged_var=helpers.KtRange(10, 13),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+            n_iter_compare=7,
+            smeared_input=True,
+        ),
+        # 2-10, 10-13, 40-120
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(2, 10),
+            smeared_untagged_var=helpers.KtRange(10, 13),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(2, 10),
+            smeared_untagged_var=helpers.KtRange(10, 13),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+            smeared_input=True,
+        ),
+        ##################### kt smeared = 3-10 ##########################
+        # 3-10, 2-3, 30-120
         InputFile(
             "kt",
             "leading_kt_z_cut_02",
             smeared_var_range=helpers.KtRange(3, 10),
             smeared_untagged_var=helpers.KtRange(2, 3),
             smeared_pt_range=helpers.JetPtRange(30, 120),
+            n_iter_compare=4,
         ),
         InputFile(
             "kt",
@@ -559,15 +624,17 @@ def run(collision_system: str) -> None:
             smeared_var_range=helpers.KtRange(3, 10),
             smeared_untagged_var=helpers.KtRange(2, 3),
             smeared_pt_range=helpers.JetPtRange(30, 120),
+            n_iter_compare=4,
             smeared_input=True,
         ),
-        # 3-10, 40-120
+        # 3-10, 2-3, 40-120
         InputFile(
             "kt",
             "leading_kt_z_cut_02",
             smeared_var_range=helpers.KtRange(3, 10),
             smeared_untagged_var=helpers.KtRange(2, 3),
             smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
         ),
         InputFile(
             "kt",
@@ -575,72 +642,109 @@ def run(collision_system: str) -> None:
             smeared_var_range=helpers.KtRange(3, 10),
             smeared_untagged_var=helpers.KtRange(2, 3),
             smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
             smeared_input=True,
         ),
-        # 3-11, 30-120
+        # 3-10, 10-13, 30-120
         InputFile(
             "kt",
             "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 11),
-            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(10, 13),
             smeared_pt_range=helpers.JetPtRange(30, 120),
+            n_iter_compare=4,
         ),
         InputFile(
             "kt",
             "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 11),
-            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(10, 13),
             smeared_pt_range=helpers.JetPtRange(30, 120),
+            n_iter_compare=4,
             smeared_input=True,
         ),
-        # 3-11, 40-120
+        # 3-10, 10-13, 40-120
         InputFile(
             "kt",
             "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 11),
-            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(10, 13),
             smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
         ),
         InputFile(
             "kt",
             "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 11),
-            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(10, 13),
             smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
             smeared_input=True,
         ),
-        # 3-15, 30-120
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 15),
-            smeared_untagged_var=helpers.KtRange(2, 3),
-            smeared_pt_range=helpers.JetPtRange(30, 120),
-        ),
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 15),
-            smeared_untagged_var=helpers.KtRange(2, 3),
-            smeared_pt_range=helpers.JetPtRange(30, 120),
-            smeared_input=True,
-        ),
-        # 3-15, 40-120
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 15),
-            smeared_untagged_var=helpers.KtRange(2, 3),
-            smeared_pt_range=helpers.JetPtRange(40, 120),
-        ),
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 15),
-            smeared_untagged_var=helpers.KtRange(2, 3),
-            smeared_pt_range=helpers.JetPtRange(40, 120),
-            smeared_input=True,
-        ),
+        ## 3-11, 30-120
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 11),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(30, 120),
+        # ),
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 11),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(30, 120),
+        #    smeared_input=True,
+        # ),
+        ## 3-11, 40-120
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 11),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        # ),
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 11),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        #    smeared_input=True,
+        # ),
+        ## 3-15, 30-120
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 15),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(30, 120),
+        # ),
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 15),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(30, 120),
+        #    smeared_input=True,
+        # ),
+        ## 3-15, 40-120
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 15),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        # ),
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 15),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        #    smeared_input=True,
+        # ),
     ]:
         hists, output_dir = setup(input_file=input_file, collision_system=collision_system)
 
@@ -650,7 +754,7 @@ def run(collision_system: str) -> None:
 
         # with sns.color_palette("GnBu_d", n_colors=11):
         with sns.color_palette("Paired", n_colors=11):
-            n_iter_for_ratio = -1
+            n_iter_for_ratio = input_file.n_iter_compare
             jet_pt_for_text = helpers.RangeSelector(60, 80)
             text = f"${jet_pt_for_text.display_str(label='true')}$"
             plot_unfolded(
@@ -678,7 +782,7 @@ def run(collision_system: str) -> None:
                         # Ratio
                         pb.Panel(
                             axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0, 15)),
+                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
                                 pb.AxisConfig(
                                     "y",
                                     label=fr"Ratio to iter {n_iter_for_ratio}"
@@ -720,7 +824,7 @@ def run(collision_system: str) -> None:
                         # Ratio
                         pb.Panel(
                             axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0, 15)),
+                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
                                 pb.AxisConfig(
                                     "y",
                                     label=fr"Ratio to iter {n_iter_for_ratio}"
@@ -735,7 +839,6 @@ def run(collision_system: str) -> None:
                 output_dir=output_dir,
             )
             text = ""
-            n_iter_for_ratio = 6
             plot_unfolded(
                 hists=hists,
                 projection_func=_project_pt,
@@ -852,7 +955,7 @@ def run(collision_system: str) -> None:
         plot_select_iteration(
             hists=hists,
             projection_func=_project_kt,
-            max_iter=9,
+            max_iter=19,
             true_bin=helpers.JetPtRange(60, 80),
             tag=tag,
             plot_config=pb.PlotConfig(
@@ -862,7 +965,7 @@ def run(collision_system: str) -> None:
                         pb.AxisConfig("x", label="Iteration"),
                         pb.AxisConfig("y", label="Summed Error", range=(0, None)),
                     ],
-                    legend=pb.LegendConfig(location="upper right"),
+                    legend=pb.LegendConfig(location="center right"),
                     text=pb.TextConfig(text, 0.03, 0.03),
                 ),
             ),
