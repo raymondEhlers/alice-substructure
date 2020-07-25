@@ -681,6 +681,47 @@ def run(collision_system: str) -> None:
             n_iter_compare=3,
             smeared_input=True,
         ),
+        ##################### kt smeared = 3-10, broad true bins ##########################
+        # 3-10, 2-3, 30-120
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+            n_iter_compare=4,
+            suffix="broadTrueBins",
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+            n_iter_compare=4,
+            suffix="broadTrueBins",
+            smeared_input=True,
+        ),
+        # 3-10, 2-3, 40-120
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+            suffix="broadTrueBins",
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+            suffix="broadTrueBins",
+            smeared_input=True,
+        ),
         ## 3-11, 30-120
         # InputFile(
         #    "kt",
