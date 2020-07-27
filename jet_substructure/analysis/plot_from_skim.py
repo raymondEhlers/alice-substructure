@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Mapping, Sequence, Tuple
 
 import attr
 import boost_histogram as bh
@@ -724,6 +724,8 @@ def _plot_response_by_matching_type(
     matching_types: Sequence[str],
     matching_level: str,
     hist_suffix: str,
+    subjet_name: str,
+    subjet_pt_fraction_range: Tuple[float, float],
     hybrid_jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
     output_dir: Path,
@@ -731,11 +733,12 @@ def _plot_response_by_matching_type(
 ) -> None:
     for matching_type in matching_types:
         logger.debug(
-            f"Plotting {label} {response_type} response for {grooming_method}, {matching_type}, matching level: {matching_level}, hybrid: {hybrid_jet_pt_bin}, hist_suffix: {hist_suffix}"
+            f"Plotting {label} {response_type} response for {grooming_method}, {matching_type}, matching level: {matching_level}, hybrid: {hybrid_jet_pt_bin}, hist_suffix: {hist_suffix}, subjet_name: {subjet_name}, subjet_pt_fraction_range: {subjet_pt_fraction_range}"
         )
 
         matches_label = " ".join(matching_type.split("_")).capitalize()
-        hist_name = f"{grooming_method}_{response_type}_{label}_response_{matching_level}_matching_type_{matching_type}"
+        # hist_name = f"{grooming_method}_{response_type}_{label}_response_{matching_level}_matching_type_{matching_type}"
+        hist_name = f"{grooming_method}_{response_type}_{label}_response_{matching_level}_matching_type_{matching_type}_{subjet_name}_pt_fraction_in_hybrid"
         if hist_suffix:
             hist_name += f"_{hist_suffix}"
         bh_input_hist = hists[hist_name]
@@ -746,7 +749,8 @@ def _plot_response_by_matching_type(
         # NOTE: We already applied the 40 < hybrid jet pt < 120 cut, so it doesn't need an additional selection.
         if rdf_plots:
             # For RDF skim
-            h = h_input
+            subjet_range = slice(bh.loc(subjet_pt_fraction_range[0]), bh.loc(subjet_pt_fraction_range[1]), bh.sum)
+            h = binned_data.BinnedData.from_existing_data(bh_input_hist[::, ::, subjet_range])
         else:
             h = binned_data.BinnedData(
                 axes=[h_input.axes[1], h_input.axes[3]],
@@ -767,8 +771,10 @@ def _plot_response_by_matching_type(
         z_axis_range = {
             # "vmin": h_proj.values[h_proj.values > 0].min(),
             "vmin": 1e-4,
-            "vmax": h.values.max(),
+            # Account for the possibility of having no values.
+            "vmax": h.values.max() if (h.values).any() else 1.0,
         }
+        logger.debug(f"z_axis_range: {z_axis_range}")
 
         # Plot
         mesh = ax.pcolormesh(
@@ -810,7 +816,7 @@ def plot_response_by_matching_type(
 
     for matching_level, generator_like_prefix in [
         ("hybrid_det_level", "det_level"),
-        # ("det_level_true", "true")
+        # ("det_level_true", "true"),
     ]:
         for grooming_method in grooming_methods:
             for response_type in response_types:
@@ -828,6 +834,8 @@ def plot_response_by_matching_type(
                     matching_types=matching_types,
                     matching_level=matching_level,
                     hist_suffix="",
+                    subjet_name="leading",
+                    subjet_pt_fraction_range=(0, 1),
                     hybrid_jet_pt_bin=hybrid_jet_pt_bin,
                     plot_config=PlotConfig(
                         name=f"response_kt_{response_type}",
@@ -850,6 +858,58 @@ def plot_response_by_matching_type(
                     output_dir=output_dir,
                     rdf_plots=rdf_plots,
                 )
+
+                if matching_level == "hybrid_det_level" and response_type.generator_like == "det_level":
+                    for subjet_name in ["leading", "subleading"]:
+                        logger.debug(f"Plotting for {subjet_name} subjet")
+                        for subjet_pt_fraction_range in zip(
+                            list(np.linspace(0, 1, 11))[:-1], list(np.linspace(0, 1, 11))[1:]
+                        ):
+                            temp_text = text + "\n" + f"{subjet_name.capitalize()} subjet"
+                            temp_text += "\n" + grooming_styling[grooming_method].label
+                            temp_text += (
+                                "\n"
+                                + f"{subjet_name}"
+                                + r" $p_{\text{T}}$ fraction: ("
+                                + ", ".join([f"{round(v, 2)}" for v in subjet_pt_fraction_range])
+                                + ")"
+                            )
+                            _plot_response_by_matching_type(
+                                hists=hists,
+                                label="kt",
+                                grooming_method=grooming_method,
+                                response_type=response_type,
+                                matching_types=matching_types,
+                                matching_level=matching_level,
+                                hist_suffix="",
+                                subjet_name=subjet_name,
+                                subjet_pt_fraction_range=subjet_pt_fraction_range,
+                                hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                                plot_config=PlotConfig(
+                                    name=f"response_kt_{response_type}_{subjet_name}_subjet_{int(round(subjet_pt_fraction_range[0]*10))}_{int(round(subjet_pt_fraction_range[1]*10))}",
+                                    panels=Panel(
+                                        axes=[
+                                            AxisConfig(
+                                                "x",
+                                                label=fr"$k_{{\text{{T}}}}^{{\text{{{measured_like_label}}}}}\:(\text{{GeV}}/c)$",
+                                            ),
+                                            AxisConfig(
+                                                "y",
+                                                label=fr"$k_{{\text{{T}}}}^{{\text{{{generator_like_label}}}}}\:(\text{{GeV}}/c)$",
+                                            ),
+                                        ],
+                                        text=TextConfig(x=0.03, y=0.97, text=temp_text),
+                                        # legend=LegendConfig(location="upper left", font_size=14),
+                                    ),
+                                    figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
+                                ),
+                                output_dir=output_dir,
+                                rdf_plots=rdf_plots,
+                            )
+
+                # Skip for RDF plots because they're (temporarily) removed
+                if rdf_plots:
+                    continue
                 # n_to_split < 3
                 text_n_to_split_less_than_3 = text
                 text_n_to_split_less_than_3 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{{generator_like_label}}}}} < 3$"
@@ -861,6 +921,8 @@ def plot_response_by_matching_type(
                     matching_types=matching_types,
                     matching_level=matching_level,
                     hist_suffix=f"{generator_like_prefix}_n_to_split_less_than_3",
+                    subjet_name="leading",
+                    subjet_pt_fraction_range=(0, 1),
                     hybrid_jet_pt_bin=hybrid_jet_pt_bin,
                     plot_config=PlotConfig(
                         name=f"response_kt_{response_type}",
@@ -896,6 +958,8 @@ def plot_response_by_matching_type(
                     matching_types=matching_types,
                     matching_level=matching_level,
                     hist_suffix=f"{generator_like_prefix}_n_to_split_greater_than_4",
+                    subjet_name="leading",
+                    subjet_pt_fraction_range=(0, 1),
                     hybrid_jet_pt_bin=hybrid_jet_pt_bin,
                     plot_config=PlotConfig(
                         name=f"response_kt_{response_type}",
@@ -930,6 +994,8 @@ def plot_response_by_matching_type(
                     matching_types=matching_types,
                     hist_suffix="",
                     matching_level=matching_level,
+                    subjet_name="leading",
+                    subjet_pt_fraction_range=(0, 1),
                     hybrid_jet_pt_bin=hybrid_jet_pt_bin,
                     plot_config=PlotConfig(
                         name=f"response_delta_R_{response_type}",
