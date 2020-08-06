@@ -263,6 +263,8 @@ void RunUnfolding()
   // Determine the base output filename and directory
   std::string outputFilename = "unfolding";
   std::string outputDir = "output/PbPb/unfolding";
+  // And an optional tag at the end...
+  std::string tag = "broadTrueBins";
 
   //***************************************************
 
@@ -345,6 +347,9 @@ void RunUnfolding()
   if (usePureMatches == true) {
     outputFilename += "_pureMatches";
   }
+  if (tag != "") {
+    outputFilename += "_" + tag;
+  }
   outputFilename = outputDir + "/" + outputFilename + ".root";
 
   // Print the configuration
@@ -389,7 +394,7 @@ void RunUnfolding()
   // Print out for logs (and to mirror Leticia).
   //dataChain.ls();
   TTreeReader dataReader(&dataChain);
-  dataReader.Print();
+  //dataReader.Print();
 
   // Determines the type of data that we use. Usually, this is going to be "data" for raw data.
   std::string data_prefix = "data";
@@ -558,7 +563,7 @@ void RunUnfolding()
   h2fulleff.Write();
 
   // Unfold the standard spectra.
-  int nIter = 10;
+  int nIter = 20;
   Unfold(response, h2true, h2raw, errorTreatment, fout, "", nIter);
   // Unfold with the hybrid as the smeared input for a trivial closure.
   Unfold(response, h2true, h2smeared, errorTreatment, fout, "hybridAsInput", nIter);
