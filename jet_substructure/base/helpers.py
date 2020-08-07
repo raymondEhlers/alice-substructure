@@ -265,7 +265,7 @@ class KtRange(RangeSelector):
 @attr.s(frozen=True)
 class RgRange(RangeSelector):
     def __str__(self) -> str:
-        return f"deltaR_{self.min}_{self.max}"
+        return f"delta_R_{self.min}_{self.max}"
 
     def display_str(self, label: str = "") -> str:
         return fr"{self.min} < {{\Delta R}}^{{\text{{{label}}}}} < {self.max}"
