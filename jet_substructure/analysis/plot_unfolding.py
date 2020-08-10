@@ -96,14 +96,15 @@ def plot_unfolded(
     tag: str,
     plot_config: pb.PlotConfig,
     output_dir: Path,
+    max_iter: int = 10,
 ) -> None:
     """ Plot unfolded.
 
     """
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
     # Setup
-    fig, axes = plt.subplots(2, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
-    ax_upper, ax_lower = axes
+    fig, axes = plt.subplots(3, 1, figsize=(10, 12), gridspec_kw={"height_ratios": [4, 1, 1]}, sharex=True,)
+    ax_upper, ax_ratio_iter, ax_ratio_true = axes
 
     # We need the efficiency in the true bin that we actually want to measure.
     efficiency = efficiency_func(hists, true_bin)
@@ -127,7 +128,7 @@ def plot_unfolded(
     else:
         h_ratio_denominator = hist_true
 
-    for i in range(1, 10):
+    for i in range(1, max_iter):
         # Retrieve the hist and normalize it properly.
         hist_name = f"Bayesian_Unfoldediter{i}"
         if tag:
@@ -146,12 +147,26 @@ def plot_unfolded(
             alpha=0.8,
         )
 
+        # Plot ratio with selected iter (in principle could also be with true, but now it's
+        # not necessary because we have another panel with the true).
         ratio = hist / h_ratio_denominator
-        ax_lower.errorbar(
+        ax_ratio_iter.errorbar(
             ratio.axes[0].bin_centers,
             ratio.values,
             xerr=ratio.axes[0].bin_widths / 2,
             yerr=ratio.errors,
+            marker="o",
+            linestyle="",
+            alpha=0.8,
+        )
+
+        # Plot ratio with true
+        ratio_true = hist / hist_true
+        ax_ratio_true.errorbar(
+            ratio_true.axes[0].bin_centers,
+            ratio_true.values,
+            xerr=ratio_true.axes[0].bin_widths / 2,
+            yerr=ratio_true.errors,
             marker="o",
             linestyle="",
             alpha=0.8,
@@ -206,10 +221,11 @@ def plot_unfolded(
     # )
 
     # Draw reference line for ratio
-    ax_lower.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+    ax_ratio_iter.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+    ax_ratio_true.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
     # Label and layout
-    plot_config.apply(fig=fig, axes=[ax_upper, ax_lower])
+    plot_config.apply(fig=fig, axes=[ax_upper, ax_ratio_iter, ax_ratio_true])
 
     figure_name = f"{plot_config.name}.pdf"
     if tag:
@@ -235,6 +251,7 @@ def plot_refolded(
     tag: str,
     plot_config: pb.PlotConfig,
     output_dir: Path,
+    max_iter: int = 10,
 ) -> None:
     """ Plot refolded.
 
@@ -274,7 +291,7 @@ def plot_refolded(
     )
 
     ratio_denominator = hist_smeared if smeared_input else hist_raw
-    for i in range(1, 10):
+    for i in range(1, max_iter):
         # Convert
         hist_name = f"Bayesian_Foldediter{i}"
         if tag:
@@ -322,6 +339,78 @@ def plot_refolded(
 
     # Label and layout
     plot_config.apply(fig=fig, axes=[ax_upper, ax_lower])
+
+    figure_name = f"{plot_config.name}.pdf"
+    if tag:
+        figure_name = f"{tag}_{figure_name}"
+    fig.savefig(output_dir / figure_name)
+    plt.close(fig)
+
+
+def plot_response(
+    hists: Mapping[str, binned_data.BinnedData], tag: str, plot_config: pb.PlotConfig, output_dir: Path,
+) -> None:
+    # Setup
+    logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
+
+    h = binned_data.BinnedData.from_existing_data(hists["h2SplittingVariable"])
+
+    # Normalize the response.
+    normalization_values = h.values.sum(axis=0, keepdims=True)
+    h.values = np.divide(h.values, normalization_values, out=np.zeros_like(h.values), where=normalization_values != 0)
+
+    # Finish setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Determine the normalization range
+    z_axis_range = {
+        # "vmin": h_proj.values[h_proj.values > 0].min(),
+        "vmin": max(1e-4, h.values[h.values > 0].min()),
+        # "vmax": h.values.max(),
+        "vmax": 1,
+    }
+
+    # Plot
+    mesh = ax.pcolormesh(
+        h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+    )
+    fig.colorbar(mesh, pad=0.02)
+
+    # Label and layout
+    plot_config.apply(fig=fig, ax=ax)
+
+    figure_name = f"{plot_config.name}.pdf"
+    if tag:
+        figure_name = f"{tag}_{figure_name}"
+    fig.savefig(output_dir / figure_name)
+    plt.close(fig)
+
+
+def plot_jet_pt_vs_substructure(
+    hists: Mapping[str, binned_data.BinnedData], hist_name: str, tag: str, plot_config: pb.PlotConfig, output_dir: Path,
+) -> None:
+    # Setup
+    logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
+
+    h = binned_data.BinnedData.from_existing_data(hists[hist_name])
+
+    # Finish setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Determine the normalization range
+    z_axis_range = {
+        "vmin": h.values[h.values > 0].min(),
+        "vmax": h.values.max(),
+    }
+
+    # Plot
+    mesh = ax.pcolormesh(
+        h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+    )
+    fig.colorbar(mesh, pad=0.02)
+
+    # Label and layout
+    plot_config.apply(fig=fig, ax=ax)
 
     figure_name = f"{plot_config.name}.pdf"
     if tag:
@@ -479,6 +568,7 @@ class InputFile:
     smeared_untagged_var: helpers.RangeSelector = attr.ib()
     smeared_pt_range: helpers.RangeSelector = attr.ib()
     n_iter_compare: int = attr.ib(default=4)
+    max_iter: int = attr.ib(default=10)
     smeared_input: bool = attr.ib(default=False)
     pure_matches: bool = attr.ib(default=False)
     suffix: str = attr.ib(default="")
@@ -627,24 +717,24 @@ def run(collision_system: str) -> None:
         #    n_iter_compare=4,
         #    smeared_input=True,
         # ),
-        ## 3-10, 2-3, 40-120
-        # InputFile(
-        #    "kt",
-        #    "leading_kt_z_cut_02",
-        #    smeared_var_range=helpers.KtRange(3, 10),
-        #    smeared_untagged_var=helpers.KtRange(2, 3),
-        #    smeared_pt_range=helpers.JetPtRange(40, 120),
-        #    n_iter_compare=3,
-        # ),
-        # InputFile(
-        #    "kt",
-        #    "leading_kt_z_cut_02",
-        #    smeared_var_range=helpers.KtRange(3, 10),
-        #    smeared_untagged_var=helpers.KtRange(2, 3),
-        #    smeared_pt_range=helpers.JetPtRange(40, 120),
-        #    n_iter_compare=3,
-        #    smeared_input=True,
-        # ),
+        # 3-10, 2-3, 40-120
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+        ),
+        InputFile(
+            "kt",
+            "leading_kt_z_cut_02",
+            smeared_var_range=helpers.KtRange(3, 10),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+            smeared_input=True,
+        ),
         ## 3-10, 10-13, 30-120
         # InputFile(
         #    "kt",
@@ -689,7 +779,8 @@ def run(collision_system: str) -> None:
             smeared_untagged_var=helpers.KtRange(2, 3),
             smeared_pt_range=helpers.JetPtRange(40, 120),
             pure_matches=True,
-            n_iter_compare=3,
+            n_iter_compare=11,
+            max_iter=15,
         ),
         InputFile(
             "kt",
@@ -698,7 +789,8 @@ def run(collision_system: str) -> None:
             smeared_untagged_var=helpers.KtRange(2, 3),
             smeared_pt_range=helpers.JetPtRange(40, 120),
             pure_matches=True,
-            n_iter_compare=3,
+            n_iter_compare=11,
+            max_iter=15,
             smeared_input=True,
         ),
         ###################### kt smeared = 3-10, broad true bins ##########################
@@ -790,63 +882,63 @@ def run(collision_system: str) -> None:
         #    smeared_pt_range=helpers.JetPtRange(30, 120),
         #    smeared_input=True,
         # ),
-        # 3-15, 40-120
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 15),
-            smeared_untagged_var=helpers.KtRange(2, 3),
-            smeared_pt_range=helpers.JetPtRange(40, 120),
-            n_iter_compare=3,
-            pure_matches=True,
-        ),
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 15),
-            smeared_untagged_var=helpers.KtRange(2, 3),
-            smeared_pt_range=helpers.JetPtRange(40, 120),
-            n_iter_compare=3,
-            pure_matches=True,
-            smeared_input=True,
-        ),
-        ##################### kt smeared = 5-15 ##########################
-        # 4-15, 3-4, 40-120
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(4, 15),
-            smeared_untagged_var=helpers.KtRange(3, 4),
-            smeared_pt_range=helpers.JetPtRange(40, 120),
-            n_iter_compare=3,
-        ),
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(4, 15),
-            smeared_untagged_var=helpers.KtRange(3, 4),
-            smeared_pt_range=helpers.JetPtRange(40, 120),
-            n_iter_compare=3,
-            smeared_input=True,
-        ),
-        # 5-15, 4-5, 40-120
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(5, 15),
-            smeared_untagged_var=helpers.KtRange(4, 5),
-            smeared_pt_range=helpers.JetPtRange(40, 120),
-            n_iter_compare=3,
-        ),
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(5, 15),
-            smeared_untagged_var=helpers.KtRange(4, 5),
-            smeared_pt_range=helpers.JetPtRange(40, 120),
-            n_iter_compare=3,
-            smeared_input=True,
-        ),
+        ## 3-15, 40-120
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 15),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        #    n_iter_compare=3,
+        #    pure_matches=True,
+        # ),
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 15),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        #    n_iter_compare=3,
+        #    pure_matches=True,
+        #    smeared_input=True,
+        # ),
+        ###################### kt smeared = 5-15 ##########################
+        ## 4-15, 3-4, 40-120
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(4, 15),
+        #    smeared_untagged_var=helpers.KtRange(3, 4),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        #    n_iter_compare=3,
+        # ),
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(4, 15),
+        #    smeared_untagged_var=helpers.KtRange(3, 4),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        #    n_iter_compare=3,
+        #    smeared_input=True,
+        # ),
+        ## 5-15, 4-5, 40-120
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(5, 15),
+        #    smeared_untagged_var=helpers.KtRange(4, 5),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        #    n_iter_compare=3,
+        # ),
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(5, 15),
+        #    smeared_untagged_var=helpers.KtRange(4, 5),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        #    n_iter_compare=3,
+        #    smeared_input=True,
+        # ),
     ]:
         hists, output_dir = setup(input_file=input_file, collision_system=collision_system)
 
@@ -855,7 +947,7 @@ def run(collision_system: str) -> None:
             tag = "hybridAsInput"
 
         # with sns.color_palette("GnBu_d", n_colors=11):
-        with sns.color_palette("Paired", n_colors=11):
+        with sns.color_palette("Paired", n_colors=input_file.max_iter):
             n_iter_for_ratio = input_file.n_iter_compare
             jet_pt_for_text = helpers.RangeSelector(60, 80)
             text = f"${jet_pt_for_text.display_str(label='true')}$"
@@ -864,6 +956,7 @@ def run(collision_system: str) -> None:
                 projection_func=_project_kt,
                 efficiency_func=_efficiency_kt,
                 n_iter_for_ratio=n_iter_for_ratio,
+                max_iter=input_file.max_iter,
                 true_bin=helpers.RangeSelector(60, 80),
                 tag=tag,
                 plot_config=pb.PlotConfig(
@@ -884,7 +977,6 @@ def run(collision_system: str) -> None:
                         # Ratio
                         pb.Panel(
                             axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
                                 pb.AxisConfig(
                                     "y",
                                     label=fr"Ratio to iter {n_iter_for_ratio}"
@@ -894,7 +986,14 @@ def run(collision_system: str) -> None:
                                 ),
                             ],
                         ),
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
+                                pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
+                            ],
+                        ),
                     ],
+                    figure=pb.Figure(edge_padding=dict(bottom=0.06)),
                 ),
                 output_dir=output_dir,
             )
@@ -906,6 +1005,7 @@ def run(collision_system: str) -> None:
                 projection_func=_project_kt,
                 efficiency_func=_efficiency_kt,
                 n_iter_for_ratio=n_iter_for_ratio,
+                max_iter=input_file.max_iter,
                 true_bin=helpers.RangeSelector(40, 120),
                 tag=tag,
                 plot_config=pb.PlotConfig(
@@ -926,7 +1026,6 @@ def run(collision_system: str) -> None:
                         # Ratio
                         pb.Panel(
                             axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
                                 pb.AxisConfig(
                                     "y",
                                     label=fr"Ratio to iter {n_iter_for_ratio}"
@@ -934,6 +1033,12 @@ def run(collision_system: str) -> None:
                                     else "Ratio to true",
                                     range=(0.5, 1.5),
                                 ),
+                            ],
+                        ),
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
+                                pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
                             ],
                         ),
                     ],
@@ -946,6 +1051,7 @@ def run(collision_system: str) -> None:
                 projection_func=_project_pt,
                 efficiency_func=_efficiency_pt,
                 n_iter_for_ratio=n_iter_for_ratio,
+                max_iter=input_file.max_iter,
                 true_bin=helpers.RangeSelector(0, 25),
                 tag=tag,
                 plot_config=pb.PlotConfig(
@@ -964,7 +1070,6 @@ def run(collision_system: str) -> None:
                         # Ratio
                         pb.Panel(
                             axes=[
-                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
                                 pb.AxisConfig(
                                     "y",
                                     label=fr"Ratio to iter {n_iter_for_ratio}"
@@ -972,6 +1077,12 @@ def run(collision_system: str) -> None:
                                     else "Ratio to true",
                                     range=(0.5, 1.5),
                                 ),
+                            ],
+                        ),
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
+                                pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
                             ],
                         ),
                     ],
@@ -984,6 +1095,7 @@ def run(collision_system: str) -> None:
                 hists=hists,
                 projection_func=_project_kt,
                 smeared_input=input_file.smeared_input,
+                max_iter=input_file.max_iter,
                 measured_bin=helpers.RangeSelector(40, 120),
                 tag=tag,
                 plot_config=pb.PlotConfig(
@@ -1020,6 +1132,7 @@ def run(collision_system: str) -> None:
                 hists=hists,
                 projection_func=_project_pt,
                 smeared_input=input_file.smeared_input,
+                max_iter=input_file.max_iter,
                 measured_bin=helpers.RangeSelector(1, 15),
                 tag=tag,
                 plot_config=pb.PlotConfig(
@@ -1052,6 +1165,67 @@ def run(collision_system: str) -> None:
                 output_dir=output_dir,
             )
 
+        # Plot the response
+        if "h2SplittingVariable" in hists:
+            jet_pt_for_text = helpers.JetPtRange(40, 120)
+            text = f"${jet_pt_for_text.display_str(label='hybrid')}$"
+            plot_response(
+                hists=hists,
+                tag=tag,
+                plot_config=pb.PlotConfig(
+                    name=f"response_{input_file.substructure_variable}_hybrid_40_120",
+                    panels=pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$"),
+                            # Use the smeared variable max value as a proxy for the max true value of interest.
+                            pb.AxisConfig(
+                                "y",
+                                label=r"$k_{\text{T}}^{\text{true}}\:(\text{GeV}/c)$",
+                                range=(0, input_file.smeared_var_range.max),
+                            ),
+                        ],
+                        text=pb.TextConfig(text, 0.97, 0.03),
+                    ),
+                ),
+                output_dir=output_dir,
+            )
+
+        # Plot kt vs jet pt
+        plot_jet_pt_vs_substructure(
+            hists=hists,
+            hist_name="smeared",
+            tag=tag,
+            plot_config=pb.PlotConfig(
+                name=f"{input_file.substructure_variable}_vs_jet_pt_hybrid",
+                panels=pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$"),
+                        pb.AxisConfig("y", label=r"$p_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$"),
+                    ],
+                    text=pb.TextConfig(text, 0.97, 0.03),
+                ),
+            ),
+            output_dir=output_dir,
+        )
+        # True
+        plot_jet_pt_vs_substructure(
+            hists=hists,
+            hist_name="true",
+            tag=tag,
+            plot_config=pb.PlotConfig(
+                name=f"{input_file.substructure_variable}_vs_jet_pt_true",
+                panels=pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}^{\text{true}}\:(\text{GeV}/c)$", range=(None, 20)),
+                        pb.AxisConfig("y", label=r"$p_{\text{T}}^{\text{true}}\:(\text{GeV}/c)$"),
+                    ],
+                    text=pb.TextConfig(text, 0.97, 0.03),
+                ),
+            ),
+            output_dir=output_dir,
+        )
+
+        # Select the n_iter iteration
         jet_pt_for_text = helpers.JetPtRange(60, 80)
         text = f"${jet_pt_for_text.display_str(label='true')}$"
         plot_select_iteration(
@@ -1074,6 +1248,7 @@ def run(collision_system: str) -> None:
             output_dir=output_dir,
         )
 
+        # Efficiency
         plot_efficiency(
             hists=hists,
             efficiency_func=_efficiency_kt,
@@ -1154,7 +1329,7 @@ def run_delta_R(collision_system: str) -> None:
             tag = "hybridAsInput"
 
         # with sns.color_palette("GnBu_d", n_colors=11):
-        with sns.color_palette("Paired", n_colors=11):
+        with sns.color_palette("Paired", n_colors=input_file.max_iter):
             n_iter_for_ratio = 6
             jet_pt_for_text = helpers.RangeSelector(60, 80)
             text = f"${jet_pt_for_text.display_str(label='true')}$"
@@ -1163,6 +1338,7 @@ def run_delta_R(collision_system: str) -> None:
                 projection_func=_project_kt,
                 efficiency_func=_efficiency_kt,
                 n_iter_for_ratio=n_iter_for_ratio,
+                max_iter=input_file.max_iter,
                 true_bin=helpers.RangeSelector(60, 80),
                 tag=tag,
                 plot_config=pb.PlotConfig(
@@ -1177,9 +1353,12 @@ def run_delta_R(collision_system: str) -> None:
                         ),
                         # Ratio
                         pb.Panel(
+                            axes=[pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0.5, 1.5))],
+                        ),
+                        pb.Panel(
                             axes=[
                                 pb.AxisConfig("x", label=r"$\Delta R$"),
-                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0.5, 1.5)),
+                                pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
                             ],
                         ),
                     ],
@@ -1194,6 +1373,7 @@ def run_delta_R(collision_system: str) -> None:
                 projection_func=_project_kt,
                 efficiency_func=_efficiency_kt,
                 n_iter_for_ratio=n_iter_for_ratio,
+                max_iter=input_file.max_iter,
                 true_bin=helpers.RangeSelector(40, 120),
                 tag=tag,
                 plot_config=pb.PlotConfig(
@@ -1213,9 +1393,12 @@ def run_delta_R(collision_system: str) -> None:
                         ),
                         # Ratio
                         pb.Panel(
+                            axes=[pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0.5, 1.5))],
+                        ),
+                        pb.Panel(
                             axes=[
                                 pb.AxisConfig("x", label=r"$\Delta R$"),
-                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0.5, 1.5)),
+                                pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
                             ],
                         ),
                     ],
@@ -1228,6 +1411,7 @@ def run_delta_R(collision_system: str) -> None:
                 projection_func=_project_pt,
                 efficiency_func=_efficiency_pt,
                 n_iter_for_ratio=n_iter_for_ratio,
+                max_iter=input_file.max_iter,
                 true_bin=helpers.RangeSelector(0, 0.6),
                 tag=tag,
                 plot_config=pb.PlotConfig(
@@ -1245,9 +1429,12 @@ def run_delta_R(collision_system: str) -> None:
                         ),
                         # Ratio
                         pb.Panel(
+                            axes=[pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0.5, 1.5))],
+                        ),
+                        pb.Panel(
                             axes=[
                                 pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
-                                pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0.5, 1.5)),
+                                pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
                             ],
                         ),
                     ],
@@ -1260,6 +1447,7 @@ def run_delta_R(collision_system: str) -> None:
                 hists=hists,
                 projection_func=_project_kt,
                 smeared_input=input_file.smeared_input,
+                max_iter=input_file.max_iter,
                 measured_bin=helpers.RangeSelector(40, 120),
                 tag=tag,
                 plot_config=pb.PlotConfig(
@@ -1292,6 +1480,7 @@ def run_delta_R(collision_system: str) -> None:
                 hists=hists,
                 projection_func=_project_pt,
                 smeared_input=input_file.smeared_input,
+                max_iter=input_file.max_iter,
                 measured_bin=helpers.RangeSelector(0, 0.35),
                 tag=tag,
                 plot_config=pb.PlotConfig(
@@ -1324,6 +1513,28 @@ def run_delta_R(collision_system: str) -> None:
                 output_dir=output_dir,
             )
 
+        # Plot the response
+        if "h2SplittingVariable" in hists:
+            jet_pt_for_text = helpers.JetPtRange(40, 120)
+            text = f"${jet_pt_for_text.display_str(label='hybrid')}$"
+            plot_response(
+                hists=hists,
+                tag=tag,
+                plot_config=pb.PlotConfig(
+                    name=f"response_{input_file.substructure_variable}_hybrid_40_120",
+                    panels=pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$\Delta R^{\text{hybrid}}\:(\text{GeV}/c)$"),
+                            pb.AxisConfig("y", label=r"$\Delta R^{\text{true}}\:(\text{GeV}/c)$", range=(0, 0.4)),
+                        ],
+                        text=pb.TextConfig(text, 0.97, 0.03),
+                    ),
+                    figure=pb.Figure(edge_padding={"left": 0.11, "bottom": 0.10}),
+                ),
+                output_dir=output_dir,
+            )
+
+        # Select the n_iter iteration
         jet_pt_for_text = helpers.JetPtRange(60, 80)
         text = f"${jet_pt_for_text.display_str(label='true')}$"
         plot_select_iteration(
@@ -1364,4 +1575,4 @@ if __name__ == "__main__":
     # matplotlib.rcParams["ytick.minor.right"] = True
 
     run(collision_system=collision_system)
-    # run_delta_R(collision_system=collision_system)
+    run_delta_R(collision_system=collision_system)
