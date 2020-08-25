@@ -10,7 +10,7 @@ from __future__ import annotations
 import functools
 import logging
 from pathlib import Path
-from typing import cast, Dict, Iterable, Tuple
+from typing import Dict, Iterable, Tuple, cast
 
 import attr
 import awkward1 as ak
@@ -20,9 +20,9 @@ import numpy as np
 import uproot as uproot3
 from pachyderm import yaml
 
+from jet_substructure.analysis import analyze_tree
 from jet_substructure.base import analysis_objects, data_manager, new_methods
 from jet_substructure.base.helpers import UprootArray
-from jet_substructure.analysis import analyze_tree
 
 
 logger = logging.getLogger(__name__)
@@ -117,13 +117,13 @@ def _define_calculation_functions(
     """
     functions = {
         # TODO: Fix uncomment
-        #"dynamical_z": functools.partial(new_methods.JetSplittingArray.dynamical_z, R=dataset.settings.jet_R),
-        #"dynamical_kt": functools.partial(
+        # "dynamical_z": functools.partial(new_methods.JetSplittingArray.dynamical_z, R=dataset.settings.jet_R),
+        # "dynamical_kt": functools.partial(
         #    new_methods.JetSplittingArray.dynamical_kt, R=dataset.settings.jet_R
-        #),
-        #"dynamical_time": functools.partial(
+        # ),
+        # "dynamical_time": functools.partial(
         #    new_methods.JetSplittingArray.dynamical_time, R=dataset.settings.jet_R
-        #),
+        # ),
         "leading_kt": functools.partial(new_methods.JetSplittingArray.leading_kt,),
         "leading_kt_z_cut_02": functools.partial(new_methods.JetSplittingArray.leading_kt, z_cutoff=0.2),
         "leading_kt_z_cut_04": functools.partial(new_methods.JetSplittingArray.leading_kt, z_cutoff=0.4),
@@ -131,13 +131,10 @@ def _define_calculation_functions(
     # TODO: This currently only works for iterative splittings...
     #       Calculating recursive is way harder in any array-like manner.
     if iterative_splittings:
-        functions["soft_drop_z_cut_02"] = functools.partial(
-            new_methods.JetSplittingArray.soft_drop, z_cutoff=0.2
-        )
-        functions["soft_drop_z_cut_04"] = functools.partial(
-            new_methods.JetSplittingArray.soft_drop, z_cutoff=0.4
-        )
+        functions["soft_drop_z_cut_02"] = functools.partial(new_methods.JetSplittingArray.soft_drop, z_cutoff=0.2)
+        functions["soft_drop_z_cut_04"] = functools.partial(new_methods.JetSplittingArray.soft_drop, z_cutoff=0.4)
     return functions
+
 
 def _select_and_retrieve_splittings(
     jets: ak.Array, mask: UprootArray[bool], iterative_splittings: bool
@@ -165,10 +162,11 @@ def _select_and_retrieve_splittings(
 
     return restricted_jets, restricted_splittings, restricted_splittings_indices
 
-#@nb.jit
-#def reproduce(
+
+# @nb.jit
+# def reproduce(
 #    selected_splittings: new_methods.JetSplittingArray,
-#) -> np.ndarray:
+# ) -> np.ndarray:
 #    output = np.zeros(len(selected_splittings), np.int16)
 #
 #    i = 0
@@ -187,7 +185,7 @@ def _select_and_retrieve_splittings(
 #
 #    return output
 
-#@nb.jit
+
 @nb.njit
 def calculate_splitting_number(
     all_splittings: new_methods.JetSplittingArray,
@@ -195,44 +193,55 @@ def calculate_splitting_number(
     restricted_splittings_indices: UprootArray[int],
     debug: bool = False,
 ) -> np.ndarray:
+    # TODO: Optimize the data sizes...
     output = np.zeros(len(selected_splittings), np.int16)
 
-    # Awkward1 doesn't support enumerate right now (Aug 2020), so we count by hand.
-    i = 0
-    for selected_splitting in selected_splittings:
-        restricted_splitting_indices = restricted_splittings_indices[i]
-        available_splittings_parents = all_splittings[i].parent_index
+    for i, (selected_splitting, restricted_splitting_indices, available_splittings_parents) in enumerate(
+        zip(selected_splittings, restricted_splittings_indices, all_splittings.parent_index)
+    ):
+        # restricted_splitting_indices = restricted_splittings_indices[i]
+        # available_splittings_parents = all_splittings[i].parent_index
 
         parent_indices = selected_splitting.parent_index
         if len(parent_indices):
-            for p in parent_indices:
-                print(p)
+            # for p in parent_indices:
+            #    print(p)
             parent_index = parent_indices[0]
-            assert parent_index == parent_indices[0]
-            print("i", i, "parent_indices", parent_indices, "parent_index", parent_index, "restricted_splitting_indices", restricted_splitting_indices)
-            #if i == 27:
-            #    import IPython; IPython.embed()
-            if i == 27:
-                print("parent_indices", parent_indices, "parent_index", parent_index, "restricted_splitting_indices", restricted_splitting_indices)
+            if debug:
+                print("parent_index", parent_index, "restricted_splitting_indices", restricted_splitting_indices)
+            # print("i", i, "parent_indices", parent_indices, "parent_index", parent_index, "restricted_splitting_indices", restricted_splitting_indices)
+            # if i == 27:
+            #    print("parent_indices", parent_indices, "parent_index", parent_index, "restricted_splitting_indices", restricted_splitting_indices)
             while parent_index != -1:
                 # Apparently contains isn't inplemented either. So we just implement by hand.
-                #if parent_index in restricted_splitting_indices:
+                # if parent_index in restricted_splitting_indices:
                 for index in restricted_splitting_indices:
-                    #print("parent_index: {parent_index}, index: {index}".format(parent_index=parent_index, index=index))
-                    #print("parent_index, index: %d, %d" % (parent_index, index))
-                    print("i", i, "parent_index", parent_index, "index", index)
+                    # print("parent_index: {parent_index}, index: {index}".format(parent_index=parent_index, index=index))
+                    if debug:
+                        print("parent_index", parent_index, "index", index)
+                    # print("parent_index, index: %d, %d" % (parent_index, index))
+                    # print("i", i, "parent_index", parent_index, "index", index)
                     if parent_index == index:
+                        if debug:
+                            print("Found parent index:", index)
                         output[i] += 1
-                        #import IPython; IPython.embed()
+                        # import IPython; IPython.embed()
                         parent_index = available_splittings_parents[parent_index]
-                        print("Breaking...")
+                        if debug:
+                            print("New parent index:", parent_index)
+                        # print("Breaking...")
                         break
-                if i == 27:
-                    return output
+                else:
+                    # We didn't find it, but we need to advance forward.
+                    parent_index = available_splittings_parents[parent_index]
 
-        i += 1
+            if debug:
+                print("output[i]", output[i])
+
+        # i += 1
 
     return output
+
 
 def calculate_splitting_number_old(
     all_splittings: new_methods.JetSplittingArray,
@@ -289,6 +298,272 @@ def calculate_splitting_number_old(
 
     # logger.debug("Finished splitting number calculation")
     return counts
+
+
+@nb.njit
+def _find_contributing_subjets(input_jet, groomed_index: int):
+    # subjets = []
+    # for sj in input_jet.subjets:
+    #    if sj.parent_splitting_index == groomed_index:
+    #        subjets.append(sj)
+    # return subjets
+    return [sj for sj in input_jet.subjets if sj.parent_splitting_index == groomed_index]
+
+
+@nb.njit
+def _sort_subjets(input_jet, input_subjets):
+    pts = []
+    for sj in input_subjets:
+        px = 0
+        py = 0
+        for constituent_index in sj.constituent_indices:
+            constituent = input_jet.jet_constituents[constituent_index]
+            px += constituent.pt * np.cos(constituent.phi)
+            py += constituent.pt * np.sin(constituent.phi)
+        pts.append(np.sqrt(px ** 2 + py ** 2))
+
+    leading = input_subjets[0]
+    subleading = input_subjets[1]
+
+    if pts[1] > pts[0]:
+        leading, subleading = subleading, leading
+
+    return leading, subleading
+
+
+@nb.njit
+def _subjet_shared_momentum(
+    measured_like_subjet,
+    measured_like_jet,
+    generator_like_subjet,
+    generator_like_jet,
+    match_using_distance: bool = False,
+):
+    delta = 0.01
+    sum_pt = 0
+
+    for generator_like_constituent_index in generator_like_subjet.constituent_indices:
+        generator_like_constituent = generator_like_jet.jet_constituents[generator_like_constituent_index]
+        for measured_like_constituent_index in measured_like_subjet.constituent_indices:
+            measured_like_constituent = measured_like_jet.jet_constituents[measured_like_constituent_index]
+            if match_using_distance:
+                if np.abs(measured_like_constituent.eta - generator_like_constituent.eta) > delta:
+                    continue
+                if np.abs(measured_like_constituent.phi - generator_like_constituent.phi) > delta:
+                    continue
+            else:
+                if generator_like_constituent.id != measured_like_constituent.id:
+                    continue
+
+            sum_pt += generator_like_constituent.pt
+            # We've matched once - no need to match again.
+            # Otherwise, the run the risk of summing a generator-like constituent pt twice.
+            break
+
+    return sum_pt
+
+
+@nb.njit
+def subjet_pt(subjet, jet):
+    px = 0
+    py = 0
+    for constituent_index in subjet.constituent_indices:
+        constituent = jet.jet_constituents[constituent_index]
+        px += constituent.pt * np.cos(constituent.phi)
+        py += constituent.pt * np.sin(constituent.phi)
+        # pt += jet.jet_constituents[constituent_index].pt
+    return np.sqrt(px ** 2 + py ** 2)
+
+
+@nb.njit
+def _subjet_contained_in_subjet(
+    measured_like_subjet,
+    measured_like_jet,
+    generator_like_subjet,
+    generator_like_jet,
+    match_using_distance: bool = False,
+):
+    return (
+        _subjet_shared_momentum(
+            measured_like_subjet=measured_like_subjet,
+            measured_like_jet=measured_like_jet,
+            generator_like_subjet=generator_like_subjet,
+            generator_like_jet=generator_like_jet,
+            match_using_distance=match_using_distance,
+        )
+        / subjet_pt(generator_like_subjet, generator_like_jet)
+    ) > 0.5
+
+
+@nb.njit
+def determine_matched_jets_numba(
+    measured_like_jets,
+    measured_like_splittings,
+    measured_like_groomed_values,
+    measured_like_groomed_indices,
+    generator_like_jets,
+    generator_like_splittings,
+    generator_like_groomed_values,
+    generator_like_groomed_indices,
+    match_using_distance: bool,
+) -> Dict[str, np.ndarray]:
+    n_jets = len(measured_like_jets)
+    leading_matching = np.ones(n_jets) * -1
+    subleading_matching = np.ones(n_jets) * -1
+
+    for (
+        i,
+        (
+            generator_like_jet,
+            generator_like_splitting,
+            generator_like_groomed_value,
+            generator_like_groomed_index_array,
+            measured_like_jet,
+            measured_like_splitting,
+            measured_like_groomed_value,
+            measured_like_groomed_index_array,
+        ),
+    ) in enumerate(
+        zip(
+            generator_like_jets,
+            generator_like_splittings,
+            generator_like_groomed_values,
+            generator_like_groomed_indices,
+            measured_like_jets,
+            measured_like_splittings,
+            measured_like_groomed_values,
+            measured_like_groomed_indices,
+        )
+    ):
+        # Find the selected index if it's available.
+        if len(measured_like_groomed_index_array) > 0 and len(generator_like_groomed_index_array) > 0:
+            # This is required. If we not, we handle the other cases and continue.
+            pass
+        elif len(measured_like_groomed_index_array) > 0:
+            # Assign 0 for this case and move on.
+            leading_matching[i] = 0
+            subleading_matching[i] = 0
+            continue
+        else:
+            # Use the default values and continue
+            continue
+
+        # We maintain the singles structure per jet so that each index can be applied to each jet (ie. array entry)
+        # (this also lets us keep empty cases accounted for). However, we've now already accounted for empty cases,
+        # and it's much easier to work with the individual values, so we extract them. We know each one will have only
+        # one entry because it's from an argmax call.
+        generator_like_groomed_index = generator_like_groomed_index_array[0]
+        measured_like_groomed_index = measured_like_groomed_index_array[0]
+
+        # Find the contributing subjets
+        generator_like_subjets = _find_contributing_subjets(generator_like_jet, generator_like_groomed_index)
+        measured_like_subjets = _find_contributing_subjets(measured_like_jet, measured_like_groomed_index)
+        # print(measured_like_subjets)
+        # Sort
+        generator_like_leading, generator_like_subleading = _sort_subjets(generator_like_jet, generator_like_subjets)
+        measured_like_leading, measured_like_subleading = _sort_subjets(measured_like_jet, measured_like_subjets)
+
+        # print(measured_like_leading, measured_like_subleading)
+
+        # Compare
+        if _subjet_contained_in_subjet(
+            generator_like_leading, generator_like_jet, measured_like_leading, measured_like_jet, match_using_distance
+        ):
+            leading_matching[i] = 1
+        elif _subjet_contained_in_subjet(
+            generator_like_leading,
+            generator_like_jet,
+            measured_like_subleading,
+            measured_like_jet,
+            match_using_distance,
+        ):
+            leading_matching[i] = 2
+        else:
+            leading_matching[i] = 3
+
+        if _subjet_contained_in_subjet(
+            generator_like_subleading,
+            generator_like_jet,
+            measured_like_subleading,
+            measured_like_jet,
+            match_using_distance,
+        ):
+            subleading_matching[i] = 1
+        elif _subjet_contained_in_subjet(
+            generator_like_subleading,
+            generator_like_jet,
+            measured_like_leading,
+            measured_like_jet,
+            match_using_distance,
+        ):
+            subleading_matching[i] = 2
+        else:
+            subleading_matching[i] = 3
+
+    return leading_matching, subleading_matching
+
+
+def prong_matching_numba_wrapper(
+    measured_like_jets_calculation: Calculation,
+    measured_like_jets_label: str,
+    generator_like_jets_calculation: Calculation,
+    generator_like_jets_label: str,
+    grooming_method: str,
+    match_using_distance: bool = False,
+) -> Dict[str, np.ndarray]:
+    """ Performs prong matching for the provided collections.
+
+    Note:
+        0 is there were insufficient constituents to form a splitting, 1 is properly matched, 2 is mistagged
+        (leading -> subleading or subleading -> leading), 3 is untagged (failed).
+
+    Args:
+        measured_like_jets_calculation: Grooming calculation for measured-like jets (hybrid for hybrid-det level matching).
+        measured_like_jets_label: Label for measured jets (hybrid for hybrid-det level matching).
+        generator_like_jets_calculation: Grooming calculation for generator-like jets (det level for hybrid-det level matching).
+        generator_like_jets_label: Label for generator jets (det_level for hybrid-det level matching).
+        grooming_method: Name of the grooming method.
+        match_using_distance: If True, match using distance. Otherwise, match using the stored label.
+    Returns:
+        Matching and subleading matching values.
+    """
+    ...
+
+    # Matching
+    grooming_results = {}
+    logger.info(f"Performing {measured_like_jets_label}-{generator_like_jets_label} matching for {grooming_method}")
+    leading_matching, subleading_matching = determine_matched_jets_numba(
+        measured_like_jets=measured_like_jets_calculation.input_jets,
+        measured_like_splittings=measured_like_jets_calculation.input_splittings,
+        measured_like_groomed_values=measured_like_jets_calculation.values,
+        measured_like_groomed_indices=measured_like_jets_calculation.indices,
+        generator_like_jets=generator_like_jets_calculation.input_jets,
+        generator_like_splittings=generator_like_jets_calculation.input_splittings,
+        generator_like_groomed_values=generator_like_jets_calculation.values,
+        generator_like_groomed_indices=generator_like_jets_calculation.indices,
+        match_using_distance=match_using_distance,
+    )
+    # Store leading, subleading matches
+    # for label, matching in [("leading", leading_matching), ("subleading", subleading_matching)]:
+    #    # We'll store the output in an array, and then store that in the overall output with a mask
+    #    # We need the additional mask because we can't perform matching for every jet (single particle jets, etc).
+    #    output = np.zeros(ak.num(generator_like_jets_calculation.input_jets), dtype=np.int)
+    #    matching_output = np.zeros(len(matching.properly), dtype=np.int)
+    #    matching_output[matching.properly] = 1
+    #    matching_output[matching.mistag] = 2
+    #    matching_output[matching.failed] = 3
+    #    output[mask] = matching_output
+    #    grooming_results[
+    #        f"{grooming_method}_{measured_like_jets_label}_{generator_like_jets_label}_matching_{label}"
+    #    ] = output
+
+    for label, matching in [("leading", leading_matching), ("subleading", subleading_matching)]:
+        grooming_results[
+            f"{grooming_method}_{measured_like_jets_label}_{generator_like_jets_label}_matching_{label}"
+        ] = matching
+
+    return grooming_results
+
 
 def prong_matching(
     measured_like_jets_calculation: Calculation,
@@ -359,17 +634,15 @@ def prong_matching(
     return grooming_results
 
 
-#def calculate_and_skim_embedding(  # noqa: C901
+# def calculate_and_skim_embedding(  # noqa: C901
 #    tree: data_manager.Tree,
 #    dataset: analysis_objects.Dataset,
 #    iterative_splittings: bool,
 #    create_friend_tree: bool = False,
 #    draw_example_splittings: bool = False,
-#) -> bool:
+# ) -> bool:
 def calculate_and_skim_embedding(  # noqa: C901
-    iterative_splittings: bool,
-    create_friend_tree: bool = False,
-    draw_example_splittings: bool = False,
+    iterative_splittings: bool, create_friend_tree: bool = False, draw_example_splittings: bool = False,
 ) -> bool:
     """ Determine the response and prong matching for jets substructure techniques.
 
@@ -384,30 +657,30 @@ def calculate_and_skim_embedding(  # noqa: C901
     # Perhaps make these into arguments?
     iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
     ## TODO: Maybe convert to hdf5? But maybe not because of compression?
-    #output_dir = tree.filename.parent / "skim"
+    # output_dir = tree.filename.parent / "skim"
     # TODO: Fix hardcode!
     output_dir = Path("trains/embedPythia/5966/skim/")
     output_dir.mkdir(parents=True, exist_ok=True)
     # TODO: Fix hardcode!
-    #output_filename = output_dir / f"{tree.filename.stem}_{iterative_splittings_label}_splittings.root"
+    # output_filename = output_dir / f"{tree.filename.stem}_{iterative_splittings_label}_splittings.root"
     output_filename = output_dir / f"AnalysisResults.18q.repaired_{iterative_splittings_label}_splittings.root"
 
     ## Use the train configuration to extract the train number and pt hard bin, which are used to get the scale factor.
-    #y = yaml.yaml()
-    #with open(tree.filename.parent / "config.yaml", "r") as f:
+    # y = yaml.yaml()
+    # with open(tree.filename.parent / "config.yaml", "r") as f:
     #    train_config = y.load(f)
-    #train_number = train_config["number"]
-    #pt_hard_bin = train_config["pt_hard_bin"]
-    #logger.debug(f"Extracted train number: {train_number}, pt hard bin: {pt_hard_bin}")
-    #analysis_settings = cast(analysis_objects.PtHardAnalysisSettings, dataset.settings)
-    #scale_factor = analysis_settings.scale_factors[pt_hard_bin]
+    # train_number = train_config["number"]
+    # pt_hard_bin = train_config["pt_hard_bin"]
+    # logger.debug(f"Extracted train number: {train_number}, pt hard bin: {pt_hard_bin}")
+    # analysis_settings = cast(analysis_objects.PtHardAnalysisSettings, dataset.settings)
+    # scale_factor = analysis_settings.scale_factors[pt_hard_bin]
     # TODO: Fix hardcode
     scale_factor = 1
     dataset = None
 
     # Actual setup.
     # TODO: Uncomment
-    #logger.info(f"Skimming tree from file {tree.filename}")
+    # logger.info(f"Skimming tree from file {tree.filename}")
     all_jets = new_methods.arrow_to_substructure(prefixes=prefixes)
     true_jets, det_level_jets, hybrid_jets = all_jets
 
@@ -431,13 +704,13 @@ def calculate_and_skim_embedding(  # noqa: C901
     mask = hybrid_jets.jet_pt > 0
 
     # Mask the jets
-    IPython.embed()
+    # IPython.embed()
     masked_true_jets, masked_true_jet_splittings, masked_true_jet_splittings_indices = _select_and_retrieve_splittings(
         true_jets, mask, iterative_splittings
     )
-    IPython.embed()
-    #reproduce(selected_splittings=masked_true_jet_splittings)
-    print("\n\nEarly reproduce done\n\n")
+    # IPython.embed()
+    # reproduce(selected_splittings=masked_true_jet_splittings)
+    # print("\n\nEarly reproduce done\n\n")
     (
         masked_det_level_jets,
         masked_det_level_jet_splittings,
@@ -462,11 +735,16 @@ def calculate_and_skim_embedding(  # noqa: C901
         grooming_results["jet_pt_hybrid"] = masked_hybrid_jets.jet_pt
         # Add jet eta phi.
         for prefix, jets in zip(prefixes, [masked_true_jets, masked_det_level_jets, masked_hybrid_jets]):
-            # TODO: Fix and uncomment
-            #jet_four_vec = jets.jet_constituents.four_vectors().sum()
-            #grooming_results[f"jet_eta_{prefix}"] = jet_four_vec.eta
-            #grooming_results[f"jet_phi_{prefix}"] = jet_four_vec.phi
-            pass
+            # jet_four_vec = jets.jet_constituents.four_vectors().sum()
+            # Since vector isn't ready yet, just do this by hand...
+            constituents = jets.jet_constituents
+            px = ak.sum(constituents.pt * np.cos(constituents.phi), axis=1)
+            py = ak.sum(constituents.pt * np.sin(constituents.phi), axis=1)
+            pz = ak.sum(constituents.pt * np.sinh(constituents.eta), axis=1)
+            # Formulas just from inverting the above.
+            grooming_results[f"jet_eta_{prefix}"] = np.arcsinh(pz / np.sqrt(px ** 2 + py ** 2))
+            grooming_results[f"jet_phi_{prefix}"] = np.arctan2(py, px)
+
         # Leading track
         grooming_results["leading_track_true"] = ak.max(masked_true_jets.jet_constituents.pt, axis=1)
         grooming_results["leading_track_det_level"] = ak.max(masked_det_level_jets.jet_constituents.pt, axis=1)
@@ -500,11 +778,11 @@ def calculate_and_skim_embedding(  # noqa: C901
                 ("det_level", det_level_jets_calculation),
                 ("hybrid", hybrid_jets_calculation),
             ]:
-                #reproduce(selected_splittings=calculation.splittings)
-                #IPython.embed()
-                #reproduce(selected_splittings=masked_true_jet_splittings)
-                reproduce(selected_splittings=true_jets.jet_splittings)
-                print("\n\nPost reproducer")
+                # reproduce(selected_splittings=calculation.splittings)
+                # IPython.embed()
+                # reproduce(selected_splittings=masked_true_jet_splittings)
+                # reproduce(selected_splittings=true_jets.jet_splittings)
+                print(f"Prefix: {prefix}")
                 # Calculate splitting number for the appropriate cases.
                 groomed_splittings = calculation.splittings
                 # Number of splittings until the selected splitting, irrespective of the grooming conditions.
@@ -514,43 +792,51 @@ def calculate_and_skim_embedding(  # noqa: C901
                     # Need all splitting indices (unrestricted by any possible grooming selections).
                     restricted_splittings_indices=calculation.input_splittings_indices,
                 )
+                print("Done with first splitting calculation")
                 # Number of splittings which pass the grooming conditions until the selected splitting.
                 n_groomed_to_split = calculate_splitting_number(
                     all_splittings=calculation.input_jets.jet_splittings,
                     selected_splittings=groomed_splittings,
                     # Need the indices that correspond to the splittings that pass the grooming.
                     restricted_splittings_indices=calculation.possible_indices,
+                    debug=False,
                 )
+                print("Done with second splitting calculation")
 
                 # We pad with the UNFILLED_VALUE constant to account for any calculations that don't find a splitting.
                 grooming_result = GroomingResultForTree(
                     grooming_method=func_name,
-                    delta_R=ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.delta_R, 1), new_methods.UNFILLED_VALUE)),
+                    delta_R=ak.flatten(
+                        ak.fill_none(ak.pad_none(groomed_splittings.delta_R, 1), new_methods.UNFILLED_VALUE)
+                    ),
                     z=ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.z, 1), new_methods.UNFILLED_VALUE)),
                     kt=ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.kt, 1), new_methods.UNFILLED_VALUE)),
                     # All of the numbers are already flattened. 0 means untagged.
                     n_to_split=n_to_split,
                     n_groomed_to_split=n_groomed_to_split,
                     # Number of splittings which pass the grooming condition. For SoftDrop, this is n_sd.
-                    n_passed_grooming=calculation.possible_indices.counts,
+                    n_passed_grooming=ak.num(calculation.possible_indices, axis=1),
                 )
                 grooming_results.update(grooming_result.asdict(prefix=prefix))
 
+            print("Before prong matching")
+            # IPython.embed()
             # Hybrid-det level matching.
             # We match using distance here because the labels don't align anymore due to the subtraction mixing the labels.
-            hybrid_det_level_matching_results = prong_matching(
+            hybrid_det_level_matching_results = prong_matching_numba_wrapper(
                 measured_like_jets_calculation=hybrid_jets_calculation,
                 measured_like_jets_label="hybrid",
                 generator_like_jets_calculation=det_level_jets_calculation,
                 generator_like_jets_label="det_level",
                 grooming_method=func_name,
-                match_using_distance=True,
+                match_using_distance=False,
             )
             grooming_results.update(hybrid_det_level_matching_results)
+            print("Done with first prong matching")
             # Det level-true matching
             # We match using labels here because otherwise the reconstruction can cause the particles to move
             # enough that they may not match within a particular distance.
-            det_level_true_matching_results = prong_matching(
+            det_level_true_matching_results = prong_matching_numba_wrapper(
                 measured_like_jets_calculation=det_level_jets_calculation,
                 measured_like_jets_label="det_level",
                 generator_like_jets_calculation=true_jets_calculation,
@@ -559,6 +845,7 @@ def calculate_and_skim_embedding(  # noqa: C901
                 match_using_distance=False,
             )
             grooming_results.update(det_level_true_matching_results)
+            print("Done with second prong matching")
 
             # Look for leading kt just because it's easier to understand conceptually.
             hybrid_det_level_leading_matching = grooming_results[f"{func_name}_hybrid_det_level_matching_leading"]
@@ -606,7 +893,12 @@ def calculate_and_skim_embedding(  # noqa: C901
                         selected_splitting_index=det_level_jet_selected_splitting_index,
                     )
 
+            print(f"Completed {func_name}")
+
     # Convert to numpy
+    for k, v in grooming_results.items():
+        # print(f"{k}: {ak.num(v, axis=0)}")
+        print(f"{k}: {ak.type(v)}")
     grooming_results_np = {k: ak.to_numpy(v) for k, v in grooming_results.items()}
     # Write with uproot
     branches = {k: v.dtype for k, v in grooming_results_np.items()}
@@ -619,6 +911,8 @@ def calculate_and_skim_embedding(  # noqa: C901
     logger.info(f"Finished processing tree from file {tree.filename}")
     return True
 
-if __name__ == "__main__":
-    import IPython; IPython.start_ipython(user_ns=locals())
 
+if __name__ == "__main__":
+    # import IPython; IPython.start_ipython(user_ns=locals())
+    # TODO: Optimize the data sizes...
+    calculate_and_skim_embedding(True)

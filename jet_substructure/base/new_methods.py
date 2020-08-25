@@ -17,6 +17,7 @@ import uproot_methods
 
 from jet_substructure.base.helpers import ArrayOrScalar, UprootArray
 
+
 # Typing helpers
 _T = TypeVar("_T")
 
@@ -60,10 +61,15 @@ def find_leading(values: UprootArray[_T]) -> Tuple[np.ndarray, UprootArray[int]]
     Returns:
         Leading value, index of value.
     """
+    # TODO: Go back to the old code. My trick fixed the problem....
     # Restore the dimensions with ak.singletons (keepdims doesn't seem to work properly because the value is nullable.
     arg_max = ak.singletons(ak.argmax(values, axis=1))
-    max_values = ak.fill_none(ak.pad_none(values[arg_max], 1), UNFILLED_VALUE)
-    return ak.flatten(max_values), arg_max
+    # max_values = ak.fill_none(ak.pad_none(values[arg_max], 1), UNFILLED_VALUE)
+    # import IPython; IPython.embed()
+    max_values = ak.fill_none(ak.max(values, axis=1), UNFILLED_VALUE)
+    # return ak.flatten(max_values), arg_max
+    return max_values, arg_max
+
 
 class JetConstituentCommon:
     offset: int = 2000000
@@ -75,6 +81,7 @@ class JetConstituentCommon:
     def delta_R(self: _T, other: _T) -> ArrayOrScalar[float]:
         """ Separation between jet constituents. """
         return np.sqrt((self.phi - other.phi) ** 2 + (self.eta - other.eta) ** 2)
+
 
 class JetConstituent(ak.Record, JetConstituentCommon):
     """ A single jet constituent.
@@ -117,13 +124,13 @@ class JetConstituentArray(ak.Array, JetConstituentCommon):
 
     def four_vectors(self, mass_hypothesis: float = 0.139) -> uproot_methods.TLorentzVectorArray:
         mass_hypothesis_array = self.pt * 0 + mass_hypothesis
-        return uproot_methods.TLorentzVectorArray.from_ptetaphim(
-            self.pt, self.eta, self.phi, mass_hypothesis_array,
-        )
+        return uproot_methods.TLorentzVectorArray.from_ptetaphim(self.pt, self.eta, self.phi, mass_hypothesis_array,)
+
 
 # Register behavior
 ak.behavior["JetConstituent"] = JetConstituent
 ak.behavior["*", "JetConstituent"] = JetConstituentArray
+
 
 class SubjetCommon:
     """ Common subjet related methods. """
@@ -158,22 +165,28 @@ class SubjetCommon:
 
 class Subjet(ak.Record, SubjetCommon):
     """ Single subjet. """
+
     part_of_iterative_splitting: bool
     parent_splitting_index: int
     constituents_indices: UprootArray[int]
 
+
 class SubjetArray(ak.Array, SubjetCommon):
     """ Array of subjets. """
+
     part_of_iterative_splitting: UprootArray[bool]
     parent_splitting_index: UprootArray[int]
     constituents_indices: UprootArray[int]
+
 
 # Register behavior
 ak.behavior["Subjet"] = Subjet
 ak.behavior["*", "Subjet"] = SubjetArray
 
+
 class JetSplittingCommon:
     """ Common jet splitting related methods. """
+
     kt: float
     delta_R: float
     z: float
@@ -268,6 +281,7 @@ class JetSplitting(ak.Record, JetSplittingCommon):
         """
         return dynamical_time(self.delta_R, self.z, self.parent_pt, R)  # type: ignore
 
+
 class JetSplittingArray(ak.Array, JetSplittingCommon):
     """ Array of jet splittings. """
 
@@ -276,9 +290,8 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):
     z: UprootArray[float]
     parent_index: UprootArray[int]
 
-
     def iterative_splittings(self, subjets: SubjetArray) -> SubjetArray:
-        """ Retriieve the iterative splittings.
+        """ Retrieve the iterative splittings.
 
         Args:
             subjets: Subjets of the jets which containing the iterative splitting information.
@@ -363,32 +376,33 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):
 
         return z_g, z_index, indices_passing_cutoff
 
+
 # Register behavior
 ak.behavior["JetSplitting"] = JetSplitting
 ak.behavior["*", "JetSplitting"] = JetSplittingArray
 
-#def jet_substructure(tree: ak.JaggedArray, prefix: str):
+# def jet_substructure(tree: ak.JaggedArray, prefix: str):
 def jet_substructure_initial(tree, prefixes: Sequence[str]):
 
     filename = Path("trains/embedPythia/5966/AnalysisResults.18q.parquet")
     if filename.exists():
         return
 
-    #return ak.Array(
+    # return ak.Array(
     #    properties={
 
     #    }
-    #)
+    # )
 
     # FIXME: Calling array on each is slow!!
 
     # TODO: Need to play with the depth limit here.
     # TODO: It may make sense to convert the arrays that are defined here to be zip with a limited depth limit...
 
-    #arrays = ak.zip({
+    # arrays = ak.zip({
     #    f"data.fJetPt": tree[f"{prefix}.fJetPt"].array(),
     #    f"data.fJetConstituents.fPt": tree[f"{prefix}.fJetConstituents.fPt"].array(),
-    #})
+    # })
     all_branches = []
     for prefix in prefixes:
         branches = [
@@ -409,7 +423,7 @@ def jet_substructure_initial(tree, prefixes: Sequence[str]):
     print(all_branches)
     arrays = tree.arrays(
         all_branches
-        #[
+        # [
         #    f"{prefix}.fJetPt",
         #    f"{prefix}.fJetConstituents.fPt",
         #    f"{prefix}.fJetConstituents.fEta",
@@ -422,20 +436,21 @@ def jet_substructure_initial(tree, prefixes: Sequence[str]):
         #    f"{prefix}.fSubjets.fPartOfIterativeSplitting",
         #    f"{prefix}.fSubjets.fSplittingNodeIndex",
         #    f"{prefix}.fSubjets.fConstituentIndices",
-        #],
-        #filter_name=f"{prefix}.fJetConstituents",
-        #entry_stop=1000,
+        # ],
+        # filter_name=f"{prefix}.fJetConstituents",
+        # entry_stop=1000,
     )
 
     ak.to_parquet(arrays, "trains/embedPythia/5966/AnalysisResults.18q.parquet")
 
     return arrays
 
+
 def arrow_to_substructure(prefixes: Sequence[str]):
 
     arrays = ak.from_parquet("trains/embedPythia/5966/AnalysisResults.18q.parquet")
 
-    #jet_constituents = ak.zip(
+    # jet_constituents = ak.zip(
     #    {
     #        "pt": arrays[f"{prefix}.fJetConstituents.fPt"],
     #        "eta": arrays[f"{prefix}.fJetConstituents.fEta"],
@@ -443,8 +458,8 @@ def arrow_to_substructure(prefixes: Sequence[str]):
     #        "id": arrays[f"{prefix}.fJetConstituents.fID"],
     #    },
     #    with_name="JetConstituent",
-    #)
-    #subjets = ak.zip(
+    # )
+    # subjets = ak.zip(
     #    {
     #        "kt": arrays[f"{prefix}.fJetSplittings.fKt"],
     #        "delta_R": arrays[f"{prefix}.fJetSplittings.fDeltaR"],
@@ -452,11 +467,11 @@ def arrow_to_substructure(prefixes: Sequence[str]):
     #        "parent_index": arrays[f"{prefix}.fJetSplittings.fParentIndex"],
     #    },
     #    with_name="Subjet",
-    #)
-    #return arrays
+    # )
+    # return arrays
 
-    #fill_none_value = -9999
-    #return ak.zip({
+    # fill_none_value = -9999
+    # return ak.zip({
     #    "jet_pt": ak.fill_none(arrays[f"{prefix}.fJetPt"], fill_none_value),
     #    "jet_constituents": ak.zip(
     #        {
@@ -485,47 +500,86 @@ def arrow_to_substructure(prefixes: Sequence[str]):
     #        with_name="Subjet",
     #        depth_limit=1,
     #    ),
-    #}, depth_limit=1)
+    # }, depth_limit=1)
 
     # We need to fill_none so that we don't have any nullable types.
     # Nullable types seem to make most operations a lot more difficult in awkward1.
     fill_none_value = -9999
-    return [ak.fill_none(
-        ak.zip({
-            "jet_pt": arrays[f"{prefix}.fJetPt"],
-            "jet_constituents": ak.zip(
-                {
-                    "pt": arrays[f"{prefix}.fJetConstituents.fPt"],
-                    "eta": arrays[f"{prefix}.fJetConstituents.fEta"],
-                    "phi": arrays[f"{prefix}.fJetConstituents.fPhi"],
-                    "id": arrays[f"{prefix}.fJetConstituents.fID"],
-                },
-                with_name="JetConstituent",
-                depth_limit=1,
-            ),
-            "jet_splittings": ak.zip(
-                {
-                    "kt": arrays[f"{prefix}.fJetSplittings.fKt"],
-                    "delta_R": arrays[f"{prefix}.fJetSplittings.fDeltaR"],
-                    "z": arrays[f"{prefix}.fJetSplittings.fZ"],
-                    "parent_index": arrays[f"{prefix}.fJetSplittings.fParentIndex"],
-                },
-                with_name="JetSplitting",
-                depth_limit=1,
-            ),
-            "subjets": ak.zip(
-                {
-                    "part_of_iterative_splitting": arrays[f"{prefix}.fSubjets.fPartOfIterativeSplitting"],
-                    "parent_splitting_index": arrays[f"{prefix}.fSubjets.fSplittingNodeIndex"],
-                    "constituent_indices": arrays[f"{prefix}.fSubjets.fConstituentIndices"],
-                },
-                with_name="Subjet",
-                depth_limit=1,
-            ),
-        }, depth_limit=1),
-        fill_none_value,
-    ) for prefix in prefixes]
-    #return [
+    arrays = ak.fill_none(arrays, fill_none_value)
+    # return [ak.fill_none(
+    #    ak.zip({
+    #        "jet_pt": arrays[f"{prefix}.fJetPt"],
+    #        "jet_constituents": ak.zip(
+    #            {
+    #                "pt": arrays[f"{prefix}.fJetConstituents.fPt"],
+    #                "eta": arrays[f"{prefix}.fJetConstituents.fEta"],
+    #                "phi": arrays[f"{prefix}.fJetConstituents.fPhi"],
+    #                "id": arrays[f"{prefix}.fJetConstituents.fID"],
+    #            },
+    #            with_name="JetConstituent",
+    #            depth_limit=2,
+    #        ),
+    #        "jet_splittings": ak.zip(
+    #            {
+    #                "kt": arrays[f"{prefix}.fJetSplittings.fKt"],
+    #                "delta_R": arrays[f"{prefix}.fJetSplittings.fDeltaR"],
+    #                "z": arrays[f"{prefix}.fJetSplittings.fZ"],
+    #                "parent_index": arrays[f"{prefix}.fJetSplittings.fParentIndex"],
+    #            },
+    #            with_name="JetSplitting",
+    #            depth_limit=2,
+    #        ),
+    #        "subjets": ak.zip(
+    #            {
+    #                "part_of_iterative_splitting": arrays[f"{prefix}.fSubjets.fPartOfIterativeSplitting"],
+    #                "parent_splitting_index": arrays[f"{prefix}.fSubjets.fSplittingNodeIndex"],
+    #                "constituent_indices": arrays[f"{prefix}.fSubjets.fConstituentIndices"],
+    #            },
+    #            with_name="Subjet",
+    #            depth_limit=2,
+    #        ),
+    #    }, depth_limit=1),
+    #    fill_none_value,
+    # ) for prefix in prefixes]
+    return [
+        ak.zip(
+            {
+                "jet_pt": arrays[f"{prefix}.fJetPt"],
+                "jet_constituents": ak.zip(
+                    {
+                        "pt": arrays[f"{prefix}.fJetConstituents.fPt"],
+                        "eta": arrays[f"{prefix}.fJetConstituents.fEta"],
+                        "phi": arrays[f"{prefix}.fJetConstituents.fPhi"],
+                        "id": arrays[f"{prefix}.fJetConstituents.fID"],
+                    },
+                    with_name="JetConstituent",
+                    depth_limit=2,
+                ),
+                "jet_splittings": ak.zip(
+                    {
+                        "kt": arrays[f"{prefix}.fJetSplittings.fKt"],
+                        "delta_R": arrays[f"{prefix}.fJetSplittings.fDeltaR"],
+                        "z": arrays[f"{prefix}.fJetSplittings.fZ"],
+                        "parent_index": arrays[f"{prefix}.fJetSplittings.fParentIndex"],
+                    },
+                    with_name="JetSplitting",
+                    depth_limit=2,
+                ),
+                "subjets": ak.zip(
+                    {
+                        "part_of_iterative_splitting": arrays[f"{prefix}.fSubjets.fPartOfIterativeSplitting"],
+                        "parent_splitting_index": arrays[f"{prefix}.fSubjets.fSplittingNodeIndex"],
+                        "constituent_indices": arrays[f"{prefix}.fSubjets.fConstituentIndices"],
+                    },
+                    with_name="Subjet",
+                    depth_limit=2,
+                ),
+            },
+            depth_limit=1,
+        )
+        for prefix in prefixes
+    ]
+    # return [
     #    ak.zip({
     #        "jet_pt": arrays[f"{prefix}.fJetPt"],
     #        "jet_constituents": ak.zip(
@@ -557,27 +611,34 @@ def arrow_to_substructure(prefixes: Sequence[str]):
     #        ),
     #    }, depth_limit=1) for prefix in prefixes]
 
+
 if __name__ == "__main__":
     import uproot4 as uproot
+
     f = uproot.open("trains/embedPythia/5966/AnalysisResults.18q.repaired.root")
-    tree = f["AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"]
+    tree = f[
+        "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+    ]
     tree.show()
     import time
+
     start = time.perf_counter()
     arrays_original = jet_substructure_initial(tree, prefixes=["data", "matched", "detLevel"])
-    arrays, = arrow_to_substructure(prefixes=["data"])
+    (arrays,) = arrow_to_substructure(prefixes=["data"])
     finish = time.perf_counter()
     print(f"Uproot4: Length: {ak.num(arrays, axis=0)}, time: {finish-start}")
     # Sanity check if the fill_none is a problem
     assert not ak.any(arrays == -9999)
-    import IPython; IPython.embed()
+    import IPython
+
+    IPython.embed()
     f.close()
 
-    #import uproot as uproot3
-    #f = uproot3.open("trains/embedPythia/5966/AnalysisResults.18q.root")
-    #tree = f["AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"]
-    #import time
-    #start = time.perf_counter()
-    #arrays = jet_substructure(tree, prefix="data")
-    #finish = time.perf_counter()
-    #print(f"Uproot3: Length: {len(arrays[b'data.fJetPt'])}, time: {finish-start}")
+    # import uproot as uproot3
+    # f = uproot3.open("trains/embedPythia/5966/AnalysisResults.18q.root")
+    # tree = f["AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"]
+    # import time
+    # start = time.perf_counter()
+    # arrays = jet_substructure(tree, prefix="data")
+    # finish = time.perf_counter()
+    # print(f"Uproot3: Length: {len(arrays[b'data.fJetPt'])}, time: {finish-start}")
