@@ -119,11 +119,14 @@ def _define_calculation_functions(
         # TODO: Fix uncomment
         # "dynamical_z": functools.partial(new_methods.JetSplittingArray.dynamical_z, R=dataset.settings.jet_R),
         # "dynamical_kt": functools.partial(
-        #    new_methods.JetSplittingArray.dynamical_kt, R=dataset.settings.jet_R
+        #   new_methods.JetSplittingArray.dynamical_kt, R=dataset.settings.jet_R
         # ),
         # "dynamical_time": functools.partial(
-        #    new_methods.JetSplittingArray.dynamical_time, R=dataset.settings.jet_R
+        #   new_methods.JetSplittingArray.dynamical_time, R=dataset.settings.jet_R
         # ),
+        "dynamical_z": functools.partial(new_methods.JetSplittingArray.dynamical_z, R=0.4),
+        "dynamical_kt": functools.partial(new_methods.JetSplittingArray.dynamical_kt, R=0.4),
+        "dynamical_time": functools.partial(new_methods.JetSplittingArray.dynamical_time, R=0.4),
         "leading_kt": functools.partial(new_methods.JetSplittingArray.leading_kt,),
         "leading_kt_z_cut_02": functools.partial(new_methods.JetSplittingArray.leading_kt, z_cutoff=0.2),
         "leading_kt_z_cut_04": functools.partial(new_methods.JetSplittingArray.leading_kt, z_cutoff=0.4),
@@ -204,8 +207,9 @@ def calculate_splitting_number(
 
         parent_indices = selected_splitting.parent_index
         if len(parent_indices):
-            # for p in parent_indices:
-            #    print(p)
+            # We have at least one splitting, so we add an entry for it.
+            output[i] += 1
+
             parent_index = parent_indices[0]
             if debug:
                 print("parent_index", parent_index, "restricted_splitting_indices", restricted_splitting_indices)
@@ -408,8 +412,8 @@ def determine_matched_jets_numba(
     match_using_distance: bool,
 ) -> Dict[str, np.ndarray]:
     n_jets = len(measured_like_jets)
-    leading_matching = np.ones(n_jets) * -1
-    subleading_matching = np.ones(n_jets) * -1
+    leading_matching = np.ones(n_jets, dtype=np.int16) * -1
+    subleading_matching = np.ones(n_jets, dtype=np.int16) * -1
 
     for (
         i,
@@ -663,7 +667,7 @@ def calculate_and_skim_embedding(  # noqa: C901
     output_dir.mkdir(parents=True, exist_ok=True)
     # TODO: Fix hardcode!
     # output_filename = output_dir / f"{tree.filename.stem}_{iterative_splittings_label}_splittings.root"
-    output_filename = output_dir / f"AnalysisResults.18q.repaired_{iterative_splittings_label}_splittings.root"
+    output_filename = output_dir / f"AnalysisResults.18q.repaired_{iterative_splittings_label}_splittings_new.root"
 
     ## Use the train configuration to extract the train number and pt hard bin, which are used to get the scale factor.
     # y = yaml.yaml()
@@ -792,6 +796,7 @@ def calculate_and_skim_embedding(  # noqa: C901
                     # Need all splitting indices (unrestricted by any possible grooming selections).
                     restricted_splittings_indices=calculation.input_splittings_indices,
                 )
+                # import IPython; IPython.embed()
                 print("Done with first splitting calculation")
                 # Number of splittings which pass the grooming conditions until the selected splitting.
                 n_groomed_to_split = calculate_splitting_number(
