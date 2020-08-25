@@ -337,10 +337,10 @@ def _sort_subjets(input_jet, input_subjets):
 
 @nb.njit
 def _subjet_shared_momentum(
-    measured_like_subjet,
-    measured_like_jet,
     generator_like_subjet,
     generator_like_jet,
+    measured_like_subjet,
+    measured_like_jet,
     match_using_distance: bool = False,
 ):
     delta = 0.01
@@ -371,28 +371,30 @@ def _subjet_shared_momentum(
 def subjet_pt(subjet, jet):
     px = 0
     py = 0
+    # pt = 0
     for constituent_index in subjet.constituent_indices:
         constituent = jet.jet_constituents[constituent_index]
         px += constituent.pt * np.cos(constituent.phi)
         py += constituent.pt * np.sin(constituent.phi)
-        # pt += jet.jet_constituents[constituent_index].pt
+        # pt += constituent.pt
+    # return pt
     return np.sqrt(px ** 2 + py ** 2)
 
 
 @nb.njit
 def _subjet_contained_in_subjet(
-    measured_like_subjet,
-    measured_like_jet,
     generator_like_subjet,
     generator_like_jet,
+    measured_like_subjet,
+    measured_like_jet,
     match_using_distance: bool = False,
 ):
     return (
         _subjet_shared_momentum(
-            measured_like_subjet=measured_like_subjet,
-            measured_like_jet=measured_like_jet,
             generator_like_subjet=generator_like_subjet,
             generator_like_jet=generator_like_jet,
+            measured_like_subjet=measured_like_subjet,
+            measured_like_jet=measured_like_jet,
             match_using_distance=match_using_distance,
         )
         / subjet_pt(generator_like_subjet, generator_like_jet)
@@ -401,14 +403,14 @@ def _subjet_contained_in_subjet(
 
 @nb.njit
 def determine_matched_jets_numba(
-    measured_like_jets,
-    measured_like_splittings,
-    measured_like_groomed_values,
-    measured_like_groomed_indices,
     generator_like_jets,
     generator_like_splittings,
     generator_like_groomed_values,
     generator_like_groomed_indices,
+    measured_like_jets,
+    measured_like_splittings,
+    measured_like_groomed_values,
+    measured_like_groomed_indices,
     match_using_distance: bool,
 ) -> Dict[str, np.ndarray]:
     n_jets = len(measured_like_jets)
@@ -467,38 +469,40 @@ def determine_matched_jets_numba(
         generator_like_leading, generator_like_subleading = _sort_subjets(generator_like_jet, generator_like_subjets)
         measured_like_leading, measured_like_subleading = _sort_subjets(measured_like_jet, measured_like_subjets)
 
-        # print(measured_like_leading, measured_like_subleading)
-
         # Compare
         if _subjet_contained_in_subjet(
-            generator_like_leading, generator_like_jet, measured_like_leading, measured_like_jet, match_using_distance
+            generator_like_subjet=generator_like_leading,
+            generator_like_jet=generator_like_jet,
+            measured_like_subjet=measured_like_leading,
+            measured_like_jet=measured_like_jet,
+            match_using_distance=match_using_distance,
         ):
             leading_matching[i] = 1
         elif _subjet_contained_in_subjet(
-            generator_like_leading,
-            generator_like_jet,
-            measured_like_subleading,
-            measured_like_jet,
-            match_using_distance,
+            generator_like_subjet=generator_like_leading,
+            generator_like_jet=generator_like_jet,
+            measured_like_subjet=measured_like_subleading,
+            measured_like_jet=measured_like_jet,
+            match_using_distance=match_using_distance,
         ):
             leading_matching[i] = 2
         else:
             leading_matching[i] = 3
 
         if _subjet_contained_in_subjet(
-            generator_like_subleading,
-            generator_like_jet,
-            measured_like_subleading,
-            measured_like_jet,
-            match_using_distance,
+            generator_like_subjet=generator_like_subleading,
+            generator_like_jet=generator_like_jet,
+            measured_like_subjet=measured_like_subleading,
+            measured_like_jet=measured_like_jet,
+            match_using_distance=match_using_distance,
         ):
             subleading_matching[i] = 1
         elif _subjet_contained_in_subjet(
-            generator_like_subleading,
-            generator_like_jet,
-            measured_like_leading,
-            measured_like_jet,
-            match_using_distance,
+            generator_like_subjet=generator_like_subleading,
+            generator_like_jet=generator_like_jet,
+            measured_like_subjet=measured_like_leading,
+            measured_like_jet=measured_like_jet,
+            match_using_distance=match_using_distance,
         ):
             subleading_matching[i] = 2
         else:
@@ -537,14 +541,14 @@ def prong_matching_numba_wrapper(
     grooming_results = {}
     logger.info(f"Performing {measured_like_jets_label}-{generator_like_jets_label} matching for {grooming_method}")
     leading_matching, subleading_matching = determine_matched_jets_numba(
-        measured_like_jets=measured_like_jets_calculation.input_jets,
-        measured_like_splittings=measured_like_jets_calculation.input_splittings,
-        measured_like_groomed_values=measured_like_jets_calculation.values,
-        measured_like_groomed_indices=measured_like_jets_calculation.indices,
         generator_like_jets=generator_like_jets_calculation.input_jets,
         generator_like_splittings=generator_like_jets_calculation.input_splittings,
         generator_like_groomed_values=generator_like_jets_calculation.values,
         generator_like_groomed_indices=generator_like_jets_calculation.indices,
+        measured_like_jets=measured_like_jets_calculation.input_jets,
+        measured_like_splittings=measured_like_jets_calculation.input_splittings,
+        measured_like_groomed_values=measured_like_jets_calculation.values,
+        measured_like_groomed_indices=measured_like_jets_calculation.indices,
         match_using_distance=match_using_distance,
     )
     # Store leading, subleading matches
