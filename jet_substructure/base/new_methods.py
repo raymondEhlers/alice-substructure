@@ -10,7 +10,6 @@ import typing
 from pathlib import Path
 from typing import Final, Optional, Sequence, Tuple, TypeVar, cast
 
-import attr
 import awkward1 as ak
 import numpy as np
 import uproot_methods
@@ -23,6 +22,7 @@ _T = TypeVar("_T")
 
 
 # Constants
+# This value corresponds to an unidentified splitting.
 UNFILLED_VALUE: Final[float] = -0.005
 
 
@@ -39,12 +39,58 @@ def _dynamical_hardness_measure(delta_R: float, z: float, parent_pt: float, R: f
 
 
 def _dynamical_hardness_measure(delta_R, z, parent_pt, R, a):  # type: ignore
+    """ Implements the dynamical hardness measure used in dynamical grooming.
+
+    Args:
+        delta_R: Splitting delta R.
+        z: Splitting z.
+        parent_pt: Pt of the parent of the splitting.
+        R: Jet resolution parameter.
+        a: Dynamical grooming parameter, a.
+    Returns:
+        The hardness of the splitting according to the measure.
+    """
     return z * (1 - z) * parent_pt * (delta_R / R) ** a
 
 
 dynamical_z = functools.partial(_dynamical_hardness_measure, a=0.1)
+dynamical_z.__doc__ = """
+Calculates dynamical z (a = 0.1). Also known as zDrop.
+
+Args:
+    delta_R: Splitting delta R.
+    z: Splitting z.
+    parent_pt: Pt of the parent of the splitting.
+    R: Jet resolution parameter.
+Returns:
+    The hardness of the splitting according to the measure.
+"""
+
 dynamical_kt = functools.partial(_dynamical_hardness_measure, a=1.0)
+dynamical_kt.__doc__ = """
+Calculates dynamical kt (a = 1). Also known as ktDrop.
+
+Args:
+    delta_R: Splitting delta R.
+    z: Splitting z.
+    parent_pt: Pt of the parent of the splitting.
+    R: Jet resolution parameter.
+Returns:
+    The hardness of the splitting according to the measure.
+"""
+
 dynamical_time = functools.partial(_dynamical_hardness_measure, a=2.0)
+dynamical_time.__doc__ = """
+Calculates dynamical time (a = 2). Also known as timeDrop.
+
+Args:
+    delta_R: Splitting delta R.
+    z: Splitting z.
+    parent_pt: Pt of the parent of the splitting.
+    R: Jet resolution parameter.
+Returns:
+    The hardness of the splitting according to the measure.
+"""
 
 
 def find_leading(values: UprootArray[_T]) -> Tuple[np.ndarray, UprootArray[int]]:
@@ -53,7 +99,7 @@ def find_leading(values: UprootArray[_T]) -> Tuple[np.ndarray, UprootArray[int]]
     Used for dynamical grooming, hardest kt, etc.
 
     In the case that we don't find a viable max (ie. because there was no splitting), we pad
-    to one entry and fill -0.01 (our UNFILLED_VALUE) before flattening. The corresponding index
+    to one entry and fill -0.005 (our UNFILLED_VALUE) before flattening. The corresponding index
     will be empty for that event. This way, we can just fill all values, regardless of whether
     the splittings were selected, and we automatically get the right normalization (as long as
     those values are included in the hist...).
@@ -61,29 +107,25 @@ def find_leading(values: UprootArray[_T]) -> Tuple[np.ndarray, UprootArray[int]]
     Returns:
         Leading value, index of value.
     """
-    # TODO: Go back to the old code. My trick fixed the problem....
-    # Restore the dimensions with ak.singletons (keepdims doesn't seem to work properly because the value is nullable.
+    # keepdims doesn't seem to play nice with applying to values, so we restore the dimensions with ak.singletons.
     arg_max = ak.singletons(ak.argmax(values, axis=1))
-    # max_values = ak.fill_none(ak.pad_none(values[arg_max], 1), UNFILLED_VALUE)
-    # import IPython; IPython.embed()
-    max_values = ak.fill_none(ak.max(values, axis=1), UNFILLED_VALUE)
-    # return ak.flatten(max_values), arg_max
-    return max_values, arg_max
+    max_values = ak.fill_none(ak.pad_none(values[arg_max], 1), UNFILLED_VALUE)
+    return ak.flatten(max_values), arg_max
 
 
 class JetConstituentCommon:
     offset: int = 2000000
-    pt: float
-    eta: float
-    phi: float
-    ID: int
+    pt: ArrayOrScalar[float]
+    eta: ArrayOrScalar[float]
+    phi: ArrayOrScalar[float]
+    ID: ArrayOrScalar[int]
 
     def delta_R(self: _T, other: _T) -> ArrayOrScalar[float]:
         """ Separation between jet constituents. """
         return np.sqrt((self.phi - other.phi) ** 2 + (self.eta - other.eta) ** 2)
 
 
-class JetConstituent(ak.Record, JetConstituentCommon):
+class JetConstituent(ak.Record, JetConstituentCommon):  # type: ignore
     """ A single jet constituent.
 
     Args:
@@ -102,7 +144,7 @@ class JetConstituent(ak.Record, JetConstituentCommon):
         return uproot_methods.TLorentzVector(self.pt, self.eta, self.phi, mass_hypothesis,)
 
 
-class JetConstituentArray(ak.Array, JetConstituentCommon):
+class JetConstituentArray(ak.Array, JetConstituentCommon):  # type: ignore
     """ Methods for operating on jet constituents arrays.
 
     These methods operate on externally stored arrays. This is solely a mixin.
@@ -120,11 +162,12 @@ class JetConstituentArray(ak.Array, JetConstituentCommon):
     @property
     def max_pt(self) -> ArrayOrScalar[float]:
         """ Maximum pt of the stored constituent. """
-        return cast(ArrayOrScalar[float], self.pt.max())
+        return cast(ArrayOrScalar[float], ak.max(self.pt, axis=-1))
 
-    def four_vectors(self, mass_hypothesis: float = 0.139) -> uproot_methods.TLorentzVectorArray:
-        mass_hypothesis_array = self.pt * 0 + mass_hypothesis
-        return uproot_methods.TLorentzVectorArray.from_ptetaphim(self.pt, self.eta, self.phi, mass_hypothesis_array,)
+    def four_vectors(self, mass_hypothesis: float = 0.139) -> None:
+        # mass_hypothesis_array = self.pt * 0 + mass_hypothesis
+        # return uproot_methods.TLorentzVectorArray.from_ptetaphim(self.pt, self.eta, self.phi, mass_hypothesis_array,)
+        raise NotImplementedError("Vector isn't ready yet. You'll have to do the operations by hand...")
 
 
 # Register behavior
@@ -163,7 +206,7 @@ class SubjetCommon:
         return splittings[self.parent_splitting_index]
 
 
-class Subjet(ak.Record, SubjetCommon):
+class Subjet(ak.Record, SubjetCommon):  # type: ignore
     """ Single subjet. """
 
     part_of_iterative_splitting: bool
@@ -171,7 +214,7 @@ class Subjet(ak.Record, SubjetCommon):
     constituents_indices: UprootArray[int]
 
 
-class SubjetArray(ak.Array, SubjetCommon):
+class SubjetArray(ak.Array, SubjetCommon):  # type: ignore
     """ Array of subjets. """
 
     part_of_iterative_splitting: UprootArray[bool]
@@ -221,7 +264,7 @@ class JetSplittingCommon:
         return self.delta_R / jet_R
 
 
-class JetSplitting(ak.Record, JetSplittingCommon):
+class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
     """ Single jet splitting. """
 
     kt: float
@@ -282,7 +325,7 @@ class JetSplitting(ak.Record, JetSplittingCommon):
         return dynamical_time(self.delta_R, self.z, self.parent_pt, R)  # type: ignore
 
 
-class JetSplittingArray(ak.Array, JetSplittingCommon):
+class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
     """ Array of jet splittings. """
 
     kt: UprootArray[float]
