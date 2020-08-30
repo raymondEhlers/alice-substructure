@@ -689,7 +689,7 @@ def calculate_and_skim_embedding(  # noqa: C901
     # Actual setup.
     # TODO: Uncomment
     # logger.info(f"Skimming tree from file {tree.filename}")
-    all_jets = new_methods.arrow_to_substructure(prefixes=prefixes)
+    all_jets = new_methods.parquet_to_substructure_analysis(filename = Path("trains/embedPythia/5966/AnalysisResults.18q.parquet"), prefixes=prefixes)
     true_jets, det_level_jets, hybrid_jets = all_jets
 
     ## Do the calculations
