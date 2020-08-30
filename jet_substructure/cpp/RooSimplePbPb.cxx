@@ -377,6 +377,8 @@ void RunUnfolding()
   TH2D h2true("true", "true", trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
   // full true correlation (without cuts)
   TH2D h2fulleff("truef", "truef", trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
+  // Correlation between the splitting variables at true and hybrid (with cuts).
+  TH2D h2SplittingVariable("h2SplittingVariable", "h2SplittingVariable", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data());
 
   TH2D* effnum = dynamic_cast<TH2D*>(h2fulleff.Clone("effnum"));
   TH2D* effdenom = dynamic_cast<TH2D*>(h2fulleff.Clone("effdenom"));
@@ -516,12 +518,16 @@ void RunUnfolding()
       }
     }
     // Matching cuts: Requiring a pure match.
-    if (usePureMatches && !((std::abs(*matchingLeading - 1) < 0.001) && (std::abs(*matchingSubleading - 1) < 0.001))) {
+    if (usePureMatches && !(
+                ((std::abs(*matchingLeading - 1) < 0.001) && (std::abs(*matchingSubleading - 1) < 0.001)) || (std::abs(hybridSubstructureVariableValue - smearedUntaggedBinValue) < 0.001)
+            )) {
       continue;
     }
     h2smeared.Fill(hybridSubstructureVariableValue, *hybridJetPt, scaleFactor);
     h2true.Fill(*trueSubstructureVariable, *trueJetPt, scaleFactor);
     response.Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, scaleFactor);
+    // So we can look at the substructure variable correlation.
+    h2SplittingVariable.Fill(hybridSubstructureVariableValue, *trueSubstructureVariable, scaleFactor);
   }
 
   TH1D* htrueptd = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("trueptd", 1, -1));
@@ -562,6 +568,7 @@ void RunUnfolding()
   h2true.SetName("true");
   h2true.Write();
   h2fulleff.Write();
+  h2SplittingVariable.Write();
 
   // Unfold the standard spectra.
   int nIter = 20;
