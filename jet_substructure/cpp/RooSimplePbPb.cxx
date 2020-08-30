@@ -281,28 +281,29 @@ void RunUnfolding()
   // Set to true if the untagged bin values are set explicitly. Must be done for all four values!
   bool explicitlySetUntaggedBinValues = false;
 
+  double printFactor = 1;
+
   switch (unfoldingType) {
     case UnfoldingType_t::kt:
       smearedJetPtBins = {40, 50, 60, 70, 90, 120};
-      trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
-      smearedSplittingVariableBins = {2, 3, 4, 5, 7, 10, 15};
+      trueJetPtBins = {0, 40, 60, 80, 100, 120, 160};
+      smearedSplittingVariableBins = {2, 3, 4, 5, 7, 10};
       // NOTE: (-0.05, 0) is the untagged bin.
-      trueSplittingVariableBins = {-0.05, 0, 1, 2, 3, 4, 5, 7, 10, 15, 100};
+      trueSplittingVariableBins = {-0.05, 0, 2, 3, 4, 5, 7, 10, 100};
       break;
     case UnfoldingType_t::zg:
       // This is for z_cut > 0.2
       smearedJetPtBins = {40, 50, 60, 70, 80, 100, 120};
       trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
       smearedSplittingVariableBins = {-0.05, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5};
-      minSmearedSplittingVariable = 0.2;
       trueSplittingVariableBins = {0, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5};
       break;
     case UnfoldingType_t::rg:
       smearedJetPtBins = {40, 50, 60, 70, 90, 120};
       trueJetPtBins = {0, 20, 40, 60, 80, 100, 120, 140, 160};
       smearedSplittingVariableBins = {-0.05, 0, 0.02, 0.04, 0.06, 0.1, 0.2, 0.35};
-      minSmearedSplittingVariable = 0.0;
       trueSplittingVariableBins = {-0.05, 0, 0.02, 0.04, 0.06, 0.1, 0.2, 0.35, 0.6};
+      printFactor = 1000;
       break;
     default:
       throw std::runtime_error("Must specify an unfolding type.");
@@ -316,13 +317,13 @@ void RunUnfolding()
       minSmearedSplittingVariable = smearedSplittingVariableBins[1];
       maxSmearedSplittingVariable = smearedSplittingVariableBins[lastBin];
       smearedUntaggedBinValue = (smearedSplittingVariableBins[1] - smearedSplittingVariableBins[0]) / 2 + smearedSplittingVariableBins[0];
-      untaggedBinDescription = std::to_string(static_cast<int>(smearedSplittingVariableBins[0])) + "_" + static_cast<int>(smearedSplittingVariableBins[1]);
+      untaggedBinDescription = std::to_string(static_cast<int>(smearedSplittingVariableBins[0] * printFactor)) + "_" + static_cast<int>(smearedSplittingVariableBins[1] * printFactor);
     }
     else {
       smearedUntaggedBinValue = (smearedSplittingVariableBins[lastBin] - smearedSplittingVariableBins[lastBin - 1]) / 2 + smearedSplittingVariableBins[lastBin - 1];
       minSmearedSplittingVariable = smearedSplittingVariableBins[0];
       maxSmearedSplittingVariable = smearedSplittingVariableBins[lastBin - 1];
-      untaggedBinDescription = std::to_string(static_cast<int>(smearedSplittingVariableBins[lastBin - 1])) + "_" + static_cast<int>(smearedSplittingVariableBins[lastBin]);
+      untaggedBinDescription = std::to_string(static_cast<int>(smearedSplittingVariableBins[lastBin - 1] * printFactor)) + "_" + static_cast<int>(smearedSplittingVariableBins[lastBin] * printFactor);
     }
   }
 
@@ -337,7 +338,7 @@ void RunUnfolding()
   // Binning information.
   // Used std::string and std::to_string at times to coerce the type to a string so we can keep adding.
   // kt
-  outputFilename += "_smeared_" + substructureVariableName + "_" + static_cast<int>(minSmearedSplittingVariable) + "_" + static_cast<int>(maxSmearedSplittingVariable);
+  outputFilename += "_smeared_" + substructureVariableName + "_" + static_cast<int>(minSmearedSplittingVariable * printFactor) + "_" + static_cast<int>(maxSmearedSplittingVariable * printFactor);
   // Untagged bin information.
   outputFilename += "_untagged_" + substructureVariableName + "_" + untaggedBinDescription;
   // pt. (use std::to_string to coerce the type to a string so we can keep adding).
