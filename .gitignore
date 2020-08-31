@@ -19,6 +19,8 @@ ipynb_checkpoints/
 .ipynb_checkpoints/
 .mypy_cache/
 .python-version
+# parsl
+runinfo/
 
 # Packaging
 dist/

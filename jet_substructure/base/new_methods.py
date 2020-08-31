@@ -8,7 +8,11 @@ from __future__ import annotations
 import functools
 import typing
 from pathlib import Path
-from typing import Any, Final, Optional, Sequence, Tuple, TypeVar, cast
+from typing import Any, Optional, Sequence, Tuple, TypeVar, cast
+try:
+    from typing import Final
+except ImportError:
+    from typing_extensions import Final
 
 import awkward1 as ak
 import numpy as np
@@ -429,7 +433,7 @@ ak.behavior["JetSplitting"] = JetSplitting
 ak.behavior["*", "JetSplitting"] = JetSplittingArray
 
 
-def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], output_filename: Path, verbose: bool = False) -> bool:
+def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], output_filename: Path, entries: Tuple[Optional[int], Optional[int]], verbose: bool = False) -> bool:
     """ Convert open tree to parquet.
 
     The template of the branch names to include are defined here.
@@ -447,6 +451,9 @@ def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], output_filename
     # Only create the parquet file if we haven't already made the conversion.
     if output_filename.exists():
         return True
+    # Setup
+    if not output_filename.parent.exists():
+        output_filename.parent.mkdir(parents=True, exist_ok=True)
 
     if verbose:
         tree.show()
@@ -469,7 +476,12 @@ def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], output_filename
         ]
         all_branches.extend(branches)
     print(all_branches)
-    arrays = tree.arrays(all_branches)
+    additional_kwargs = {}
+    if entries:
+        additional_kwargs.update({
+            "entry_start": entries[0], "entry_stop": entries[1]
+        })
+    arrays = tree.arrays(all_branches, **additional_kwargs)
 
     ak.to_parquet(arrays, output_filename)
 
@@ -477,8 +489,8 @@ def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], output_filename
 
 
 def convert_tree_to_parquet(
-    filename: Path, tree_name: str, prefixes: Sequence[str], output_filename: Optional[Path] = None
-) -> bool:
+    filename: Path, tree_name: str, prefixes: Sequence[str], output_filename: Optional[Path] = None, entries: Optional[Tuple[Optional[int], Optional[int]]] = None
+) -> Tuple[bool, Path]:
     """ Convert a ROOT tree to a parquet file using awkward.
 
     The main benefit is that it can open _much_ faster via parquet compared to uproot because it doesn't
@@ -494,13 +506,16 @@ def convert_tree_to_parquet(
     Returns:
         True if the tree was successfully converted.
     """
+    # Validation
     if output_filename is None:
-        output_filename = filename.with_suffix("parquet")
+        output_filename = filename.with_suffix(".parquet")
+    if entries is None:
+        entries = (None, None)
 
     with uproot.open(filename) as f:
         tree = f[tree_name]
-        result = _convert_tree_to_parquet(tree=tree, prefixes=prefixes, output_filename=output_filename)
-    return result
+        result = _convert_tree_to_parquet(tree=tree, prefixes=prefixes, output_filename=output_filename, entries=entries)
+    return result, output_filename
 
 
 def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) -> Tuple[ak.Array, ...]:
