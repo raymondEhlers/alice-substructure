@@ -13,8 +13,10 @@ import numpy as np
 import parsl
 import uproot4 as uproot
 #import uproot as uproot
+from parsl.addresses import address_by_hostname
 from parsl.app.app import python_app
 from parsl.data_provider.files import File
+from parsl.monitoring.monitoring import MonitoringHub
 from pachyderm import yaml
 
 from jet_substructure.base import helpers
@@ -158,13 +160,21 @@ if __name__ == "__main__":
                     # when others are running to avoid running out of memory.
                     exclusive=True,
                     # Format: HH:MM:SS, so we request one hour
-                    walltime="01:30:00",
-                    # pc051 has too much in swap right now to be useful, so let's just skip and
-                    # avoid the problems.
-                    scheduler_options="#SBATCH --exclude=pc051",
+                    walltime="01:00:00",
+                    # pc051 has too much in swap right now to be useful, so let's just skip and avoid the problems.
+                    # pc147 also struggles and we don't want that to come down because it's one of the ceph quorum machines...
+                    # pc075 also has high swap right now...
+                    scheduler_options="#SBATCH --exclude=pc051,pc147,pc075",
                 ),
             )
         ],
+        # Monitoring information
+        monitoring=MonitoringHub(
+            hub_address=address_by_hostname(),
+            hub_port=55055,
+            monitoring_debug=False,
+            resource_monitoring_interval=10,
+        ),
         # Disables resource scaling.
         strategy=None,
     )
