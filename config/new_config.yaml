@@ -1,0 +1,91 @@
+available_datasets:
+    LHC19f4_embedded_into_LHC18qr_5966_5985: &LHC19f4_embedded_into_LHC18qr
+        name: "LHC19f4_embedded_into_LHC18qr_5966_5985"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        branches:
+            - "data.fJetPt"
+            - "data.fJetConstituents.fPt"
+            - "data.fJetConstituents.fEta"
+            - "data.fJetConstituents.fPhi"
+            - "data.fJetConstituents.fID"
+            - "data.fJetSplittings.fKt"
+            - "data.fJetSplittings.fDeltaR"
+            - "data.fJetSplittings.fZ"
+            - "data.fJetSplittings.fParentIndex"
+            - "data.fSubjets.fPartOfIterativeSplitting"
+            - "data.fSubjets.fSplittingNodeIndex"
+            - "data.fSubjets.fConstituentIndices"
+            - "matched.fJetPt"
+            - "matched.fJetConstituents.fPt"
+            - "matched.fJetConstituents.fEta"
+            - "matched.fJetConstituents.fPhi"
+            - "matched.fJetConstituents.fID"
+            - "matched.fJetSplittings.fKt"
+            - "matched.fJetSplittings.fDeltaR"
+            - "matched.fJetSplittings.fZ"
+            - "matched.fJetSplittings.fParentIndex"
+            - "matched.fSubjets.fPartOfIterativeSplitting"
+            - "matched.fSubjets.fSplittingNodeIndex"
+            - "matched.fSubjets.fConstituentIndices"
+            - "detLevel.fJetPt"
+            - "detLevel.fJetConstituents.fPt"
+            - "detLevel.fJetConstituents.fEta"
+            - "detLevel.fJetConstituents.fPhi"
+            - "detLevel.fJetConstituents.fID"
+            - "detLevel.fJetSplittings.fKt"
+            - "detLevel.fJetSplittings.fDeltaR"
+            - "detLevel.fJetSplittings.fZ"
+            - "detLevel.fJetSplittings.fParentIndex"
+            - "detLevel.fSubjets.fPartOfIterativeSplitting"
+            - "detLevel.fSubjets.fSplittingNodeIndex"
+            - "detLevel.fSubjets.fConstituentIndices"
+        jet_R: 0.4
+        scale_factors:
+            1: 16.0695
+            2: 4.60776
+            3: 2.14894
+            4: 0.781811
+            5: 0.26462
+            6: 0.0975008
+            7: 0.0292782
+            8: 0.00988435
+            9: 0.0040435
+            10: 0.00135313
+            11: 0.000529795
+            12: 0.000188235
+            13: 9.22016e-05
+            14: 4.29112e-05
+            15: 2.09133e-05
+            16: 1.06058e-05
+            17: 5.74855e-06
+            18: 3.0036e-06
+            19: 1.61604e-06
+            20: 2.0978e-06
+        files:
+            - "trains/embedPythia/5966/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5967/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5968/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5969/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5970/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5971/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5972/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5973/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5974/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5975/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5976/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5977/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5978/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5979/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5980/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5981/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5982/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5983/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5984/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/5985/AnalysisResults.*.repaired.root"
+
+base_directory: "/alf/data/rehlers/substructure"
+execution:
+    embedPythia:
+        dataset: *LHC19f4_embedded_into_LHC18qr
+

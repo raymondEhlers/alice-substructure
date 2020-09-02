@@ -89,6 +89,23 @@ def convert_to_parquet(tree_name: str, prefixes: Sequence[str], event_range: Opt
     print(outputs)
     return res
 
+
+@python_app
+def calculate_and_skim_embedding(inputs=[], outputs=[]):
+    from jet_substructure.analysis import new_skim_to_flat_tree
+    from pathlib import Path
+    # Need to define dataset here, I think?
+    try:
+        res = new_skim_to_flat_tree.calculate_and_skim_embedding(input_filename=Path(inputs[0].filepath), iterative_splittings=True)
+    except Exception as e:
+        # Skip any problems for now
+        print(e)
+        res = None
+
+    print(outputs)
+    return res
+
+
 def run(events_per_job: int):
     collision_system = "embedPythia"
 
@@ -133,8 +150,10 @@ if __name__ == "__main__":
     #   - cores_per_node = 2
     # NOTE: If we just try to scale with nodes_per_block, we'll allocate the appropriate nodes,
     #       but then all the jobs will be on just one node, which is definitely not what we want.
+    # Try out 3...
     jobs_per_node = 2
     nodes_to_allocate = 10
+    #nodes_to_allocate = 9
     b587_executor = Config(
         executors=[
             HighThroughputExecutor(
@@ -180,38 +199,57 @@ if __name__ == "__main__":
     )
     parsl.load(b587_executor)
 
-    events_per_job = int(1e5)
-    entries_per_file, job_ranges = run(events_per_job)
-
-    # Setup single input files
     results = []
-    #for filename in list(entries_per_file.keys())[:10]:
-    #    ...
+    if True:
+        events_per_job = int(1e5)
+        entries_per_file, job_ranges = run(events_per_job)
 
-    for i_file, (filename, event_ranges) in enumerate(job_ranges.items()):
-        # TEMP
-        #if i_file > 20:
-        #    break
-        # ENDTEMP
+        # Setup single input files
+        #for filename in list(entries_per_file.keys())[:10]:
+        #    ...
 
-        for i, event_range in enumerate(event_ranges):
-            parsl_input_file = File(str(filename))
-            #output_filename = str(Path(parsl_input_file.filepath).with_suffix("")) + f"_{event_range[0]}_{event_range[1]}"
-            output_filename = Path(parsl_input_file.filepath)
-            output_filename = output_filename.parent / "parquet" / f"events_per_job_{events_per_job}" / output_filename.name
-            output_filename = output_filename.with_suffix(f".{i:02}.parquet")
-            #output_filename = Path(str(output_filename) + f".{i:02}.parquet")
-            #print(f"i: {i}, output_filename: {output_filename}")
-            parsl_output_file = File(str(output_filename))
+        for i_file, (filename, event_ranges) in enumerate(job_ranges.items()):
+            # TEMP
+            #if i_file > 20:
+            #    break
+            # ENDTEMP
 
-            results.append(convert_to_parquet(
-                tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
-                prefixes=["data", "matched", "detLevel"],
-                event_range=event_range,
-                inputs=[parsl_input_file],
-                outputs=[parsl_output_file],
-                stdout=f"{i_file}.log"
-            ))
+            for i, event_range in enumerate(event_ranges):
+                parsl_input_file = File(str(filename))
+                #output_filename = str(Path(parsl_input_file.filepath).with_suffix("")) + f"_{event_range[0]}_{event_range[1]}"
+                output_filename = Path(parsl_input_file.filepath)
+                output_filename = output_filename.parent / "parquet" / f"events_per_job_{events_per_job}" / output_filename.name
+                output_filename = output_filename.with_suffix(f".{i:02}.parquet")
+                #output_filename = Path(str(output_filename) + f".{i:02}.parquet")
+                #print(f"i: {i}, output_filename: {output_filename}")
+                parsl_output_file = File(str(output_filename))
+
+                results.append(convert_to_parquet(
+                    tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+                    prefixes=["data", "matched", "detLevel"],
+                    event_range=event_range,
+                    inputs=[parsl_input_file],
+                    outputs=[parsl_output_file],
+                    stdout=f"{i_file}.log"
+                ))
+    else:
+        #for train_number in range(5966, 5986):
+        for train_number in range(5974, 5986):
+            for filename in Path(f"trains/embedPythia/{train_number}/parquet/events_per_job_100000/").glob("*.parquet"):
+                parsl_input_file = File(str(filename))
+                # TODO: Configure properly...
+                # TODO: Consolidate this code...
+                iterative_splittings = True
+                iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
+                # The "skim" output directory is made relative to the main train output directory.
+                output_dir = filename.parent.parent.parent / "skim"
+                output_filename = output_dir / f"{filename.stem}_{iterative_splittings_label}_splittings.root"
+                parsl_output_file = File(str(output_filename))
+
+                results.append(calculate_and_skim_embedding(
+                    inputs=[parsl_input_file],
+                    outputs=[parsl_output_file],
+                ))
 
 
     print(f"About to ask for result. len: {len(results)}")

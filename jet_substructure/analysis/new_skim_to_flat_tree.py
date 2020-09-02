@@ -650,46 +650,62 @@ def prong_matching(
 #    draw_example_splittings: bool = False,
 # ) -> bool:
 def calculate_and_skim_embedding(  # noqa: C901
-    iterative_splittings: bool, create_friend_tree: bool = False, draw_example_splittings: bool = False,
+    #input_filename: Path, dataset: analysis_objects.Dataset, iterative_splittings: bool,
+    input_filename: Path, iterative_splittings: bool,
+    create_friend_tree: bool = False, draw_example_splittings: bool = False,
 ) -> bool:
     """ Determine the response and prong matching for jets substructure techniques.
 
-    Why combine them together? Because then we only have to open and process a tree once.
-    At a future date (beyond the start of April 2020), it would be better to refactor them more separately,
-    such that we can enable or disable the different options and still have appropriate return values.
-    But for now, we don't worry about it.
     """
     # Validation
     prefixes = ["matched", "detLevel", "data"]
     # Setup
     # Perhaps make these into arguments?
     iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
-    ## TODO: Maybe convert to hdf5? But maybe not because of compression?
-    # output_dir = tree.filename.parent / "skim"
-    # TODO: Fix hardcode!
-    output_dir = Path("trains/embedPythia/5966/skim/")
+    # The "skim" output directory is made relative to the main train output directory.
+    output_dir = input_filename.parent.parent.parent / "skim"
     output_dir.mkdir(parents=True, exist_ok=True)
-    # TODO: Fix hardcode!
-    # output_filename = output_dir / f"{tree.filename.stem}_{iterative_splittings_label}_splittings.root"
-    output_filename = output_dir / f"AnalysisResults.18q.repaired_{iterative_splittings_label}_splittings_new.root"
+    output_filename = output_dir / f"{input_filename.stem}_{iterative_splittings_label}_splittings.root"
 
     ## Use the train configuration to extract the train number and pt hard bin, which are used to get the scale factor.
-    # y = yaml.yaml()
-    # with open(tree.filename.parent / "config.yaml", "r") as f:
-    #    train_config = y.load(f)
-    # train_number = train_config["number"]
-    # pt_hard_bin = train_config["pt_hard_bin"]
-    # logger.debug(f"Extracted train number: {train_number}, pt hard bin: {pt_hard_bin}")
-    # analysis_settings = cast(analysis_objects.PtHardAnalysisSettings, dataset.settings)
-    # scale_factor = analysis_settings.scale_factors[pt_hard_bin]
-    # TODO: Fix hardcode
-    scale_factor = 1
+    y = yaml.yaml()
+    with open(output_dir.parent / "config.yaml", "r") as f:
+       train_config = y.load(f)
+    train_number = train_config["number"]
+    pt_hard_bin = train_config["pt_hard_bin"]
+    logger.debug(f"Extracted train number: {train_number}, pt hard bin: {pt_hard_bin}")
+    # TODO: Load this properly...
+    scale_factors = {
+        1: 16.0695,
+        2: 4.60776,
+        3: 2.14894,
+        4: 0.781811,
+        5: 0.26462,
+        6: 0.0975008,
+        7: 0.0292782,
+        8: 0.00988435,
+        9: 0.0040435,
+        10: 0.00135313,
+        11: 0.000529795,
+        12: 0.000188235,
+        13: 9.22016e-05,
+        14: 4.29112e-05,
+        15: 2.09133e-05,
+        16: 1.06058e-05,
+        17: 5.74855e-06,
+        18: 3.0036e-06,
+        19: 1.61604e-06,
+        20: 2.0978e-06,
+    }
+    scale_factor = scale_factors[pt_hard_bin]
+    #analysis_settings = cast(analysis_objects.PtHardAnalysisSettings, dataset.settings)
+    #scale_factor = analysis_settings.scale_factors[pt_hard_bin]
+    # TODO: Fix this...
     dataset = None
 
     # Actual setup.
-    # TODO: Uncomment
-    # logger.info(f"Skimming tree from file {tree.filename}")
-    all_jets = new_methods.parquet_to_substructure_analysis(filename = Path("trains/embedPythia/5966/AnalysisResults.18q.parquet"), prefixes=prefixes)
+    logger.info(f"Skimming tree from file {input_filename}")
+    all_jets = new_methods.parquet_to_substructure_analysis(filename = Path(input_filename), prefixes=prefixes)
     true_jets, det_level_jets, hybrid_jets = all_jets
 
     ## Do the calculations
@@ -712,13 +728,9 @@ def calculate_and_skim_embedding(  # noqa: C901
     mask = hybrid_jets.jet_pt > 0
 
     # Mask the jets
-    # IPython.embed()
     masked_true_jets, masked_true_jet_splittings, masked_true_jet_splittings_indices = _select_and_retrieve_splittings(
         true_jets, mask, iterative_splittings
     )
-    # IPython.embed()
-    # reproduce(selected_splittings=masked_true_jet_splittings)
-    # print("\n\nEarly reproduce done\n\n")
     (
         masked_det_level_jets,
         masked_det_level_jet_splittings,
@@ -905,9 +917,9 @@ def calculate_and_skim_embedding(  # noqa: C901
             print(f"Completed {func_name}")
 
     # Convert to numpy
-    for k, v in grooming_results.items():
-        # print(f"{k}: {ak.num(v, axis=0)}")
-        print(f"{k}: {ak.type(v)}")
+    #for k, v in grooming_results.items():
+    #    # print(f"{k}: {ak.num(v, axis=0)}")
+    #    print(f"{k}: {ak.type(v)}")
     grooming_results_np = {k: ak.to_numpy(v) for k, v in grooming_results.items()}
     # Write with uproot
     branches = {k: v.dtype for k, v in grooming_results_np.items()}
@@ -917,11 +929,12 @@ def calculate_and_skim_embedding(  # noqa: C901
         # Write all of the calculations
         output_file["tree"].extend(grooming_results_np)
 
-    logger.info(f"Finished processing tree from file {tree.filename}")
+    logger.info(f"Finished processing tree from file {input_filename}")
     return True
 
 
 if __name__ == "__main__":
     # import IPython; IPython.start_ipython(user_ns=locals())
     # TODO: Optimize the data sizes...
-    calculate_and_skim_embedding(True)
+    #calculate_and_skim_embedding(True)
+    ...
