@@ -30,10 +30,10 @@ dask = {extras = ["dataframe"], version = "^2.14.0"}
 enlighten = "^1.4.0"
 pathos = "^0.2.5"
 seaborn = "^0.10.1"
-awkward1 = "^0.2.32"
+awkward1 = "^0.2.36"
 pyarrow = "^1.0.0"
-uproot4 = "^0.0.18"
 numba = "^0.51.0"
+uproot4 = "^0.0.20"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.761"
