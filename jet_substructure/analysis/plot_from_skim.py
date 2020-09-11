@@ -1832,6 +1832,7 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
     set_zero_to_nan: bool,
     plot_config: PlotConfig,
     output_dir: Path,
+    plot_png: bool = False,
 ) -> None:
     # Setup
     display_labels_vs = " vs. ".join([obj.display_label for obj in hists])
@@ -1921,6 +1922,10 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
     identifiers = "_".join([obj.identifier for obj in hists])
     filename = f"{plot_config.name}_{jet_pt_bin}{grooming_methods_filename_label}_{identifiers}_iterative_splittings"
     fig.savefig(output_dir / f"{filename}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{filename}.png")
     plt.close(fig)
 
 
@@ -1930,6 +1935,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
     grooming_methods: Sequence[str],
     output_dir: Path,
     rdf_plots: bool = False,
+    plot_png: bool = False,
 ) -> None:
     """ Compare grooming methods for PbPb vs embedded.
 
@@ -1942,9 +1948,9 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
     hists = [
         PlotHists(hists=data_hists, prefix="data", identifier="PbPb", display_label="Pb--Pb",),
         # For the standard skim (probably to be adapted).
-        # PlotHists(hists=embed_hists, prefix="hybrid", identifier="hybrid", display_label="Hybrid",),
+        PlotHists(hists=embed_hists, prefix="hybrid", identifier="hybrid", display_label="Hybrid",),
         # For the RDF skim
-        PlotHists(hists=embed_hists, prefix="data", identifier="hybrid", display_label="Hybrid",),
+        # PlotHists(hists=embed_hists, prefix="data", identifier="hybrid", display_label="Hybrid",),
     ]
     for grooming_method in grooming_methods:
         _plot_compare_grooming_methods_for_attribute_data_embed(
@@ -1970,13 +1976,14 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     Panel(
                         axes=[
                             AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
-                            AxisConfig("y", label="Pb--Pb/Hybrid", range=(-0.2, 6)),
+                            AxisConfig("y", label="Pb--Pb/Hybrid", range=(-0.2, 4)),
                         ]
                     ),
                 ],
                 figure=Figure(edge_padding={"left": 0.12}),
             ),
             output_dir=output_dir,
+            plot_png=plot_png,
         )
         _plot_compare_grooming_methods_for_attribute_data_embed(
             hists=hists,
@@ -2009,6 +2016,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                 ],
             ),
             output_dir=output_dir,
+            plot_png=plot_png,
         )
 
         _plot_compare_grooming_methods_for_attribute_data_embed(
@@ -2037,6 +2045,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                 figure=Figure(edge_padding={"left": 0.12}),
             ),
             output_dir=output_dir,
+            plot_png=plot_png,
         )
 
         _plot_compare_grooming_methods_for_attribute_data_embed(
@@ -2060,6 +2069,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                 figure=Figure(edge_padding={"left": 0.12}),
             ),
             output_dir=output_dir,
+            plot_png=plot_png,
         )
 
         _plot_compare_grooming_methods_for_attribute_data_embed(
@@ -2089,6 +2099,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                 ],
             ),
             output_dir=output_dir,
+            plot_png=plot_png,
         )
 
         _plot_compare_grooming_methods_for_attribute_data_embed(
@@ -2098,7 +2109,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
             jet_pt_bin=jet_pt_bin,
             set_zero_to_nan=False,
             plot_config=PlotConfig(
-                name="n_passed_grooming_grooming_methods",
+                name="number_passed_grooming_grooming_methods",
                 panels=[
                     # Main axis.
                     Panel(
@@ -2119,6 +2130,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                 figure=Figure(edge_padding={"left": 0.12}),
             ),
             output_dir=output_dir,
+            plot_png=plot_png,
         )
 
         # High kt comparison
@@ -2156,6 +2168,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                 figure=Figure(edge_padding={"left": 0.12}),
             ),
             output_dir=output_dir,
+            plot_png=plot_png,
         )
 
         _plot_compare_grooming_methods_for_attribute_data_embed(
@@ -2191,6 +2204,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                 figure=Figure(edge_padding={"left": 0.12}),
             ),
             output_dir=output_dir,
+            plot_png=plot_png,
         )
 
         _plot_compare_grooming_methods_for_attribute_data_embed(
@@ -2215,6 +2229,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                 ],
             ),
             output_dir=output_dir,
+            plot_png=plot_png,
         )
 
         _plot_compare_grooming_methods_for_attribute_data_embed(
@@ -2237,6 +2252,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                 ],
             ),
             output_dir=output_dir,
+            plot_png=plot_png,
         )
 
 
