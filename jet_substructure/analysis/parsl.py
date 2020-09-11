@@ -107,7 +107,8 @@ def calculate_and_skim_embedding(inputs=[], outputs=[]):
 
 
 def run(events_per_job: int):
-    collision_system = "embedPythia"
+    #collision_system = "embedPythia"
+    collision_system = "PbPb"
 
     y = yaml.yaml()
 
@@ -151,9 +152,10 @@ if __name__ == "__main__":
     # NOTE: If we just try to scale with nodes_per_block, we'll allocate the appropriate nodes,
     #       but then all the jobs will be on just one node, which is definitely not what we want.
     # Try out 3...
+    # TODO: Careful - 3 will mess up the conversion to parquet
     jobs_per_node = 2
-    nodes_to_allocate = 10
-    #nodes_to_allocate = 9
+    #nodes_to_allocate = 10
+    nodes_to_allocate = 9
     b587_executor = Config(
         executors=[
             HighThroughputExecutor(
@@ -224,9 +226,12 @@ if __name__ == "__main__":
                 #print(f"i: {i}, output_filename: {output_filename}")
                 parsl_output_file = File(str(output_filename))
 
+                # TODO: Take from config...
                 results.append(convert_to_parquet(
-                    tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
-                    prefixes=["data", "matched", "detLevel"],
+                    #tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+                    #prefixes=["data", "matched", "detLevel"],
+                    tree_name="AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl",
+                    prefixes=["data"],
                     event_range=event_range,
                     inputs=[parsl_input_file],
                     outputs=[parsl_output_file],
@@ -234,7 +239,8 @@ if __name__ == "__main__":
                 ))
     else:
         #for train_number in range(5966, 5986):
-        for train_number in range(5974, 5986):
+        #for train_number in range(5973, 5986):
+        for train_number in range(5982, 5986):
             for filename in Path(f"trains/embedPythia/{train_number}/parquet/events_per_job_100000/").glob("*.parquet"):
                 parsl_input_file = File(str(filename))
                 # TODO: Configure properly...
