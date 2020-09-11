@@ -33,7 +33,7 @@ seaborn = "^0.10.1"
 awkward1 = "^0.2.36"
 pyarrow = "^1.0.0"
 numba = "^0.51.0"
-uproot4 = "^0.0.20"
+uproot4 = "^0"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.761"
@@ -45,7 +45,7 @@ pre-commit = "^2.0.1"
 yamllint = "^1.20.0"
 isort = {extras = ["toml"], version = "^4.3.21"}
 IPython = "^7.12.0"
-jupyterlab = "^1.2.6"
+jupyterlab = "^2.2.7"
 jupyter_nbextensions_configurator = "^0.4.1"
 # Not explictily enabled because it needs graphviz to be install separately via apt, brew, etc.
 #pygraphviz = "^1.5"
