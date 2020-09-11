@@ -5,8 +5,9 @@
 
 import base64
 import logging
+import math
 from pathlib import Path
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 import uproot as uproot3
 from pachyderm import binned_data
@@ -94,7 +95,7 @@ def _image_to_base64(filename: Path) -> str:
 
 def display_images(
     rows: Sequence[Sequence[str]], fig_output_dir: Path, embed_with_base64: bool = False, render_display: bool = True
-) -> str:
+) -> Optional[str]:
     """ Display stored images in a layout using HTML + CSS.
 
     For each row, the width is determined by the number of images, such that they their widths
@@ -104,13 +105,16 @@ def display_images(
 
     For details on the scaling transform, see: https://stackoverflow.com/a/56401601/12907985.
 
+    The function is inspired by `ipyplot`.
+
     Args:
         rows: Lists of filenames of images to be displayed. Each entry in the list corresponds to one row.
         fig_output_dir: Directory where the figures are stored.
         embed_with_base64: Embed the image into the html by encoding it via base64. Default: False.
         render_display: If True, display the HTML immediately. Otherwise, it's up to the user. Default: True.
     Returns:
-        The compiled HTML containing the image.
+        The compiled HTML containing the image. If the images are rendered, then we skip returning the HTML
+        to avoid dumping the str into the notebook output.
     """
     # First, we define the CSS necessary for zooming into the image.
     # This could be cleaned up and improved, but it's fine for now.
@@ -140,8 +144,9 @@ def display_images(
 
         # Display images with equal width.
         # Need to express width as percentage for CSS.
-        # The 0.1 is to avoid accidentally pushing the images onto the next line in case of margin, padding, etc.
-        width = round(1 / len(row) * 100 - 0.1, 3)
+        # Using math.floor and the small decrease of 0.05 to ensure that we don't accidentally push
+        # the images onto the next line in case of margin, padding, etc.
+        width = math.floor((1 / len(row) * 100) - 0.05)
 
         # For smaller images, we need a larger scale factor.
         # By using the number of images, the scale factor makes each image approximately 100% of the width.
@@ -194,8 +199,10 @@ def display_images(
         from IPython.display import display, HTML
 
         display(HTML(full_html))
+    else:
+        return full_html
 
-    return full_html
+    return None
 
 
 def display_images_ipywidgets(rows: Sequence[Sequence[str]], fig_output_dir: Path, render_display: bool = True) -> Any:
