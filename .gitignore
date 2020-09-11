@@ -3,6 +3,7 @@
 
 # Data
 trains
+output/
 
 # Virtualenv
 env/
