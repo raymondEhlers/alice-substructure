@@ -720,7 +720,7 @@ def calculate_embedding_skim(  # noqa: C901
         grooming_results[f"{prefixes['detLevel']}_jet_pt"] = masked_det_level_jets.jet_pt
         grooming_results[f"{prefixes['data']}_jet_pt"] = masked_hybrid_jets.jet_pt
         # Add general jet properties.
-        for prefix, jets in zip([(prefixes["matched"], masked_true_jets), (prefixes["detLevel"], masked_det_level_jets), (prefixes["data"], masked_hybrid_jets)]):
+        for prefix, jets in [(prefixes["matched"], masked_true_jets), (prefixes["detLevel"], masked_det_level_jets), (prefixes["data"], masked_hybrid_jets)]:
             # Jet eta phi
             # jet_four_vec = jets.jet_constituents.four_vectors().sum()
             # Since vector isn't ready yet, just do this by hand...
@@ -890,7 +890,16 @@ def calculate_embedding_skim(  # noqa: C901
 
 
 if __name__ == "__main__":
+    # An example for testing...
+    from jet_substructure.base import helpers
+    helpers.setup_logging()
+    calculate_embedding_skim(
+        input_filename=Path("trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"),
+        iterative_splittings=True,
+        prefixes={"matched": "true", "detLevel": "det_level", "data": "hybrid"},
+        scale_factors={1: 1},
+        train_directory=Path("trains/embedPythia/5966/"),
+        jet_R=0.4,
+        output_filename=Path("trains/embedPythia/5966/skim/AnalysisResults.18q.repaired.00_iterative_splittings.root")
+    )
     # import IPython; IPython.start_ipython(user_ns=locals())
-    # TODO: Optimize the data sizes...
-    #calculate_and_skim_embedding(True)
-    ...

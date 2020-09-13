@@ -132,12 +132,12 @@ ArrayOrScalar = Union[UprootArray[T], T]
 UprootArrays = Mapping[str, UprootArray[Any]]
 
 
-def setup_logging() -> None:
+def setup_logging(level: int = logging.DEBUG) -> None:
     # Delayed import since we may not want this as a hard dependency in such a base module.
     import coloredlogs
 
     # Basic setup
-    coloredlogs.install(level=logging.DEBUG, fmt="%(asctime)s %(name)s:%(lineno)d %(levelname)s %(message)s")
+    coloredlogs.install(level=level, fmt="%(asctime)s %(name)s:%(lineno)d %(levelname)s %(message)s")
     # Quiet down the matplotlib logging
     logging.getLogger("matplotlib").setLevel(logging.INFO)
     # For sanity when using IPython

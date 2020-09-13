@@ -6,9 +6,10 @@
 from __future__ import annotations
 
 import functools
+import logging
 import typing
 from pathlib import Path
-from typing import Any, Optional, Sequence, Tuple, TypeVar, cast
+from typing import Any, Dict, Optional, Sequence, Tuple, TypeVar, cast
 try:
     from typing import Final
 except ImportError:
@@ -19,6 +20,9 @@ import numpy as np
 import uproot4 as uproot
 
 from jet_substructure.base.helpers import ArrayOrScalar, UprootArray
+
+
+logger = logging.getLogger(__name__)
 
 
 # Typing helpers
@@ -111,7 +115,7 @@ def find_leading(values: UprootArray[_T]) -> Tuple[np.ndarray, UprootArray[int]]
     Returns:
         Leading value, index of value.
     """
-    # keepdims doesn't seem to play nice with applying to the values, so we restore the dimensions with ak.singletons.
+    # As of August 2020, keepdims doesn't seem to play nice with applying to the values, so we restore the dimensions with ak.singletons.
     arg_max = ak.singletons(ak.argmax(values, axis=1))
     max_values = ak.fill_none(ak.pad_none(values[arg_max], 1), UNFILLED_VALUE)
     return ak.flatten(max_values), arg_max
@@ -409,7 +413,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
 
         Note:
             z_g is filled with the `UNFILLED_VALUE` if a splitting wasn't selected. In that case, there is
-            no index (ie. an emptry JaggedArray entry), and n_sd = 0.
+            no index (ie. an empty JaggedArray entry), and n_sd = 0.
 
         Note:
             n_sd can be calculated by using `count_nonzero()` on the indices which pass the cutoff.
@@ -433,7 +437,8 @@ ak.behavior["JetSplitting"] = JetSplitting
 ak.behavior["*", "JetSplitting"] = JetSplittingArray
 
 
-def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], output_filename: Path, entries: Tuple[Optional[int], Optional[int]], verbose: bool = False) -> bool:
+def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], branches: Sequence[str], prefix_branches: Sequence[str],
+                             output_filename: Path, entries: Tuple[Optional[int], Optional[int]], verbose: bool = False) -> bool:
     """ Convert open tree to parquet.
 
     The template of the branch names to include are defined here.
@@ -442,7 +447,12 @@ def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], output_filename
         tree: Uproot TTree.
         prefixes: Prefixes of the branches to be stored in the parquet file. The template branches
             are already specified - these are just to fill them in.
-        output_filename: Name under which the parquet file should be saved.
+        branches: Branches to be read from the tree. These are branches which shouldn't be formatted
+            with the prefix.
+        prefix_branches: Branches to be read from the tree. They will be formatted with the passed prefixes.
+        output_filename: Name under which the parquet file should be saved. Default: None, which
+            takes the root filename and replaces the `.root` extension with `.parquet`.
+        entries: Selection of entries to be read. Default: None, which indicates no selection.
         verbose: If True, print verbose info, including the tree branches.
     Returns:
         True if the tree was successfully converted.
@@ -458,24 +468,16 @@ def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], output_filename
     if verbose:
         tree.show()
 
+    # Determine branches.
     all_branches = []
+    all_branches.extend(branches)
     for prefix in prefixes:
-        branches = [
-            f"{prefix}.fJetPt",
-            f"{prefix}.fJetConstituents.fPt",
-            f"{prefix}.fJetConstituents.fEta",
-            f"{prefix}.fJetConstituents.fPhi",
-            f"{prefix}.fJetConstituents.fID",
-            f"{prefix}.fJetSplittings.fKt",
-            f"{prefix}.fJetSplittings.fDeltaR",
-            f"{prefix}.fJetSplittings.fZ",
-            f"{prefix}.fJetSplittings.fParentIndex",
-            f"{prefix}.fSubjets.fPartOfIterativeSplitting",
-            f"{prefix}.fSubjets.fSplittingNodeIndex",
-            f"{prefix}.fSubjets.fConstituentIndices",
-        ]
-        all_branches.extend(branches)
-    print(all_branches)
+        all_branches.extend([
+            b.format(prefix=prefix) for b in prefix_branches
+        ])
+    logger.debug(all_branches)
+
+    # Extract arrays
     additional_kwargs = {}
     if entries:
         additional_kwargs.update({
@@ -483,13 +485,15 @@ def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], output_filename
         })
     arrays = tree.arrays(all_branches, **additional_kwargs)
 
+    # Write out to parquet.
     ak.to_parquet(arrays, output_filename)
 
     return True
 
 
 def convert_tree_to_parquet(
-    filename: Path, tree_name: str, prefixes: Sequence[str], output_filename: Optional[Path] = None, entries: Optional[Tuple[Optional[int], Optional[int]]] = None
+    filename: Path, tree_name: str, prefixes: Sequence[str], branches: Sequence[str], prefix_branches: Sequence[str],
+    output_filename: Optional[Path] = None, entries: Optional[Tuple[Optional[int], Optional[int]]] = None
 ) -> Tuple[bool, Path]:
     """ Convert a ROOT tree to a parquet file using awkward.
 
@@ -501,8 +505,12 @@ def convert_tree_to_parquet(
         tree_name: Name of the tree stored in the file.
         prefixes: Prefixes of the branches to be stored in the parquet file. The template branches
             are already specified - these are just to fill them in.
+        branches: Branches to be read from the tree. These are branches which shouldn't be formatted
+            with the prefix.
+        prefix_branches: Branches to be read from the tree. They will be formatted with the passed prefixes.
         output_filename: Name under which the parquet file should be saved. Default: None, which
             takes the root filename and replaces the `.root` extension with `.parquet`.
+        entries: Selection of entries to be read. Default: None, which indicates no selection.
     Returns:
         True if the tree was successfully converted.
     """
@@ -514,11 +522,11 @@ def convert_tree_to_parquet(
 
     with uproot.open(filename) as f:
         tree = f[tree_name]
-        result = _convert_tree_to_parquet(tree=tree, prefixes=prefixes, output_filename=output_filename, entries=entries)
+        result = _convert_tree_to_parquet(tree=tree, prefixes=prefixes, branches=branches, prefix_branches=prefix_branches, output_filename=output_filename, entries=entries)
     return result, output_filename
 
 
-def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) -> Tuple[ak.Array, ...]:
+def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) -> Dict[str, ak.Array]:
     """ Convert an existing parquet file to arrays for substructure analysis.
 
     Args:
@@ -526,7 +534,7 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
         prefixes: Prefixes of the branches to be loaded from the parquet file. The template branches are
             already specified - these are just to fill them in. Each prefix will create a substructure array.
     Returns:
-        One substructure array pre prefix.
+        One substructure array per prefix.
     """
     # Read all of the arrays from parquet.
     # NOTE: In principle, we could read fewer branches here. However, it doesn't seem to be necessary
@@ -547,8 +555,8 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
     fill_none_value = -9999
     arrays = ak.fill_none(arrays, fill_none_value)
 
-    return [
-        ak.zip(
+    return {
+        prefix: ak.zip(
             {
                 "jet_pt": arrays[f"{prefix}.fJetPt"],
                 "jet_constituents": ak.zip(
@@ -592,29 +600,52 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
             depth_limit=1,
         )
         for prefix in prefixes
-    ]
+    }
 
 
 if __name__ == "__main__":
 
-    import time
+    #import time
 
-    start = time.perf_counter()
-    convert_tree_to_parquet(
-        filename=Path("trains/embedPythia/5966/AnalysisResults.18q.repaired.root"),
-        tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
-        prefixes=["data", "matched", "detLevel"],
-    )
-    (arrays,) = parquet_to_substructure_analysis(
-        filename=Path("trains/embedPythia/5966/AnalysisResults.18q.repaired.parquet"), prefixes=["data"]
-    )
-    finish = time.perf_counter()
-    print(f"Uproot4: Length: {ak.num(arrays, axis=0)}, time: {finish-start}")
-    # Sanity check if the fill_none is a problem
-    assert not ak.any(arrays == -9999)
-    import IPython
+    #start = time.perf_counter()
+    #convert_tree_to_parquet(
+    #    filename=Path("trains/embedPythia/5966/AnalysisResults.18q.repaired.root"),
+    #    tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+    #    prefixes=["data", "matched", "detLevel"],
+    #)
+    #(arrays,) = parquet_to_substructure_analysis(
+    #    filename=Path("trains/embedPythia/5966/AnalysisResults.18q.repaired.parquet"), prefixes=["data"]
+    #)
+    #finish = time.perf_counter()
+    #print(f"Uproot4: Length: {ak.num(arrays, axis=0)}, time: {finish-start}")
+    ## Sanity check if the fill_none is a problem
+    #assert not ak.any(arrays == -9999)
+    #import IPython
 
-    IPython.embed()
+    #IPython.embed()
+
+    # An example for testing.
+    convert_tree_to_parquet(filename=Path("trains/embedPythia/5966/AnalysisResults.18q.repaired.root"),
+                            tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+                            prefixes={"matched": "true", "detLevel": "det_level", "data": "hybrid"},
+                            branches=[],
+                            prefix_branches=[
+                                "{prefix}.fJetPt",
+                                "{prefix}.fJetConstituents.fPt",
+                                "{prefix}.fJetConstituents.fEta",
+                                "{prefix}.fJetConstituents.fPhi",
+                                "{prefix}.fJetConstituents.fID",
+                                "{prefix}.fJetSplittings.fKt",
+                                "{prefix}.fJetSplittings.fDeltaR",
+                                "{prefix}.fJetSplittings.fZ",
+                                "{prefix}.fJetSplittings.fParentIndex",
+                                "{prefix}.fSubjets.fPartOfIterativeSplitting",
+                                "{prefix}.fSubjets.fSplittingNodeIndex",
+                                "{prefix}.fSubjets.fConstituentIndices",
+                            ],
+                            entries=(0, None),
+                            output_filename=Path("trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"))
+
 
     # import uproot as uproot3
     # f = uproot3.open("trains/embedPythia/5966/AnalysisResults.18q.root")

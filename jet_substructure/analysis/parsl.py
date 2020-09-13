@@ -29,7 +29,7 @@ from jet_substructure.base import helpers
 logger = logging.getLogger(__name__)
 
 
-def read_config(collision_system: str, config_path: Path("config/new_config.yaml")) -> Dict[str, Any]:
+def read_config(collision_system: str, config_path: Path = Path("config/new_config.yaml")) -> Dict[str, Any]:
     """ Read collision system configuration from YAML file.
 
     The collision system specification is defined in the YAML file.
@@ -225,11 +225,18 @@ def _distribute_entries_to_jobs(number_of_entries_per_file: Mapping[Path, int], 
 
 
 @python_app
-def _convert_to_parquet(tree_name: str, prefixes: Sequence[str], event_range: Optional[Tuple[Optional[int], Optional[int]]] = None, inputs=[], outputs=[], stdout=None):
+def _convert_to_parquet(tree_name: str, prefixes: Sequence[str], branches: Sequence[str], prefix_branches: Sequence[str],
+                        event_range: Optional[Tuple[Optional[int], Optional[int]]] = None, inputs=[], outputs=[], stdout=None):
+    """ Convert to parquet app. """
     from jet_substructure.base import new_methods
     from pathlib import Path
-    res = new_methods.convert_tree_to_parquet(filename=Path(inputs[0].filepath), tree_name=tree_name, prefixes=prefixes, entries=event_range, output_filename=Path(outputs[0].filepath))
-    print(outputs)
+    res = new_methods.convert_tree_to_parquet(
+        filename=Path(inputs[0].filepath), tree_name=tree_name, prefixes=prefixes,
+        branches=branches,
+        prefix_branches=prefix_branches,
+        entries=event_range, output_filename=Path(outputs[0].filepath)
+    )
+    logger.debug(outputs)
     return res
 
 
@@ -256,9 +263,9 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
     job_ranges = _distribute_entries_to_jobs(
         number_of_entries_per_file=number_of_entries_per_file, entries_per_job=entries_per_job
     )
-    #print(job_ranges)
+    #logger.debug(job_ranges)
     # Sanity check.
-    print(f"Total entries: {sum([len(l) for l in job_ranges.values()])}")
+    logger.debug(f"Total entries: {sum([len(l) for l in job_ranges.values()])}")
 
     # Iterate over the file and event ranges, setting up an app for each entry.
     for i_file, (filename, event_ranges) in enumerate(job_ranges.items()):
@@ -274,6 +281,8 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
             results.append(_convert_to_parquet(
                 tree_name=dataset_config["tree_name"],
                 prefixes=list(dataset_config["prefixes"].keys()),
+                branches=dataset_config["branches"],
+                prefix_branches=dataset_config["prefix_branches"],
                 event_range=event_range,
                 inputs=[parsl_input_file],
                 outputs=[parsl_output_file],
@@ -284,7 +293,8 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
 
 
 @python_app
-def _calculate_embedding_skim(dataset_config: Dict[str, Any], train_directory: Path, iterative_splittings: bool, inputs=[], outputs=[]) -> AppFuture:
+def _calculate_embedding_skim(dataset_config: Dict[str, Any], train_directory: Path, iterative_splittings: bool, inputs=[], outputs=[], stdout=None, stderr=None) -> AppFuture:
+    """ Calculate embedding skim app. """
     from jet_substructure.analysis import new_skim_to_flat_tree
     from pathlib import Path
     try:
@@ -299,11 +309,12 @@ def _calculate_embedding_skim(dataset_config: Dict[str, Any], train_directory: P
         )
     except Exception as e:
         # Skip any problems for now
-        print(e)
+        logger.info(e)
         res = None
 
-    print(outputs)
+    logger.debug(outputs)
     return res
+
 
 def setup_calculate_embedding_skim(
     collision_system: str,
@@ -329,12 +340,14 @@ def setup_calculate_embedding_skim(
     # Setup
     results = []
     dataset_config = read_config(collision_system=collision_system)
-    train_directories = set([filename.parent for filename in dataset_config["files"]])
+    train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
 
     for train_directory in train_directories:
         # Select train numbers.
-        if selected_train_numbers and str(train_directory.name) not in selected_train_numbers:
+        if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
+            logger.debug(f"Skipping train number {train_directory.name}")
             continue
+        logger.info(f"Processing {train_directory.name}")
 
         # Then iterate over the directories.
         for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
@@ -352,30 +365,42 @@ def setup_calculate_embedding_skim(
                 train_directory=train_directory,
                 inputs=[parsl_input_file],
                 outputs=[parsl_output_file],
+                #stdout=parsl.AUTO_LOGNAME,
+                #stderr=parsl.AUTO_LOGNAME,
             ))
+
+    return results
 
 
 if __name__ == "__main__":
-    # Setup
-    collision_system = "PbPb"
+    # Settings
+    collision_system = "embedPythia"
     entries_per_job = int(1e5)
 
     # Setup parsl
     setup_parsl_587(
-        nodes_to_allocate=9,
-        jobs_per_node=2,
+        #nodes_to_allocate=9,
+        #jobs_per_node=2,
+        nodes_to_allocate=1,
+        jobs_per_node=1,
     )
+
+    # Setup logging. By doing it after parsl, we're able to keep it much quieter.
+    # Oddly, I can't seem to select the parsl modules to change their loggers, so this seems
+    # to be the only reasonable way to configure logging.
+    helpers.setup_logging(logging.INFO)
 
     results = []
     # results = setup_convert_to_parquet(collision_system=collision_system, entries_per_job=entries_per_job)
-    # results = setup_calculate_embedding_skim(collision_system=collision_system, entries_per_job=entries_per_job)
+    # results = setup_calculate_embedding_skim(collision_system=collision_system, entries_per_job=entries_per_job, selected_train_numbers=list(range(5966, 5967)))
 
-    print(f"About to ask for result. len: {len(results)}")
+    logger.info(f"About to ask for result. len: {len(results)}")
     # Wait on results
     # print each job status, initially all are running
     #print ("Job Status: {}".format([r.done() for r in results]))
     # wait for all apps to complete
     res = [r.result() for r in results]
+    logger.info(res)
 
-    print("Done")
+    logger.info("Done")
 

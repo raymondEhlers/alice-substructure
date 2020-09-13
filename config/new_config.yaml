@@ -1,5 +1,5 @@
 # Shared parameters
-_branches_prefix_standard: &branches_prefix
+_prefix_branches_standard: &prefix_branches
     - "{prefix}.fJetPt"
     - "{prefix}.fJetConstituents.fPt"
     - "{prefix}.fJetConstituents.fEta"
@@ -24,7 +24,7 @@ available_datasets:
         # Branches which don't contain a prefix
         branches: []
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
-        branches_prefix: *branches_prefix
+        prefix_branches: *prefix_branches
         jet_R: 0.4
         files:
             - "trains/PbPb/5863/AnalysisResults.*.repaired.root"
@@ -38,7 +38,7 @@ available_datasets:
         # Branches which don't contain a prefix
         branches: []
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
-        branches_prefix: *branches_prefix
+        prefix_branches: *prefix_branches
         jet_R: 0.4
         files:
             - "trains/PbPb/5862/AnalysisResults.*.repaired.root"
@@ -54,7 +54,7 @@ available_datasets:
         # Branches which don't contain a prefix
         branches: []
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
-        branches_prefix: *branches_prefix
+        prefix_branches: *prefix_branches
         jet_R: 0.4
         scale_factors:
             1: 16.0695
