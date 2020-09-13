@@ -7,16 +7,21 @@
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import parsl
 import uproot4 as uproot
-#import uproot as uproot
 from parsl.addresses import address_by_hostname
 from parsl.app.app import python_app
+from parsl.channels import LocalChannel
+from parsl.config import Config
 from parsl.data_provider.files import File
+from parsl.dataflow.futures import AppFuture
+from parsl.executors import HighThroughputExecutor
 from parsl.monitoring.monitoring import MonitoringHub
+from parsl.providers import SlurmProvider
+
 from pachyderm import yaml
 
 from jet_substructure.base import helpers
@@ -24,147 +29,71 @@ from jet_substructure.base import helpers
 logger = logging.getLogger(__name__)
 
 
-def number_of_entries(filenames: Sequence[Path], tree_name: str) -> Dict[Path, int]:
-    number_of_entries_map: Dict[Path, int] = {}
+def read_config(collision_system: str, config_path: Path("config/new_config.yaml")) -> Dict[str, Any]:
+    """ Read collision system configuration from YAML file.
 
-    for filename in filenames:
-        print(filename)
-        # uproot4
-        with uproot.open(filename) as f:
-            number_of_entries_map[filename] = f[tree_name].num_entries
-        # uproot3
-        #number_of_entries_map[filename] = uproot.numentries(str(filename), tree_name)
+    The collision system specification is defined in the YAML file.
 
-    return number_of_entries_map
-
-def setup(input_filenames: Sequence[Union[Path, str]], tree_name: str, collision_system:str, identifier: str, recreate: bool = False) -> Dict[Path, int]:
-    filenames = helpers.expand_wildcards_in_filenames(input_filenames)
-
-    # Setup
-    number_of_entries_file = Path(f"trains/{collision_system}/{identifier}.yaml")
+    Args:
+        collision_system: Name of the collision system.
+        config_path: Path to the configuration file. Default: "config/new_config.yaml".
+    Returns:
+        The collision system configuration.
+    """
     y = yaml.yaml()
-
-    # We need the number of entries per file to be able to split up jobs properly.
-    # If it doesn't exist, create it.
-    if not number_of_entries_file.exists() or recreate:
-        logger.debug("Need to get entries from the input files.")
-        number_of_entries_per_file = number_of_entries(filenames=filenames, tree_name=tree_name)
-        with open(number_of_entries_file, "w") as f:
-            y.dump({str(k): v for k, v in number_of_entries_per_file.items()}, f)
-
-    # Now we know that it exists, we can grab it.
-    with open(number_of_entries_file, "r") as f:
-        res = y.load(f)
-        number_of_entries_per_file = {Path(k): v for k, v in res.items()}
-
-    return number_of_entries_per_file
-
-def distribute_jobs(number_of_entries_per_file: Mapping[Path, int], number_per_job: int) -> Dict[Path, List[Tuple[int, int]]]:
-    job_info = {}
-
-    for filename, number_of_entries in number_of_entries_per_file.items():
-        splits = []
-        start = 0
-        continue_iterating = True
-        while continue_iterating:
-            end = start + number_per_job
-            # Ensure that we never ask for more entries than are in the file.
-            if start + number_per_job > number_of_entries:
-                end = number_of_entries
-                continue_iterating = False
-            # Store the start and stop for convenience.
-            splits.append([start, end])
-            # Move up to the next iteration.
-            start = end
-
-        job_info[filename] = splits
-
-    return job_info
-
-@python_app
-def convert_to_parquet(tree_name: str, prefixes: Sequence[str], event_range: Optional[Tuple[Optional[int], Optional[int]]] = None, inputs=[], outputs=[], stdout=None):
-    from jet_substructure.base import new_methods
-    from pathlib import Path
-    res = new_methods.convert_tree_to_parquet(filename=Path(inputs[0].filepath), tree_name=tree_name, prefixes=prefixes, entries=event_range, output_filename=Path(outputs[0].filepath))
-    print(outputs)
-    return res
-
-
-@python_app
-def calculate_and_skim_embedding(inputs=[], outputs=[]):
-    from jet_substructure.analysis import new_skim_to_flat_tree
-    from pathlib import Path
-    # Need to define dataset here, I think?
-    try:
-        res = new_skim_to_flat_tree.calculate_and_skim_embedding(input_filename=Path(inputs[0].filepath), iterative_splittings=True)
-    except Exception as e:
-        # Skip any problems for now
-        print(e)
-        res = None
-
-    print(outputs)
-    return res
-
-
-def run(events_per_job: int):
-    #collision_system = "embedPythia"
-    collision_system = "PbPb"
-
-    y = yaml.yaml()
-
-    with open("config/new_config.yaml", "r") as f:
+    with open(config_path, "r") as f:
         full_config = y.load(f)
-    base_dir = Path(full_config["base_directory"])
+
     config = full_config["execution"][collision_system]["dataset"]
 
-    res = setup(
-        input_filenames=config["files"],
-        tree_name=config["tree_name"],
-        collision_system=collision_system,
-        identifier=config["name"],
-        #recreate=True,
-    )
-    #print(res)
-    #print(sum(res.values()))
+    return config
 
-    #job_ranges = distribute_jobs(number_of_entries_per_file=res, number_per_job=500_000)
-    job_ranges = distribute_jobs(number_of_entries_per_file=res, number_per_job=1e5)
 
-    #print(job_ranges)
-    print(sum([len(l) for l in job_ranges.values()]))
+def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partition: str = "short", debug: bool = False, use_root: bool = False,)-> Config:
+    """ Setup parsl for the 587 cluster.
 
-    return res, job_ranges
+    The configuration that is defined here is loaded by parsl. We also setup monitoring infrastructure.
 
-if __name__ == "__main__":
-    # Setup a test...
-    # Setup parsl executor
-    from parsl.providers import SlurmProvider
-    from parsl.channels import LocalChannel
-    from parsl.config import Config
-    from parsl.executors import HighThroughputExecutor
-    # Explanation:
+    We default to allocating the entire node for simplicity. This helps address any possible memory issues.
+
+    Args:
+        partition: Partition to use with slurm. Default: "short".
+        debug: If True, enable debugging on the workers. Default: False.
+        use_root: If True, we intend to use ROOT in the worker jobs. In that case, we need to
+            initialize the worker environment. Default: False.
+        jobs_per_node: Number of jobs to run per node. Default: 2.
+        nodes_to_allocate: Number of nodes to allocate. Default: 9.
+    Returns:
+        The parsl configuration for the 587 cluster. Note that it's already been loaded by parsl.
+    """
+    # Explanation of the parsl config:
     # - Number of blocks is the number of nodes * nodes_per_block. We want one node per block
     #   so we can use blocks as a proxy for nodes.
-    #   - Control the number of nodes via init_blocks and max_blocks (we don't use an elasticity).
+    #   - Control the number of nodes via init_blocks and max_blocks (we don't use any elasticity).
     # - If we want, for example, two jobs per node (one core per job), we need to set:
     #   - max_workers = 2
     #   - cores_per_node = 2
     # NOTE: If we just try to scale with nodes_per_block, we'll allocate the appropriate nodes,
     #       but then all the jobs will be on just one node, which is definitely not what we want.
-    # Try out 3...
-    # TODO: Careful - 3 will mess up the conversion to parquet
-    jobs_per_node = 2
-    #nodes_to_allocate = 10
-    nodes_to_allocate = 9
+
+    # Setup ROOT if necessary
+    slurm_kwargs = {}
+    if use_root:
+        slurm_kwargs.update(
+            dict(
+                worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv AliPhysics/latest`",
+            )
+        )
+
     b587_executor = Config(
         executors=[
             HighThroughputExecutor(
                 label="b587",
-                worker_debug=True,
+                worker_debug=debug,
                 # Ensures two jobs per job.
                 max_workers=jobs_per_node,
                 provider=SlurmProvider(
-                    partition="short",
+                    partition=partition,
                     # Submitting from pc059, so we have local communication available.
                     channel=LocalChannel(),
                     # This is effectively how many sets of nodes to allocate (assuming nodes_per_block = 1).
@@ -186,6 +115,8 @@ if __name__ == "__main__":
                     # pc147 also struggles and we don't want that to come down because it's one of the ceph quorum machines...
                     # pc075 also has high swap right now...
                     scheduler_options="#SBATCH --exclude=pc051,pc147,pc075",
+                    # For root
+                    **slurm_kwargs,
                 ),
             )
         ],
@@ -201,62 +132,243 @@ if __name__ == "__main__":
     )
     parsl.load(b587_executor)
 
+    return b587_executor
+
+
+def _determine_number_of_entries_per_file(filenames: Sequence[Path], tree_name: str) -> Dict[Path, int]:
+    """ Retrieve the number of tree entries per ROOT file.
+
+    Args:
+        filenames: Filenames containing the trees of interest.
+        tree_name: Name of the tree.
+    Returns:
+        Map from the filename to the number of entries.
+    """
+    number_of_entries_per_file: Dict[Path, int] = {}
+
+    for filename in filenames:
+        with uproot.open(filename) as f:
+            number_of_entries_per_file[filename] = f[tree_name].num_entries
+
+    return number_of_entries_per_file
+
+
+def _number_of_entries_per_file(input_filenames: Sequence[Union[Path, str]], tree_name: str, collision_system: str, identifier: str, recreate: bool = False) -> Dict[Path, int]:
+    """ Determine number of entries per file.
+
+    Args:
+        input_filenames: Filenames to use in the number of entries determination.
+        tree_name: Name of the tree.
+        collision_system: Collision system.
+        identifier: Identifier for the dataset. Used to cache the number of entries per file.
+        recreate: Force recreation of the number of entries per file for a dataset, skipping
+            over the cache. Default: False.
+    Returns:
+        Mapping between file and number of entries in the file.
+    """
+    # Validation
+    filenames = helpers.expand_wildcards_in_filenames(input_filenames)
+
+    # Setup
+    y = yaml.yaml()
+    number_of_entries_file = Path(f"trains/{collision_system}/{identifier}.yaml")
+
+    # We need the number of entries per file to be able to split up the jobs properly later.
+    # If it doesn't exist, create it.
+    if not number_of_entries_file.exists() or recreate:
+        logger.debug("Need to get entries from the input files.")
+        number_of_entries_per_file = _determine_number_of_entries_per_file(filenames=filenames, tree_name=tree_name)
+        with open(number_of_entries_file, "w") as f:
+            # Explicit iteration because we need to convert from Path to str.
+            y.dump({str(k): v for k, v in number_of_entries_per_file.items()}, f)
+
+    # Now we know that it exists, we can grab it.
+    with open(number_of_entries_file, "r") as f:
+        res = y.load(f)
+        number_of_entries_per_file = {Path(k): v for k, v in res.items()}
+
+    return number_of_entries_per_file
+
+
+def _distribute_entries_to_jobs(number_of_entries_per_file: Mapping[Path, int], entries_per_job: int) -> Dict[Path, List[Tuple[int, int]]]:
+    """ Distribute a specific number of entries to each job.
+
+    We distribute based on the number of entries in a given file, so if a file doesn't contain enough for a full job,
+    we assign fewer events. We lose some efficiency, but it's much simpler.
+
+    Args:
+        number_of_entries_per_file: Mapping between file and number of entries in the file.
+        entries_per_job: Number of entries to be assigned per job.
+    Returns:
+        Mapping from file to list of entry ranges (low, high).
+    """
+    job_info = {}
+
+    for filename, number_of_entries in number_of_entries_per_file.items():
+        splits = []
+        start = 0
+        continue_iterating = True
+        while continue_iterating:
+            end = start + entries_per_job
+            # Ensure that we never ask for more entries than are in the file.
+            if start + entries_per_job > number_of_entries:
+                end = number_of_entries
+                continue_iterating = False
+            # Store the start and stop for convenience.
+            splits.append([start, end])
+            # Move up to the next iteration.
+            start = end
+
+        job_info[filename] = splits
+
+    return job_info
+
+
+@python_app
+def _convert_to_parquet(tree_name: str, prefixes: Sequence[str], event_range: Optional[Tuple[Optional[int], Optional[int]]] = None, inputs=[], outputs=[], stdout=None):
+    from jet_substructure.base import new_methods
+    from pathlib import Path
+    res = new_methods.convert_tree_to_parquet(filename=Path(inputs[0].filepath), tree_name=tree_name, prefixes=prefixes, entries=event_range, output_filename=Path(outputs[0].filepath))
+    print(outputs)
+    return res
+
+
+def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1e5)) -> List[AppFuture]:
+    """ Setup convert_to_parquet app for execution with parsl.
+
+    Args:
+        events_per_job: Number of events to process in each job.
+    Returns:
+        List of `AppFuture` created when defining the jobs.
+    """
+    # Setup
     results = []
-    if True:
-        events_per_job = int(1e5)
-        entries_per_file, job_ranges = run(events_per_job)
+    dataset_config = read_config(collision_system=collision_system)
 
-        # Setup single input files
-        #for filename in list(entries_per_file.keys())[:10]:
-        #    ...
+    # Based on the number of events desired per job, split the files into jobs with those number of events.
+    number_of_entries_per_file = _number_of_entries_per_file(
+        input_filenames=dataset_config["files"],
+        tree_name=dataset_config["tree_name"],
+        collision_system=collision_system,
+        identifier=dataset_config["name"],
+        #recreate=True,
+    )
+    job_ranges = _distribute_entries_to_jobs(
+        number_of_entries_per_file=number_of_entries_per_file, entries_per_job=entries_per_job
+    )
+    #print(job_ranges)
+    # Sanity check.
+    print(f"Total entries: {sum([len(l) for l in job_ranges.values()])}")
 
-        for i_file, (filename, event_ranges) in enumerate(job_ranges.items()):
-            # TEMP
-            #if i_file > 20:
-            #    break
-            # ENDTEMP
+    # Iterate over the file and event ranges, setting up an app for each entry.
+    for i_file, (filename, event_ranges) in enumerate(job_ranges.items()):
+        for i, event_range in enumerate(event_ranges):
+            # Setup file IO
+            parsl_input_file = File(str(filename))
+            output_filename = Path(parsl_input_file.filepath)
+            # Path becomes .../parquet/events_per_job_.../filename.00.parquet
+            output_filename = output_filename.parent / "parquet" / f"events_per_job_{entries_per_job}" / output_filename.name
+            output_filename = output_filename.with_suffix(f".{i:02}.parquet")
+            parsl_output_file = File(str(output_filename))
 
-            for i, event_range in enumerate(event_ranges):
-                parsl_input_file = File(str(filename))
-                #output_filename = str(Path(parsl_input_file.filepath).with_suffix("")) + f"_{event_range[0]}_{event_range[1]}"
-                output_filename = Path(parsl_input_file.filepath)
-                output_filename = output_filename.parent / "parquet" / f"events_per_job_{events_per_job}" / output_filename.name
-                output_filename = output_filename.with_suffix(f".{i:02}.parquet")
-                #output_filename = Path(str(output_filename) + f".{i:02}.parquet")
-                #print(f"i: {i}, output_filename: {output_filename}")
-                parsl_output_file = File(str(output_filename))
+            results.append(_convert_to_parquet(
+                tree_name=dataset_config["tree_name"],
+                prefixes=list(dataset_config["prefixes"].keys()),
+                event_range=event_range,
+                inputs=[parsl_input_file],
+                outputs=[parsl_output_file],
+                stdout=f"{i_file}_{i}.log"
+            ))
 
-                # TODO: Take from config...
-                results.append(convert_to_parquet(
-                    #tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
-                    #prefixes=["data", "matched", "detLevel"],
-                    tree_name="AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl",
-                    prefixes=["data"],
-                    event_range=event_range,
-                    inputs=[parsl_input_file],
-                    outputs=[parsl_output_file],
-                    stdout=f"{i_file}.log"
-                ))
-    else:
-        #for train_number in range(5966, 5986):
-        #for train_number in range(5973, 5986):
-        for train_number in range(5982, 5986):
-            for filename in Path(f"trains/embedPythia/{train_number}/parquet/events_per_job_100000/").glob("*.parquet"):
-                parsl_input_file = File(str(filename))
-                # TODO: Configure properly...
-                # TODO: Consolidate this code...
-                iterative_splittings = True
-                iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
-                # The "skim" output directory is made relative to the main train output directory.
-                output_dir = filename.parent.parent.parent / "skim"
-                output_filename = output_dir / f"{filename.stem}_{iterative_splittings_label}_splittings.root"
-                parsl_output_file = File(str(output_filename))
+    return results
 
-                results.append(calculate_and_skim_embedding(
-                    inputs=[parsl_input_file],
-                    outputs=[parsl_output_file],
-                ))
 
+@python_app
+def _calculate_embedding_skim(dataset_config: Dict[str, Any], train_directory: Path, iterative_splittings: bool, inputs=[], outputs=[]) -> AppFuture:
+    from jet_substructure.analysis import new_skim_to_flat_tree
+    from pathlib import Path
+    try:
+        res = new_skim_to_flat_tree.calculate_embedding_skim(
+            input_filename=Path(inputs[0].filepath),
+            iterative_splittings=iterative_splittings,
+            prefixes=dataset_config["prefixes"],
+            scale_factors=dataset_config["scale_factors"],
+            train_directory=train_directory,
+            jet_R=dataset_config["jet_R"],
+            output_filename=Path(outputs[0].filepath),
+        )
+    except Exception as e:
+        # Skip any problems for now
+        print(e)
+        res = None
+
+    print(outputs)
+    return res
+
+def setup_calculate_embedding_skim(
+    collision_system: str,
+    entries_per_job: int,
+    iterative_splittings: bool = True,
+    selected_train_numbers: Optional[Sequence[int]] = None
+) -> List[AppFuture]:
+    """ Setup to calculate embedding skim.
+
+    Args:
+        collision_system: Collision system.
+        entries_per_job: Number of entries per job.
+        iterative_splittings: True if iterative splittings are selected rather than recursive splittings. Default: True.
+        selected_train_numbers: Use only a selection of train numbers. Default: None. All train numbers are
+            taken from the config.
+    Returns:
+        List of `AppFuture` created when defining the jobs.
+    """
+    # Validation
+    if selected_train_numbers is None:
+        selected_train_numbers = []
+
+    # Setup
+    results = []
+    dataset_config = read_config(collision_system=collision_system)
+    train_directories = set([filename.parent for filename in dataset_config["files"]])
+
+    for train_directory in train_directories:
+        # Select train numbers.
+        if selected_train_numbers and str(train_directory.name) not in selected_train_numbers:
+            continue
+
+        # Then iterate over the directories.
+        for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
+            # Setup
+            iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
+            # Setup file I/O
+            parsl_input_file = File(str(filename))
+            output_dir = train_directory / "skim"
+            output_filename = output_dir / f"{filename.stem}_{iterative_splittings_label}_splittings.root"
+            parsl_output_file = File(str(output_filename))
+
+            results.append(_calculate_embedding_skim(
+                dataset_config=dataset_config,
+                iterative_splittings=iterative_splittings,
+                train_directory=train_directory,
+                inputs=[parsl_input_file],
+                outputs=[parsl_output_file],
+            ))
+
+
+if __name__ == "__main__":
+    # Setup
+    collision_system = "PbPb"
+    entries_per_job = int(1e5)
+
+    # Setup parsl
+    setup_parsl_587(
+        nodes_to_allocate=9,
+        jobs_per_node=2,
+    )
+
+    results = []
+    # results = setup_convert_to_parquet(collision_system=collision_system, entries_per_job=entries_per_job)
+    # results = setup_calculate_embedding_skim(collision_system=collision_system, entries_per_job=entries_per_job)
 
     print(f"About to ask for result. len: {len(results)}")
     # Wait on results

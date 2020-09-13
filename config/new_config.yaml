@@ -1,45 +1,60 @@
+# Shared parameters
+_branches_prefix_standard: &branches_prefix
+    - "{prefix}.fJetPt"
+    - "{prefix}.fJetConstituents.fPt"
+    - "{prefix}.fJetConstituents.fEta"
+    - "{prefix}.fJetConstituents.fPhi"
+    - "{prefix}.fJetConstituents.fID"
+    - "{prefix}.fJetSplittings.fKt"
+    - "{prefix}.fJetSplittings.fDeltaR"
+    - "{prefix}.fJetSplittings.fZ"
+    - "{prefix}.fJetSplittings.fParentIndex"
+    - "{prefix}.fSubjets.fPartOfIterativeSplitting"
+    - "{prefix}.fSubjets.fSplittingNodeIndex"
+    - "{prefix}.fSubjets.fConstituentIndices"
+
 available_datasets:
+    LHC18qr: &LHC18qr
+        name: "LHC18qr_5863"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
+        # A map to potentially rename the branch prefix.
+        prefix:
+            data: "data"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        branches_prefix: *branches_prefix
+        jet_R: 0.4
+        files:
+            - "trains/PbPb/5863/AnalysisResults.*.repaired.root"
+    LHC18qr_Rmax06:
+        name: "LHC18qr_5862"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
+        # A map to potentially rename the branch prefix.
+        prefix:
+            data: "data"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        branches_prefix: *branches_prefix
+        jet_R: 0.4
+        files:
+            - "trains/PbPb/5862/AnalysisResults.*.repaired.root"
     LHC19f4_embedded_into_LHC18qr_5966_5985: &LHC19f4_embedded_into_LHC18qr
         name: "LHC19f4_embedded_into_LHC18qr_5966_5985"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
-        branches:
-            - "data.fJetPt"
-            - "data.fJetConstituents.fPt"
-            - "data.fJetConstituents.fEta"
-            - "data.fJetConstituents.fPhi"
-            - "data.fJetConstituents.fID"
-            - "data.fJetSplittings.fKt"
-            - "data.fJetSplittings.fDeltaR"
-            - "data.fJetSplittings.fZ"
-            - "data.fJetSplittings.fParentIndex"
-            - "data.fSubjets.fPartOfIterativeSplitting"
-            - "data.fSubjets.fSplittingNodeIndex"
-            - "data.fSubjets.fConstituentIndices"
-            - "matched.fJetPt"
-            - "matched.fJetConstituents.fPt"
-            - "matched.fJetConstituents.fEta"
-            - "matched.fJetConstituents.fPhi"
-            - "matched.fJetConstituents.fID"
-            - "matched.fJetSplittings.fKt"
-            - "matched.fJetSplittings.fDeltaR"
-            - "matched.fJetSplittings.fZ"
-            - "matched.fJetSplittings.fParentIndex"
-            - "matched.fSubjets.fPartOfIterativeSplitting"
-            - "matched.fSubjets.fSplittingNodeIndex"
-            - "matched.fSubjets.fConstituentIndices"
-            - "detLevel.fJetPt"
-            - "detLevel.fJetConstituents.fPt"
-            - "detLevel.fJetConstituents.fEta"
-            - "detLevel.fJetConstituents.fPhi"
-            - "detLevel.fJetConstituents.fID"
-            - "detLevel.fJetSplittings.fKt"
-            - "detLevel.fJetSplittings.fDeltaR"
-            - "detLevel.fJetSplittings.fZ"
-            - "detLevel.fJetSplittings.fParentIndex"
-            - "detLevel.fSubjets.fPartOfIterativeSplitting"
-            - "detLevel.fSubjets.fSplittingNodeIndex"
-            - "detLevel.fSubjets.fConstituentIndices"
+        # A map to potentially rename the branch prefix.
+        prefixes:
+            data: "hybrid"
+            matched: "true"
+            detLevel: "det_level"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        branches_prefix: *branches_prefix
         jet_R: 0.4
         scale_factors:
             1: 16.0695
@@ -84,8 +99,9 @@ available_datasets:
             - "trains/embedPythia/5984/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/5985/AnalysisResults.*.repaired.root"
 
-base_directory: "/alf/data/rehlers/substructure"
 execution:
     embedPythia:
         dataset: *LHC19f4_embedded_into_LHC18qr
+    PbPb:
+        dataset: *LHC18qr
 
