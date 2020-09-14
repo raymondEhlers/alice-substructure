@@ -19,7 +19,7 @@ available_datasets:
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
         # A map to potentially rename the branch prefix.
-        prefix:
+        prefixes:
             data: "data"
         # Branches which don't contain a prefix
         branches: []
@@ -33,7 +33,7 @@ available_datasets:
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
         # A map to potentially rename the branch prefix.
-        prefix:
+        prefixes:
             data: "data"
         # Branches which don't contain a prefix
         branches: []
