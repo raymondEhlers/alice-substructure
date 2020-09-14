@@ -679,7 +679,7 @@ def calculate_embedding_skim(  # noqa: C901
     output_tree_name: str = "tree",
     create_friend_tree: bool = False,
     draw_example_splittings: bool = False,
-) -> bool:
+) -> Tuple[bool, str]:
     """ Determine the response and prong matching for jets substructure techniques.
 
     Args:
@@ -689,6 +689,11 @@ def calculate_embedding_skim(  # noqa: C901
             supplemental information. See the code for precisely what it contains. Default: False.
         draw_example_splittings: If True, draw a few interesting splitting graphs. Default: False.
     """
+    # Validation
+    # Bail out early if the file already exists.
+    if output_filename.exists():
+        return True, "already exists"
+
     # Setup
     # Use the train configuration to extract the train number and pt hard bin, which are used to get the scale factor.
     y = yaml.yaml()
@@ -892,7 +897,7 @@ def calculate_embedding_skim(  # noqa: C901
         output_file[output_tree_name].extend(grooming_results_np)
 
     logger.info(f"Finished processing tree from file {input_filename}")
-    return True
+    return True, "processed"
 
 
 def calculate_data_skim(  # noqa: C901
@@ -905,10 +910,13 @@ def calculate_data_skim(  # noqa: C901
     output_tree_name: str = "tree",
     create_friend_tree: bool = False,
     scale_factors: Optional[Mapping[int, float]] = None
-) -> bool:
+) -> Tuple[bool, str]:
     # Validation
     if scale_factors is None and collision_system == "pythia":
         raise ValueError("Need scale factors for pythia to be provided externally.")
+    # Bail out early if the file already exists.
+    if output_filename.exists():
+        return True, "already exists"
 
     # Setup
     logger.info(f"Skimming tree from file {input_filename}")
@@ -1028,7 +1036,7 @@ def calculate_data_skim(  # noqa: C901
         output_file[output_tree_name].extend(grooming_results_np)
 
     logger.info(f"Finished processing tree from file {input_filename}")
-    return True
+    return True, "processed"
 
 
 if __name__ == "__main__":

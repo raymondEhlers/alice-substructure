@@ -14,10 +14,11 @@ import parsl
 import uproot4 as uproot
 from parsl.addresses import address_by_hostname
 from parsl.app.app import python_app
+from parsl.app.futures import DataFuture
 from parsl.channels import LocalChannel
 from parsl.config import Config
 from parsl.data_provider.files import File
-from parsl.dataflow.futures import AppFuture, DataFuture
+from parsl.dataflow.futures import AppFuture
 from parsl.executors import HighThroughputExecutor
 from parsl.monitoring.monitoring import MonitoringHub
 from parsl.providers import SlurmProvider
@@ -347,6 +348,7 @@ def setup_calculate_embedding_skim(
 
     # If input files aren't passed, then we need to determine them ourselves.
     if input_files is None:
+        logger.info("Determining input files independently.")
         input_files = []
         for train_directory in train_directories:
             # Select train numbers.
@@ -365,7 +367,7 @@ def setup_calculate_embedding_skim(
         iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
         # Setup file I/O
         output_dir = train_directory / "skim"
-        output_filename = output_dir / f"{filename.stem}_{iterative_splittings_label}_splittings.root"
+        output_filename = output_dir / f"{Path(parsl_input_file.filepath).stem}_{iterative_splittings_label}_splittings.root"
         parsl_output_file = File(str(output_filename))
 
         results.append(_calculate_embedding_skim(
@@ -381,8 +383,8 @@ def setup_calculate_embedding_skim(
     return results
 
 
-@python_app
-def _calculate_data_skim(collision_system: str, dataset_config: Dict[str, Any], iterative_splittings: bool, inputs=[], outputs=[], stdout=None, stderr=None) -> AppFuture:
+@python_app()
+def _calculate_data_skim(collision_system: str, dataset_config: Dict[str, Any], iterative_splittings: bool, inputs=[], outputs=[]) -> AppFuture:
     """ Calculate data skim app. """
     import traceback
     from pathlib import Path
@@ -436,13 +438,14 @@ def setup_calculate_data_skim(
 
     # If input files aren't passed, then we need to determine them ourselves.
     if input_files is None:
+        logger.info("Determining input files independently.")
         input_files = []
         for train_directory in train_directories:
             # Select train numbers.
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
                 logger.debug(f"Skipping train number {train_directory.name}")
                 continue
-            logger.info(f"Processing {train_directory.name}")
+            logger.info(f"Processing train number {train_directory.name}")
 
             # Then iterate over the directories.
             for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
@@ -454,8 +457,9 @@ def setup_calculate_data_skim(
         iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
         # Setup file I/O
         output_dir = train_directory / "skim"
-        output_filename = output_dir / f"{filename.stem}_{iterative_splittings_label}_splittings.root"
+        output_filename = output_dir / f"{Path(parsl_input_file.filepath).stem}_{iterative_splittings_label}_splittings.root"
         parsl_output_file = File(str(output_filename))
+
         results.append(_calculate_data_skim(
             dataset_config=dataset_config,
             collision_system=collision_system,

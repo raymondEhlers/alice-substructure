@@ -520,6 +520,10 @@ def convert_tree_to_parquet(
     if entries is None:
         entries = (None, None)
 
+    # Bail out early if the file already exists.
+    if output_filename.exists():
+        return True, output_filename
+
     with uproot.open(filename) as f:
         tree = f[tree_name]
         result = _convert_tree_to_parquet(tree=tree, prefixes=prefixes, branches=branches, prefix_branches=prefix_branches, output_filename=output_filename, entries=entries)
