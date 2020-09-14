@@ -295,8 +295,9 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
 @python_app
 def _calculate_embedding_skim(dataset_config: Dict[str, Any], train_directory: Path, iterative_splittings: bool, inputs=[], outputs=[], stdout=None, stderr=None) -> AppFuture:
     """ Calculate embedding skim app. """
-    from jet_substructure.analysis import new_skim_to_flat_tree
+    import traceback
     from pathlib import Path
+    from jet_substructure.analysis import new_skim_to_flat_tree
     try:
         res = new_skim_to_flat_tree.calculate_embedding_skim(
             input_filename=Path(inputs[0].filepath),
@@ -309,8 +310,8 @@ def _calculate_embedding_skim(dataset_config: Dict[str, Any], train_directory: P
         )
     except Exception as e:
         # Skip any problems for now
-        logger.info(e)
-        res = None
+        logger.warning(e)
+        res = traceback.format_exc()
 
     logger.debug(outputs)
     return res
@@ -372,27 +373,108 @@ def setup_calculate_embedding_skim(
     return results
 
 
+@python_app
+def _calculate_data_skim(collision_system: str, dataset_config: Dict[str, Any], iterative_splittings: bool, inputs=[], outputs=[], stdout=None, stderr=None) -> AppFuture:
+    """ Calculate data skim app. """
+    import traceback
+    from pathlib import Path
+    from jet_substructure.analysis import new_skim_to_flat_tree
+    try:
+        res = new_skim_to_flat_tree.calculate_data_skim(
+            input_filename=Path(inputs[0].filepath),
+            collision_system=collision_system,
+            iterative_splittings=iterative_splittings,
+            prefixes=dataset_config["prefixes"],
+            jet_R=dataset_config["jet_R"],
+            output_filename=Path(outputs[0].filepath),
+            scale_factors=dataset_config.get("scale_factors", None),
+        )
+    except Exception as e:
+        # Skip any problems for now
+        logger.warning(e)
+        res = traceback.format_exc()
+
+    logger.debug(outputs)
+    return res
+
+
+def setup_calculate_data_skim(
+    collision_system: str,
+    entries_per_job: int,
+    iterative_splittings: bool = True,
+    selected_train_numbers: Optional[Sequence[int]] = None
+) -> List[AppFuture]:
+    """ Setup to calculate data skim.
+
+    Args:
+        collision_system: Collision system.
+        entries_per_job: Number of entries per job.
+        iterative_splittings: True if iterative splittings are selected rather than recursive splittings. Default: True.
+        selected_train_numbers: Use only a selection of train numbers. Default: None. All train numbers are
+            taken from the config.
+    Returns:
+        List of `AppFuture` created when defining the jobs.
+    """
+    # Validation
+    if selected_train_numbers is None:
+        selected_train_numbers = []
+
+    # Setup
+    results = []
+    dataset_config = read_config(collision_system=collision_system)
+    train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
+
+    for train_directory in train_directories:
+        # Select train numbers.
+        if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
+            logger.debug(f"Skipping train number {train_directory.name}")
+            continue
+        logger.info(f"Processing {train_directory.name}")
+
+        # Then iterate over the directories.
+        for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
+            # Setup
+            iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
+            # Setup file I/O
+            parsl_input_file = File(str(filename))
+            output_dir = train_directory / "skim"
+            output_filename = output_dir / f"{filename.stem}_{iterative_splittings_label}_splittings.root"
+            parsl_output_file = File(str(output_filename))
+            results.append(_calculate_data_skim(
+                dataset_config=dataset_config,
+                collision_system=collision_system,
+                iterative_splittings=iterative_splittings,
+                inputs=[parsl_input_file],
+                outputs=[parsl_output_file],
+                #stdout=parsl.AUTO_LOGNAME,
+                #stderr=parsl.AUTO_LOGNAME,
+            ))
+
+    return results
+
+
 if __name__ == "__main__":
     # Settings
-    collision_system = "embedPythia"
+    collision_system = "PbPb"
     entries_per_job = int(1e5)
 
     # Setup parsl
     setup_parsl_587(
-        #nodes_to_allocate=9,
-        #jobs_per_node=2,
-        nodes_to_allocate=1,
-        jobs_per_node=1,
+        nodes_to_allocate=9,
+        jobs_per_node=2,
     )
 
     # Setup logging. By doing it after parsl, we're able to keep it much quieter.
     # Oddly, I can't seem to select the parsl modules to change their loggers, so this seems
     # to be the only reasonable way to configure logging.
     helpers.setup_logging(logging.INFO)
+    # Quiet down parsl
+    logging.getLogger("parsl").setLevel(logging.WARNING)
 
     results = []
     # results = setup_convert_to_parquet(collision_system=collision_system, entries_per_job=entries_per_job)
     # results = setup_calculate_embedding_skim(collision_system=collision_system, entries_per_job=entries_per_job, selected_train_numbers=list(range(5966, 5967)))
+    # results = setup_calculate_data_skim(collision_system=collision_system, entries_per_job=entries_per_job)
 
     logger.info(f"About to ask for result. len: {len(results)}")
     # Wait on results
