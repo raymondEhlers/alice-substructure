@@ -17,7 +17,7 @@ from parsl.app.app import python_app
 from parsl.channels import LocalChannel
 from parsl.config import Config
 from parsl.data_provider.files import File
-from parsl.dataflow.futures import AppFuture
+from parsl.dataflow.futures import AppFuture, DataFuture
 from parsl.executors import HighThroughputExecutor
 from parsl.monitoring.monitoring import MonitoringHub
 from parsl.providers import SlurmProvider
@@ -321,7 +321,8 @@ def setup_calculate_embedding_skim(
     collision_system: str,
     entries_per_job: int,
     iterative_splittings: bool = True,
-    selected_train_numbers: Optional[Sequence[int]] = None
+    selected_train_numbers: Optional[Sequence[int]] = None,
+    input_files: Optional[Sequence[DataFuture]] = None,
 ) -> List[AppFuture]:
     """ Setup to calculate embedding skim.
 
@@ -331,6 +332,7 @@ def setup_calculate_embedding_skim(
         iterative_splittings: True if iterative splittings are selected rather than recursive splittings. Default: True.
         selected_train_numbers: Use only a selection of train numbers. Default: None. All train numbers are
             taken from the config.
+        input_files: DataFuture from an AppFuture from a previous execution.
     Returns:
         List of `AppFuture` created when defining the jobs.
     """
@@ -343,32 +345,38 @@ def setup_calculate_embedding_skim(
     dataset_config = read_config(collision_system=collision_system)
     train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
 
-    for train_directory in train_directories:
-        # Select train numbers.
-        if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
-            logger.debug(f"Skipping train number {train_directory.name}")
-            continue
-        logger.info(f"Processing {train_directory.name}")
+    # If input files aren't passed, then we need to determine them ourselves.
+    if input_files is None:
+        input_files = []
+        for train_directory in train_directories:
+            # Select train numbers.
+            if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
+                logger.debug(f"Skipping train number {train_directory.name}")
+                continue
+            logger.info(f"Processing {train_directory.name}")
 
-        # Then iterate over the directories.
-        for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
-            # Setup
-            iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
-            # Setup file I/O
-            parsl_input_file = File(str(filename))
-            output_dir = train_directory / "skim"
-            output_filename = output_dir / f"{filename.stem}_{iterative_splittings_label}_splittings.root"
-            parsl_output_file = File(str(output_filename))
+            # Then iterate over the directories.
+            for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
+                input_files.append(File(str(filename)))
 
-            results.append(_calculate_embedding_skim(
-                dataset_config=dataset_config,
-                iterative_splittings=iterative_splittings,
-                train_directory=train_directory,
-                inputs=[parsl_input_file],
-                outputs=[parsl_output_file],
-                #stdout=parsl.AUTO_LOGNAME,
-                #stderr=parsl.AUTO_LOGNAME,
-            ))
+    # Create the Apps.
+    for parsl_input_file in input_files:
+        # Setup
+        iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
+        # Setup file I/O
+        output_dir = train_directory / "skim"
+        output_filename = output_dir / f"{filename.stem}_{iterative_splittings_label}_splittings.root"
+        parsl_output_file = File(str(output_filename))
+
+        results.append(_calculate_embedding_skim(
+            dataset_config=dataset_config,
+            iterative_splittings=iterative_splittings,
+            train_directory=train_directory,
+            inputs=[parsl_input_file],
+            outputs=[parsl_output_file],
+            #stdout=parsl.AUTO_LOGNAME,
+            #stderr=parsl.AUTO_LOGNAME,
+        ))
 
     return results
 
@@ -402,7 +410,8 @@ def setup_calculate_data_skim(
     collision_system: str,
     entries_per_job: int,
     iterative_splittings: bool = True,
-    selected_train_numbers: Optional[Sequence[int]] = None
+    selected_train_numbers: Optional[Sequence[int]] = None,
+    input_files: Optional[Sequence[DataFuture]] = None,
 ) -> List[AppFuture]:
     """ Setup to calculate data skim.
 
@@ -412,6 +421,7 @@ def setup_calculate_data_skim(
         iterative_splittings: True if iterative splittings are selected rather than recursive splittings. Default: True.
         selected_train_numbers: Use only a selection of train numbers. Default: None. All train numbers are
             taken from the config.
+        input_files: DataFuture from an AppFuture from a previous execution.
     Returns:
         List of `AppFuture` created when defining the jobs.
     """
@@ -424,31 +434,37 @@ def setup_calculate_data_skim(
     dataset_config = read_config(collision_system=collision_system)
     train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
 
-    for train_directory in train_directories:
-        # Select train numbers.
-        if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
-            logger.debug(f"Skipping train number {train_directory.name}")
-            continue
-        logger.info(f"Processing {train_directory.name}")
+    # If input files aren't passed, then we need to determine them ourselves.
+    if input_files is None:
+        input_files = []
+        for train_directory in train_directories:
+            # Select train numbers.
+            if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
+                logger.debug(f"Skipping train number {train_directory.name}")
+                continue
+            logger.info(f"Processing {train_directory.name}")
 
-        # Then iterate over the directories.
-        for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
-            # Setup
-            iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
-            # Setup file I/O
-            parsl_input_file = File(str(filename))
-            output_dir = train_directory / "skim"
-            output_filename = output_dir / f"{filename.stem}_{iterative_splittings_label}_splittings.root"
-            parsl_output_file = File(str(output_filename))
-            results.append(_calculate_data_skim(
-                dataset_config=dataset_config,
-                collision_system=collision_system,
-                iterative_splittings=iterative_splittings,
-                inputs=[parsl_input_file],
-                outputs=[parsl_output_file],
-                #stdout=parsl.AUTO_LOGNAME,
-                #stderr=parsl.AUTO_LOGNAME,
-            ))
+            # Then iterate over the directories.
+            for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
+                input_files.append(File(str(filename)))
+
+    # Create the Apps.
+    for parsl_input_file in input_files:
+        # Setup
+        iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
+        # Setup file I/O
+        output_dir = train_directory / "skim"
+        output_filename = output_dir / f"{filename.stem}_{iterative_splittings_label}_splittings.root"
+        parsl_output_file = File(str(output_filename))
+        results.append(_calculate_data_skim(
+            dataset_config=dataset_config,
+            collision_system=collision_system,
+            iterative_splittings=iterative_splittings,
+            inputs=[parsl_input_file],
+            outputs=[parsl_output_file],
+            #stdout=parsl.AUTO_LOGNAME,
+            #stderr=parsl.AUTO_LOGNAME,
+        ))
 
     return results
 
@@ -472,15 +488,27 @@ if __name__ == "__main__":
     logging.getLogger("parsl").setLevel(logging.WARNING)
 
     results = []
-    # results = setup_convert_to_parquet(collision_system=collision_system, entries_per_job=entries_per_job)
-    # results = setup_calculate_embedding_skim(collision_system=collision_system, entries_per_job=entries_per_job, selected_train_numbers=list(range(5966, 5967)))
-    # results = setup_calculate_data_skim(collision_system=collision_system, entries_per_job=entries_per_job)
+    # results = setup_convert_to_parquet(
+    #     collision_system=collision_system,
+    #     entries_per_job=entries_per_job,
+    # )
+    # results = setup_calculate_embedding_skim(
+    #     collision_system=collision_system,
+    #     entries_per_job=entries_per_job,
+    #     selected_train_numbers=list(range(5966, 5967)),
+    #     input_files=[r.outputs[0] for r in results] if results else None,
+    # )
+    # results = setup_calculate_data_skim(
+    #     collision_system=collision_system,
+    #     entries_per_job=entries_per_job,
+    #     input_files=[r.outputs[0] for r in results] if results else None,
+    # )
 
     logger.info(f"About to ask for result. len: {len(results)}")
     # Wait on results
     # print each job status, initially all are running
     #print ("Job Status: {}".format([r.done() for r in results]))
-    # wait for all apps to complete
+    # Wait for all apps to complete
     res = [r.result() for r in results]
     logger.info(res)
 
