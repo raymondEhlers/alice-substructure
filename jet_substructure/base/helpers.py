@@ -144,6 +144,8 @@ def setup_logging(level: int = logging.DEBUG) -> None:
     logging.getLogger("parso").setLevel(logging.INFO)
     # Quiet down BinndData copy warnings
     logging.getLogger("pachyderm.binned_data").setLevel(logging.INFO)
+    # Quiet down numba
+    logging.getLogger("numba").setLevel(logging.INFO)
 
 
 def pretty_print_tree(d: Mapping[int, Any], indent: int = 0) -> None:
