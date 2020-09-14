@@ -555,6 +555,13 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
     fill_none_value = -9999
     arrays = ak.fill_none(arrays, fill_none_value)
 
+    additional_columns = {}
+    if "ptHard" in ak.keys(arrays):
+        additional_columns = {
+            "pt_hard": arrays["ptHard"],
+            "pt_hard_bin": arrays["ptHardBin"],
+        }
+
     return {
         prefix: ak.zip(
             {
@@ -594,6 +601,7 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
                     # in the jet, so we use a depth limit of 2.
                     depth_limit=2,
                 ),
+                **additional_columns,
             },
             # The structure of the jet pt and the other values is inherently different, so
             # we only put them together on the jet level with a depth limit of 1.
