@@ -136,6 +136,59 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
     return b587_executor
 
 
+@python_app
+def _repair_root_files(tree_name: str, inputs=[], outputs=[]) -> AppFuture:
+    """ Repair ROOT files app. """
+    from jet_substructure.base import helpers
+    from pathlib import Path
+    res = helpers.split_tree(
+        filenames=[Path(inputs[0].filepath)],
+        tree_name=tree_name,
+        number_of_chunks=1,
+    )
+    return res
+
+def setup_repair_root_files(
+    collision_system: str,
+    selected_train_numbers: Optional[Sequence[int]] = None,
+) -> List[AppFuture]:
+    """ Repair ROOT files.
+
+    Settings will be taken out of the configuration file.
+
+    Args:
+        collision_system: Collision system.
+        selected_train_numbers: Use only a selection of train numbers. Default: None. All train numbers are
+            taken from the config.
+    Returns:
+        List of `AppFuture` created when defining the jobs.
+    """
+    # Validation
+    if selected_train_numbers is None:
+        selected_train_numbers = []
+
+    # Setup
+    results = []
+    dataset_config = read_config(collision_system=collision_system)
+    tree_name = dataset_config["tree_name"]
+    filenames = helpers.expand_wildcards_in_filenames(dataset_config["files"])
+    logger.info(f"Repairing files from dataset {dataset_config['name']}")
+
+    for filename in filenames:
+        # Setup file IO
+        parsl_input_file = File(str(filename))
+        output_filename = filename.with_name(f"{filename.stem}.repaired.root")
+        parsl_output_file = File(str(output_filename))
+
+        results.append(_repair_root_files(
+            tree_name=tree_name,
+            inputs=[parsl_input_file],
+            outputs=[parsl_output_file],
+        ))
+
+    return results
+
+
 def _determine_number_of_entries_per_file(filenames: Sequence[Path], tree_name: str) -> Dict[Path, int]:
     """ Retrieve the number of tree entries per ROOT file.
 
@@ -476,12 +529,14 @@ def setup_calculate_data_skim(
 if __name__ == "__main__":
     # Settings
     collision_system = "PbPb"
+    use_root = False
     entries_per_job = int(1e5)
 
     # Setup parsl
     setup_parsl_587(
         nodes_to_allocate=9,
         jobs_per_node=2,
+        use_root=use_root,
     )
 
     # Setup logging. By doing it after parsl, we're able to keep it much quieter.
@@ -492,6 +547,9 @@ if __name__ == "__main__":
     logging.getLogger("parsl").setLevel(logging.WARNING)
 
     results = []
+    # results = setup_repair_root_files(
+    #     collision_system=collision_system,
+    # )
     # results = setup_convert_to_parquet(
     #     collision_system=collision_system,
     #     entries_per_job=entries_per_job,
