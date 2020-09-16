@@ -113,7 +113,7 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
                     # when others are running to avoid running out of memory.
                     exclusive=True,
                     # Format: HH:MM:SS, so we request one hour
-                    walltime="01:00:00",
+                    walltime="01:30:00",
                     # pc051 has too much in swap right now to be useful, so let's just skip and avoid the problems.
                     # pc147 also struggles and we don't want that to come down because it's one of the ceph quorum machines...
                     # pc075 also has high swap right now...
