@@ -755,7 +755,7 @@ def calculate_embedding_skim(  # noqa: C901
             # Add jet pt and general jet properties.
             # Jet kinematics
             grooming_results[f"{prefix}_jet_pt"] = input_jets.jets.jet_pt
-            grooming_results[f"{prefix}_jet_eta"], grooming_results[f"{prefix}_jet_phi"] = _calculate_jet_kinematics(input_jets.jet_constituents)
+            grooming_results[f"{prefix}_jet_eta"], grooming_results[f"{prefix}_jet_phi"] = _calculate_jet_kinematics(input_jets.jets.jet_constituents)
             # Leading track
             grooming_results[f"{prefix}_leading_track_pt"] = ak.max(input_jets.jets.jet_constituents.pt, axis=1)
 
