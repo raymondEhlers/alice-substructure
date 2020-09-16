@@ -6,6 +6,7 @@
 """
 
 import logging
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
@@ -82,7 +83,8 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
     if use_root:
         slurm_kwargs.update(
             dict(
-                worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv AliPhysics/latest`",
+                #worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv AliPhysics/latest`",
+                worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv ROOT/latest`",
             )
         )
 
@@ -173,6 +175,8 @@ def setup_repair_root_files(
     tree_name = dataset_config["tree_name"]
     filenames = helpers.expand_wildcards_in_filenames(dataset_config["files"])
     logger.info(f"Repairing files from dataset {dataset_config['name']}")
+    if selected_train_numbers:
+        filenames = [f for f in filenames if int(f.parent.name) in selected_train_numbers]
 
     for filename in filenames:
         # Setup file IO
@@ -420,6 +424,8 @@ def setup_calculate_embedding_skim(
         iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
         # Setup file I/O
         output_dir = train_directory / "skim"
+        if not output_dir.exists():
+            output_dir.mkdir(parents=True, exist_ok=True)
         output_filename = output_dir / f"{Path(parsl_input_file.filepath).stem}_{iterative_splittings_label}_splittings.root"
         parsl_output_file = File(str(output_filename))
 
@@ -510,6 +516,8 @@ def setup_calculate_data_skim(
         iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
         # Setup file I/O
         output_dir = train_directory / "skim"
+        if not output_dir.exists():
+            output_dir.mkdir(parents=True, exist_ok=True)
         output_filename = output_dir / f"{Path(parsl_input_file.filepath).stem}_{iterative_splittings_label}_splittings.root"
         parsl_output_file = File(str(output_filename))
 
@@ -526,17 +534,113 @@ def setup_calculate_data_skim(
     return results
 
 
+@python_app
+def _root_data_frame(collision_system: str, tree_name: str, prefixes: Sequence[str], grooming_method: str, jet_R: float, n_cores: int,
+                     inputs: Optional[Sequence[File]] = [], outputs: Optional[Sequence[File]] = []) -> AppFuture:
+    """ ROOT data frame app. """
+    from pathlib import Path
+    from jet_substructure.cpp import data_frame
+
+    res = data_frame.run(
+        collision_system=collision_system,
+        input_filenames=[Path(f.filepath) for f in inputs],
+        tree_name=tree_name,
+        prefixes=prefixes,
+        grooming_method=grooming_method,
+        jet_R=jet_R,
+        output_filename=Path(outputs[0].filepath),
+        jet_pt_prefix_first=True,
+        n_cores=n_cores,
+    )
+
+    return res
+
+
+def setup_root_data_frame(
+    collision_system: str,
+    jobs_per_node: int,
+    selected_train_numbers: Optional[Sequence[int]] = None,
+    input_files: Optional[Sequence[DataFuture]] = None,
+) -> List[AppFuture]:
+
+    # Setup
+    output_dir = Path("output") / collision_system / "RDF" / "Sept2020"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    dataset_config = read_config(collision_system=collision_system)
+    train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
+    prefixes = dataset_config["prefixes"]
+
+    # If input files aren't passed, then we need to determine them ourselves.
+    if input_files is None:
+        logger.info("Determining input files independently.")
+        input_files = []
+        for train_directory in train_directories:
+            # Select train numbers.
+            if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
+                logger.debug(f"Skipping train number {train_directory.name}")
+                continue
+            logger.info(f"Processing train number {train_directory.name}")
+
+            # Then iterate over the directories.
+            for filename in Path(f"{train_directory}/skim/").glob("*.root"):
+                input_files.append(File(str(filename)))
+
+    logger.info(f"N cores per job: {math.floor(8 / jobs_per_node)}")
+    results = []
+    for grooming_method in ["leading_kt", "leading_kt_z_cut_02", "leading_kt_z_cut_04",
+                            "dynamical_z", "dynamical_kt", "dynamical_time",
+                            "soft_drop_z_cut_02", "soft_drop_z_cut_04"]:
+        # Setup file IO
+        output_file = output_dir / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.values())}.root"
+        parsl_output_file = File(str(output_file))
+        results.append(_root_data_frame(
+            collision_system=collision_system,
+            tree_name="tree",
+            prefixes=list(prefixes.values()),
+            grooming_method=grooming_method,
+            jet_R=dataset_config["jet_R"],
+            n_cores=math.floor(8 / jobs_per_node),
+            inputs=input_files,
+            outputs=[parsl_output_file],
+        ))
+
+    return results
+
+
 if __name__ == "__main__":
     # Settings
-    collision_system = "PbPb"
-    use_root = False
+    collision_system = "embedPythia"
+    jobs_to_execute = [
+        "calculate_embedding_skim",
+        #"root_data_frame",
+    ]
     entries_per_job = int(1e5)
+    nodes_to_allocate = 9
+    jobs_per_node = 3
+
+    # Basic setup for jobs
+    _possible_jobs = [
+        "repair_root_files", "convert_to_parquet",
+        "calculate_embedding_skim", "calculate_data_skim",
+        "root_data_frame",
+    ]
+    _jobs_requiring_root = [
+        "repair_root_files",
+        "root_data_frame",
+    ]
+    # Validation
+    for job_name in jobs_to_execute:
+        if job_name not in _possible_jobs:
+            raise RuntimeError(
+                f"Requested to run job {job_name}, but the name is invalid."
+                f" Possible jobs: {_possible_jobs}"
+            )
 
     # Setup parsl
     setup_parsl_587(
-        nodes_to_allocate=9,
-        jobs_per_node=2,
-        use_root=use_root,
+        nodes_to_allocate=nodes_to_allocate,
+        jobs_per_node=jobs_per_node,
+        use_root=any((job in _jobs_requiring_root for job in jobs_to_execute)),
     )
 
     # Setup logging. By doing it after parsl, we're able to keep it much quieter.
@@ -547,24 +651,36 @@ if __name__ == "__main__":
     logging.getLogger("parsl").setLevel(logging.WARNING)
 
     results = []
-    # results = setup_repair_root_files(
-    #     collision_system=collision_system,
-    # )
-    # results = setup_convert_to_parquet(
-    #     collision_system=collision_system,
-    #     entries_per_job=entries_per_job,
-    # )
-    # results = setup_calculate_embedding_skim(
-    #     collision_system=collision_system,
-    #     entries_per_job=entries_per_job,
-    #     selected_train_numbers=list(range(5966, 5967)),
-    #     input_files=[r.outputs[0] for r in results] if results else None,
-    # )
-    # results = setup_calculate_data_skim(
-    #     collision_system=collision_system,
-    #     entries_per_job=entries_per_job,
-    #     input_files=[r.outputs[0] for r in results] if results else None,
-    # )
+    if "repair_root_files" in jobs_to_execute:
+        results = setup_repair_root_files(
+            collision_system=collision_system,
+            selected_train_numbers=list(range(5791, 5792)),
+        )
+    if "convert_to_parquet" in jobs_to_execute:
+        results = setup_convert_to_parquet(
+            collision_system=collision_system,
+            entries_per_job=entries_per_job,
+        )
+    if "calculate_embedding_skim" in jobs_to_execute:
+        results = setup_calculate_embedding_skim(
+            collision_system=collision_system,
+            entries_per_job=entries_per_job,
+            #selected_train_numbers=list(range(5791, 5792)),
+            input_files=[r.outputs[0] for r in results] if results else None,
+        )
+    if "calculate_data_skim" in jobs_to_execute:
+        results = setup_calculate_data_skim(
+            collision_system=collision_system,
+            entries_per_job=entries_per_job,
+            input_files=[r.outputs[0] for r in results] if results else None,
+        )
+    if "root_data_frame" in jobs_to_execute:
+        results = setup_root_data_frame(
+            collision_system=collision_system,
+            jobs_per_node=jobs_per_node,
+            #selected_train_numbers=list(range(5791, 5792)),
+            input_files=[r.outputs[0] for r in results] if results else None,
+        )
 
     logger.info(f"About to ask for result. len: {len(results)}")
     # Wait on results
