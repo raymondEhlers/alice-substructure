@@ -202,7 +202,7 @@ def calculate_splitting_number(
     debug: bool = False,
 ) -> np.ndarray:
     # TODO: Optimize the data sizes...
-    output = np.zeros(len(selected_splittings), np.int16)
+    output = np.zeros(len(selected_splittings), np.int8)
 
     for i, (selected_splitting, restricted_splitting_indices, available_splittings_parents) in enumerate(
         zip(selected_splittings, restricted_splittings_indices, all_splittings.parent_index)
@@ -348,8 +348,8 @@ def _subjet_shared_momentum(
     measured_like_jet,
     match_using_distance: bool = False,
 ):
-    delta = 0.01
     sum_pt = 0
+    delta = new_methods.DISTANCE_DELTA
 
     for generator_like_constituent_index in generator_like_subjet.constituent_indices:
         generator_like_constituent = generator_like_jet.jet_constituents[generator_like_constituent_index]
@@ -417,7 +417,7 @@ def determine_matched_jets_numba(
     measured_like_groomed_values,
     measured_like_groomed_indices,
     match_using_distance: bool,
-) -> Dict[str, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray]:
     n_jets = len(measured_like_jets)
     leading_matching = np.ones(n_jets, dtype=np.int16) * -1
     subleading_matching = np.ones(n_jets, dtype=np.int16) * -1
@@ -448,7 +448,7 @@ def determine_matched_jets_numba(
     ):
         # Find the selected index if it's available.
         if len(measured_like_groomed_index_array) > 0 and len(generator_like_groomed_index_array) > 0:
-            # This is required. If we not, we handle the other cases and continue.
+            # This is required. If not, we handle the other cases and continue.
             pass
         elif len(measured_like_groomed_index_array) > 0:
             # Assign 0 for this case and move on.
@@ -544,7 +544,7 @@ def prong_matching_numba_wrapper(
 
     # Matching
     grooming_results = {}
-    logger.info(f"Performing {measured_like_jets_label}-{generator_like_jets_label} matching for {grooming_method}")
+    logger.debug(f"Performing {measured_like_jets_label}-{generator_like_jets_label} matching for {grooming_method}")
     leading_matching, subleading_matching = determine_matched_jets_numba(
         generator_like_jets=generator_like_jets_calculation.input_jets,
         generator_like_splittings=generator_like_jets_calculation.input_splittings,
@@ -574,6 +574,133 @@ def prong_matching_numba_wrapper(
         grooming_results[
             f"{grooming_method}_{measured_like_jets_label}_{generator_like_jets_label}_matching_{label}"
         ] = matching
+
+    return grooming_results
+
+
+@nb.njit
+def _subjet_momentum_fraction_in_jet(
+    generator_like_subjet,
+    generator_like_jet,
+    measured_like_jet,
+    match_using_distance: bool = False,
+):
+    """ Calculate subjet momentum fraction contained within another jet.
+
+    Unfortunately, we can't blindly use the `_subjet_shared_momentum` function because
+    the interfaces vary between jet constituents and subjet constituents. We could refactor them,
+    but the code is simple enough that it's easier just to implement the different versions.
+    """
+    sum_pt = 0
+    delta = new_methods.DISTANCE_DELTA
+
+    for generator_like_constituent_index in generator_like_subjet.constituent_indices:
+        generator_like_constituent = generator_like_jet.jet_constituents[generator_like_constituent_index]
+        for measured_like_constituent in measured_like_jet.jet_constituents:
+            if match_using_distance:
+                if np.abs(measured_like_constituent.eta - generator_like_constituent.eta) > delta:
+                    continue
+                if np.abs(measured_like_constituent.phi - generator_like_constituent.phi) > delta:
+                    continue
+            else:
+                if generator_like_constituent.id != measured_like_constituent.id:
+                    continue
+
+            sum_pt += generator_like_constituent.pt
+            # We've matched once - no need to match again.
+            # Otherwise, the run the risk of summing a generator-like constituent pt twice.
+            break
+
+    return sum_pt / subjet_pt(generator_like_subjet, generator_like_jet)
+
+
+@nb.njit
+def generator_subjet_momentum_fraction_in_measured_jet_numba(
+    generator_like_jets,
+    generator_like_splittings,
+    generator_like_groomed_indices,
+    measured_like_jets,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """ Determine the generator-like subjet momentum fraction stored in a measured-like jet.
+
+    Note:
+        This isn't looking at the measured-like subjet. It's about finding where subjets go,
+        especially for those which aren't matched at the subjet level (they of course must have
+        matched at the overall jet level).
+    """
+    n_jets = len(measured_like_jets)
+    leading_momentum_fraction = np.zeros(n_jets, dtype=np.float32)
+    subleading_momentum_fraction = np.zeros(n_jets, dtype=np.float32)
+
+    for (
+        i,
+        (
+            generator_like_jet,
+            generator_like_splitting,
+            generator_like_groomed_index_array,
+            measured_like_jet,
+        ),
+    ) in enumerate(
+        zip(
+            generator_like_jets,
+            generator_like_splittings,
+            generator_like_groomed_indices,
+            measured_like_jets,
+        )
+    ):
+        # Find the selected index if it's available.
+        if len(generator_like_groomed_index_array) > 0:
+            # This is required. Otherwise, we just skip case.
+            pass
+        else:
+            # Use the default values and continue
+            continue
+
+        # Retrieve the generator like subjet.
+        # We know each one will have only one entry because it's from an argmax call, so we extract it.
+        generator_like_groomed_index = generator_like_groomed_index_array[0]
+        # Find the contributing subjets
+        generator_like_subjets = _find_contributing_subjets(generator_like_jet, generator_like_groomed_index)
+        # Sort
+        generator_like_leading, generator_like_subleading = _sort_subjets(generator_like_jet, generator_like_subjets)
+
+        leading_momentum_fraction[i] = _subjet_momentum_fraction_in_jet(
+            generator_like_subjet=generator_like_leading,
+            generator_like_jet=generator_like_jet,
+            measured_like_jet=measured_like_jet,
+        )
+        subleading_momentum_fraction[i] = _subjet_momentum_fraction_in_jet(
+            generator_like_subjet=generator_like_subleading,
+            generator_like_jet=generator_like_jet,
+            measured_like_jet=measured_like_jet,
+        )
+
+    return leading_momentum_fraction, subleading_momentum_fraction
+
+
+def generator_subjet_momentum_fraction_in_measured_jet_numba_wrapper(
+    measured_like_jets_calculation: Calculation,
+    measured_like_jets_label: str,
+    generator_like_jets_calculation: Calculation,
+    generator_like_jets_label: str,
+    grooming_method: str,
+) -> Dict[str, np.ndarray]:
+    grooming_results = {}
+
+    leading_momentum_fraction, subleading_momentum_fraction = generator_subjet_momentum_fraction_in_measured_jet_numba(
+        generator_like_jets=generator_like_jets_calculation.input_jets,
+        generator_like_splittings=generator_like_jets_calculation.input_splittings,
+        generator_like_groomed_indices=generator_like_jets_calculation.indices,
+        measured_like_jets=measured_like_jets_calculation.input_jets,
+    )
+
+    for label, momentum_fraction in [("leading", leading_momentum_fraction), ("subleading", subleading_momentum_fraction)]:
+        # groomingMethod + "_hybrid_det_level_matching_leading_pt_fraction_in_hybrid_jet"
+        # NOTE: This is different than the name in the hardest kt cross check task. Since I had more time to think about it,
+        #       this name makes more sense to me.
+        grooming_results[
+            f"{grooming_method}_{generator_like_jets_label}_{label}_subjet_momentum_fraction_in_{measured_like_jets_label}_jet"
+        ] = momentum_fraction
 
     return grooming_results
 
@@ -783,7 +910,7 @@ def calculate_embedding_skim(  # noqa: C901
                     # Need all splitting indices (unrestricted by any possible grooming selections).
                     restricted_splittings_indices=calculation.input_splittings_indices,
                 )
-                logger.debug("Done with first splitting calculation")
+                logger.debug(f"Done with first splitting calculation, {prefix}")
                 # Number of splittings which pass the grooming conditions until the selected splitting.
                 n_groomed_to_split = calculate_splitting_number(
                     all_splittings=calculation.input_jets.jet_splittings,
@@ -792,7 +919,7 @@ def calculate_embedding_skim(  # noqa: C901
                     restricted_splittings_indices=calculation.possible_indices,
                     debug=False,
                 )
-                logger.debug("Done with second splitting calculation")
+                logger.debug(f"Done with second splitting calculation, {prefix}")
 
                 # We pad with the UNFILLED_VALUE constant to account for any calculations that don't find a splitting.
                 grooming_result = GroomingResultForTree(
@@ -837,6 +964,17 @@ def calculate_embedding_skim(  # noqa: C901
             )
             grooming_results.update(det_level_true_matching_results)
             logger.debug("Done with second prong matching")
+            # Subjet momentum fraction in hybrid
+            grooming_results.update(
+                generator_subjet_momentum_fraction_in_measured_jet_numba_wrapper(
+                    measured_like_jets_calculation=calculations[prefixes["data"]],
+                    measured_like_jets_label=prefixes["data"],
+                    generator_like_jets_calculation=calculations[prefixes["detLevel"]],
+                    generator_like_jets_label=prefixes["detLevel"],
+                    grooming_method=func_name,
+                )
+            )
+            logger.debug("Done with det level subjet momentum fraction in hybrid jets")
 
             # Look for leading kt just because it's easier to understand conceptually.
             hybrid_det_level_leading_matching = grooming_results[f"{func_name}_{prefixes['data']}_{prefixes['detLevel']}_matching_leading"]
@@ -888,6 +1026,8 @@ def calculate_embedding_skim(  # noqa: C901
 
     # Convert to numpy since we want to write to an output tree.
     grooming_results_np = {k: ak.to_numpy(v) for k, v in grooming_results.items()}
+    # For extra safety
+    output_filename.parent.mkdir(parents=True, exist_ok=True)
     # Write with uproot
     branches = {k: v.dtype for k, v in grooming_results_np.items()}
     logger.info(f"Writing embedding skim to {output_filename}")
@@ -1043,23 +1183,23 @@ if __name__ == "__main__":
     # An example for testing...
     from jet_substructure.base import helpers
     helpers.setup_logging()
-    #calculate_embedding_skim(
-    #    input_filename=Path("trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"),
-    #    iterative_splittings=True,
-    #    prefixes={"matched": "true", "detLevel": "det_level", "data": "hybrid"},
-    #    scale_factors={1: 1},
-    #    train_directory=Path("trains/embedPythia/5966/"),
-    #    jet_R=0.4,
-    #    output_filename=Path("trains/embedPythia/5966/skim/AnalysisResults.18q.repaired.00_iterative_splittings.root")
-    #)
-    collision_system = "PbPb"
-    train_number = 5863
-    calculate_data_skim(
-        input_filename=Path(f"trains/{collision_system}/{train_number}/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"),
-        collision_system=collision_system,
+    calculate_embedding_skim(
+        input_filename=Path("trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"),
         iterative_splittings=True,
-        prefixes={"data": "data"},
+        prefixes={"matched": "true", "detLevel": "det_level", "data": "hybrid"},
+        scale_factors={1: 1},
+        train_directory=Path("trains/embedPythia/5966/"),
         jet_R=0.4,
-        output_filename=Path(f"trains/{collision_system}/{train_number}/skim/AnalysisResults.18q.repaired.00_iterative_splittings.root")
+        output_filename=Path("trains/embedPythia/5966/skim/test/AnalysisResults.18q.repaired.00_iterative_splittings.root")
     )
+    #collision_system = "PbPb"
+    #train_number = 5863
+    #calculate_data_skim(
+    #    input_filename=Path(f"trains/{collision_system}/{train_number}/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"),
+    #    collision_system=collision_system,
+    #    iterative_splittings=True,
+    #    prefixes={"data": "data"},
+    #    jet_R=0.4,
+    #    output_filename=Path(f"trains/{collision_system}/{train_number}/skim/AnalysisResults.18q.repaired.00_iterative_splittings.root")
+    #)
     # import IPython; IPython.start_ipython(user_ns=locals())

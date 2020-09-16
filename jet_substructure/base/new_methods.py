@@ -32,6 +32,7 @@ _T = TypeVar("_T")
 # Constants
 # This value corresponds to an unidentified splitting.
 UNFILLED_VALUE: Final[float] = -0.005
+DISTANCE_DELTA: Final[float] = 0.01
 
 
 @typing.overload
