@@ -416,10 +416,10 @@ def setup_calculate_embedding_skim(
 
             # Then iterate over the directories.
             for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
-                input_files.append(File(str(filename)))
+                input_files.append((train_directory, File(str(filename))))
 
     # Create the Apps.
-    for parsl_input_file in input_files:
+    for train_directory, parsl_input_file in input_files:
         # Setup
         iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
         # Setup file I/O
@@ -508,10 +508,10 @@ def setup_calculate_data_skim(
 
             # Then iterate over the directories.
             for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
-                input_files.append(File(str(filename)))
+                input_files.append((train_directory, File(str(filename))))
 
     # Create the Apps.
-    for parsl_input_file in input_files:
+    for train_directory, parsl_input_file in input_files:
         # Setup
         iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
         # Setup file I/O
