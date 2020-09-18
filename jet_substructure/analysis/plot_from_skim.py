@@ -1848,7 +1848,9 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
             # Setup and project
             # Axes: jet_pt, attr_name
             h = _project_and_prepare_grooming_variable_hist(
-                bh_hist=hists_obj.hists[f"{grooming_method}_{hists_obj.prefix}_{attr_name}"],
+                bh_hist=hists_obj.hists[
+                    f"{grooming_method}_{hists_obj.prefix}_{attr_name}_{jet_pt_bin.histogram_str(hists_obj.prefix)}"
+                ],
                 jet_pt_bin=jet_pt_bin,
                 set_zero_to_nan=set_zero_to_nan,
             )
@@ -1930,8 +1932,7 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
 
 
 def compare_grooming_methods_for_substructure_data_embed_prod(
-    data_hists: Mapping[str, bh.Histogram],
-    embed_hists: Mapping[str, bh.Histogram],
+    hists: Tuple[PlotHists, PlotHists],
     grooming_methods: Sequence[str],
     output_dir: Path,
     rdf_plots: bool = False,
@@ -1939,19 +1940,34 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
 ) -> None:
     """ Compare grooming methods for PbPb vs embedded.
 
+    Note:
+        The name says data vs embed production because that's what the spacing is tuned for.
+        However, it can work for other combinations. Just don't update the spacing for them.
+
+    Args:
+        hists: PlotHists for the two hist classes to compare.
+        grooming_methods: Grooming methods to used in the comparisons.
+        output_dir: Output directory.
+        rdf_plots: If True, we're using RDF plots. Adjust accordingly.
+        plot_png: If True, plot png in addition to pdf.
+    Returns:
+        None.
     """
     jet_pt_bin = helpers.RangeSelector(min=40, max=120)
     text = "Iterative splittings"
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     text_high_kt = text + "\n" + r"$k_{\text{T}} > 10\:\text{GeV}/c$"
 
-    hists = [
-        PlotHists(hists=data_hists, prefix="data", identifier="PbPb", display_label="Pb--Pb",),
-        # For the standard skim (probably to be adapted).
-        PlotHists(hists=embed_hists, prefix="hybrid", identifier="hybrid", display_label="Hybrid",),
-        # For the RDF skim
-        # PlotHists(hists=embed_hists, prefix="data", identifier="hybrid", display_label="Hybrid",),
-    ]
+    # Normal data vs embed
+    # This basically documents the default hist options that should be passed here.
+    # hists = [
+    #    PlotHists(hists=data_hists, prefix="data", identifier="PbPb", display_label="Pb--Pb",),
+    #    # For the standard skim (probably to be adapted).
+    #    PlotHists(hists=embed_hists, prefix="hybrid", identifier="hybrid", display_label="Hybrid",),
+    #    # For the RDF skim
+    #    # PlotHists(hists=embed_hists, prefix="data", identifier="hybrid", display_label="Hybrid",),
+    # ]
+    ratio_label = f"{hists[0].display_label}/{hists[1].display_label}"
     for grooming_method in grooming_methods:
         _plot_compare_grooming_methods_for_attribute_data_embed(
             hists=hists,
@@ -1976,7 +1992,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     Panel(
                         axes=[
                             AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
-                            AxisConfig("y", label="Pb--Pb/Hybrid", range=(-0.2, 4)),
+                            AxisConfig("y", label=ratio_label, range=(-0.2, 4)),
                         ]
                     ),
                 ],
@@ -2008,10 +2024,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     ),
                     # Ratio.
                     Panel(
-                        axes=[
-                            AxisConfig("x", label=r"$\Delta R$"),
-                            AxisConfig("y", label="Pb--Pb/Hybrid", range=(0, 2)),
-                        ]
+                        axes=[AxisConfig("x", label=r"$\Delta R$"), AxisConfig("y", label=ratio_label, range=(0, 2))]
                     ),
                 ],
             ),
@@ -2038,7 +2051,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     Panel(
                         axes=[
                             AxisConfig("x", label=r"$z$", range=(0, 0.51)),
-                            AxisConfig("y", label="Pb--Pb/Hybrid", range=(0.5, 1.5)),
+                            AxisConfig("y", label=ratio_label, range=(0.5, 1.5)),
                         ]
                     ),
                 ],
@@ -2064,7 +2077,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                         legend=LegendConfig(location="upper right", anchor=(0.96, 0.79)),
                     ),
                     # Ratio.
-                    Panel(axes=[AxisConfig("x", label=r"$n_{\text{split}}$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
+                    Panel(axes=[AxisConfig("x", label=r"$n_{\text{split}}$"), AxisConfig("y", label=ratio_label)]),
                 ],
                 figure=Figure(edge_padding={"left": 0.12}),
             ),
@@ -2093,7 +2106,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     Panel(
                         axes=[
                             AxisConfig("x", label=r"$n_{\text{groomed,split}}$", range=(-0.9, 10)),
-                            AxisConfig("y", label="Pb--Pb/Hybrid"),
+                            AxisConfig("y", label=ratio_label),
                         ]
                     ),
                 ],
@@ -2123,7 +2136,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     Panel(
                         axes=[
                             AxisConfig("x", label=r"$n_{\text{passed grooming}}$"),
-                            AxisConfig("y", label="Pb--Pb/Hybrid"),
+                            AxisConfig("y", label=ratio_label),
                         ]
                     ),
                 ],
@@ -2161,7 +2174,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     Panel(
                         axes=[
                             AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
-                            AxisConfig("y", label="Pb--Pb/Hybrid", range=(-0.2, 9.9)),
+                            AxisConfig("y", label=ratio_label, range=(-0.2, 9.9)),
                         ]
                     ),
                 ],
@@ -2197,7 +2210,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     Panel(
                         axes=[
                             AxisConfig("x", label=r"$\Delta R$", range=(0, 0.41)),
-                            AxisConfig("y", label="Pb--Pb/Hybrid"),
+                            AxisConfig("y", label=ratio_label),
                         ]
                     ),
                 ],
@@ -2223,9 +2236,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                         legend=LegendConfig(location="upper left", anchor=(0.02, 0.73)),
                     ),
                     # Ratio.
-                    Panel(
-                        axes=[AxisConfig("x", label=r"$z$", range=(0, 0.51)), AxisConfig("y", label="Pb--Pb/Hybrid")]
-                    ),
+                    Panel(axes=[AxisConfig("x", label=r"$z$", range=(0, 0.51)), AxisConfig("y", label=ratio_label)]),
                 ],
             ),
             output_dir=output_dir,
@@ -2248,7 +2259,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                         legend=LegendConfig(location="upper right", anchor=(0.96, 0.73)),
                     ),
                     # Ratio.
-                    Panel(axes=[AxisConfig("x", label=r"$n$"), AxisConfig("y", label="Pb--Pb/Hybrid")]),
+                    Panel(axes=[AxisConfig("x", label=r"$n$"), AxisConfig("y", label=ratio_label)]),
                 ],
             ),
             output_dir=output_dir,

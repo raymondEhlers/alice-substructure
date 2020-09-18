@@ -246,6 +246,11 @@ class RangeSelector:
     def __str__(self) -> str:
         return f"jetPt_{self.min}_{self.max}"
 
+    def histogram_str(self, label: str = "") -> str:
+        if label:
+            label = f"_{label}"
+        return fr"jet_pt{label}_{self.min}_{self.max}"
+
     def display_str(self, label: str = "") -> str:
         return fr"{self.min} < p_{{\text{{T,ch jet}}}}^{{\text{{{label}}}}} < {self.max}"
 
