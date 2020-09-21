@@ -25,6 +25,8 @@ def matching_hists(  # noqa: C901
     grooming_method: str,
     hist_suffix: str,
     general_selection: str,
+    #measured_like_prefix: str,
+    #generator_like_prefix: str,
     matching_level: str = "hybrid_det_level",
     det_level_axis: Optional[Tuple[int, float, float]] = None,
     create_subjet_in_hybrid_hists: bool = False,
@@ -72,7 +74,7 @@ def matching_hists(  # noqa: C901
         name = f"{grooming_method}_{matching_level}_matching_{matching_type}"
         if hist_suffix:
             name += f"_{hist_suffix}"
-        h_matching = df_selection.Histo1D((name, name, *det_level_axis), "jet_pt_det_level", "scale_factor",)
+        h_matching = df_selection.Histo1D((name, name, *det_level_axis), "det_level_jet_pt", "scale_factor",)
         hists.append(h_matching)
         # Hybrid-true
         name = f"{grooming_method}_hybrid_true_kt_response_{matching_level}_matching_type_{matching_type}"
@@ -99,16 +101,16 @@ def matching_hists(  # noqa: C901
             hists.append(kt_hybrid_det_level_response)
 
             # Does the subjet stay in the hybrid jet?
-            #if create_subjet_in_hybrid_hists:
-            # TODO: Fix this...
-            if False:
+            if create_subjet_in_hybrid_hists:
                 for subjet_name in ["leading", "subleading"]:
-                    name = f"{grooming_method}_{matching_level}_matching_{subjet_name}_pt_fraction_in_hybrid_{matching_type}"
+                    name = f"{grooming_method}_{matching_level}_matching_{subjet_name}_subjet_pt_fraction_in_hybrid_{matching_type}"
                     if hist_suffix:
                         name += f"_{hist_suffix}"
                     h_subjet_pt_fraction = df_selection.Histo1D(
                         (name, name, 50, 0, 1,),
-                        f"{grooming_method}_{matching_level}_matching_{subjet_name}_pt_fraction_in_hybrid_jet",
+                        #f"{grooming_method}_{matching_level}_matching_{subjet_name}_pt_fraction_in_hybrid_jet",
+                        # TODO: Generalize this labeling.
+                        f"{grooming_method}_det_level_{subjet_name}_subjet_momentum_fraction_in_hybrid_jet",
                         "scale_factor",
                     )
                     hists.append(h_subjet_pt_fraction)
@@ -226,6 +228,253 @@ def _substructure_hists(
     return hists
 
 
+def run_response(
+    collision_system: str,
+    input_filenames: Sequence[Path],
+    tree_name: str,
+    prefixes: Sequence[str],
+    grooming_method: str,
+    jet_R: float,
+    output_filename: Path,
+    jet_pt_prefix_first: bool = False,
+    n_cores: int = 8
+) -> bool:
+    # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
+
+    # Delay ROOT import so we don't explicitly rely on it.
+    import ROOT
+
+    # Setup for ROOT
+    # Enable multithreading
+    ROOT.ROOT.EnableImplicitMT(n_cores)
+    # Sumw2
+    ROOT.TH1.SetDefaultSumw2(True)
+
+    # Parameters
+    jet_pt_column_format = "jet_pt_{prefix}"
+    if jet_pt_prefix_first:
+        jet_pt_column_format = "{prefix}_jet_pt"
+
+    # Setup tree
+    main_tree = ROOT.TChain(tree_name)
+    for filename in input_filenames:
+        main_tree.Add(str(filename))
+    #if collision_system == "embedPythia":
+    if False:
+        friend_tree = ROOT.TChain("tree")
+        for filename in input_filenames:
+            friend_tree.Add(str(filename.parent / "scale_factor" / filename.name))
+        # Add friends with scale factors
+        main_tree.AddFriend(friend_tree)
+
+    df_original = ROOT.RDataFrame(main_tree)
+    # df = ROOT.RDataFrame("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl", "")
+
+    # Add scale factor column with 1s if it doesn't exist yet.
+    if "scale_factor" not in df_original.GetColumnNames():
+        logger.info("Defining scale_factor column")
+        df_original = df_original.Define("scale_factor", "1")
+
+    # Apply general cuts.
+    # Double counting must be applied for embedding.
+    if collision_system == "embedPythia":
+        double_counting_cut = "det_level_leading_track_pt >= hybrid_leading_track_pt"
+        df_original = df_original.Filter(double_counting_cut)
+        smeared_cut_prefix = "hybrid"
+    else:
+        smeared_cut_prefix = "data"
+
+    # For the substructure variables, we also apply a jet pt cut at the measured level (ie. data or hybrid).
+    jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= 40 && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < 120"
+    df_measured_selections = df_original.Filter(jet_pt_cut)
+
+    hists = []
+    jet_pt_axis = (28, 0, 140)
+    # Responses
+    # General responses.
+    # Hybrid-det level
+    df = df_measured_selections
+    kt_hybrid_det_level_response = df.Histo2D(
+        (
+            f"{grooming_method}_hybrid_det_level_kt_response",
+            f"{grooming_method}_hybrid_det_level_kt_response",
+            26,
+            -1,
+            25,
+            26,
+            -1,
+            25,
+        ),
+        f"{grooming_method}_hybrid_kt",
+        f"{grooming_method}_det_level_kt",
+        "scale_factor",
+    )
+    hists.append(kt_hybrid_det_level_response)
+    # Hybrid-true
+    kt_hybrid_true_response = df.Histo2D(
+        (
+            f"{grooming_method}_hybrid_true_kt_response",
+            f"{grooming_method}_hybrid_true_kt_response",
+            26,
+            -1,
+            25,
+            26,
+            -1,
+            25,
+        ),
+        f"{grooming_method}_hybrid_kt",
+        f"{grooming_method}_true_kt",
+        "scale_factor",
+    )
+    hists.append(kt_hybrid_true_response)
+    # Det-level true
+    kt_det_level_true_response = df.Histo2D(
+        (
+            f"{grooming_method}_det_level_true_kt_response",
+            f"{grooming_method}_det_level_true_kt_response",
+            26,
+            -1,
+            25,
+            26,
+            -1,
+            25,
+        ),
+        f"{grooming_method}_det_level_kt",
+        f"{grooming_method}_true_kt",
+        "scale_factor",
+    )
+    hists.append(kt_det_level_true_response)
+
+    # Debug code for the RDF Filtering.
+    # We explicitly require splittings at both the det level and hybrid level.
+    # From here, we require a splitting at det level.
+    # df = df.Filter(f"{grooming_method}_det_level_n_passed_grooming > 0 && {grooming_method}_hybrid_n_passed_grooming > 0")
+    # extra = df.Filter(f"{grooming_method}_hybrid_det_level_matching_leading == 1 && {grooming_method}_hybrid_det_level_matching_subleading == 2").Count()
+    # logger.debug(f"Extra: {extra.GetValue()}")
+
+    # Matrix of possible counts values.
+    # counts = {}
+    # for leading_value in range(-1, 4):
+    #    for subleading_value in range(-1, 4):
+    #        counts[
+    #            f"{grooming_method}_hybrid_det_level_matching_leading == {leading_value}"
+    #            f" && {grooming_method}_hybrid_det_level_matching_subleading == {subleading_value}"
+    #        ] = 0
+    # for selection in counts:
+    #    counts[selection] = df.Filter(selection).Count()
+    ## Get the values:
+    # for selection, values in counts.items():
+    #    logger.info(f"Selection: {selection}: {values.GetValue()}")
+
+    # Matching and matching dependent responses.
+    matching_level_map = {
+        "hybrid_det_level": ("hybrid", "det_level"),
+        "det_level_true": ("det_level", "true"),
+    }
+    for matching_level, (measured_like_label, generator_like_label) in matching_level_map.items():
+        # Base tag
+        tag = f"jet_pt_{smeared_cut_prefix}_40_120"
+
+        # We explicitly require splittings at both the det level (generator-like) and hybrid level (measured-like).
+        # This excludes matching_leading and matching_subleading == 0.
+        df_selection = df.Filter(
+            f"{grooming_method}_{measured_like_label}_n_passed_grooming > 0 && {grooming_method}_{generator_like_label}_n_passed_grooming > 0"
+        )
+        # No selection
+        hists.extend(
+            matching_hists(
+                df=df_selection,
+                grooming_method=grooming_method,
+                hist_suffix=tag,
+                general_selection="",
+                matching_level=matching_level,
+                create_subjet_in_hybrid_hists=True,
+            )
+        )
+        # Kt selections
+        # NOTE: We exclude -1 (as we include in the standard hists case) because it's already handled above.
+        for measured_min_kt in [-1, 2, 3, 5]:
+            # kt == -1 is the cause that includes the untagged. There, we don't want to include any kt tag.
+            selection_tag = tag
+            if measured_min_kt == -1:
+                df = df_selection
+                selection_tag += ""
+            else:
+                df = df_selection.Filter(f"{grooming_method}_{smeared_cut_prefix}_kt > {measured_min_kt}")
+                selection_tag += f"_min_smeared_kt_{measured_min_kt}"
+            hists.extend(
+                matching_hists(
+                    df=df_selection,
+                    grooming_method=grooming_method,
+                    hist_suffix=selection_tag,
+                    general_selection="",
+                    matching_level=matching_level,
+                    create_subjet_in_hybrid_hists=True,
+                )
+            )
+
+        # For now, we skip because it slows down RDF to have more hists...
+        ## n_groomed_to_split > 1
+        # hists.extend(
+        #    matching_hists(
+        #        df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_groomed_to_split_greater_than_1", general_selection = f"{grooming_method}_{measured_like_label}_n_groomed_to_split > 1",
+        #        matching_level=matching_level,
+        #    )
+        # )
+        ## n_groomed_to_split < 2
+        # hists.extend(
+        #    matching_hists(
+        #        df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_groomed_to_split_less_than_2", general_selection = f"{grooming_method}_{measured_like_label}_n_groomed_to_split < 2",
+        #        matching_level=matching_level,
+        #    )
+        # )
+        # n_to_split > 4
+        hists.extend(
+            matching_hists(
+                df=df_selection,
+                grooming_method=grooming_method,
+                hist_suffix=f"{generator_like_label}_n_to_split_greater_than_4",
+                general_selection=f"{grooming_method}_{generator_like_label}_n_to_split > 4",
+                matching_level=matching_level,
+                create_subjet_in_hybrid_hists=True,
+            )
+        )
+        # n_to_split < 3
+        hists.extend(
+            matching_hists(
+                df=df_selection,
+                grooming_method=grooming_method,
+                hist_suffix=f"{generator_like_label}_n_to_split_less_than_3",
+                general_selection=f"{grooming_method}_{generator_like_label}_n_to_split < 3",
+                matching_level=matching_level,
+                create_subjet_in_hybrid_hists=True,
+            )
+        )
+
+    # If we want to save the dot graph. Unfortunately, it won't really be so insightful because we create many branches for the histograms.
+    # ROOT.RDF.SaveGraph(df)
+
+    # Calculate the DataFrame by forcing it determine a property.
+    # Discard the result - we don't really care. We just need a meaningless property.
+    logger.info("Calculating DF...")
+    hists[0].GetEntries()
+
+    logger.info(f"Creating output file for {collision_system}, {grooming_method}, {prefixes}")
+    output = ROOT.TFile(str(output_filename), "RECREATE")
+    output.cd()
+    for h in hists:
+        h.SetDirectory(output)
+        # Why doesn't h.Write() work? Because ROOT. It fucking sucks.
+        # h.Write()
+    output.Write()
+    # output.ls()
+    output.Close()
+
+    logger.info("Done!")
+
+    return True
+
+
 def run(
     collision_system: str,
     input_filenames: Sequence[Path],
@@ -272,7 +521,7 @@ def run(
         df_original = df_original.Define("scale_factor", "1")
 
     # Apply general cuts.
-    # Double couting must be applied for embedding.
+    # Double counting must be applied for embedding.
     if collision_system == "embedPythia":
         double_counting_cut = "det_level_leading_track_pt >= hybrid_leading_track_pt"
         df_original = df_original.Filter(double_counting_cut)
@@ -310,83 +559,6 @@ def run(
                 )
             )
 
-            # Apply no additional pt cuts beyond those above, but plot against the relevant jet pt.
-            jet_pt_column = jet_pt_column_format.format(prefix=prefix)
-
-            kt = df.Histo2D(
-                (f"{grooming_method}_{prefix}_kt{tag}", f"{grooming_method}_{prefix}_kt{tag}", *jet_pt_axis, 26, -1, 25),
-                jet_pt_column,
-                f"{grooming_method}_{prefix}_kt",
-                "scale_factor",
-            )
-            hists.append(kt)
-            delta_R = df.Histo2D(
-                (f"{grooming_method}_{prefix}_delta_R{tag}", f"{grooming_method}_{prefix}_delta_R{tag}", *jet_pt_axis, 21, -0.02, jet_R),
-                jet_pt_column,
-                f"{grooming_method}_{prefix}_delta_R",
-                "scale_factor",
-            )
-            hists.append(delta_R)
-            z = df.Histo2D(
-                (f"{grooming_method}_{prefix}_z{tag}", f"{grooming_method}_{prefix}_z{tag}", *jet_pt_axis, 21, -0.025, 0.5),
-                jet_pt_column,
-                f"{grooming_method}_{prefix}_z",
-                "scale_factor",
-            )
-            hists.append(z)
-            n_to_split = df.Histo2D(
-                (
-                    f"{grooming_method}_{prefix}_n_to_split{tag}",
-                    f"{grooming_method}_{prefix}_n_to_split{tag}",
-                    *jet_pt_axis,
-                    10,
-                    -0.5,
-                    9.5,
-                ),
-                jet_pt_column,
-                f"{grooming_method}_{prefix}_n_to_split",
-                "scale_factor",
-            )
-            hists.append(n_to_split)
-            n_groomed_to_split = df.Histo2D(
-                (
-                    f"{grooming_method}_{prefix}_n_groomed_to_split{tag}",
-                    f"{grooming_method}_{prefix}_n_groomed_to_split{tag}",
-                    *jet_pt_axis,
-                    10,
-                    -0.5,
-                    9.5,
-                ),
-                jet_pt_column,
-                f"{grooming_method}_{prefix}_n_groomed_to_split",
-                "scale_factor",
-            )
-            hists.append(n_groomed_to_split)
-            n_passed_grooming = df.Histo2D(
-                (
-                    f"{grooming_method}_{prefix}_n_passed_grooming{tag}",
-                    f"{grooming_method}_{prefix}_n_passed_grooming{tag}",
-                    *jet_pt_axis,
-                    10,
-                    -0.5,
-                    9.5,
-                ),
-                jet_pt_column,
-                f"{grooming_method}_{prefix}_n_passed_grooming",
-                "scale_factor",
-            )
-            hists.append(n_passed_grooming)
-            df_lund_plane = df.Define("lund_plane_x_axis", f"log(1.0 / {grooming_method}_{prefix}_delta_R)").Define(
-                f"{grooming_method}_{prefix}_log_kt", f"log({grooming_method}_{prefix}_kt)"
-            )
-            lund_plane = df_lund_plane.Histo2D(
-                (f"{grooming_method}_{prefix}_lund_plane{tag}", f"{grooming_method}_{prefix}_lund_plane{tag}", 100, 0, 5, 100, -5.0, 5.0),
-                "lund_plane_x_axis",
-                f"{grooming_method}_{prefix}_log_kt",
-                "scale_factor",
-            )
-            hists.append(lund_plane)
-
     # Some more specialized substructure variables.
     if collision_system == "embedPythia":
         # Plot all substructure variables, but instead with a constant generator level pt cut.
@@ -406,147 +578,14 @@ def run(
                 jet_pt_prefix="true",
             ))
 
-    # Responses
-    #if collision_system == "embedPythia":
-    if False:
-        # General responses.
-        # Hybrid-det level
-        kt_hybrid_det_level_response = df.Histo2D(
-            (
-                f"{grooming_method}_hybrid_det_level_kt_response",
-                f"{grooming_method}_hybrid_det_level_kt_response",
-                26,
-                -1,
-                25,
-                26,
-                -1,
-                25,
-            ),
-            f"{grooming_method}_hybrid_kt",
-            f"{grooming_method}_det_level_kt",
-            "scale_factor",
-        )
-        hists.append(kt_hybrid_det_level_response)
-        # Hybrid-true
-        kt_hybrid_true_response = df.Histo2D(
-            (
-                f"{grooming_method}_hybrid_true_kt_response",
-                f"{grooming_method}_hybrid_true_kt_response",
-                26,
-                -1,
-                25,
-                26,
-                -1,
-                25,
-            ),
-            f"{grooming_method}_hybrid_kt",
-            f"{grooming_method}_true_kt",
-            "scale_factor",
-        )
-        hists.append(kt_hybrid_true_response)
-        # Det-level true
-        kt_det_level_true_response = df.Histo2D(
-            (
-                f"{grooming_method}_det_level_true_kt_response",
-                f"{grooming_method}_det_level_true_kt_response",
-                26,
-                -1,
-                25,
-                26,
-                -1,
-                25,
-            ),
-            f"{grooming_method}_det_level_kt",
-            f"{grooming_method}_true_kt",
-            "scale_factor",
-        )
-        hists.append(kt_det_level_true_response)
-
-        # Debug code for the RDF Filtering.
-        # We explicitly require splittings at both the det level and hybrid level.
-        # From here, we require a splitting at det level.
-        # df = df.Filter(f"{grooming_method}_det_level_n_passed_grooming > 0 && {grooming_method}_hybrid_n_passed_grooming > 0")
-        # extra = df.Filter(f"{grooming_method}_hybrid_det_level_matching_leading == 1 && {grooming_method}_hybrid_det_level_matching_subleading == 2").Count()
-        # logger.debug(f"Extra: {extra.GetValue()}")
-
-        # Matrix of possible counts values.
-        # counts = {}
-        # for leading_value in range(-1, 4):
-        #    for subleading_value in range(-1, 4):
-        #        counts[
-        #            f"{grooming_method}_hybrid_det_level_matching_leading == {leading_value}"
-        #            f" && {grooming_method}_hybrid_det_level_matching_subleading == {subleading_value}"
-        #        ] = 0
-        # for selection in counts:
-        #    counts[selection] = df.Filter(selection).Count()
-        ## Get the values:
-        # for selection, values in counts.items():
-        #    logger.info(f"Selection: {selection}: {values.GetValue()}")
-
-        # Matching and matching dependent responses.
-        matching_level_map = {
-            "hybrid_det_level": ("hybrid", "det_level"),
-            "det_level_true": ("det_level", "true"),
-        }
-        for matching_level, (measured_like_label, generator_like_label) in matching_level_map.items():
-            # We explicitly require splittings at both the det level (generator-like) and hybrid level (measured-like).
-            # This excludes matching_leading and matching_subleading == 0.
-            df_selection = df.Filter(
-                f"{grooming_method}_{measured_like_label}_n_passed_grooming > 0 && {grooming_method}_{generator_like_label}_n_passed_grooming > 0"
-            )
-            # No selection
-            hists.extend(
-                matching_hists(
-                    df=df_selection,
-                    grooming_method=grooming_method,
-                    hist_suffix="",
-                    general_selection="",
-                    matching_level=matching_level,
-                    create_subjet_in_hybrid_hists=True,
-                )
-            )
-            # For now, we skip because it slows down RDF to have more hists...
-            ## n_groomed_to_split > 1
-            # hists.extend(
-            #    matching_hists(
-            #        df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_groomed_to_split_greater_than_1", general_selection = f"{grooming_method}_{measured_like_label}_n_groomed_to_split > 1",
-            #        matching_level=matching_level,
-            #    )
-            # )
-            ## n_groomed_to_split < 2
-            # hists.extend(
-            #    matching_hists(
-            #        df=df_selection, grooming_method=grooming_method, hist_suffix = f"{measured_like_label}_n_groomed_to_split_less_than_2", general_selection = f"{grooming_method}_{measured_like_label}_n_groomed_to_split < 2",
-            #        matching_level=matching_level,
-            #    )
-            # )
-            # n_to_split > 4
-            hists.extend(
-                matching_hists(
-                    df=df_selection,
-                    grooming_method=grooming_method,
-                    hist_suffix=f"{generator_like_label}_n_to_split_greater_than_4",
-                    general_selection=f"{grooming_method}_{generator_like_label}_n_to_split > 4",
-                    matching_level=matching_level,
-                    create_subjet_in_hybrid_hists=True,
-                )
-            )
-            # n_to_split < 3
-            hists.extend(
-                matching_hists(
-                    df=df_selection,
-                    grooming_method=grooming_method,
-                    hist_suffix=f"{generator_like_label}_n_to_split_less_than_3",
-                    general_selection=f"{grooming_method}_{generator_like_label}_n_to_split < 3",
-                    matching_level=matching_level,
-                    create_subjet_in_hybrid_hists=True,
-                )
-            )
-
     # If we want to save the dot graph. Unfortunately, it won't really be so insightful because we create many branches for the histograms.
     # ROOT.RDF.SaveGraph(df)
 
-    # TODO: Disentangle response output...
+    # Calculate the DataFrame by forcing it determine a property.
+    # Discard the result - we don't really care. We just need a meaningless property.
+    logger.info("Calculating DF...")
+    hists[0].GetEntries()
+
     logger.info(f"Creating output file for {collision_system}, {grooming_method}, {prefixes}")
     output = ROOT.TFile(str(output_filename), "RECREATE")
     output.cd()
@@ -579,9 +618,9 @@ def run_standalone(collision_system: str, train_numbers: Sequence[int], tree_nam
     if len(train_numbers) == 1 and collision_system == "embedPythia":
         base_filename = base_filename / str(train_numbers[0])
     base_filename.mkdir(parents=True, exist_ok=True)
-    output_filename = base_filename / f"{grooming_method}_{'_'.join(prefixes)}.root"
+    output_filename = base_filename / f"{grooming_method}_{'_'.join(prefixes)}_response.root"
 
-    return run(
+    return run_response(
         collision_system=collision_system,
         input_filenames=filenames,
         tree_name=tree_name,
@@ -623,8 +662,8 @@ if __name__ == "__main__":
     prefixes = ["hybrid", "true", "det_level"]
     run_standalone(
         collision_system="embedPythia",
-        train_numbers=list(range(5791, 5792)),
-        #train_numbers=list(range(5966, 5968)),
+        #train_numbers=list(range(5791, 5792)),
+        train_numbers=list(range(5966, 5968)),
         # train_numbers=list(range(6017, 6018)),
         # train_numbers=list(range(5988, 5989)),
         #tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
