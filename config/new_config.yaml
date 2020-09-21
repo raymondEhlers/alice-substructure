@@ -12,6 +12,27 @@ _prefix_branches_standard: &prefix_branches
     - "{prefix}.fSubjets.fPartOfIterativeSplitting"
     - "{prefix}.fSubjets.fSplittingNodeIndex"
     - "{prefix}.fSubjets.fConstituentIndices"
+_scale_factors_LHC19f4_embedded_into_LHC18qr: &scale_factors
+    1: 16.0695
+    2: 4.60776
+    3: 2.14894
+    4: 0.781811
+    5: 0.26462
+    6: 0.0975008
+    7: 0.0292782
+    8: 0.00988435
+    9: 0.0040435
+    10: 0.00135313
+    11: 0.000529795
+    12: 0.000188235
+    13: 9.22016e-05
+    14: 4.29112e-05
+    15: 2.09133e-05
+    16: 1.06058e-05
+    17: 5.74855e-06
+    18: 3.0036e-06
+    19: 1.61604e-06
+    20: 2.0978e-06
 
 available_datasets:
     LHC18qr: &LHC18qr
@@ -83,27 +104,7 @@ available_datasets:
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
         prefix_branches: *prefix_branches
         jet_R: 0.4
-        scale_factors:
-            1: 16.0695
-            2: 4.60776
-            3: 2.14894
-            4: 0.781811
-            5: 0.26462
-            6: 0.0975008
-            7: 0.0292782
-            8: 0.00988435
-            9: 0.0040435
-            10: 0.00135313
-            11: 0.000529795
-            12: 0.000188235
-            13: 9.22016e-05
-            14: 4.29112e-05
-            15: 2.09133e-05
-            16: 1.06058e-05
-            17: 5.74855e-06
-            18: 3.0036e-06
-            19: 1.61604e-06
-            20: 2.0978e-06
+        scale_factors: *scale_factors
         files:
             - "trains/embedPythia/5966/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/5967/AnalysisResults.*.repaired.root"
@@ -152,27 +153,7 @@ available_datasets:
             - "{prefix}.fSubjets.fSplittingNodeIndex"
             - "{prefix}.fSubjets.fConstituentIndices"
         jet_R: 0.4
-        scale_factors:
-            1: 16.0695
-            2: 4.60776
-            3: 2.14894
-            4: 0.781811
-            5: 0.26462
-            6: 0.0975008
-            7: 0.0292782
-            8: 0.00988435
-            9: 0.0040435
-            10: 0.00135313
-            11: 0.000529795
-            12: 0.000188235
-            13: 9.22016e-05
-            14: 4.29112e-05
-            15: 2.09133e-05
-            16: 1.06058e-05
-            17: 5.74855e-06
-            18: 3.0036e-06
-            19: 1.61604e-06
-            20: 2.0978e-06
+        scale_factors: *scale_factors
         files:
             - "trains/embedPythia/5780/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/5781/AnalysisResults.*.repaired.root"
