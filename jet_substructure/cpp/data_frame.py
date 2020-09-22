@@ -25,18 +25,22 @@ def matching_hists(  # noqa: C901
     grooming_method: str,
     hist_suffix: str,
     general_selection: str,
-    #measured_like_prefix: str,
-    #generator_like_prefix: str,
-    matching_level: str = "hybrid_det_level",
-    det_level_axis: Optional[Tuple[int, float, float]] = None,
-    create_subjet_in_hybrid_hists: bool = False,
+    measured_like_prefix: str,
+    generator_like_prefix: str,
+    jet_pt_column_format: str,
+    matching_jet_pt_prefix: Optional[str] = None,
+    matching_jet_pt_axis: Optional[Tuple[int, float, float]] = None,
+    create_generator_subjet_in_measured_jet_hists: bool = False,
 ) -> List[RootHist]:
     # Validation
-    if det_level_axis is None:
-        det_level_axis = (150, 0, 150)
+    if matching_jet_pt_axis is None:
+        matching_jet_pt_axis = (150, 0, 150)
+    if matching_jet_pt_prefix is None:
+        matching_jet_pt_prefix = generator_like_prefix
 
     # Setup
     hists = []
+    matching_level = f"{measured_like_prefix}_{generator_like_prefix}"
     matching_map: Dict[str, str] = {
         "all": "",
         "pure": f"{grooming_method}_{matching_level}_matching_leading == 1"
@@ -74,8 +78,10 @@ def matching_hists(  # noqa: C901
         name = f"{grooming_method}_{matching_level}_matching_{matching_type}"
         if hist_suffix:
             name += f"_{hist_suffix}"
-        h_matching = df_selection.Histo1D((name, name, *det_level_axis), "det_level_jet_pt", "scale_factor",)
+        h_matching = df_selection.Histo1D((name, name, *matching_jet_pt_axis), jet_pt_column_format.format(prefix=matching_jet_pt_prefix), "scale_factor",)
         hists.append(h_matching)
+
+        # Responses
         # Hybrid-true
         name = f"{grooming_method}_hybrid_true_kt_response_{matching_level}_matching_type_{matching_type}"
         if hist_suffix:
@@ -88,7 +94,7 @@ def matching_hists(  # noqa: C901
         )
         hists.append(kt_hybrid_true_response)
         # Hybrid-det level
-        if "hybrid" in matching_level:
+        if measured_like_prefix == "hybrid":
             name = f"{grooming_method}_hybrid_det_level_kt_response_{matching_level}_matching_type_{matching_type}"
             if hist_suffix:
                 name += f"_{hist_suffix}"
@@ -99,24 +105,8 @@ def matching_hists(  # noqa: C901
                 "scale_factor",
             )
             hists.append(kt_hybrid_det_level_response)
-
-            # Does the subjet stay in the hybrid jet?
-            if create_subjet_in_hybrid_hists:
-                for subjet_name in ["leading", "subleading"]:
-                    name = f"{grooming_method}_{matching_level}_matching_{subjet_name}_subjet_pt_fraction_in_hybrid_{matching_type}"
-                    if hist_suffix:
-                        name += f"_{hist_suffix}"
-                    h_subjet_pt_fraction = df_selection.Histo1D(
-                        (name, name, 50, 0, 1,),
-                        #f"{grooming_method}_{matching_level}_matching_{subjet_name}_pt_fraction_in_hybrid_jet",
-                        # TODO: Generalize this labeling.
-                        f"{grooming_method}_det_level_{subjet_name}_subjet_momentum_fraction_in_hybrid_jet",
-                        "scale_factor",
-                    )
-                    hists.append(h_subjet_pt_fraction)
-
         # Det-level true
-        if "true" in matching_level:
+        if generator_like_prefix == "true":
             name = f"{grooming_method}_det_level_true_kt_response_{matching_level}_matching_type_{matching_type}"
             if hist_suffix:
                 name += f"_{hist_suffix}"
@@ -127,6 +117,21 @@ def matching_hists(  # noqa: C901
                 "scale_factor",
             )
             hists.append(kt_det_level_true_response)
+
+        # Does the generator-like subjet stay in the measured-like jet?
+        # As a concrete example, does the det level subjet stay in the hybrid jet?
+        # In principle, we keep this switch in case we have to look at old productions which don't have this as an option.
+        if create_generator_subjet_in_measured_jet_hists:
+            for subjet_name in ["leading", "subleading"]:
+                name = f"{grooming_method}_{subjet_name}_{generator_like_prefix}_subjet_momentum_fraction_in_{measured_like_prefix}_{matching_level}_matching_{matching_type}"
+                if hist_suffix:
+                    name += f"_{hist_suffix}"
+                h_subjet_pt_fraction = df_selection.Histo1D(
+                    (name, name, 50, 0, 1,),
+                    f"{grooming_method}_{generator_like_prefix}_{subjet_name}_subjet_momentum_fraction_in_{measured_like_prefix}_jet",
+                    "scale_factor",
+                )
+                hists.append(h_subjet_pt_fraction)
 
     return hists
 
@@ -267,13 +272,12 @@ def run_response(
         # Add friends with scale factors
         main_tree.AddFriend(friend_tree)
 
-    df_original = ROOT.RDataFrame(main_tree)
+    # Keep the fully original DF so we can see everything applied to it.
+    df_true_original = ROOT.RDataFrame(main_tree)
+    df_original = df_true_original
     # df = ROOT.RDataFrame("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl", "")
 
-    # Add scale factor column with 1s if it doesn't exist yet.
-    if "scale_factor" not in df_original.GetColumnNames():
-        logger.info("Defining scale_factor column")
-        df_original = df_original.Define("scale_factor", "1")
+    # Scale factors _must_ be defined here, so we don't provide a fall back.
 
     # Apply general cuts.
     # Double counting must be applied for embedding.
@@ -293,8 +297,7 @@ def run_response(
     # Responses
     # General responses.
     # Hybrid-det level
-    df = df_measured_selections
-    kt_hybrid_det_level_response = df.Histo2D(
+    kt_hybrid_det_level_response = df_measured_selections.Histo2D(
         (
             f"{grooming_method}_hybrid_det_level_kt_response",
             f"{grooming_method}_hybrid_det_level_kt_response",
@@ -311,7 +314,7 @@ def run_response(
     )
     hists.append(kt_hybrid_det_level_response)
     # Hybrid-true
-    kt_hybrid_true_response = df.Histo2D(
+    kt_hybrid_true_response = df_measured_selections.Histo2D(
         (
             f"{grooming_method}_hybrid_true_kt_response",
             f"{grooming_method}_hybrid_true_kt_response",
@@ -328,7 +331,7 @@ def run_response(
     )
     hists.append(kt_hybrid_true_response)
     # Det-level true
-    kt_det_level_true_response = df.Histo2D(
+    kt_det_level_true_response = df_measured_selections.Histo2D(
         (
             f"{grooming_method}_det_level_true_kt_response",
             f"{grooming_method}_det_level_true_kt_response",
@@ -367,51 +370,62 @@ def run_response(
     #    logger.info(f"Selection: {selection}: {values.GetValue()}")
 
     # Matching and matching dependent responses.
-    matching_level_map = {
-        "hybrid_det_level": ("hybrid", "det_level"),
-        "det_level_true": ("det_level", "true"),
-    }
-    for matching_level, (measured_like_label, generator_like_label) in matching_level_map.items():
+    for measured_like_prefix, generator_like_prefix in [("hybrid", "det_level"),
+                                                        ("det_level", "true")]:
+        # Setup
+        # As of 21 September 2020, this is only for hybrid <-> det level
+        create_generator_subjet_in_measured_jet_hists = (measured_like_prefix == "hybrid")
         # Base tag
         tag = f"jet_pt_{smeared_cut_prefix}_40_120"
 
         # We explicitly require splittings at both the det level (generator-like) and hybrid level (measured-like).
         # This excludes matching_leading and matching_subleading == 0.
-        df_selection = df.Filter(
-            f"{grooming_method}_{measured_like_label}_n_passed_grooming > 0 && {grooming_method}_{generator_like_label}_n_passed_grooming > 0"
-        )
-        # No selection
-        hists.extend(
-            matching_hists(
-                df=df_selection,
-                grooming_method=grooming_method,
-                hist_suffix=tag,
-                general_selection="",
-                matching_level=matching_level,
-                create_subjet_in_hybrid_hists=True,
-            )
-        )
-        # Kt selections
-        # NOTE: We exclude -1 (as we include in the standard hists case) because it's already handled above.
+        require_splittings_filter = f"{grooming_method}_{measured_like_prefix}_n_passed_grooming > 0 && {grooming_method}_{generator_like_prefix}_n_passed_grooming > 0"
+        df_selection = df.Filter(require_splittings_filter)
+        # Measured kt selections
         for measured_min_kt in [-1, 2, 3, 5]:
             # kt == -1 is the cause that includes the untagged. There, we don't want to include any kt tag.
             selection_tag = tag
+            kt_smeared_selection_filter = f"{grooming_method}_{smeared_cut_prefix}_kt > {measured_min_kt}"
+            kt_selection_tag = ""
             if measured_min_kt == -1:
                 df = df_selection
-                selection_tag += ""
             else:
-                df = df_selection.Filter(f"{grooming_method}_{smeared_cut_prefix}_kt > {measured_min_kt}")
-                selection_tag += f"_min_smeared_kt_{measured_min_kt}"
+                df = df_selection.Filter(kt_smeared_selection_filter)
+                kt_selection_tag = f"min_smeared_kt_{measured_min_kt}"
+            selection_tag += f"_{kt_selection_tag}"
             hists.extend(
                 matching_hists(
                     df=df_selection,
                     grooming_method=grooming_method,
                     hist_suffix=selection_tag,
                     general_selection="",
-                    matching_level=matching_level,
-                    create_subjet_in_hybrid_hists=True,
+                    measured_like_prefix=measured_like_prefix,
+                    generator_like_prefix=generator_like_prefix,
+                    jet_pt_column_format=jet_pt_column_format,
+                    create_generator_subjet_in_measured_jet_hists=create_generator_subjet_in_measured_jet_hists,
                 )
             )
+            # Only do this in the case where we're looking at hybrid-det level matching
+            if measured_like_prefix == "hybrid":
+                # Since we're looking at as a function of hybrid jet pt, we don't want to apply the hybrid jet pt cut.
+                df_hybrid_matching_selection = df_original.Filter(
+                    f"({kt_smeared_selection_filter}) && ({require_splittings_filter})"
+                )
+                selection_tag = kt_selection_tag
+                hists.extend(
+                    matching_hists(
+                        df=df_hybrid_matching_selection,
+                        grooming_method=grooming_method,
+                        hist_suffix=selection_tag,
+                        general_selection="",
+                        measured_like_prefix=measured_like_prefix,
+                        generator_like_prefix=generator_like_prefix,
+                        jet_pt_column_format=jet_pt_column_format,
+                        matching_jet_pt_prefix="hybrid",
+                        create_generator_subjet_in_measured_jet_hists=create_generator_subjet_in_measured_jet_hists,
+                    )
+                )
 
         # For now, we skip because it slows down RDF to have more hists...
         ## n_groomed_to_split > 1
@@ -428,38 +442,45 @@ def run_response(
         #        matching_level=matching_level,
         #    )
         # )
+
         # n_to_split > 4
+        hist_suffix = f"{tag}_{generator_like_prefix}_n_to_split_greater_than_4"
         hists.extend(
             matching_hists(
                 df=df_selection,
                 grooming_method=grooming_method,
-                hist_suffix=f"{generator_like_label}_n_to_split_greater_than_4",
-                general_selection=f"{grooming_method}_{generator_like_label}_n_to_split > 4",
-                matching_level=matching_level,
-                create_subjet_in_hybrid_hists=True,
+                hist_suffix=hist_suffix,
+                general_selection=f"{grooming_method}_{generator_like_prefix}_n_to_split > 4",
+                measured_like_prefix=measured_like_prefix,
+                generator_like_prefix=generator_like_prefix,
+                jet_pt_column_format=jet_pt_column_format,
+                create_generator_subjet_in_measured_jet_hists=create_generator_subjet_in_measured_jet_hists,
             )
         )
         # n_to_split < 3
+        hist_suffix = f"{tag}_{generator_like_prefix}_n_to_split_less_than_3"
         hists.extend(
             matching_hists(
                 df=df_selection,
                 grooming_method=grooming_method,
-                hist_suffix=f"{generator_like_label}_n_to_split_less_than_3",
-                general_selection=f"{grooming_method}_{generator_like_label}_n_to_split < 3",
-                matching_level=matching_level,
-                create_subjet_in_hybrid_hists=True,
+                hist_suffix=hist_suffix,
+                general_selection=f"{grooming_method}_{generator_like_prefix}_n_to_split < 3",
+                measured_like_prefix=measured_like_prefix,
+                generator_like_prefix=generator_like_prefix,
+                jet_pt_column_format=jet_pt_column_format,
+                create_generator_subjet_in_measured_jet_hists=create_generator_subjet_in_measured_jet_hists,
             )
         )
 
     # If we want to save the dot graph. Unfortunately, it won't really be so insightful because we create many branches for the histograms.
-    # ROOT.RDF.SaveGraph(df)
+    #ROOT.RDF.SaveGraph(df_true_original, "graph.dot")
 
     # Calculate the DataFrame by forcing it determine a property.
     # Discard the result - we don't really care. We just need a meaningless property.
     logger.info("Calculating DF...")
     hists[0].GetEntries()
 
-    logger.info(f"Creating output file for {collision_system}, {grooming_method}, {prefixes}")
+    logger.info(f"Creating response output file for {collision_system}, {grooming_method}, {prefixes}")
     output = ROOT.TFile(str(output_filename), "RECREATE")
     output.cd()
     for h in hists:
@@ -663,7 +684,8 @@ if __name__ == "__main__":
     run_standalone(
         collision_system="embedPythia",
         #train_numbers=list(range(5791, 5792)),
-        train_numbers=list(range(5966, 5968)),
+        #train_numbers=list(range(5966, 5968)),
+        train_numbers=list(range(5977, 5978)),
         # train_numbers=list(range(6017, 6018)),
         # train_numbers=list(range(5988, 5989)),
         #tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
