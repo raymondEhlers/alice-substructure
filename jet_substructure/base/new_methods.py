@@ -561,7 +561,7 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
     arrays = ak.fill_none(arrays, fill_none_value)
 
     additional_columns = {}
-    if "ptHard" in ak.keys(arrays):
+    if "ptHard" in ak.fields(arrays):
         additional_columns = {
             "pt_hard": arrays["ptHard"],
             "pt_hard_bin": arrays["ptHardBin"],
