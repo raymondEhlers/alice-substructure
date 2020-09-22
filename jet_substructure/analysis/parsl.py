@@ -84,9 +84,22 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
         slurm_kwargs.update(
             dict(
                 #worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv AliPhysics/latest`",
+                # Only load ROOT rather than AliPhysics to avoid any potential dictionary issues...
                 worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv ROOT/latest`",
             )
         )
+
+    machines_to_exclude = [
+        # pc051 has too much in swap right now to be useful, so let's just skip and avoid the problems.
+        "pc051",
+        # pc147 also struggles and we don't want that to come down because it's one of the ceph quorum machines...
+        "pc147",
+        # pc075 also has high swap right now...
+        "pc075",
+    ]
+    if use_root:
+        # pc059 to avoid causing problems on the login node when using 8 cores for root data frame.
+        machines_to_exclude.append("pc059")
 
     b587_executor = Config(
         executors=[
@@ -114,10 +127,8 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
                     exclusive=True,
                     # Format: HH:MM:SS, so we request one hour
                     walltime="01:30:00",
-                    # pc051 has too much in swap right now to be useful, so let's just skip and avoid the problems.
-                    # pc147 also struggles and we don't want that to come down because it's one of the ceph quorum machines...
-                    # pc075 also has high swap right now...
-                    scheduler_options="#SBATCH --exclude=pc051,pc147,pc075",
+                    # See notes on machines to exclude above.
+                    scheduler_options=f"#SBATCH --exclude={','.join(machines_to_exclude)}",
                     # For root
                     **slurm_kwargs,
                 ),
