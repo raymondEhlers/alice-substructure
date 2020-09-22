@@ -575,7 +575,7 @@ def setup_root_data_frame(
     input_files: Optional[Sequence[DataFuture]] = None,
 ) -> List[AppFuture]:
     # Setup
-    output_dir = Path("output") / collision_system / "RDF" / "test"
+    output_dir = Path("output") / collision_system / "RDF"
     output_dir.mkdir(parents=True, exist_ok=True)
     dataset_config = read_config(collision_system=collision_system)
     train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
@@ -700,8 +700,7 @@ if __name__ == "__main__":
     # Settings
     collision_system = "embedPythia"
     jobs_to_execute = [
-        #"root_data_frame_response",
-        "root_data_frame",
+        "root_data_frame_response",
     ]
     entries_per_job = int(1e5)
     nodes_to_allocate = 8
@@ -776,7 +775,7 @@ if __name__ == "__main__":
         results = setup_root_data_frame_response(
             collision_system=collision_system,
             jobs_per_node=jobs_per_node,
-            selected_train_numbers=list(range(5977, 5978)),
+            #selected_train_numbers=list(range(5977, 5978)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
 
