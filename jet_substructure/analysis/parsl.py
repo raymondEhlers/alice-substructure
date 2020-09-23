@@ -696,11 +696,87 @@ def setup_root_data_frame_response(
     return results
 
 
+@python_app
+def _root_data_frame_closure(collision_system: str, tree_name: str, prefixes: Sequence[str], grooming_method: str, jet_R: float, n_cores: int,
+                              inputs: Optional[Sequence[File]] = [], outputs: Optional[Sequence[File]] = []) -> AppFuture:
+    """ ROOT data frame clsoure app. """
+    from pathlib import Path
+    from jet_substructure.cpp import data_frame
+
+    res = data_frame.run_create_closure_ratio(
+        collision_system=collision_system,
+        input_filenames=[Path(f.filepath) for f in inputs],
+        tree_name=tree_name,
+        prefixes=prefixes,
+        grooming_method=grooming_method,
+        jet_R=jet_R,
+        output_filename=Path(outputs[0].filepath),
+        jet_pt_prefix_first=True,
+        n_cores=n_cores,
+    )
+
+    return res
+
+
+def setup_root_data_frame_closure(
+    collision_system: str,
+    jobs_per_node: int,
+    selected_train_numbers: Optional[Sequence[int]] = None,
+    input_files: Optional[Sequence[DataFuture]] = None,
+) -> List[AppFuture]:
+    # Setup
+    output_dir = Path("output") / collision_system / "RDF"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    dataset_config = read_config(collision_system=collision_system)
+    train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
+    prefixes = dataset_config["prefixes"]
+    logger.info(f"RDF Closure for {collision_system}")
+
+    # If input files aren't passed, then we need to determine them ourselves.
+    if input_files is None:
+        logger.info("Determining input files independently.")
+        input_files = []
+        for train_directory in train_directories:
+            # Select train numbers.
+            if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
+                logger.debug(f"Skipping train number {train_directory.name}")
+                continue
+            logger.info(f"Processing train number {train_directory.name}")
+
+            # Then iterate over the directories.
+            for filename in Path(f"{train_directory}/skim/").glob("*.root"):
+                input_files.append(File(str(filename)))
+
+    logger.info(f"N cores per job: {math.floor(8 / jobs_per_node)}")
+    results = []
+    for grooming_method in ["leading_kt", "leading_kt_z_cut_02", "leading_kt_z_cut_04",
+                            "dynamical_z", "dynamical_kt", "dynamical_time",
+                            "soft_drop_z_cut_02", "soft_drop_z_cut_04"]:
+        # Setup file IO
+        # Randomize the input list so we don't always hit the same files at the same time.
+        # Note: It randomizes in place.
+        random.shuffle(input_files)
+        output_file = output_dir / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.values())}_closure.root"
+        parsl_output_file = File(str(output_file))
+        results.append(_root_data_frame_closure(
+            collision_system=collision_system,
+            tree_name="tree",
+            prefixes=list(prefixes.values()),
+            grooming_method=grooming_method,
+            jet_R=dataset_config["jet_R"],
+            n_cores=math.floor(8 / jobs_per_node),
+            inputs=input_files,
+            outputs=[parsl_output_file],
+        ))
+
+    return results
+
+
 if __name__ == "__main__":
     # Settings
     collision_system = "embedPythia"
     jobs_to_execute = [
-        "root_data_frame_response",
+        "root_data_frame_closure",
     ]
     entries_per_job = int(1e5)
     nodes_to_allocate = 8
@@ -710,12 +786,13 @@ if __name__ == "__main__":
     _possible_jobs = [
         "repair_root_files", "convert_to_parquet",
         "calculate_embedding_skim", "calculate_data_skim",
-        "root_data_frame", "root_data_frame_response",
+        "root_data_frame", "root_data_frame_response", "root_data_frame_closure",
     ]
     _jobs_requiring_root = [
         "repair_root_files",
         "root_data_frame",
         "root_data_frame_response",
+        "root_data_frame_closure",
     ]
     # Validation
     for job_name in jobs_to_execute:
@@ -778,6 +855,17 @@ if __name__ == "__main__":
             #selected_train_numbers=list(range(5977, 5978)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
+    if "root_data_frame_closure" in jobs_to_execute:
+        # We'll always want both, so let's just do both.
+        temp_results = []
+        for collision_system in ["PbPb", "embedPythia"]:
+            temp_results.extend(setup_root_data_frame_closure(
+                collision_system=collision_system,
+                jobs_per_node=jobs_per_node,
+                #selected_train_numbers=list(range(5977, 5978)),
+                input_files=[r.outputs[0] for r in results] if results else None,
+            ))
+        results.extend(temp_results)
 
     logger.info(f"About to ask for result. len: {len(results)}")
     # Wait on results

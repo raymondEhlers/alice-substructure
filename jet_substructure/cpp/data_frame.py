@@ -323,6 +323,96 @@ def _substructure_hists(
 
     return hists
 
+def run_create_closure_ratio(
+    collision_system: str,
+    input_filenames: Sequence[Path],
+    tree_name: str,
+    prefixes: Sequence[str],
+    grooming_method: str,
+    jet_R: float,
+    output_filename: Path,
+    jet_pt_prefix_first: bool = False,
+    n_cores: int = 8
+) -> bool:
+    # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
+
+    # Delay ROOT import so we don't explicitly rely on it.
+    import ROOT
+
+    # Setup for ROOT
+    # Enable multithreading
+    ROOT.ROOT.EnableImplicitMT(n_cores)
+    # Sumw2
+    ROOT.TH1.SetDefaultSumw2(True)
+
+    # Parameters
+    jet_pt_column_format = "jet_pt_{prefix}"
+    if jet_pt_prefix_first:
+        jet_pt_column_format = "{prefix}_jet_pt"
+
+    # Setup tree
+    main_tree = ROOT.TChain(tree_name)
+    for filename in input_filenames:
+        main_tree.Add(str(filename))
+
+    # Keep the fully original DF so we can see everything applied to it.
+    df_true_original = ROOT.RDataFrame(main_tree)
+    df_original = df_true_original
+
+    # Add scale factor column with 1s if it doesn't exist yet.
+    if "scale_factor" not in df_original.GetColumnNames():
+        logger.info("Defining scale_factor column")
+        df_original = df_original.Define("scale_factor", "1")
+
+    # Apply general cuts.
+    # Double counting must be applied for embedding.
+    if collision_system == "embedPythia":
+        double_counting_cut = "det_level_leading_track_pt >= hybrid_leading_track_pt"
+        df_original = df_original.Filter(double_counting_cut)
+        smeared_cut_prefix = "hybrid"
+        prefix_for_ratio = "det_level"
+    else:
+        smeared_cut_prefix = "data"
+        prefix_for_ratio = "data"
+
+    smeared_substructure_variable_bins=np.array(
+        [1, 2, 3, 4, 5, 7, 10, 15],
+        dtype=np.float64,
+    )
+    smeared_jet_pt_bins=np.array(
+        [30, 40, 50, 60, 80, 100, 120],
+        dtype=np.float64,
+    )
+    hists = []
+    hists.append(df_original.Histo2D(
+        (f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt", f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt",
+         len(smeared_substructure_variable_bins) - 1, smeared_substructure_variable_bins, len(smeared_jet_pt_bins) - 1, smeared_jet_pt_bins),
+        f"{jet_pt_column_format.format(prefix=prefix_for_ratio)}",
+        f"{grooming_method}_{prefix_for_ratio}_kt",
+        "scale_factor",
+    ))
+
+    # Calculate the DataFrame by forcing it determine a property.
+    # Discard the result - we don't really care. We just need a meaningless property.
+    logger.info("Calculating DF...")
+    hists[0].GetEntries()
+
+    logger.info(f"Creating ratio output file for {collision_system}, {grooming_method}, {prefixes}")
+    logger.info(f"Writing to {output_filename}")
+    output = ROOT.TFile(str(output_filename), "RECREATE")
+    output.cd()
+    for h in hists:
+        h.SetDirectory(output)
+        # Why doesn't h.Write() work? Because ROOT. It fucking sucks.
+        # h.Write()
+    output.Write()
+    # output.ls()
+    output.Close()
+
+    logger.info("Done!")
+
+    return True
+
 
 def run_response(
     collision_system: str,
@@ -795,9 +885,9 @@ def run_standalone(collision_system: str, train_numbers: Sequence[int], tree_nam
     if len(train_numbers) == 1 and collision_system == "embedPythia":
         base_filename = base_filename / str(train_numbers[0])
     base_filename.mkdir(parents=True, exist_ok=True)
-    output_filename = base_filename / f"{grooming_method}_{'_'.join(prefixes)}_response.root"
+    output_filename = base_filename / f"{grooming_method}_{'_'.join(prefixes)}_closure.root"
 
-    return run_response(
+    return run_create_closure_ratio(
         collision_system=collision_system,
         input_filenames=filenames,
         tree_name=tree_name,
@@ -837,32 +927,33 @@ def embed_pythia_entry_point() -> None:
 if __name__ == "__main__":
     helpers.setup_logging()
     prefixes = ["hybrid", "true", "det_level"]
+    #run_standalone(
+    #    collision_system="embedPythia",
+    #    #train_numbers=list(range(5791, 5792)),
+    #    #train_numbers=list(range(5966, 5968)),
+    #    train_numbers=list(range(5977, 5978)),
+    #    # train_numbers=list(range(6017, 6018)),
+    #    # train_numbers=list(range(5988, 5989)),
+    #    #tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+    #    tree_name="tree",
+    #    # prefix="det_level",
+    #    prefixes=prefixes,
+    #    grooming_method="leading_kt",
+    #    jet_R=0.4,
+    #    n_cores=6,
+    #    jet_pt_prefix_first=True,
+    #)
+    # for grooming_method in ["leading_kt", "leading_kt_z_cut_02", "leading_kt_z_cut_04", "dynamical_z", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02", "soft_drop_z_cut_04"]:
     run_standalone(
-        collision_system="embedPythia",
-        #train_numbers=list(range(5791, 5792)),
-        #train_numbers=list(range(5966, 5968)),
-        train_numbers=list(range(5977, 5978)),
-        # train_numbers=list(range(6017, 6018)),
-        # train_numbers=list(range(5988, 5989)),
-        #tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+        collision_system="PbPb",
+        train_numbers=[5537],
+        #tree_name="AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl",
         tree_name="tree",
-        # prefix="det_level",
-        prefixes=prefixes,
+        prefixes=["data"],
+        #grooming_method=grooming_method,
         grooming_method="leading_kt",
         jet_R=0.4,
         n_cores=6,
         jet_pt_prefix_first=True,
     )
-    # for grooming_method in ["leading_kt", "leading_kt_z_cut_02", "leading_kt_z_cut_04", "dynamical_z", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02", "soft_drop_z_cut_04"]:
-    #     run_standalone(
-    #         collision_system="PbPb",
-    #         train_numbers=[5537],
-    #         #tree_name="AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl",
-    #         tree_name="tree",
-    #         prefixes=["data"],
-    #         grooming_method=grooming_method,
-    #         jet_R=0.4,
-    #         n_cores=6,
-    #         jet_pt_prefix_first=True,
-    #     )
 
