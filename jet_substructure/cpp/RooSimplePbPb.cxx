@@ -253,7 +253,8 @@ void RunUnfolding()
   // Unfolding type
   const UnfoldingType_t unfoldingType = UnfoldingType_t::kt;
   // Grooming method
-  const std::string groomingMethod = "leading_kt_z_cut_02";
+  //const std::string groomingMethod = "leading_kt_z_cut_02";
+  const std::string groomingMethod = "dynamical_kt";
   // If true, use pure matches
   const bool usePureMatches = false;
   // Unfolding settings
@@ -285,11 +286,11 @@ void RunUnfolding()
 
   switch (unfoldingType) {
     case UnfoldingType_t::kt:
-      smearedJetPtBins = {40, 50, 60, 70, 90, 120};
-      trueJetPtBins = {0, 40, 60, 80, 100, 120, 160};
-      smearedSplittingVariableBins = {2, 3, 4, 5, 7, 10};
+      smearedJetPtBins = {30, 40, 50, 60, 80, 100, 120};
+      trueJetPtBins = {0, 30, 40, 60, 80, 100, 120, 160};
+      smearedSplittingVariableBins = {1, 2, 3, 4, 5, 7, 10, 15};
       // NOTE: (-0.05, 0) is the untagged bin.
-      trueSplittingVariableBins = {-0.05, 0, 2, 3, 4, 5, 7, 10, 100};
+      trueSplittingVariableBins = {-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100};
       break;
     case UnfoldingType_t::zg:
       // This is for z_cut > 0.2
@@ -392,18 +393,20 @@ void RunUnfolding()
 
   // Read the data and create the raw data hist.
   // First, setup the input data.
-  TChain dataChain("AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl");
-  dataChain.Add("trains/PbPb/5987/*.root");
+  //TChain dataChain("AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl");
+  TChain dataChain("tree");
+  //dataChain.Add("trains/PbPb/5987/*.root");
+  dataChain.Add("trains/PbPb/5863/skim/*.root");
   // Print out for logs (and to mirror Leticia).
   //dataChain.ls();
   TTreeReader dataReader(&dataChain);
   //dataReader.Print();
 
   // Determines the type of data that we use. Usually, this is going to be "data" for raw data.
-  std::string data_prefix = "data";
+  std::string dataPrefix = "data";
 
-  TTreeReaderValue<float> dataJetPt(dataReader, (data_prefix + "_jet_pt").c_str());
-  TTreeReaderValue<float> dataSubstructureVariable(dataReader, (groomingMethod + "_" + data_prefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<float> dataJetPt(dataReader, ("jet_pt_" + dataPrefix).c_str());
+  TTreeReaderValue<float> dataSubstructureVariable(dataReader, (groomingMethod + "_" + dataPrefix + "_" + substructureVariableName).c_str());
   while (dataReader.Next()) {
     // Jet pt cut.
     if (*dataJetPt < smearedJetPtBins[0] || *dataJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
@@ -424,49 +427,51 @@ void RunUnfolding()
   }
 
   // Setup response tree.
-  TChain embeddedChain("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl");
+  //TChain embeddedChain("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl");
+  TChain embeddedChain("tree");
   // We are specific on the filenames to avoid the friend trees.
   // It appears that it can only handle one * per call. So we have to enumerate each train.
-  //embeddedChain.Add("temp_cache/embedPythia/55*/skim/*_iterative_splittings.root");
-  embeddedChain.Add("trains/embedPythia/5988/*.root");
-  embeddedChain.Add("trains/embedPythia/5989/*.root");
-  embeddedChain.Add("trains/embedPythia/5990/*.root");
-  embeddedChain.Add("trains/embedPythia/5991/*.root");
-  embeddedChain.Add("trains/embedPythia/5992/*.root");
-  embeddedChain.Add("trains/embedPythia/5993/*.root");
-  embeddedChain.Add("trains/embedPythia/5994/*.root");
-  embeddedChain.Add("trains/embedPythia/5995/*.root");
-  embeddedChain.Add("trains/embedPythia/5996/*.root");
-  embeddedChain.Add("trains/embedPythia/5997/*.root");
-  embeddedChain.Add("trains/embedPythia/5998/*.root");
-  embeddedChain.Add("trains/embedPythia/5999/*.root");
-  embeddedChain.Add("trains/embedPythia/6000/*.root");
-  embeddedChain.Add("trains/embedPythia/6001/*.root");
-  embeddedChain.Add("trains/embedPythia/6002/*.root");
-  embeddedChain.Add("trains/embedPythia/6003/*.root");
-  embeddedChain.Add("trains/embedPythia/6004/*.root");
-  embeddedChain.Add("trains/embedPythia/6005/*.root");
-  embeddedChain.Add("trains/embedPythia/6006/*.root");
-  embeddedChain.Add("trains/embedPythia/6007/*.root");
+  embeddedChain.Add("trains/embedPythia/5966/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5967/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5968/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5969/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5970/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5971/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5972/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5973/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5974/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5975/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5976/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5977/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5978/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5979/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5980/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5981/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5982/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5983/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5984/skim/*.root");
+  embeddedChain.Add("trains/embedPythia/5985/skim/*.root");
   //embeddedChain.ls();
   //embeddedChain.Print();
 
   // Define the reader and process.
-  std::string truePrefix = "matched";
-  std::string hybridPrefix = "data";
+  //std::string truePrefix = "matched";
+  std::string truePrefix = "true";
+  //std::string hybridPrefix = "data";
+  std::string hybridPrefix = "hybrid";
   std::string detLevelPrefix = "det_level";
   TTreeReader mcReader(&embeddedChain);
-  //TTreeReaderValue<float> scaleFactor(mcReader, "scale_factor");
-  TTreeReaderValue<float> hybridJetPt(mcReader, (hybridPrefix + "_jet_pt").c_str());
-  TTreeReaderValue<float> hybridSubstructureVariable(mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
-  TTreeReaderValue<float> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
-  TTreeReaderValue<float> trueSubstructureVariable(mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<double> scaleFactor(mcReader, "scale_factor");
+  TTreeReaderValue<double> hybridJetPt(mcReader, (hybridPrefix + "_jet_pt").c_str());
+  TTreeReaderValue<double> hybridSubstructureVariable(mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<double> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
+  TTreeReaderValue<double> trueSubstructureVariable(mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
   //TTreeReaderValue<long long> matchingLeading(mcReader, (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
-  TTreeReaderValue<float> matchingLeading(mcReader, (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
-  TTreeReaderValue<float> matchingSubleading(mcReader, (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
+  TTreeReaderValue<long long> matchingLeading(mcReader, (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
+  TTreeReaderValue<long long> matchingSubleading(mcReader, (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
   // For the double counting cut.
-  TTreeReaderValue<float> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
-  TTreeReaderValue<float> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
+  TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "leading_track_pt").c_str());
+  TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "leading_track_pt").c_str());
 
   // Setup for the response
   RooUnfoldResponse response;
@@ -475,13 +480,13 @@ void RunUnfolding()
   responsenotrunc.Setup(&h2smearednocuts, &h2fulleff);
 
   int treeNumber = -1;
-  double scaleFactor = 0;
+  //double scaleFactor = 0;
   while (mcReader.Next()) {
     // Check if the file changed.
     if (treeNumber < embeddedChain.GetTreeNumber()) {
       // File changed. Update the scale factor.
-      auto f = embeddedChain.GetFile();
-      scaleFactor = GetScaleFactor(f);
+      //auto f = embeddedChain.GetFile();
+      //scaleFactor = GetScaleFactor(f);
       // Update the tree number so we hold onto the scale factor until the next time we need to update.
       treeNumber = embeddedChain.GetTreeNumber();
     }
@@ -498,9 +503,9 @@ void RunUnfolding()
     }
 
     // Full efficiency hists.
-    h2fulleff.Fill(*trueSubstructureVariable, *trueJetPt, scaleFactor);
-    h2smearednocuts.Fill(*hybridSubstructureVariable, *hybridJetPt, scaleFactor);
-    responsenotrunc.Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, scaleFactor);
+    h2fulleff.Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    h2smearednocuts.Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
+    responsenotrunc.Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
 
     // Now start making cuts on the hybrid level.
     if (*hybridJetPt < smearedJetPtBins[0] || *hybridJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
@@ -523,11 +528,11 @@ void RunUnfolding()
             )) {
       continue;
     }
-    h2smeared.Fill(hybridSubstructureVariableValue, *hybridJetPt, scaleFactor);
-    h2true.Fill(*trueSubstructureVariable, *trueJetPt, scaleFactor);
-    response.Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, scaleFactor);
+    h2smeared.Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
+    h2true.Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    response.Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
     // So we can look at the substructure variable correlation.
-    h2SplittingVariable.Fill(hybridSubstructureVariableValue, *trueSubstructureVariable, scaleFactor);
+    h2SplittingVariable.Fill(hybridSubstructureVariableValue, *trueSubstructureVariable, *scaleFactor);
   }
 
   TH1D* htrueptd = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("trueptd", 1, -1));
