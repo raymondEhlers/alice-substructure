@@ -233,7 +233,7 @@ enum UnfoldingType_t {
  * Unfolding for a specified substructure variable. Most settings must be changed inside of the function...
  *
  */
-void RunUnfolding()
+void RunUnfolding(const std::string groomingMethod)
 {
 #ifdef __CINT__
   gSystem->Load("libRooUnfold");
@@ -252,9 +252,6 @@ void RunUnfolding()
   // Setup
   // Unfolding type
   const UnfoldingType_t unfoldingType = UnfoldingType_t::kt;
-  // Grooming method
-  //const std::string groomingMethod = "leading_kt_z_cut_02";
-  const std::string groomingMethod = "dynamical_kt";
   // If true, use pure matches
   const bool usePureMatches = false;
   // Unfolding settings
@@ -588,7 +585,10 @@ void RunUnfolding()
 #ifndef __CINT__
 int RooSimplePbPb()
 {
-  RunUnfolding();
+  // Grooming method
+  //const std::string groomingMethod = "leading_kt_z_cut_02";
+  const std::string groomingMethod = "dynamical_kt";
+  RunUnfolding(groomingMethod);
   return 0;
 } // Main program when run stand-alone
 #endif
