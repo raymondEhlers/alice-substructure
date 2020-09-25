@@ -97,6 +97,7 @@ def plot_unfolded(
     plot_config: pb.PlotConfig,
     output_dir: Path,
     max_iter: int = 10,
+    plot_png: bool = False,
 ) -> None:
     """ Plot unfolded.
 
@@ -227,10 +228,16 @@ def plot_unfolded(
     # Label and layout
     plot_config.apply(fig=fig, axes=[ax_upper, ax_ratio_iter, ax_ratio_true])
 
-    figure_name = f"{plot_config.name}.pdf"
+    figure_name = f"{plot_config.name}"
     if tag:
         figure_name = f"{tag}_{figure_name}"
-    fig.savefig(output_dir / figure_name)
+    logger.info(f"Writing plot to {output_dir / figure_name}.pdf")
+    fig.savefig(output_dir / f"{figure_name}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{figure_name}.png")
+
     plt.close(fig)
 
 
@@ -252,6 +259,7 @@ def plot_refolded(
     plot_config: pb.PlotConfig,
     output_dir: Path,
     max_iter: int = 10,
+    plot_png: bool = False,
 ) -> None:
     """ Plot refolded.
 
@@ -340,15 +348,24 @@ def plot_refolded(
     # Label and layout
     plot_config.apply(fig=fig, axes=[ax_upper, ax_lower])
 
-    figure_name = f"{plot_config.name}.pdf"
+    figure_name = f"{plot_config.name}"
     if tag:
         figure_name = f"{tag}_{figure_name}"
-    fig.savefig(output_dir / figure_name)
+    fig.savefig(output_dir / f"{figure_name}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{figure_name}.png")
+
     plt.close(fig)
 
 
 def plot_response(
-    hists: Mapping[str, binned_data.BinnedData], tag: str, plot_config: pb.PlotConfig, output_dir: Path,
+    hists: Mapping[str, binned_data.BinnedData],
+    tag: str,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+    plot_png: bool = False,
 ) -> None:
     # Setup
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
@@ -379,15 +396,24 @@ def plot_response(
     # Label and layout
     plot_config.apply(fig=fig, ax=ax)
 
-    figure_name = f"{plot_config.name}.pdf"
+    figure_name = f"{plot_config.name}"
     if tag:
         figure_name = f"{tag}_{figure_name}"
-    fig.savefig(output_dir / figure_name)
+    fig.savefig(output_dir / f"{figure_name}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{figure_name}.png")
     plt.close(fig)
 
 
 def plot_jet_pt_vs_substructure(
-    hists: Mapping[str, binned_data.BinnedData], hist_name: str, tag: str, plot_config: pb.PlotConfig, output_dir: Path,
+    hists: Mapping[str, binned_data.BinnedData],
+    hist_name: str,
+    tag: str,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+    plot_png: bool = False,
 ) -> None:
     # Setup
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
@@ -412,10 +438,14 @@ def plot_jet_pt_vs_substructure(
     # Label and layout
     plot_config.apply(fig=fig, ax=ax)
 
-    figure_name = f"{plot_config.name}.pdf"
+    figure_name = f"{plot_config.name}"
     if tag:
         figure_name = f"{tag}_{figure_name}"
-    fig.savefig(output_dir / figure_name)
+    fig.savefig(output_dir / f"{figure_name}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{figure_name}.png")
     plt.close(fig)
 
 
@@ -426,6 +456,7 @@ def plot_efficiency(
     true_bin_label: str,
     plot_config: pb.PlotConfig,
     output_dir: Path,
+    plot_png: bool = False,
 ) -> None:
     """ Plot kinematic efficiency.
 
@@ -455,6 +486,10 @@ def plot_efficiency(
     plot_config.apply(fig=fig, ax=ax)
 
     fig.savefig(output_dir / f"{plot_config.name}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{plot_config.name}.png")
     plt.close(fig)
 
 
@@ -466,6 +501,7 @@ def plot_select_iteration(
     tag: str,
     plot_config: pb.PlotConfig,
     output_dir: Path,
+    plot_png: bool = False,
 ) -> None:
     """ Plot selected iteration.
 
@@ -506,11 +542,15 @@ def plot_select_iteration(
         # hist = _normalize_hist(hist)
         # Calculate and store regularization error
         regularization_value = np.sum(
-            np.maximum(
-                np.abs(previous_iter_hist.values - current_iter_hist.values),
-                np.abs(forward_iter_hist.values - current_iter_hist.values),
+            (
+                np.maximum(
+                    np.abs(previous_iter_hist.values - current_iter_hist.values),
+                    np.abs(forward_iter_hist.values - current_iter_hist.values),
+                )
+                # TEMP: Try excluding the untagged bin.
+                # / current_iter_hist.values)[1:]
+                / current_iter_hist.values
             )
-            / current_iter_hist.values
         )
         hist_reg.values[i] = regularization_value
         # Calculate and store stat error
@@ -553,10 +593,14 @@ def plot_select_iteration(
     # Additional tweaks
     ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=2.0))
 
-    figure_name = f"{plot_config.name}.pdf"
+    figure_name = f"{plot_config.name}"
     if tag:
         figure_name = f"{tag}_{figure_name}"
-    fig.savefig(output_dir / figure_name)
+    fig.savefig(output_dir / f"{figure_name}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{figure_name}.png")
     plt.close(fig)
 
 
@@ -621,6 +665,373 @@ def setup(input_file: InputFile, collision_system: str) -> Tuple[Dict[str, binne
     # ]
 
     return hists, output_dir
+
+
+def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bool = False) -> Path:
+    hists, output_dir = setup(input_file=input_file, collision_system=collision_system)
+
+    tag = ""
+    if input_file.smeared_input:
+        tag = "hybridAsInput"
+
+    # with sns.color_palette("GnBu_d", n_colors=11):
+    with sns.color_palette("Paired", n_colors=input_file.max_iter):
+        n_iter_for_ratio = input_file.n_iter_compare
+        jet_pt_for_text = helpers.RangeSelector(60, 80)
+        text = f"${jet_pt_for_text.display_str(label='true')}$"
+        plot_unfolded(
+            hists=hists,
+            projection_func=_project_kt,
+            efficiency_func=_efficiency_kt,
+            n_iter_for_ratio=n_iter_for_ratio,
+            max_iter=input_file.max_iter,
+            true_bin=helpers.RangeSelector(60, 80),
+            tag=tag,
+            plot_config=pb.PlotConfig(
+                name=f"unfolded_{input_file.substructure_variable}_true_pt_60_80",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",
+                                log=True,
+                            )
+                        ],
+                        legend=pb.LegendConfig(location="lower left"),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"Ratio to iter {n_iter_for_ratio}" if n_iter_for_ratio > 0 else "Ratio to true",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
+                            pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
+                        ],
+                    ),
+                ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            ),
+            output_dir=output_dir,
+            plot_png=plot_png,
+        )
+        # 40-120 true pt.
+        jet_pt_for_text = helpers.RangeSelector(40, 120)
+        text = f"${jet_pt_for_text.display_str(label='true')}$"
+        plot_unfolded(
+            hists=hists,
+            projection_func=_project_kt,
+            efficiency_func=_efficiency_kt,
+            n_iter_for_ratio=n_iter_for_ratio,
+            max_iter=input_file.max_iter,
+            true_bin=helpers.RangeSelector(40, 120),
+            tag=tag,
+            plot_config=pb.PlotConfig(
+                name=f"unfolded_{input_file.substructure_variable}_true_pt_40_120",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",
+                                log=True,
+                            )
+                        ],
+                        legend=pb.LegendConfig(location="lower left"),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"Ratio to iter {n_iter_for_ratio}" if n_iter_for_ratio > 0 else "Ratio to true",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
+                            pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
+                        ],
+                    ),
+                ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            ),
+            output_dir=output_dir,
+            plot_png=plot_png,
+        )
+        text = ""
+        plot_unfolded(
+            hists=hists,
+            projection_func=_project_pt,
+            efficiency_func=_efficiency_pt,
+            n_iter_for_ratio=n_iter_for_ratio,
+            max_iter=input_file.max_iter,
+            true_bin=helpers.RangeSelector(0, 25),
+            tag=tag,
+            plot_config=pb.PlotConfig(
+                name="unfolded_pt",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
+                        ],
+                        legend=pb.LegendConfig(location="lower left"),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"Ratio to iter {n_iter_for_ratio}" if n_iter_for_ratio > 0 else "Ratio to true",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
+                            pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
+                        ],
+                    ),
+                ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            ),
+            output_dir=output_dir,
+            plot_png=plot_png,
+        )
+        jet_pt_for_text = helpers.RangeSelector(40, 120)
+        text = f"${jet_pt_for_text.display_str(label='data')}$"
+        plot_refolded(
+            hists=hists,
+            projection_func=_project_kt,
+            smeared_input=input_file.smeared_input,
+            max_iter=input_file.max_iter,
+            measured_bin=helpers.RangeSelector(40, 120),
+            tag=tag,
+            plot_config=pb.PlotConfig(
+                name=f"refolded_{input_file.substructure_variable}",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
+                        ],
+                        legend=pb.LegendConfig(location="lower left"),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
+                            # y label is set in the function.
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            ),
+            output_dir=output_dir,
+            plot_png=plot_png,
+        )
+        text = ""
+        plot_refolded(
+            hists=hists,
+            projection_func=_project_pt,
+            smeared_input=input_file.smeared_input,
+            max_iter=input_file.max_iter,
+            measured_bin=helpers.RangeSelector(1, 15),
+            tag=tag,
+            plot_config=pb.PlotConfig(
+                name="refolded_pt",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
+                        ],
+                        legend=pb.LegendConfig(location="lower left"),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
+                            # y label is set in the function.
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            ),
+            output_dir=output_dir,
+            plot_png=plot_png,
+        )
+
+    # Plot the response
+    if "h2SplittingVariable" in hists:
+        jet_pt_for_text = helpers.JetPtRange(40, 120)
+        text = f"${jet_pt_for_text.display_str(label='hybrid')}$"
+        plot_response(
+            hists=hists,
+            tag=tag,
+            plot_config=pb.PlotConfig(
+                name=f"response_{input_file.substructure_variable}_hybrid_40_120",
+                panels=pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$"),
+                        # Use the smeared variable max value as a proxy for the max true value of interest.
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$k_{\text{T}}^{\text{true}}\:(\text{GeV}/c)$",
+                            range=(0, input_file.smeared_var_range.max),
+                        ),
+                    ],
+                    text=pb.TextConfig(text, 0.97, 0.03),
+                ),
+            ),
+            output_dir=output_dir,
+            plot_png=plot_png,
+        )
+
+    # Plot kt vs jet pt
+    plot_jet_pt_vs_substructure(
+        hists=hists,
+        hist_name="smeared",
+        tag=tag,
+        plot_config=pb.PlotConfig(
+            name=f"{input_file.substructure_variable}_vs_jet_pt_hybrid",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$"),
+                    pb.AxisConfig("y", label=r"$p_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$"),
+                ],
+                text=pb.TextConfig(text, 0.97, 0.03),
+            ),
+        ),
+        output_dir=output_dir,
+        plot_png=plot_png,
+    )
+    # True
+    plot_jet_pt_vs_substructure(
+        hists=hists,
+        hist_name="true",
+        tag=tag,
+        plot_config=pb.PlotConfig(
+            name=f"{input_file.substructure_variable}_vs_jet_pt_true",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label=r"$k_{\text{T}}^{\text{true}}\:(\text{GeV}/c)$", range=(None, 20)),
+                    pb.AxisConfig("y", label=r"$p_{\text{T}}^{\text{true}}\:(\text{GeV}/c)$"),
+                ],
+                text=pb.TextConfig(text, 0.97, 0.03),
+            ),
+        ),
+        output_dir=output_dir,
+        plot_png=plot_png,
+    )
+
+    # Select the n_iter iteration
+    jet_pt_for_text = helpers.JetPtRange(60, 80)
+    text = f"${jet_pt_for_text.display_str(label='true')}$"
+    plot_select_iteration(
+        hists=hists,
+        projection_func=_project_kt,
+        max_iter=19,
+        true_bin=helpers.JetPtRange(60, 80),
+        tag=tag,
+        plot_config=pb.PlotConfig(
+            name=f"select_iteration_{input_file.substructure_variable}_true_pt_60_80",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label="Iteration"),
+                    pb.AxisConfig("y", label="Summed Error", range=(0, None)),
+                ],
+                legend=pb.LegendConfig(location="center right"),
+                text=pb.TextConfig(text, 0.03, 0.03),
+            ),
+        ),
+        output_dir=output_dir,
+        plot_png=plot_png,
+    )
+
+    # Efficiency
+    plot_efficiency(
+        hists=hists,
+        efficiency_func=_efficiency_kt,
+        true_bins=[
+            helpers.RangeSelector(40, 120),
+            helpers.RangeSelector(40, 60),
+            helpers.RangeSelector(60, 80),
+            helpers.RangeSelector(80, 120),
+        ],
+        true_bin_label="p",
+        plot_config=pb.PlotConfig(
+            name=f"efficiency_{input_file.substructure_variable}",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", log=True),
+                    pb.AxisConfig("y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
+                ],
+                legend=pb.LegendConfig(location="lower left"),
+                # text=pb.TextConfig(text, 0.97, 0.97),
+            ),
+        ),
+        output_dir=output_dir,
+        plot_png=plot_png,
+    )
+    plot_efficiency(
+        hists=hists,
+        efficiency_func=_efficiency_pt,
+        true_bins=[
+            helpers.RangeSelector(input_file.smeared_var_range.min, input_file.smeared_var_range.max),
+            # helpers.RangeSelector(1, 15),
+            # helpers.RangeSelector(2, 13),
+            # helpers.RangeSelector(2, 15),
+        ],
+        true_bin_label="k",
+        plot_config=pb.PlotConfig(
+            name="efficiency_pt",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
+                    pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
+                ],
+                legend=pb.LegendConfig(location="lower right"),
+                # text=pb.TextConfig(text, 0.97, 0.97),
+            ),
+        ),
+        output_dir=output_dir,
+        plot_png=plot_png,
+    )
+
+    # plot_spectra_comparison(hists, output_dir)
+    # plot_spectra_comparison_fine_binned(hists, output_dir)
+    # plot_response_matrix(hists["responseUnscaled"], "response", output_dir)
+
+    return output_dir
 
 
 def run(collision_system: str) -> None:
@@ -718,23 +1129,23 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         # 3-10, 2-3, 40-120
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 10),
-            smeared_untagged_var=helpers.KtRange(2, 3),
-            smeared_pt_range=helpers.JetPtRange(40, 120),
-            n_iter_compare=3,
-        ),
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 10),
-            smeared_untagged_var=helpers.KtRange(2, 3),
-            smeared_pt_range=helpers.JetPtRange(40, 120),
-            n_iter_compare=3,
-            smeared_input=True,
-        ),
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 10),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        #    n_iter_compare=3,
+        # ),
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 10),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        #    n_iter_compare=3,
+        #    smeared_input=True,
+        # ),
         ## 3-10, 10-13, 30-120
         # InputFile(
         #    "kt",
@@ -772,27 +1183,27 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         # 3-10, 2-3, 40-120, pure matches
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 10),
-            smeared_untagged_var=helpers.KtRange(2, 3),
-            smeared_pt_range=helpers.JetPtRange(40, 120),
-            pure_matches=True,
-            n_iter_compare=11,
-            max_iter=15,
-        ),
-        InputFile(
-            "kt",
-            "leading_kt_z_cut_02",
-            smeared_var_range=helpers.KtRange(3, 10),
-            smeared_untagged_var=helpers.KtRange(2, 3),
-            smeared_pt_range=helpers.JetPtRange(40, 120),
-            pure_matches=True,
-            n_iter_compare=11,
-            max_iter=15,
-            smeared_input=True,
-        ),
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 10),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        #    pure_matches=True,
+        #    n_iter_compare=11,
+        #    max_iter=15,
+        # ),
+        # InputFile(
+        #    "kt",
+        #    "leading_kt_z_cut_02",
+        #    smeared_var_range=helpers.KtRange(3, 10),
+        #    smeared_untagged_var=helpers.KtRange(2, 3),
+        #    smeared_pt_range=helpers.JetPtRange(40, 120),
+        #    pure_matches=True,
+        #    n_iter_compare=11,
+        #    max_iter=15,
+        #    smeared_input=True,
+        # ),
         ###################### kt smeared = 3-10, broad true bins ##########################
         ## 3-10, 2-3, 30-120
         # InputFile(
@@ -939,366 +1350,91 @@ def run(collision_system: str) -> None:
         #    n_iter_compare=3,
         #    smeared_input=True,
         # ),
+        ####### Dynamical kt ##########
+        # 3-15, 2-3, 40-120
+        InputFile(
+            "kt",
+            "dynamical_kt",
+            smeared_var_range=helpers.KtRange(3, 15),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+            suffix="broadTrueBins",
+        ),
+        InputFile(
+            "kt",
+            "dynamical_kt",
+            smeared_var_range=helpers.KtRange(3, 15),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+            suffix="broadTrueBins",
+            smeared_input=True,
+        ),
+        # 2-15, 1-2, 30-120
+        InputFile(
+            "kt",
+            "dynamical_kt",
+            smeared_var_range=helpers.KtRange(2, 15),
+            smeared_untagged_var=helpers.KtRange(1, 2),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+            n_iter_compare=3,
+            suffix="broadTrueBins",
+        ),
+        InputFile(
+            "kt",
+            "dynamical_kt",
+            smeared_var_range=helpers.KtRange(2, 15),
+            smeared_untagged_var=helpers.KtRange(1, 2),
+            smeared_pt_range=helpers.JetPtRange(30, 120),
+            n_iter_compare=3,
+            suffix="broadTrueBins",
+            smeared_input=True,
+        ),
+        ####### Dynamical time ##########
+        # 3-15, 2-3, 40-120
+        InputFile(
+            "kt",
+            "dynamical_time",
+            smeared_var_range=helpers.KtRange(3, 15),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+            suffix="broadTrueBins",
+        ),
+        InputFile(
+            "kt",
+            "dynamical_time",
+            smeared_var_range=helpers.KtRange(3, 15),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+            suffix="broadTrueBins",
+            smeared_input=True,
+        ),
+        ####### Leading kt ##########
+        # 3-15, 2-3, 40-120
+        InputFile(
+            "kt",
+            "leading_kt",
+            smeared_var_range=helpers.KtRange(3, 15),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+            suffix="broadTrueBins",
+        ),
+        InputFile(
+            "kt",
+            "leading_kt",
+            smeared_var_range=helpers.KtRange(3, 15),
+            smeared_untagged_var=helpers.KtRange(2, 3),
+            smeared_pt_range=helpers.JetPtRange(40, 120),
+            n_iter_compare=3,
+            suffix="broadTrueBins",
+            smeared_input=True,
+        ),
     ]:
-        hists, output_dir = setup(input_file=input_file, collision_system=collision_system)
-
-        tag = ""
-        if input_file.smeared_input:
-            tag = "hybridAsInput"
-
-        # with sns.color_palette("GnBu_d", n_colors=11):
-        with sns.color_palette("Paired", n_colors=input_file.max_iter):
-            n_iter_for_ratio = input_file.n_iter_compare
-            jet_pt_for_text = helpers.RangeSelector(60, 80)
-            text = f"${jet_pt_for_text.display_str(label='true')}$"
-            plot_unfolded(
-                hists=hists,
-                projection_func=_project_kt,
-                efficiency_func=_efficiency_kt,
-                n_iter_for_ratio=n_iter_for_ratio,
-                max_iter=input_file.max_iter,
-                true_bin=helpers.RangeSelector(60, 80),
-                tag=tag,
-                plot_config=pb.PlotConfig(
-                    name=f"unfolded_{input_file.substructure_variable}_true_pt_60_80",
-                    panels=[
-                        # Main panel
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y",
-                                    label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",
-                                    log=True,
-                                )
-                            ],
-                            legend=pb.LegendConfig(location="lower left"),
-                            text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                        # Ratio
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y",
-                                    label=fr"Ratio to iter {n_iter_for_ratio}"
-                                    if n_iter_for_ratio > 0
-                                    else "Ratio to true",
-                                    range=(0.5, 1.5),
-                                ),
-                            ],
-                        ),
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
-                                pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
-                            ],
-                        ),
-                    ],
-                    figure=pb.Figure(edge_padding=dict(bottom=0.06)),
-                ),
-                output_dir=output_dir,
-            )
-            # 40-120 true pt.
-            jet_pt_for_text = helpers.RangeSelector(40, 120)
-            text = f"${jet_pt_for_text.display_str(label='true')}$"
-            plot_unfolded(
-                hists=hists,
-                projection_func=_project_kt,
-                efficiency_func=_efficiency_kt,
-                n_iter_for_ratio=n_iter_for_ratio,
-                max_iter=input_file.max_iter,
-                true_bin=helpers.RangeSelector(40, 120),
-                tag=tag,
-                plot_config=pb.PlotConfig(
-                    name=f"unfolded_{input_file.substructure_variable}_true_pt_40_120",
-                    panels=[
-                        # Main panel
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y",
-                                    label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",
-                                    log=True,
-                                )
-                            ],
-                            legend=pb.LegendConfig(location="lower left"),
-                            text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                        # Ratio
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y",
-                                    label=fr"Ratio to iter {n_iter_for_ratio}"
-                                    if n_iter_for_ratio > 0
-                                    else "Ratio to true",
-                                    range=(0.5, 1.5),
-                                ),
-                            ],
-                        ),
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
-                                pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
-                            ],
-                        ),
-                    ],
-                ),
-                output_dir=output_dir,
-            )
-            text = ""
-            plot_unfolded(
-                hists=hists,
-                projection_func=_project_pt,
-                efficiency_func=_efficiency_pt,
-                n_iter_for_ratio=n_iter_for_ratio,
-                max_iter=input_file.max_iter,
-                true_bin=helpers.RangeSelector(0, 25),
-                tag=tag,
-                plot_config=pb.PlotConfig(
-                    name="unfolded_pt",
-                    panels=[
-                        # Main panel
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
-                                )
-                            ],
-                            legend=pb.LegendConfig(location="lower left"),
-                            text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                        # Ratio
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y",
-                                    label=fr"Ratio to iter {n_iter_for_ratio}"
-                                    if n_iter_for_ratio > 0
-                                    else "Ratio to true",
-                                    range=(0.5, 1.5),
-                                ),
-                            ],
-                        ),
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
-                                pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
-                            ],
-                        ),
-                    ],
-                ),
-                output_dir=output_dir,
-            )
-            jet_pt_for_text = helpers.RangeSelector(40, 120)
-            text = f"${jet_pt_for_text.display_str(label='data')}$"
-            plot_refolded(
-                hists=hists,
-                projection_func=_project_kt,
-                smeared_input=input_file.smeared_input,
-                max_iter=input_file.max_iter,
-                measured_bin=helpers.RangeSelector(40, 120),
-                tag=tag,
-                plot_config=pb.PlotConfig(
-                    name=f"refolded_{input_file.substructure_variable}",
-                    panels=[
-                        # Main panel
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
-                                )
-                            ],
-                            legend=pb.LegendConfig(location="lower left"),
-                            text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                        # Ratio
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
-                                # y label is set in the function.
-                                pb.AxisConfig(
-                                    "y",
-                                    label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
-                                    range=(0.5, 1.5),
-                                ),
-                            ],
-                        ),
-                    ],
-                ),
-                output_dir=output_dir,
-            )
-            text = ""
-            plot_refolded(
-                hists=hists,
-                projection_func=_project_pt,
-                smeared_input=input_file.smeared_input,
-                max_iter=input_file.max_iter,
-                measured_bin=helpers.RangeSelector(1, 15),
-                tag=tag,
-                plot_config=pb.PlotConfig(
-                    name="refolded_pt",
-                    panels=[
-                        # Main panel
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
-                                )
-                            ],
-                            legend=pb.LegendConfig(location="lower left"),
-                            text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                        # Ratio
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
-                                # y label is set in the function.
-                                pb.AxisConfig(
-                                    "y",
-                                    label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
-                                    range=(0.5, 1.5),
-                                ),
-                            ],
-                        ),
-                    ],
-                ),
-                output_dir=output_dir,
-            )
-
-        # Plot the response
-        if "h2SplittingVariable" in hists:
-            jet_pt_for_text = helpers.JetPtRange(40, 120)
-            text = f"${jet_pt_for_text.display_str(label='hybrid')}$"
-            plot_response(
-                hists=hists,
-                tag=tag,
-                plot_config=pb.PlotConfig(
-                    name=f"response_{input_file.substructure_variable}_hybrid_40_120",
-                    panels=pb.Panel(
-                        axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$"),
-                            # Use the smeared variable max value as a proxy for the max true value of interest.
-                            pb.AxisConfig(
-                                "y",
-                                label=r"$k_{\text{T}}^{\text{true}}\:(\text{GeV}/c)$",
-                                range=(0, input_file.smeared_var_range.max),
-                            ),
-                        ],
-                        text=pb.TextConfig(text, 0.97, 0.03),
-                    ),
-                ),
-                output_dir=output_dir,
-            )
-
-        # Plot kt vs jet pt
-        plot_jet_pt_vs_substructure(
-            hists=hists,
-            hist_name="smeared",
-            tag=tag,
-            plot_config=pb.PlotConfig(
-                name=f"{input_file.substructure_variable}_vs_jet_pt_hybrid",
-                panels=pb.Panel(
-                    axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$"),
-                        pb.AxisConfig("y", label=r"$p_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$"),
-                    ],
-                    text=pb.TextConfig(text, 0.97, 0.03),
-                ),
-            ),
-            output_dir=output_dir,
-        )
-        # True
-        plot_jet_pt_vs_substructure(
-            hists=hists,
-            hist_name="true",
-            tag=tag,
-            plot_config=pb.PlotConfig(
-                name=f"{input_file.substructure_variable}_vs_jet_pt_true",
-                panels=pb.Panel(
-                    axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}^{\text{true}}\:(\text{GeV}/c)$", range=(None, 20)),
-                        pb.AxisConfig("y", label=r"$p_{\text{T}}^{\text{true}}\:(\text{GeV}/c)$"),
-                    ],
-                    text=pb.TextConfig(text, 0.97, 0.03),
-                ),
-            ),
-            output_dir=output_dir,
-        )
-
-        # Select the n_iter iteration
-        jet_pt_for_text = helpers.JetPtRange(60, 80)
-        text = f"${jet_pt_for_text.display_str(label='true')}$"
-        plot_select_iteration(
-            hists=hists,
-            projection_func=_project_kt,
-            max_iter=19,
-            true_bin=helpers.JetPtRange(60, 80),
-            tag=tag,
-            plot_config=pb.PlotConfig(
-                name=f"select_iteration_{input_file.substructure_variable}_true_pt_60_80",
-                panels=pb.Panel(
-                    axes=[
-                        pb.AxisConfig("x", label="Iteration"),
-                        pb.AxisConfig("y", label="Summed Error", range=(0, None)),
-                    ],
-                    legend=pb.LegendConfig(location="center right"),
-                    text=pb.TextConfig(text, 0.03, 0.03),
-                ),
-            ),
-            output_dir=output_dir,
-        )
-
-        # Efficiency
-        plot_efficiency(
-            hists=hists,
-            efficiency_func=_efficiency_kt,
-            true_bins=[
-                helpers.RangeSelector(40, 120),
-                helpers.RangeSelector(40, 60),
-                helpers.RangeSelector(60, 80),
-                helpers.RangeSelector(80, 120),
-            ],
-            true_bin_label="p",
-            plot_config=pb.PlotConfig(
-                name=f"efficiency_{input_file.substructure_variable}",
-                panels=pb.Panel(
-                    axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", log=True),
-                        pb.AxisConfig("y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
-                    ],
-                    legend=pb.LegendConfig(location="lower left"),
-                    text=pb.TextConfig(text, 0.97, 0.97),
-                ),
-            ),
-            output_dir=output_dir,
-        )
-        plot_efficiency(
-            hists=hists,
-            efficiency_func=_efficiency_pt,
-            true_bins=[
-                helpers.RangeSelector(1, 13),
-                helpers.RangeSelector(1, 15),
-                helpers.RangeSelector(2, 13),
-                helpers.RangeSelector(2, 15),
-            ],
-            true_bin_label="k",
-            plot_config=pb.PlotConfig(
-                name="efficiency_pt",
-                panels=pb.Panel(
-                    axes=[
-                        pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
-                        pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
-                    ],
-                    legend=pb.LegendConfig(location="lower right"),
-                    text=pb.TextConfig(text, 0.97, 0.97),
-                ),
-            ),
-            output_dir=output_dir,
-        )
-
-        # plot_spectra_comparison(hists, output_dir)
-        # plot_spectra_comparison_fine_binned(hists, output_dir)
-        # plot_response_matrix(hists["responseUnscaled"], "response", output_dir)
+        plot_kt_unfolding(input_file=input_file, collision_system=collision_system)
 
 
 def run_delta_R(collision_system: str) -> None:
@@ -1575,4 +1711,4 @@ if __name__ == "__main__":
     # matplotlib.rcParams["ytick.minor.right"] = True
 
     run(collision_system=collision_system)
-    run_delta_R(collision_system=collision_system)
+    # run_delta_R(collision_system=collision_system)
