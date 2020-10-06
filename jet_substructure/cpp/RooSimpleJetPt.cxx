@@ -1,16 +1,10 @@
 #if !(defined(__CINT__) || defined(__CLING__)) || defined(__ACLIC__)
-#include <iostream>
-#include <memory>
-#include <vector>
-
-#include <TTree.h>
-#include <TChain.h>
-#include <TTreeReader.h>
-#include <TTreeReaderValue.h>
+#include <RooUnfoldBayes.h>
+#include <RooUnfoldResponse.h>
 #include <TCanvas.h>
+#include <TChain.h>
 #include <TFile.h>
 #include <TH1D.h>
-#include <TH2D.h>
 #include <TH2D.h>
 #include <TLegend.h>
 #include <TLine.h>
@@ -22,9 +16,13 @@
 #include <TString.h>
 #include <TStyle.h>
 #include <TSystem.h>
+#include <TTree.h>
+#include <TTreeReader.h>
+#include <TTreeReaderValue.h>
 
-#include <RooUnfoldBayes.h>
-#include <RooUnfoldResponse.h>
+#include <iostream>
+#include <memory>
+#include <vector>
 #endif
 
 //==============================================================================
@@ -116,13 +114,16 @@ void Normalize2D(TH2* h)
  *
  * @param[in] response Roounfold response.
  * @param[in] h2true True spectra. Only used for binning, so retrieved as a const.
- * @param[in] inputSpectra Input spectra to be unfolded (for example, data). Spectra could be 2D: pt + kt (or Rg, etc...)
+ * @param[in] inputSpectra Input spectra to be unfolded (for example, data). Spectra could be 2D: pt + kt (or Rg,
+ * etc...)
  * @param[in] errorTreatment Roounfold error treatment.
- * @param[in] fout ROOT output file. It's never called explicitly, but I like to pass it because we're implicitly writing to it.
+ * @param[in] fout ROOT output file. It's never called explicitly, but I like to pass it because we're implicitly
+ * writing to it.
  * @param[in] tag Tag to be prepended to all histograms generated in the unfolding. Default: "".
  * @param[in] nIter Number of iterations. Default: 10.
  */
-void Unfold(RooUnfoldResponse & response, const TH1D & h1true, TH1D & inputSpectra, RooUnfold::ErrorTreatment errorTreatment, TFile * fout, std::string tag = "", const int nIter = 10)
+void Unfold(RooUnfoldResponse& response, const TH1D& h1true, TH1D& inputSpectra,
+      RooUnfold::ErrorTreatment errorTreatment, TFile* fout, std::string tag = "", const int nIter = 10)
 {
   std::cout << "\n=======================================================\n";
   std::cout << "Unfolding for tag \"" << tag << "\".\n";
@@ -154,12 +155,13 @@ void Unfold(RooUnfoldResponse & response, const TH1D & h1true, TH1D & inputSpect
 
     /// HERE I GET THE COVARIANCE MATRIX/////
 
-    // TODO: Figure out how this works in 1D...
+    // TODO: Look into this for 1D...
     /*if (iter == 8) {
       TMatrixD covmat = unfold.Ereco((RooUnfold::ErrorTreatment)RooUnfold::kCovariance);
       for (Int_t k = 0; k < h1true.GetNbinsX(); k++) {
-        TH1D* hCorr = dynamic_cast<TH1D*>(CorrelationHistShape(covmat, TString::Format("%scorr%d", tag.c_str(), k), "Covariance matrix",
-                             h1true.GetNbinsX(), h1true.GetNbinsY(), k));
+        TH1D* hCorr = dynamic_cast<TH1D*>(
+         CorrelationHistShape(covmat, TString::Format("%scorr%d", tag.c_str(), k), "Covariance matrix",
+                    h1true.GetNbinsX(), h1true.GetNbinsY(), k));
         TH1D* covshape = dynamic_cast<TH1D*>(hCorr->Clone("covshape"));
         covshape->SetName(TString::Format("%spearsonmatrix_iter%d_binshape%d", tag.c_str(), iter, k));
         covshape->SetDrawOption("colz");
@@ -167,8 +169,9 @@ void Unfold(RooUnfoldResponse & response, const TH1D & h1true, TH1D & inputSpect
       }
 
       for (Int_t k = 0; k < h1true.GetNbinsY(); k++) {
-        TH1D* hCorr = dynamic_cast<TH1D*>(CorrelationHistPt(covmat, TString::Format("%scorr%dpt", tag.c_str(), k), "Covariance matrix",
-                            h1true.GetNbinsX(), h1true.GetNbinsY(), k));
+        TH1D* hCorr = dynamic_cast<TH1D*>(
+         CorrelationHistPt(covmat, TString::Format("%scorr%dpt", tag.c_str(), k), "Covariance matrix",
+                  h1true.GetNbinsX(), h1true.GetNbinsY(), k));
         TH1D* covpt = dynamic_cast<TH1D*>(hCorr->Clone("covpt"));
         covpt->SetName(TString::Format("%spearsonmatrix_iter%d_binpt%d", tag.c_str(), iter, k));
         covpt->SetDrawOption("colz");
@@ -180,8 +183,6 @@ void Unfold(RooUnfoldResponse & response, const TH1D & h1true, TH1D & inputSpect
   std::cout << "=======================================================\n";
 }
 
-
-
 /**
  * Determine pt hard scale factor of the currently open file.
  *
@@ -189,22 +190,23 @@ void Unfold(RooUnfoldResponse & response, const TH1D & h1true, TH1D & inputSpect
  *
  * @returns Pt hard scale factor.
  */
-double GetScaleFactor(TFile * f)
+double GetScaleFactor(TFile* f)
 {
   // Retrieve the embedding helper to extract the cross section and ntrials.
-  //auto task = dynamic_cast<TList*>(f->Get("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_Raw_EventSub_Incl"));
+  // auto task =
+  // dynamic_cast<TList*>(f->Get("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_Raw_EventSub_Incl"));
   auto task = dynamic_cast<TList*>(f->Get("AliAnalysisTaskEmcalEmbeddingHelper_histos"));
 
   auto hcross = dynamic_cast<TProfile*>(task->FindObject("fHistXsection"));
   auto htrials = dynamic_cast<TH1D*>(task->FindObject("fHistTrials"));
 
-  //std::cout << "hcross=" << hcross << ", htrials=" << htrials << "\n";
+  // std::cout << "hcross=" << hcross << ", htrials=" << htrials << "\n";
 
   int ptHardBin = 0;
   for (Int_t i = 1; i <= htrials->GetXaxis()->GetNbins(); i++) {
-      if (htrials->GetBinContent(i) != 0) {
-          ptHardBin = i;
-      }
+    if (htrials->GetBinContent(i) != 0) {
+      ptHardBin = i;
+    }
   }
   // Code adapted from Leticia.
   // The values don't seem to be correct...
@@ -249,15 +251,16 @@ void RunUnfolding()
   std::vector<double> smearedJetPtBins;
   std::vector<double> trueJetPtBins;
 
-  smearedJetPtBins = {40, 50, 60, 80, 100, 120};
-  trueJetPtBins = {0, 40, 60, 80, 100, 120, 160};
+  smearedJetPtBins = { 40, 50, 60, 80, 100, 120 };
+  trueJetPtBins = { 0, 40, 60, 80, 100, 120, 160 };
 
   // Final determination and setup for the output directory and filename.
   gSystem->mkdir(outputDir.c_str(), true);
   // Binning information.
   // Used std::string and std::to_string at times to coerce the type to a string so we can keep adding.
   // pt. (use std::to_string to coerce the type to a string so we can keep adding).
-  outputFilename += "_smeared_jetPt_" + std::to_string(static_cast<int>(smearedJetPtBins[0])) + "_" + static_cast<int>(smearedJetPtBins[smearedJetPtBins.size() - 1]);
+  outputFilename += "_smeared_jetPt_" + std::to_string(static_cast<int>(smearedJetPtBins[0])) + "_" +
+           static_cast<int>(smearedJetPtBins[smearedJetPtBins.size() - 1]);
 
   // Options
   if (tag != "") {
@@ -266,8 +269,8 @@ void RunUnfolding()
   outputFilename = outputDir + "/" + outputFilename + ".root";
 
   // Print the configuration
-  std::cout << "\n*********** Settings ***********\n" << std::boolalpha
-       << "output filename: " << outputFilename << "\n"
+  std::cout << "\n*********** Settings ***********\n"
+       << std::boolalpha << "output filename: " << outputFilename << "\n"
        << "********************************\n\n";
 
   // Configuration (not totally clear if this actually does anything for this script...)
@@ -278,14 +281,16 @@ void RunUnfolding()
   // detector measure level (ie. hybrid)
   TH1D h1smeared("smeared", "smeared", smearedJetPtBins.size() - 1, smearedJetPtBins.data());
   // detector measure level no cuts (ie. hybrid, but no cuts).
-  // NOTE: Strictly speaking, the y axis binning is at the hybrid level, but we want a wider range. So we use the trueJetPtBins.
+  // NOTE: Strictly speaking, the y axis binning is at the hybrid level, but we want a wider range. So we use the
+  // trueJetPtBins.
   TH1D h1smearednocuts("smearednocuts", "smearednocuts", trueJetPtBins.size() - 1, trueJetPtBins.data());
   // true correlations with measured cuts
   TH1D h1true("true", "true", trueJetPtBins.size() - 1, trueJetPtBins.data());
   // full true correlation (without cuts)
   TH1D h1fulleff("truef", "truef", trueJetPtBins.size() - 1, trueJetPtBins.data());
   // Correlation between the splitting variables at true and hybrid (with cuts).
-  TH2D h2JetPt("h2JetPt", "h2JetPt", smearedJetPtBins.size() - 1, smearedJetPtBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
+  TH2D h2JetPt("h2JetPt", "h2JetPt", smearedJetPtBins.size() - 1, smearedJetPtBins.data(), trueJetPtBins.size() - 1,
+         trueJetPtBins.data());
 
   TH1D* effnum = dynamic_cast<TH1D*>(h1fulleff.Clone("effnum"));
   TH1D* effdenom = dynamic_cast<TH1D*>(h1fulleff.Clone("effdenom"));
