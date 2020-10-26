@@ -306,10 +306,10 @@ void RunUnfolding()
   // First, setup the input data.
   TChain dataChain("tree");
   dataChain.Add("trains/PbPb/5863/skim/*.root");
-  // Print out for logs (and to mirror Leticia).
-  //dataChain.ls();
+  // Print out for logs.
+  // dataChain.ls();
   TTreeReader dataReader(&dataChain);
-  //dataReader.Print();
+  // dataReader.Print();
 
   // Determines the type of data that we use. Usually, this is going to be "data" for raw data.
   std::string dataPrefix = "data";
@@ -347,8 +347,8 @@ void RunUnfolding()
   embeddedChain.Add("trains/embedPythia/5983/skim/*.root");
   embeddedChain.Add("trains/embedPythia/5984/skim/*.root");
   embeddedChain.Add("trains/embedPythia/5985/skim/*.root");
-  //embeddedChain.ls();
-  //embeddedChain.Print();
+  // embeddedChain.ls();
+  // embeddedChain.Print();
 
   // Define the reader and process.
   std::string truePrefix = "true";
@@ -357,12 +357,7 @@ void RunUnfolding()
   TTreeReader mcReader(&embeddedChain);
   TTreeReaderValue<double> scaleFactor(mcReader, "scale_factor");
   TTreeReaderValue<double> hybridJetPt(mcReader, (hybridPrefix + "_jet_pt").c_str());
-  //TTreeReaderValue<double> hybridSubstructureVariable(mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
   TTreeReaderValue<double> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
-  //TTreeReaderValue<double> trueSubstructureVariable(mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
-  //TTreeReaderValue<long long> matchingLeading(mcReader, (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
-  //TTreeReaderValue<long long> matchingLeading(mcReader, (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
-  //TTreeReaderValue<long long> matchingSubleading(mcReader, (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
   // For the double counting cut.
   TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
   TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
@@ -374,13 +369,13 @@ void RunUnfolding()
   responsenotrunc.Setup(&h1smearednocuts, &h1fulleff);
 
   int treeNumber = -1;
-  //double scaleFactor = 0;
+  // double scaleFactor = 0;
   while (mcReader.Next()) {
     // Check if the file changed.
     if (treeNumber < embeddedChain.GetTreeNumber()) {
       // File changed. Update the scale factor.
-      //auto f = embeddedChain.GetFile();
-      //scaleFactor = GetScaleFactor(f);
+      // auto f = embeddedChain.GetFile();
+      // scaleFactor = GetScaleFactor(f);
       // Update the tree number so we hold onto the scale factor until the next time we need to update.
       treeNumber = embeddedChain.GetTreeNumber();
     }
@@ -402,12 +397,6 @@ void RunUnfolding()
     if (*hybridJetPt < smearedJetPtBins[0] || *hybridJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
       continue;
     }
-    // Matching cuts: Requiring a pure match.
-    /*if (usePureMatches && !(
-                ((std::abs(*matchingLeading - 1) < 0.001) && (std::abs(*matchingSubleading - 1) < 0.001)) || (std::abs(hybridSubstructureVariableValue - smearedUntaggedBinValue) < 0.001)
-            )) {
-      continue;
-    }*/
     h1smeared.Fill(*hybridJetPt, *scaleFactor);
     h1true.Fill(*trueJetPt, *scaleFactor);
     response.Fill(*hybridJetPt, *trueJetPt, *scaleFactor);
@@ -416,36 +405,9 @@ void RunUnfolding()
   }
 
   TH1D* htrueptd = dynamic_cast<TH1D*>(h1fulleff.Clone("trueptd"));
-  //TH1D* htrueptd = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("trueptd", 1, -1));
-  //TH1D* htruept = dynamic_cast<TH1D*>(h2fulleff.ProjectionY("truept", 1, -1));
-
-  //////////efficiencies done////////////////////////////////////
-  /*TH1D* effok = dynamic_cast<TH1D*>(h2true.ProjectionX("effok", 2, 2));
-  TH1D* effok1 = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("effok2", 2, 2));
-  effok->Divide(effok1);
-  effok->SetName("correff20-40");
-
-  TH1D* effok3 = dynamic_cast<TH1D*>(h2true.ProjectionX("effok3", 3, 3));
-  TH1D* effok4 = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("effok4", 3, 3));
-  effok3->Divide(effok4);
-  effok3->SetName("correff40-60");
-
-  TH1D* effok5 = dynamic_cast<TH1D*>(h2true.ProjectionX("effok5", 4, 4));
-  TH1D* effok6 = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("effok6", 4, 4));
-  effok5->Divide(effok6);
-  effok5->SetName("correff60-80");
-
-  TH1D* effok7 = dynamic_cast<TH1D*>(h2true.ProjectionX("effok7", 5, 6));
-  TH1D* effok8 = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("effok8", 5, 6));
-  effok7->Divide(effok8);
-  effok7->SetName("correff80-120");*/
 
   TFile* fout = new TFile(outputFilename.c_str(), "RECREATE");
   fout->cd();
-  //effok->Write();
-  //effok3->Write();
-  //effok5->Write();
-  //effok7->Write();
   h1raw.SetName("raw");
   h1raw.Write();
   h1smeared.SetName("smeared");
