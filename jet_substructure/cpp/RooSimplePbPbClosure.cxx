@@ -202,7 +202,7 @@ TH2D* getReweightedRatioForClosure(const std::string embeddedDatasetName, const 
     auto embedded = TFile::Open(("output/embedPythia/RDF/" + embeddedDatasetName + "_" + groomingMethod + "_prefixes_hybrid_true_det_level_closure.root").c_str(), "READ");
     auto PbPb = TFile::Open(("output/PbPb/RDF/" + dataDatasetName + "_" + groomingMethod + "_prefixes_data_closure.root").c_str(), "READ");
 
-    auto hEmbedded = dynamic_cast<TH2D*>(embedded->Get((groomingMethod + "_det_level_kt_jet_pt").c_str()));
+    auto hEmbedded = dynamic_cast<TH2D*>(embedded->Get((groomingMethod + "_hybrid_kt_jet_pt").c_str()));
     auto hPbPb = dynamic_cast<TH2D*>(PbPb->Get((groomingMethod + "_data_kt_jet_pt").c_str()));
 
     auto hRatio = dynamic_cast<TH2D*>(hEmbedded->Clone("hRatio"));
@@ -266,11 +266,13 @@ void RunUnfolding(const std::string groomingMethod)
   RooUnfold::ErrorTreatment errorTreatment = RooUnfold::kCovariance;
   // Untagged bin below
   const bool untaggedBinBelowRange = true;
+  // Closure settings
+  const int closureVariation = 1;
   // Determine the base output filename and directory
   std::string outputFilename = "unfolding";
   std::string outputDir = "output/PbPb/unfolding";
   // And an optional tag at the end...
-  std::string tag = "closure1";
+  std::string tag = "closure" + std::to_string(closureVariation);
 
   //***************************************************
 
@@ -552,13 +554,16 @@ void RunUnfolding(const std::string groomingMethod)
     //std::cout << "ktBin: " << ktBin << ", trueSubstructureVariable: " << *trueSubstructureVariable << "\n";
     //std::cout << "jetPtBin: " << jetPtBin << ", trueJetPt: " << *trueJetPt << "\n";
 
-    if (random.Rndm() > 0.9) {
-        h2PseudoData.Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor * reweightFactor);
-        h2PseudoTrue.Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * reweightFactor);
+    //if (random.Rndm() > 0.9) {
+    if (random.Rndm() > 0.5) {
+        double pseudoReweightFactor = closureVariation == 1 ? reweightFactor : 1;
+        h2PseudoData.Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor * pseudoReweightFactor);
+        h2PseudoTrue.Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * pseudoReweightFactor);
         continue;
     }
 
-    response.Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    double responseReweightFactor = closureVariation == 2 ? reweightFactor : 1;
+    response.Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor * responseReweightFactor);
   }
 
   TH1D* htrueptd = dynamic_cast<TH1D*>(h2fulleff.ProjectionX("trueptd", 1, -1));
@@ -605,9 +610,10 @@ void RunUnfolding(const std::string groomingMethod)
 
   // Unfold the standard spectra.
   int nIter = 20;
+  // NOTE: This API isn't consistent with the standard unfolding...
   Unfold(response, h2PseudoData, errorTreatment, fout, "", nIter);
   // Unfold with the hybrid as the smeared input for a trivial closure.
-  //Unfold(response, h2smeared, errorTreatment, fout, "hybridAsInput", nIter);
+  //Unfold(response, errorTreatment, fout, "hybridAsInput", nIter);
 
   // Cleanup
   fout->Close();
