@@ -1,10 +1,12 @@
 """ 2D substructure unfolding implemented via RooUnfold.
 
+.. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
 import logging
 from pathlib import Path
-from typing import Any, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Type
+from typing_extensions import Final
 
 import attr
 import numpy as np
@@ -14,37 +16,284 @@ from jet_substructure.base import helpers
 
 logger = logging.getLogger(__name__)
 
+# Type helpers
+RooUnfoldErrorTreatment = Any
+RooUnfoldResponse = Any
+TH2D = Any
+TMatrixD = Any
+
+
+def _np_array_converter(value: Any, dtype: np.dtype = np.float64) -> np.ndarray:
+    """ Convert the given value to a numpy array.
+
+    Normally, we would just use np.array directly as the converter function. However, mypy will complain if
+    the converter is untyped. So we add (trivial) typing here.  See: https://github.com/python/mypy/issues/6172.
+
+    Args:
+        value: Value to be converted to a numpy array.
+    Returns:
+        The converted numpy array.
+    """
+    return np.array(value, dtype=dtype)
+
 
 @attr.s
-class SubstructureVariable:
+class ParameterSettings:
+    true_bins: np.ndarray = attr.ib(converter=_np_array_converter)
+    smeared_bins: np.ndarray = attr.ib(converter=_np_array_converter)
+
+
+@attr.s
+class SubstructureVariableSettings(ParameterSettings):
     name: str = attr.ib()
     variable_name: str = attr.ib()
+    min_smeared: float = attr.ib()
+    max_smeared: float = attr.ib()
+    untagged_value: float = attr.ib()
+
+    @classmethod
+    def from_binning(
+        cls: Type["SubstructureVariableSettings"],
+        true_bins: np.ndarray,
+        smeared_bins: np.ndarray,
+        name: str,
+        variable_name: str,
+        untagged_bin_below_range: bool = True,
+    ) -> "SubstructureVariableSettings":
+        if untagged_bin_below_range:
+            min_smeared = smeared_bins[1]
+            max_smeared = smeared_bins[-1]
+            untagged_value = (smeared_bins[1] - smeared_bins[0]) / 2 + smeared_bins[0]
+            # TODO: Sort out
+            # untaggedBinDescription = std::to_string(static_cast<int>(smearedSplittingVariableBins[0] * printFactor)) + "_" + static_cast<int>(smearedSplittingVariableBins[1] * printFactor);
+        else:
+            min_smeared = smeared_bins[0]
+            max_smeared = smeared_bins[-2]
+            untagged_value = (smeared_bins[-1] - smeared_bins[-2]) / 2 + smeared_bins[-2]
+            # TODO: Sort out
+            # untaggedBinDescription = std::to_string(static_cast<int>(smearedSplittingVariableBins[lastBin - 1] * printFactor)) + "_" + static_cast<int>(smearedSplittingVariableBins[lastBin] * printFactor);
+
+        return cls(
+            true_bins=true_bins,
+            smeared_bins=smeared_bins,
+            name=name,
+            variable_name=variable_name,
+            min_smeared=min_smeared,
+            max_smeared=max_smeared,
+            untagged_value=untagged_value,
+        )
+
+
+@attr.s
+class Settings:
+    grooming_method: str = attr.ib()
+    jet_pt: ParameterSettings = attr.ib()
+    substructure_variable: SubstructureVariableSettings = attr.ib()
 
 
 def _pass_filenames_to_ROOT(filenames: Sequence[Path]) -> List[str]:
     return [str(f) for f in filenames]
 
 
-def _array_to_ROOT(arr: np.ndarray, type_name: str = "double", ROOT: Any = None) -> Any:
-    """ Convert np array to ROOT.
+def _array_to_ROOT(arr: np.ndarray, type_name: str = "double") -> Any:
+    """ Convert numpy array to std::vector via ROOT.
 
-    Because it apparently can't handle conversions directly. Which is really dumb.
+    Because it apparently can't handle conversions directly. Which is really dumb...
+
+    In principle, we could convert the numpy dtype into the c++ type, but that's a lot of mapping
+    to be done for a function that (hopefully) isn't used so often. So we let the user decide.
+
+    Args:
+        arr: Numpy array to be converted.
+        type_name: c++ type name to be used for the vector. Default: "double".
+    Returns:
+        std::vector containing the numpy array values.
     """
-    if ROOT is None:
-        import ROOT
+    import ROOT
+
     vector = ROOT.std.vector(type_name)()
     for a in arr:
         vector.push_back(a)
     return vector
 
 
+def correlation_hist_substructure_var(cov: TMatrixD, name: str, title: str, na: int, nb: int, kbin: int) -> TH2D:
+    """ Correlation histogram for the substructure variable.
+
+    Varies from the pt by the indexing of the covariance matrix.
+
+    Args:
+        cov: Covariance matrix derived from the unfolding.
+        name: Name of the covariance matrix.
+        title: Title of the covariance matrix.
+        na: Number of x bins.
+        nb: Number of y bins.
+        kbin: Bin in the selected dimension.
+    Returns:
+        The correlation histogram.
+    """
+    import ROOT
+
+    h = ROOT.TH2D(name, title, nb, 0, nb, nb, 0, nb)
+
+    for l in range(0, nb):
+        for n in range(0, nb):
+            index1 = kbin + na * l
+            index2 = kbin + na * n
+            Vv = cov(index1, index1) * cov(index2, index2)
+            if Vv > 0.0:
+                h.SetBinContent(l + 1, n + 1, cov(index1, index2) / np.sqrt(Vv))
+    return h
+
+
+def correlation_hist_pt(cov: TMatrixD, name: str, title: str, na: int, nb: int, kbin: int) -> TH2D:
+    """ Correlation histogram for the jet pt.
+
+    Varies from the substructure variable by the indexing of the covariance matrix.
+
+    Args:
+        cov: Covariance matrix derived from the unfolding.
+        name: Name of the covariance matrix.
+        title: Title of the covariance matrix.
+        na: Number of x bins.
+        nb: Number of y bins.
+        kbin: Bin in the selected dimension.
+    Returns:
+        The correlation histogram.
+    """
+    import ROOT
+
+    h = ROOT.TH2D(name, title, na, 0, na, na, 0, na)
+
+    for l in range(0, na):
+        for n in range(0, na):
+            index1 = l + na * kbin
+            index2 = n + na * kbin
+            Vv = cov(index1, index1) * cov(index2, index2)
+            if Vv > 0.0:
+                h.SetBinContent(l + 1, n + 1, cov(index1, index2) / np.sqrt(Vv))
+    return h
+
+
+def unfolding_2D(
+    response: RooUnfoldResponse,
+    h2_true: TH2D,
+    input_spectra: TH2D,
+    error_treatment: Optional[RooUnfoldErrorTreatment] = None,
+    tag: str = "",
+    max_iter: Final[int] = 20,
+    n_iter_for_covariance: Final[int] = 8,
+) -> Dict[str, TH2D]:
+    """ Perform unfolding in 2D.
+
+    Args:
+        response: Response matrix.
+        h2_true: True histogram.
+        input_spectra: Input histogram.
+        error_treatment: Error treatment to be used for unfolding.
+        tag: Tag...
+        max_iter: Maximum number of iterations for unfolding. Default: 20.
+        n_iter_for_covariance: Number of iterations that should be used for calculating the covariance. Default: 8.
+    Returns:
+        Unfolded and folded hists per iter, as well as the covariance matrices. See the hist names in the code.
+    """
+    # Delayed import for convenience.
+    import ROOT
+
+    # Validation
+    if error_treatment is None:
+        error_treatment = ROOT.RooUnfold.ErrorTreatment.kCovariance
+
+    # Setup
+    logger.info("=======================================================")
+    logger.info(f'Unfolding for tag "{tag}"')
+    # Determine the tag. If we have a non-empty tag, we append it to all of the histograms.
+    if tag != "":
+        tag += "_"
+    output_hists = {}
+
+    for n_iter in range(1, max_iter):
+        logger.debug(f"Iteration {n_iter}")
+
+        # Setup the response for unfolding.
+        unfold = ROOT.RooUnfoldBayes(response, input_spectra, n_iter)
+        # And then unfold.
+        h_unfold = unfold.Hreco(error_treatment)
+
+        # Refold the truth (ie. fold back).
+        h_fold = response.ApplyToTruth(h_unfold, "")
+
+        # Clone unfolded and refolded hists to write to the output file.
+        name = f"{tag}Bayesian_Unfoldediter{n_iter}"
+        output_hists[name] = h_unfold.Clone()
+        name = f"{tag}Bayesian_Foldediter{n_iter}"
+        output_hists[name] = h_fold.Clone(name)
+
+        # Retrieve the covariance matrix. Only for a selected iteration.
+        if n_iter == n_iter_for_covariance:
+            covariance_matrix = unfold.Ereco(ROOT.RooUnfold.kCovariance)
+            # Substructure variable.
+            for k in range(0, h2_true.GetNbinsX()):
+                h_corr = correlation_hist_substructure_var(
+                    covariance_matrix, f"{tag}corr{k}", "Covariance matrix", h2_true.GetNbinsX(), h2_true.GetNbinsY(), k
+                )
+                name = f"{tag}pearsonmatrix_iter{n_iter}_bin_substructure_var{k}"
+                cov_substructure_var = h_corr.Clone(name)
+                cov_substructure_var.SetDrawOption("colz")
+                # Save
+                output_hists[name] = cov_substructure_var
+
+            # Jet pt.
+            for k in range(0, h2_true.GetNbinsY()):
+                h_corr = correlation_hist_pt(
+                    covariance_matrix,
+                    f"{tag}corr{k}pt",
+                    "Covariance matrix",
+                    h2_true.GetNbinsX(),
+                    h2_true.GetNbinsY(),
+                    k,
+                )
+                name = f"{tag}pearsonmatrix_iter{n_iter}_binpt{k}"
+                cov_pt = h_corr.Clone(name)
+                cov_pt.SetDrawOption("colz")
+                # Save
+                output_hists[name] = cov_pt
+
+    logger.info("Finished unfolding!")
+    logger.info("=======================================================")
+
+    return output_hists
+
+
+def setup(grooming_method: str):
+    settings = Settings(
+        grooming_method=grooming_method,
+        jet_pt=ParameterSettings(
+            true_bins=np.array([0, 30, 40, 60, 80, 100, 120, 160], dtype=np.float64),
+            smeared_bins=np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64),
+        ),
+        substructure_variable=SubstructureVariableSettings.from_binning(
+            true_bins=np.array(
+                # NOTE: (-0.05, 0) is the untagged bin.
+                [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],
+                dtype=np.float64,
+            ),
+            smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64),
+            name="kt",
+            variable_name="kt",
+            untagged_bin_below_range=True,
+        ),
+    )
+
+    return settings
+
+
 def run_unfolding_fall_back(
-    grooming_method: str,
-    substructure_variable_name: str,
-    smeared_substructure_variable_bins: np.ndarray,
-    smeared_jet_pt_bins: np.ndarray,
-    true_substructure_variable_bins: np.ndarray,
-    true_jet_pt_bins: np.ndarray,
+    settings: Settings,
+    # smeared_substructure_variable_bins: np.ndarray,
+    # smeared_jet_pt_bins: np.ndarray,
+    # true_substructure_variable_bins: np.ndarray,
+    # true_jet_pt_bins: np.ndarray,
     # data_filenames: Sequence[Path],
     # embedded_filenames: Sequence[Path],
     # output_filename: Path,
@@ -56,6 +305,7 @@ def run_unfolding_fall_back(
 
     # Setup
     ROOT.gSystem.Load("libRooUnfold")
+    # Assumes that we're running from the main directory, but that's usually a safe assumption.
     ROOT.gInterpreter.ProcessLine('#include "jet_substructure/cpp/unfolding.cxx"')
 
     # Configuration (not totally clear if this actually does anything for this script...)
@@ -66,79 +316,74 @@ def run_unfolding_fall_back(
     hists["h2_raw"] = ROOT.TH2D(
         "raw",
         "raw",
-        len(smeared_substructure_variable_bins) - 1,
-        smeared_substructure_variable_bins,
-        len(smeared_jet_pt_bins) - 1,
-        smeared_jet_pt_bins,
+        len(settings.substructure_variable.smeared_bins) - 1,
+        settings.substructure_variable.smeared_bins,
+        len(settings.jet_pt.smeared_bins) - 1,
+        settings.jet_pt.smeared_bins,
     )
     # detector measure level (ie. hybrid)
     hists["h2_smeared"] = ROOT.TH2D(
         "smeared",
         "smeared",
-        len(smeared_substructure_variable_bins) - 1,
-        smeared_substructure_variable_bins,
-        len(smeared_jet_pt_bins) - 1,
-        smeared_jet_pt_bins,
+        len(settings.substructure_variable.smeared_bins) - 1,
+        settings.substructure_variable.smeared_bins,
+        len(settings.jet_pt.smeared_bins) - 1,
+        settings.jet_pt.smeared_bins,
     )
     # detector measure level no cuts (ie. hybrid, but no cuts).
-    # NOTE: Strictly speaking, the y axis binning is at the hybrid level, but we want a wider range. So we use the true_jet_pt_bins.
     hists["h2_smeared_no_cuts"] = ROOT.TH2D(
         "smearednocuts",
         "smearednocuts",
-        len(smeared_substructure_variable_bins) - 1,
-        smeared_substructure_variable_bins,
-        len(true_jet_pt_bins) - 1,
-        true_jet_pt_bins,
+        len(settings.substructure_variable.smeared_bins) - 1,
+        settings.substructure_variable.smeared_bins,
+        # NOTE: We're actually going to fill hybrid jet pt. But we want a wider range, so we use true jet pt bins for convenience.
+        len(settings.jet_pt.true_bins) - 1,
+        settings.jet_pt.true_bins,
     )
     # true correlations with measured cuts
     hists["h2_true"] = ROOT.TH2D(
         "true",
         "true",
-        len(true_substructure_variable_bins) - 1,
-        true_substructure_variable_bins,
-        len(true_jet_pt_bins) - 1,
-        true_jet_pt_bins,
+        len(settings.substructure_variable.true_bins) - 1,
+        settings.substructure_variable.true_bins,
+        len(settings.jet_pt.true_bins) - 1,
+        settings.jet_pt.true_bins,
     )
     # full true correlation (without cuts)
     hists["h2_full_eff"] = ROOT.TH2D(
         "truef",
         "truef",
-        len(true_substructure_variable_bins) - 1,
-        true_substructure_variable_bins,
-        len(true_jet_pt_bins) - 1,
-        true_jet_pt_bins,
+        len(settings.substructure_variable.true_bins) - 1,
+        settings.substructure_variable.true_bins,
+        len(settings.jet_pt.true_bins) - 1,
+        settings.jet_pt.true_bins,
     )
     # Correlation between the splitting variables at true and hybrid (with cuts).
     hists["h2_substructure_variable"] = ROOT.TH2D(
         "h2SplittingVariable",
         "h2SplittingVariable",
-        len(smeared_substructure_variable_bins) - 1,
-        smeared_substructure_variable_bins,
-        len(true_substructure_variable_bins) - 1,
-        true_substructure_variable_bins,
+        len(settings.substructure_variable.smeared_bins) - 1,
+        settings.substructure_variable.smeared_bins,
+        len(settings.substructure_variable.true_bins) - 1,
+        settings.substructure_variable.true_bins,
     )
 
     # Sumw2 for all hists, store for passing them...
-    hists_to_root = ROOT.std.map("std::string", "TH2D *")()
-    # hists_to_root = {}
+    hists_map_for_root = ROOT.std.map("std::string", "TH2D *")()
     for k, h in hists.items():
         h.Sumw2()
         # Why not via __setitem__? Because that would be too easy...
-        hists_to_root.insert((k, h))
+        hists_map_for_root.insert((k, h))
         # hists_to_root[k] = ROOT.addressof(h, True)
-        # hists_to_root[k] = ROOT.AddressOf(h)[0]
 
     # TODO: Determine the untagged bin value
     # TODO: Make args...
     data_prefix = "data"
     data_jet_pt_name = f"{data_prefix}_jet_pt"
-    data_substructure_variable_name = f"{grooming_method}_{data_prefix}_{substructure_variable_name}"
+    data_substructure_variable_name = (
+        f"{settings.grooming_method}_{data_prefix}_{settings.substructure_variable.variable_name}"
+    )
     output_filename = "output_filename.root"
-
-    # TEMP for quick performance test
-    smeared_untagged_bin_value = 2.5
-    min_smeared_substructure_variable = 3
-    max_smeared_substructure_variable = 15
 
     # NOTE: TChain can only handle one "*" in the filename.
     data_filenames = [
@@ -148,22 +393,31 @@ def run_unfolding_fall_back(
 
     # print(hists)
     res = ROOT.run_unfolding_2D(
-        hists_to_root,
-        "dynamical_kt",
-        "kt",
-        _array_to_ROOT(smeared_jet_pt_bins, "double", ROOT),
-        _array_to_ROOT(true_jet_pt_bins, "double", ROOT),
-        _array_to_ROOT(smeared_substructure_variable_bins, "double", ROOT),
-        _array_to_ROOT(true_substructure_variable_bins, "double", ROOT),
-        smeared_untagged_bin_value,
-        min_smeared_substructure_variable,
-        max_smeared_substructure_variable,
-        _array_to_ROOT(_pass_filenames_to_ROOT(data_filenames), "std::string", ROOT),
-        _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string", ROOT),
+        hists_map_for_root,
+        settings.grooming_method,
+        settings.substructure_variable.variable_name,
+        _array_to_ROOT(settings.jet_pt.smeared_bins, "double"),
+        _array_to_ROOT(settings.jet_pt.true_bins, "double"),
+        _array_to_ROOT(settings.substructure_variable.smeared_bins, "double"),
+        _array_to_ROOT(settings.substructure_variable.true_bins, "double"),
+        settings.substructure_variable.untagged_value,
+        settings.substructure_variable.min_smeared,
+        settings.substructure_variable.max_smeared,
+        _array_to_ROOT(_pass_filenames_to_ROOT(data_filenames), "std::string"),
+        _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
         output_filename,
     )
 
-    print(res)
+    logger.debug(res)
+    # import IPython; IPython.embed()
+
+    # TODO: From here, we have the responses, as well as the filled hists (stored in our map).
+    output_hists = unfolding_2D(
+        # response=res.response,
+        response=res._0,
+        h2_true=hists["h2_true"],
+        input_spectra=hists["h2_raw"],
+    )
 
     return True
 
@@ -564,14 +818,13 @@ if __name__ == "__main__":
     # )
 
     run_unfolding_fall_back(
-        grooming_method="leading_kt",
-        substructure_variable_name="kt",
-        smeared_substructure_variable_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64,),
-        smeared_jet_pt_bins=np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64,),
-        true_substructure_variable_bins=np.array(
-            # NOTE: (-0.05, 0) is the untagged bin.
-            [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],
-            dtype=np.float64,
-        ),
-        true_jet_pt_bins=np.array([0, 30, 40, 60, 80, 100, 120, 160], dtype=np.float64,),
+        settings=setup("dynamical_kt"),
+        # smeared_substructure_variable_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64,),
+        # smeared_jet_pt_bins=np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64,),
+        # true_substructure_variable_bins=np.array(
+        #    # NOTE: (-0.05, 0) is the untagged bin.
+        #    [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],
+        #    dtype=np.float64,
+        # ),
+        # true_jet_pt_bins=np.array([0, 30, 40, 60, 80, 100, 120, 160], dtype=np.float64,),
     )

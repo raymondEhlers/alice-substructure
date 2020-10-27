@@ -281,10 +281,24 @@ enum UnfoldingType_t {
   rg = 2
 };
 
+inline bool isPureMatch(int matchingLeading, int matchingSubleading, double hybridSubstructureVariableValue, double smearedUntaggedBinValue)
+{
+  return (((std::abs(matchingLeading - 1) < 0.001) && (std::abs(matchingSubleading - 1) < 0.001)) ||
+      (std::abs(hybridSubstructureVariableValue - smearedUntaggedBinValue) < 0.001));
+}
+
+struct ResponseResult {
+  RooUnfoldResponse response;
+  RooUnfoldResponse response_no_trunc;
+
+  ResponseResult(RooUnfoldResponse & _response, RooUnfoldResponse & _response_no_trunc) { response = _response; response_no_trunc = _response_no_trunc; }
+};
+
 /**
  * Interface to 2D unfoling with python.
  *
  */
+//ResponseResult run_unfolding_2D(
 std::tuple<RooUnfoldResponse, RooUnfoldResponse> run_unfolding_2D(
     std::map<std::string, TH2D *> hists,
     const std::string groomingMethod,
@@ -305,9 +319,6 @@ std::tuple<RooUnfoldResponse, RooUnfoldResponse> run_unfolding_2D(
     const unsigned int maxNIter = 20
     )
 {
-  // TODO: Define error treatment via variable...
-  RooUnfold::ErrorTreatment errorTreatment = RooUnfold::kCovariance;
-
   // the raw correlation (ie. data)
   /*TH2D h2raw("raw", "raw", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
   // detector measure level (ie. hybrid)
@@ -439,18 +450,22 @@ std::tuple<RooUnfoldResponse, RooUnfoldResponse> run_unfolding_2D(
       }
     }
     // Matching cuts: Requiring a pure match.
-    if (usePureMatches &&
+    /*if (usePureMatches &&
       !(((std::abs(*matchingLeading - 1) < 0.001) && (std::abs(*matchingSubleading - 1) < 0.001)) ||
        (std::abs(hybridSubstructureVariableValue - smearedUntaggedBinValue) < 0.001))) {
+      continue;
+    }*/
+    if (usePureMatches && !isPureMatch(*matchingLeading, *matchingSubleading, hybridSubstructureVariableValue, smearedUntaggedBinValue)) {
       continue;
     }
     hists["h2_smeared"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
     hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
-    response.Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
     // So we can look at the substructure variable correlation.
     hists["h2_substructure_variable"]->Fill(hybridSubstructureVariableValue, *trueSubstructureVariable, *scaleFactor);
+    response.Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
   }
 
+  //return ResponseResult(response, responsenotrunc);
   return std::make_tuple(response, responsenotrunc);
 
   /*
