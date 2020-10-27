@@ -287,19 +287,21 @@ inline bool isPureMatch(int matchingLeading, int matchingSubleading, double hybr
       (std::abs(hybridSubstructureVariableValue - smearedUntaggedBinValue) < 0.001));
 }
 
+/**
+ * Wrapper around the RooUnfoldResponse. Just for convenience.
+ *
+ * Since this wrapper is passed back to python, the field are named for Python.
+ */
 struct ResponseResult {
-  RooUnfoldResponse response;
-  RooUnfoldResponse response_no_trunc;
-
-  ResponseResult(RooUnfoldResponse & _response, RooUnfoldResponse & _response_no_trunc) { response = _response; response_no_trunc = _response_no_trunc; }
+  std::shared_ptr<RooUnfoldResponse> response;
+  std::shared_ptr<RooUnfoldResponse> response_no_trunc;
 };
 
 /**
- * Interface to 2D unfoling with python.
+ * Interface to 2D unfolding with python.
  *
  */
-//ResponseResult run_unfolding_2D(
-std::tuple<RooUnfoldResponse, RooUnfoldResponse> run_unfolding_2D(
+ResponseResult create_response_2D(
     std::map<std::string, TH2D *> hists,
     const std::string groomingMethod,
     const std::string substructureVariableName,
@@ -312,49 +314,25 @@ std::tuple<RooUnfoldResponse, RooUnfoldResponse> run_unfolding_2D(
     double maxSmearedSplittingVariable,
     const std::vector<std::string> & dataFilenames,
     const std::vector<std::string> & embeddedFilenames,
-    const std::string outputFilename,
     const std::string & dataTreeName = "tree",
+    const std::string & dataPrefix = "data",
     const std::string & embeddedTreeName = "tree",
+    const std::string & truePrefix = "true",
+    const std::string & hybridPrefix = "hybrid",
+    const std::string & detLevelPrefix = "det_level",
     const bool usePureMatches = false,
     const unsigned int maxNIter = 20
     )
 {
-  // the raw correlation (ie. data)
-  /*TH2D h2raw("raw", "raw", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
-  // detector measure level (ie. hybrid)
-  TH2D h2smeared("smeared", "smeared", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), smearedJetPtBins.size() - 1, smearedJetPtBins.data());
-  // detector measure level no cuts (ie. hybrid, but no cuts).
-  // NOTE: Strictly speaking, the y axis binning is at the hybrid level, but we want a wider range. So we use the trueJetPtBins.
-  TH2D h2smearednocuts("smearednocuts", "smearednocuts", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
-  // true correlations with measured cuts
-  TH2D h2true("true", "true", trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
-  // full true correlation (without cuts)
-  TH2D h2fulleff("truef", "truef", trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data(), trueJetPtBins.size() - 1, trueJetPtBins.data());
-  // Correlation between the splitting variables at true and hybrid (with cuts).
-  TH2D h2SplittingVariable("h2SplittingVariable", "h2SplittingVariable", smearedSplittingVariableBins.size() - 1, smearedSplittingVariableBins.data(), trueSplittingVariableBins.size() - 1, trueSplittingVariableBins.data());
-
-  h2raw.Sumw2();
-  h2smeared.Sumw2();
-  h2smearednocuts.Sumw2();
-  h2true.Sumw2();
-  h2fulleff.Sumw2();
-  h2SplittingVariable.Sumw2();*/
-
-  // Read the data and create the raw data hist.
-  // First, setup the input data.
-  //TChain dataChain("AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl");
+  // First, we handle the data. Setup the Reader, the columns, and store the data in the appropriate hists.
   TChain dataChain(dataTreeName.c_str());
-  //dataChain.Add("trains/PbPb/5863/skim/*.root");
   for (auto filename : dataFilenames) {
     dataChain.Add(filename.c_str());
   }
   TTreeReader dataReader(&dataChain);
 
-  // Determines the type of data that we use. Usually, this is going to be "data" for raw data.
-  const std::string dataPrefix = "data";
-
-  TTreeReaderValue<float> dataJetPt(dataReader, ("jet_pt_" + dataPrefix).c_str());
-  TTreeReaderValue<float> dataSubstructureVariable(dataReader, (groomingMethod + "_" + dataPrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<double> dataJetPt(dataReader, (dataPrefix + "_jet_pt").c_str());
+  TTreeReaderValue<double> dataSubstructureVariable(dataReader, (groomingMethod + "_" + dataPrefix + "_" + substructureVariableName).c_str());
   while (dataReader.Next()) {
     // Jet pt cut.
     if (*dataJetPt < smearedJetPtBins[0] || *dataJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
@@ -371,40 +349,37 @@ std::tuple<RooUnfoldResponse, RooUnfoldResponse> run_unfolding_2D(
         continue;
       }
     }
-    //h2raw.Fill(dataSubstructureVariableValue, *dataJetPt);
-    hists["raw"]->Fill(dataSubstructureVariableValue, *dataJetPt);
+    hists["h2_raw"]->Fill(dataSubstructureVariableValue, *dataJetPt);
   }
 
-  // Embedded
+  // Now, switch to embedded
+  // First, setup the response
+  // NOTE: We allocate a shared_ptr, but don't delete here because we want to return the response
+  //       without copying. If we do copy, RooUnfold doesn't seem to behave identically. It may not make
+  //       a difference, but better not to tempt fate. Instead, we pass ownership to the caller.
+  auto response = std::make_shared<RooUnfoldResponse>();
+  auto responsenotrunc = std::make_shared<RooUnfoldResponse>();
+  response->Setup(hists["h2_smeared"], hists["h2_true"]);
+  responsenotrunc->Setup(hists["h2_smeared_no_cuts"], hists["h2_full_eff"]);
+
+  // Next, we setup the Reader, the columns, and store the data in the appropriate hists.
   TChain embeddedChain(embeddedTreeName.c_str());
   for (auto filename : embeddedFilenames) {
     embeddedChain.Add(filename.c_str());
   }
-
-  // Define the reader and process.
-  //std::string truePrefix = "matched";
-  std::string truePrefix = "true";
-  //std::string hybridPrefix = "data";
-  std::string hybridPrefix = "hybrid";
-  std::string detLevelPrefix = "det_level";
   TTreeReader mcReader(&embeddedChain);
+
+  // Values
   TTreeReaderValue<double> scaleFactor(mcReader, "scale_factor");
   TTreeReaderValue<double> hybridJetPt(mcReader, (hybridPrefix + "_jet_pt").c_str());
   TTreeReaderValue<double> hybridSubstructureVariable(mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
   TTreeReaderValue<double> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
   TTreeReaderValue<double> trueSubstructureVariable(mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
-  //TTreeReaderValue<long long> matchingLeading(mcReader, (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
   TTreeReaderValue<long long> matchingLeading(mcReader, (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
   TTreeReaderValue<long long> matchingSubleading(mcReader, (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
   // For the double counting cut.
   TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
   TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
-
-  // Setup for the response
-  RooUnfoldResponse response;
-  RooUnfoldResponse responsenotrunc;
-  response.Setup(hists["h2_smeared"], hists["h2_true"]);
-  responsenotrunc.Setup(hists["h2_smeared_no_cuts"], hists["h2_full_eff"]);
 
   int treeNumber = -1;
   //double scaleFactor = 0;
@@ -429,12 +404,13 @@ std::tuple<RooUnfoldResponse, RooUnfoldResponse> run_unfolding_2D(
       continue;
     }
 
-    // Full efficiency hists.
+    // Full efficiency hists (and response).
     hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
     hists["h2_smeared_no_cuts"]->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
-    responsenotrunc.Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    responsenotrunc->Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
 
     // Now start making cuts on the hybrid level.
+    // Jet pt
     if (*hybridJetPt < smearedJetPtBins[0] || *hybridJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
       continue;
     }
@@ -450,44 +426,19 @@ std::tuple<RooUnfoldResponse, RooUnfoldResponse> run_unfolding_2D(
       }
     }
     // Matching cuts: Requiring a pure match.
-    /*if (usePureMatches &&
-      !(((std::abs(*matchingLeading - 1) < 0.001) && (std::abs(*matchingSubleading - 1) < 0.001)) ||
-       (std::abs(hybridSubstructureVariableValue - smearedUntaggedBinValue) < 0.001))) {
-      continue;
-    }*/
     if (usePureMatches && !isPureMatch(*matchingLeading, *matchingSubleading, hybridSubstructureVariableValue, smearedUntaggedBinValue)) {
       continue;
     }
+
+    // At this point, we've passed all of our cuts, so we store the result.
     hists["h2_smeared"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
     hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
     // So we can look at the substructure variable correlation.
     hists["h2_substructure_variable"]->Fill(hybridSubstructureVariableValue, *trueSubstructureVariable, *scaleFactor);
-    response.Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    response->Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
   }
 
-  //return ResponseResult(response, responsenotrunc);
-  return std::make_tuple(response, responsenotrunc);
-
-  /*
-  TFile* fout = new TFile(outputFilename.c_str(), "RECREATE");
-  fout->cd();
-  h2raw.Write();
-  h2smeared.Write();
-  h2true.Write();
-  h2fulleff.Write();
-  h2SplittingVariable.Write();
-
-  // Unfold the standard spectra.
-  int nIter = 20;
-  Unfold2D(response, h2true, h2raw, errorTreatment, fout, "", maxNIter);
-  // Unfold with the hybrid as the smeared input for a trivial closure.
-  Unfold2D(response, h2true, h2smeared, errorTreatment, fout, "hybrid_as_input", maxNIter);
-
-  // Cleanup
-  fout->Close();
-
-  return std::make_tuple(response);
-  */
+  return ResponseResult{response, responsenotrunc};
 }
 
 /**

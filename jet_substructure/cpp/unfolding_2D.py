@@ -6,7 +6,6 @@
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Type
-from typing_extensions import Final
 
 import attr
 import numpy as np
@@ -49,7 +48,11 @@ class SubstructureVariableSettings(ParameterSettings):
     variable_name: str = attr.ib()
     min_smeared: float = attr.ib()
     max_smeared: float = attr.ib()
-    untagged_value: float = attr.ib()
+    untagged_bin: helpers.RangeSelector = attr.ib()
+
+    @property
+    def untagged_value(self) -> float:
+        return (self.untagged_bin.max - self.untagged_bin.min) / 2 + self.untagged_bin.min
 
     @classmethod
     def from_binning(
@@ -63,14 +66,13 @@ class SubstructureVariableSettings(ParameterSettings):
         if untagged_bin_below_range:
             min_smeared = smeared_bins[1]
             max_smeared = smeared_bins[-1]
-            untagged_value = (smeared_bins[1] - smeared_bins[0]) / 2 + smeared_bins[0]
+            untagged_bin = helpers.RangeSelector(min=smeared_bins[0], max=smeared_bins[1])
             # TODO: Sort out
             # untaggedBinDescription = std::to_string(static_cast<int>(smearedSplittingVariableBins[0] * printFactor)) + "_" + static_cast<int>(smearedSplittingVariableBins[1] * printFactor);
         else:
             min_smeared = smeared_bins[0]
             max_smeared = smeared_bins[-2]
-            untagged_value = (smeared_bins[-1] - smeared_bins[-2]) / 2 + smeared_bins[-2]
-            # TODO: Sort out
+            untagged_bin = helpers.RangeSelector(min=smeared_bins[-2], max=smeared_bins[-1])
             # untaggedBinDescription = std::to_string(static_cast<int>(smearedSplittingVariableBins[lastBin - 1] * printFactor)) + "_" + static_cast<int>(smearedSplittingVariableBins[lastBin] * printFactor);
 
         return cls(
@@ -80,7 +82,7 @@ class SubstructureVariableSettings(ParameterSettings):
             variable_name=variable_name,
             min_smeared=min_smeared,
             max_smeared=max_smeared,
-            untagged_value=untagged_value,
+            untagged_bin=untagged_bin,
         )
 
 
@@ -89,6 +91,28 @@ class Settings:
     grooming_method: str = attr.ib()
     jet_pt: ParameterSettings = attr.ib()
     substructure_variable: SubstructureVariableSettings = attr.ib()
+    tag: str = attr.ib()
+    output_dir: Path = attr.ib()
+    use_pure_matches: bool = attr.ib(default=False)
+    filename_padding_factor: int = attr.ib(default=1)
+
+    @property
+    def output_filename(self) -> Path:
+        # Start with the basic information
+        base_filename = f"unfolding_{self.substructure_variable.name}_grooming_method_{self.grooming_method}"
+        # Then add the binning information.
+        # First, the substructure edges.
+        base_filename += f"_smeared_{self.substructure_variable.variable_name}_{int(self.substructure_variable.min_smeared * self.filename_padding_factor)}_{int(self.substructure_variable.max_smeared * self.filename_padding_factor)}"
+        # Then the untagged
+        base_filename += f"_untagged_{int(self.substructure_variable.untagged_bin.min * self.filename_padding_factor)}_{int(self.substructure_variable.untagged_bin.max * self.filename_padding_factor)}"
+        # Then the jet pt
+        base_filename += f"_smeared_jet_pt_{int(self.jet_pt.smeared_bins[0] * self.filename_padding_factor)}_{int(self.jet_pt.smeared_bins[-1] * self.filename_padding_factor)}"
+        # Additional options
+        if self.use_pure_matches:
+            base_filename += "_pure_matches"
+        if self.tag:
+            base_filename += f"_{self.tag}"
+        return (self.output_dir / base_filename).with_suffix(".root")
 
 
 def _pass_filenames_to_ROOT(filenames: Sequence[Path]) -> List[str]:
@@ -136,13 +160,13 @@ def correlation_hist_substructure_var(cov: TMatrixD, name: str, title: str, na: 
 
     h = ROOT.TH2D(name, title, nb, 0, nb, nb, 0, nb)
 
-    for l in range(0, nb):
+    for i in range(0, nb):
         for n in range(0, nb):
-            index1 = kbin + na * l
+            index1 = kbin + na * i
             index2 = kbin + na * n
             Vv = cov(index1, index1) * cov(index2, index2)
             if Vv > 0.0:
-                h.SetBinContent(l + 1, n + 1, cov(index1, index2) / np.sqrt(Vv))
+                h.SetBinContent(i + 1, n + 1, cov(index1, index2) / np.sqrt(Vv))
     return h
 
 
@@ -165,31 +189,31 @@ def correlation_hist_pt(cov: TMatrixD, name: str, title: str, na: int, nb: int, 
 
     h = ROOT.TH2D(name, title, na, 0, na, na, 0, na)
 
-    for l in range(0, na):
+    for i in range(0, na):
         for n in range(0, na):
-            index1 = l + na * kbin
+            index1 = i + na * kbin
             index2 = n + na * kbin
             Vv = cov(index1, index1) * cov(index2, index2)
             if Vv > 0.0:
-                h.SetBinContent(l + 1, n + 1, cov(index1, index2) / np.sqrt(Vv))
+                h.SetBinContent(i + 1, n + 1, cov(index1, index2) / np.sqrt(Vv))
     return h
 
 
 def unfolding_2D(
     response: RooUnfoldResponse,
-    h2_true: TH2D,
     input_spectra: TH2D,
+    true_spectra: TH2D,
     error_treatment: Optional[RooUnfoldErrorTreatment] = None,
     tag: str = "",
-    max_iter: Final[int] = 20,
-    n_iter_for_covariance: Final[int] = 8,
+    max_iter: int = 20,
+    n_iter_for_covariance: int = 8,
 ) -> Dict[str, TH2D]:
     """ Perform unfolding in 2D.
 
     Args:
         response: Response matrix.
-        h2_true: True histogram.
         input_spectra: Input histogram.
+        true_spectra: True histogram. Just used for binning with the covariance matrices.
         error_treatment: Error treatment to be used for unfolding.
         tag: Tag...
         max_iter: Maximum number of iterations for unfolding. Default: 20.
@@ -225,7 +249,7 @@ def unfolding_2D(
 
         # Clone unfolded and refolded hists to write to the output file.
         name = f"{tag}Bayesian_Unfoldediter{n_iter}"
-        output_hists[name] = h_unfold.Clone()
+        output_hists[name] = h_unfold.Clone(name)
         name = f"{tag}Bayesian_Foldediter{n_iter}"
         output_hists[name] = h_fold.Clone(name)
 
@@ -233,9 +257,14 @@ def unfolding_2D(
         if n_iter == n_iter_for_covariance:
             covariance_matrix = unfold.Ereco(ROOT.RooUnfold.kCovariance)
             # Substructure variable.
-            for k in range(0, h2_true.GetNbinsX()):
+            for k in range(0, true_spectra.GetNbinsX()):
                 h_corr = correlation_hist_substructure_var(
-                    covariance_matrix, f"{tag}corr{k}", "Covariance matrix", h2_true.GetNbinsX(), h2_true.GetNbinsY(), k
+                    covariance_matrix,
+                    f"{tag}corr{k}",
+                    "Covariance matrix",
+                    true_spectra.GetNbinsX(),
+                    true_spectra.GetNbinsY(),
+                    k,
                 )
                 name = f"{tag}pearsonmatrix_iter{n_iter}_bin_substructure_var{k}"
                 cov_substructure_var = h_corr.Clone(name)
@@ -244,16 +273,16 @@ def unfolding_2D(
                 output_hists[name] = cov_substructure_var
 
             # Jet pt.
-            for k in range(0, h2_true.GetNbinsY()):
+            for k in range(0, true_spectra.GetNbinsY()):
                 h_corr = correlation_hist_pt(
                     covariance_matrix,
                     f"{tag}corr{k}pt",
                     "Covariance matrix",
-                    h2_true.GetNbinsX(),
-                    h2_true.GetNbinsY(),
+                    true_spectra.GetNbinsX(),
+                    true_spectra.GetNbinsY(),
                     k,
                 )
-                name = f"{tag}pearsonmatrix_iter{n_iter}_binpt{k}"
+                name = f"{tag}pearsonmatrix_iter{n_iter}_bin_pt{k}"
                 cov_pt = h_corr.Clone(name)
                 cov_pt.SetDrawOption("colz")
                 # Save
@@ -265,8 +294,25 @@ def unfolding_2D(
     return output_hists
 
 
-def setup(grooming_method: str):
-    settings = Settings(
+def _setup_unfolding() -> None:
+    """ Setup RooUnfold and the additional unfolding code. """
+    # Delayed import to avoid direct dependence.
+    import ROOT
+
+    # Load RooUnfold
+    ROOT.gSystem.Load("libRooUnfold")
+    # Load the unfolding utilities. We're careful to be (relatively) position independent.
+    # This just assumes that this file is in the same directory as the unfolding.cxx file, which should
+    # usually be a reasonable assumption.
+    unfolding_cxx = Path(__file__).resolve().parent / "unfolding.cxx"
+    ROOT.gInterpreter.ProcessLine(f"""#include "{str(unfolding_cxx)}" """)
+    # Nominally additional setup for MT. It's not really going to do us any good here, but it doesn't hurt anything.
+    # NOTE: We do need to specify 1 to ensure that we don't use extra cores.
+    ROOT.ROOT.EnableImplicitMT(1)
+
+
+def setup(grooming_method: str) -> Settings:
+    default_settings = Settings(
         grooming_method=grooming_method,
         jet_pt=ParameterSettings(
             true_bins=np.array([0, 30, 40, 60, 80, 100, 120, 160], dtype=np.float64),
@@ -283,9 +329,12 @@ def setup(grooming_method: str):
             variable_name="kt",
             untagged_bin_below_range=True,
         ),
+        tag="broadTrueBins",
+        output_dir=Path("output/PbPb/unfolding/test"),
+        use_pure_matches=False,
     )
 
-    return settings
+    return default_settings
 
 
 def _default_hists(settings: Settings) -> Tuple[Dict[str, TH2D], Any]:
@@ -359,44 +408,23 @@ def _default_hists(settings: Settings) -> Tuple[Dict[str, TH2D], Any]:
     return hists, hists_map_for_root
 
 
-def run_unfolding_fall_back(settings: Settings,) -> bool:
+def run_unfolding_fall_back(
+    settings: Settings, data_filenames: Sequence[Path], embedded_filenames: Sequence[Path]
+) -> bool:
     # TODO: Determine input settings, etc here. This is the point of having the python code, but calling down to c++
 
     # Delayed import to avoid direct dependence.
     import ROOT
 
     # Setup
-    # Load RooUnfold
-    ROOT.gSystem.Load("libRooUnfold")
-    # Load the unfolding utilities. We're careful to be (relatively) position independent.
-    # This just assumes that this file is in the same directory as the unfolding.cxx file, which should
-    # usually be a reasonable assumption.
-    unfolding_cxx = Path(__file__).resolve().parent / "unfolding.cxx"
-    ROOT.gInterpreter.ProcessLine(f"""#include "{str(unfolding_cxx)}" """)
-    # Nominally additional setup for MT. It's not really going to do us any good here, but it doesn't hurt anything.
-    # NOTE: We do need to specify 1 to ensure that we don't use extra cores.
-    ROOT.ROOT.EnableImplicitMT(1)
+    _setup_unfolding()
 
     # Define hists (and the map to pass them into ROOT for unfolding)
     hists, hists_map_for_root = _default_hists(settings=settings)
 
-    # TODO: Determine the untagged bin value
-    # TODO: Make args...
-    data_prefix = "data"
-    data_jet_pt_name = f"{data_prefix}_jet_pt"
-    data_substructure_variable_name = (
-        f"{settings.grooming_method}_{data_prefix}_{settings.substructure_variable.variable_name}"
-    )
-    output_filename = "output_filename.root"
-
-    # NOTE: TChain can only handle one "*" in the filename.
-    data_filenames = [
-        Path("trains/PbPb/5863/skim/*.root"),
-    ]
-    embedded_filenames = [Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(5966, 5986)]
-
-    # print(hists)
-    res = ROOT.run_unfolding_2D(
+    # Create the responses. We assume some conventions about column names.
+    # They should generally be reasonable, but may require tweaks from time to time.
+    responses = ROOT.create_response_2D(
         hists_map_for_root,
         settings.grooming_method,
         settings.substructure_variable.variable_name,
@@ -409,19 +437,42 @@ def run_unfolding_fall_back(settings: Settings,) -> bool:
         settings.substructure_variable.max_smeared,
         _array_to_ROOT(_pass_filenames_to_ROOT(data_filenames), "std::string"),
         _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
-        output_filename,
     )
 
-    logger.debug(res)
-    # import IPython; IPython.embed()
+    logger.debug(responses)
 
-    # TODO: From here, we have the responses, as well as the filled hists (stored in our map).
-    output_hists = unfolding_2D(
-        response=res.response,
-        # response=res._0,
-        h2_true=hists["h2_true"],
-        input_spectra=hists["h2_raw"],
+    # Perform the actual unfolding.
+    # First, the standard unfolding.
+    output_hists = {}
+    output_hists.update(
+        unfolding_2D(response=responses.response, input_spectra=hists["h2_raw"], true_spectra=hists["h2_true"],)
     )
+    # Next, the trivial closure test where the input is the smeared hybrid spectra.
+    output_hists.update(
+        unfolding_2D(
+            response=responses.response,
+            input_spectra=hists["h2_smeared"],
+            true_spectra=hists["h2_true"],
+            tag="hybrid_smeared_as_input",
+        )
+    )
+
+    # Store the output hists.
+    settings.output_filename.parent.mkdir(parents=True, exist_ok=True)
+    # Uproot3 also works, but it's far less space efficient. Since we already have to import ROOT,
+    # we may as well just use it...
+    # with uproot3.recreate(settings.output_filename.with_suffix(".uproot.root")) as f:
+    #    for k, v in hists.items():
+    #        f[k] = binned_data.BinnedData.from_existing_data(v).to_numpy()
+    #    for k, v in output_hists.items():
+    #        f[k] = binned_data.BinnedData.from_existing_data(v).to_numpy()
+    f_out = ROOT.TFile(str(settings.output_filename), "RECREATE")
+    f_out.cd()
+    for v in hists.values():
+        v.Write()
+    for v in output_hists.values():
+        v.Write()
+    f_out.Close()
 
     return True
 
@@ -539,6 +590,8 @@ def run_unfolding(
     logger.info("Done with loop")
 
     # Embedding
+
+    return True
 
 
 def run_unfolding_rdf(
@@ -796,6 +849,8 @@ def run_unfolding_rdf(
 
     logger.info("Done with loop")
 
+    return True
+
 
 if __name__ == "__main__":
     helpers.setup_logging()
@@ -823,12 +878,9 @@ if __name__ == "__main__":
 
     run_unfolding_fall_back(
         settings=setup("dynamical_kt"),
-        # smeared_substructure_variable_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64,),
-        # smeared_jet_pt_bins=np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64,),
-        # true_substructure_variable_bins=np.array(
-        #    # NOTE: (-0.05, 0) is the untagged bin.
-        #    [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],
-        #    dtype=np.float64,
-        # ),
-        # true_jet_pt_bins=np.array([0, 30, 40, 60, 80, 100, 120, 160], dtype=np.float64,),
+        # NOTE: TChain can only handle one "*" in the filename.
+        data_filenames=[Path("trains/PbPb/5863/skim/*.root"),],
+        embedded_filenames=[
+            Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(5966, 5986)
+        ],
     )
