@@ -5,7 +5,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Type
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Type
 from typing_extensions import Final
 
 import attr
@@ -288,28 +288,8 @@ def setup(grooming_method: str):
     return settings
 
 
-def run_unfolding_fall_back(
-    settings: Settings,
-    # smeared_substructure_variable_bins: np.ndarray,
-    # smeared_jet_pt_bins: np.ndarray,
-    # true_substructure_variable_bins: np.ndarray,
-    # true_jet_pt_bins: np.ndarray,
-    # data_filenames: Sequence[Path],
-    # embedded_filenames: Sequence[Path],
-    # output_filename: Path,
-) -> bool:
-    # TODO: Determine input settings, etc here. This is the point of having the python code, but calling down to c++
-
-    # Delayed import to avoid direct dependence.
+def _default_hists(settings: Settings) -> Tuple[Dict[str, TH2D], Any]:
     import ROOT
-
-    # Setup
-    ROOT.gSystem.Load("libRooUnfold")
-    # Assumes that we're running from the main directory, but that's usually a safe assumption.
-    ROOT.gInterpreter.ProcessLine('#include "jet_substructure/cpp/unfolding.cxx"')
-
-    # Configuration (not totally clear if this actually does anything for this script...)
-    ROOT.ROOT.EnableImplicitMT(1)
 
     hists = {}
     # the raw correlation (ie. data)
@@ -376,6 +356,30 @@ def run_unfolding_fall_back(
         hists_map_for_root.insert((k, h))
         # hists_to_root[k] = ROOT.addressof(h, True)
 
+    return hists, hists_map_for_root
+
+
+def run_unfolding_fall_back(settings: Settings,) -> bool:
+    # TODO: Determine input settings, etc here. This is the point of having the python code, but calling down to c++
+
+    # Delayed import to avoid direct dependence.
+    import ROOT
+
+    # Setup
+    # Load RooUnfold
+    ROOT.gSystem.Load("libRooUnfold")
+    # Load the unfolding utilities. We're careful to be (relatively) position independent.
+    # This just assumes that this file is in the same directory as the unfolding.cxx file, which should
+    # usually be a reasonable assumption.
+    unfolding_cxx = Path(__file__).resolve().parent / "unfolding.cxx"
+    ROOT.gInterpreter.ProcessLine(f"""#include "{str(unfolding_cxx)}" """)
+    # Nominally additional setup for MT. It's not really going to do us any good here, but it doesn't hurt anything.
+    # NOTE: We do need to specify 1 to ensure that we don't use extra cores.
+    ROOT.ROOT.EnableImplicitMT(1)
+
+    # Define hists (and the map to pass them into ROOT for unfolding)
+    hists, hists_map_for_root = _default_hists(settings=settings)
+
     # TODO: Determine the untagged bin value
     # TODO: Make args...
     data_prefix = "data"
@@ -413,8 +417,8 @@ def run_unfolding_fall_back(
 
     # TODO: From here, we have the responses, as well as the filled hists (stored in our map).
     output_hists = unfolding_2D(
-        # response=res.response,
-        response=res._0,
+        response=res.response,
+        # response=res._0,
         h2_true=hists["h2_true"],
         input_spectra=hists["h2_raw"],
     )
