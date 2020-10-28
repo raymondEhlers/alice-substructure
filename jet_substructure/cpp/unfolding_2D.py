@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Sequence, Type
 
 import attr
 import numpy as np
+from pachyderm import binned_data
 
 from jet_substructure.base import helpers
 
@@ -614,10 +615,7 @@ def get_reweighted_ratio_for_closure(
 
 
 def run_unfolding_closure_reweighting(
-    settings: Settings,
-    embedded_filenames: Sequence[Path],
-    fraction_for_response: float = 0.75,
-    reweight_response: bool = False,
+    settings: Settings, embedded_filenames: Sequence[Path], closure_variation: str, fraction_for_response: float = 0.75,
 ) -> bool:
     """ Run unfolding closure with reweighting.
 
@@ -627,6 +625,7 @@ def run_unfolding_closure_reweighting(
     Args:
         settings: Unfolding settings.
         embedded_filenames: Filenames for embedded data.
+        closure_variation: Name of the closure variation.
         fraction_for_response: Fraction of statistics for the response. Default: 0.75, as determined by
             comparing error bars in data and embedded.
     Returns:
@@ -636,33 +635,45 @@ def run_unfolding_closure_reweighting(
     import ROOT
 
     # TODO: Need to chain creating the reweighting hists unless they already exists.
-    # TODO: Careful - the binning needs to match!
 
     # Setup
     _setup_unfolding()
+    # Validate variations.
+    _variations = {
+        "split_MC": ROOT.ClosureVariation_t.splitMC,
+        "reweight_pseudo_data": ROOT.ClosureVariation_t.reweightPseudoData,
+        "reweight_response": ROOT.reweightResponse,
+    }
+    variation = _variations[closure_variation]
 
     # Define hists (and the map to pass them into ROOT for unfolding)
     hists = _default_hists(settings=settings)
     # Add pseudo-data and pseudo-true. They're equivalent to raw and true, so they can just be cloned.
     hists["h2_pseudo_data"] = hists["h2_raw"].Clone("h2_pseudo_data")
-    hists["h2_pseudo_data"].Sumw2()
     hists["h2_pseudo_true"] = hists["h2_true"].Clone("h2_pseudo_data")
-    hists["h2_pseudo_true"].Sumw2()
 
     hists_map_for_root = _hists_to_map_for_ROOT(hists=hists)
 
     # Load hists for reweighting and calculate ratio.
-    h_reweighting_ratio = get_reweighted_ratio_for_closure(
-        embedded_dataset_name="LHC19f4_embedded_into_LHC18qr_5966_5985",
-        data_dataset_name="LHC18qr_5863",
-        grooming_method=settings.grooming_method,
-    )
+    h_reweighting_ratio = ROOT.nullptr
+    if variation != ROOT.ClosureVariation_t.splitMC:
+        h_reweighting_ratio = get_reweighted_ratio_for_closure(
+            embedded_dataset_name="LHC19f4_embedded_into_LHC18qr_5966_5985",
+            data_dataset_name="LHC18qr_5863",
+            grooming_method=settings.grooming_method,
+        )
+
+        # Validate the reweighting ratio
+        # x axis should contain the smeared substructure variable
+        # y axis contains the smeared jet pt.
+        temp_hist = binned_data.BinnedData.from_existing_data(h_reweighting_ratio)
+        np.testing.assert_allclose(temp_hist.axes[0].bin_edges, settings.substructure_variable.smeared_bins)
+        np.testing.assert_allclose(temp_hist.axes[1].bin_edges, settings.jet_pt.smeared_bins)
 
     # Create the responses. We assume some conventions about column names.
     # They should generally be reasonable, but may require tweaks from time to time.
-    responses = ROOT.create_reweighted_response_2D(
+    responses = ROOT.create_closure_response_2D(
         hists_map_for_root,
-        h_reweighting_ratio,
         settings.grooming_method,
         settings.substructure_variable.variable_name,
         _array_to_ROOT(settings.jet_pt.smeared_bins, "double"),
@@ -673,13 +684,16 @@ def run_unfolding_closure_reweighting(
         settings.substructure_variable.min_smeared,
         settings.substructure_variable.max_smeared,
         _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
+        variation,
         fraction_for_response,
+        settings.use_pure_matches,
+        h_reweighting_ratio,
     )
 
     # Perform the actual unfolding.
     # First, the standard split MC closure
     output_hists = {}
-    tag = "closure_split_MC"
+    tag = f"closure_{closure_variation}"
     if settings.use_pure_matches:
         tag = f"{tag}_pure_matches"
     output_hists.update(
@@ -1096,11 +1110,21 @@ if __name__ == "__main__":
     #    ),
     # )
 
-    run_unfolding_fall_back(
+    # run_unfolding_fall_back(
+    #    settings=setup("dynamical_kt"),
+    #    # NOTE: TChain can only handle one "*" in the filename.
+    #    data_filenames=[Path("trains/PbPb/5863/skim/*.root")],
+    #    embedded_filenames=[
+    #        Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(5966, 5986)
+    #    ],
+    # )
+
+    run_unfolding_closure_reweighting(
         settings=setup("dynamical_kt"),
         # NOTE: TChain can only handle one "*" in the filename.
-        data_filenames=[Path("trains/PbPb/5863/skim/*.root")],
         embedded_filenames=[
             Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(5966, 5986)
         ],
+        # closure_variation="reweight_pseudo_data",
+        closure_variation="split_MC",
     )
