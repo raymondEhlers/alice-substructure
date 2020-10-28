@@ -195,6 +195,22 @@ double GetScaleFactor(TFile * f)
   return scaleFactor;
 }
 
+/**
+ * Determine if we have a pure match.
+ *
+ * @param[in] matchingLeading Matching status for the leading subjet.
+ * @param[in] matchingSubleading Matching status for the subleading subjet.
+ * @param[in] hybridSubstructureVariableValue Substructure variable value.
+ * @param[in] smearedUntaggedBinValue Value that will be assigned to the untagged bin for checking if we have this value.
+ *
+ * @returns True if we have a pure match.
+ */
+inline bool isPureMatch(int matchingLeading, int matchingSubleading, double hybridSubstructureVariableValue, double smearedUntaggedBinValue)
+{
+  return (((std::abs(matchingLeading - 1) < 0.001) && (std::abs(matchingSubleading - 1) < 0.001)) ||
+      (std::abs(hybridSubstructureVariableValue - smearedUntaggedBinValue) < 0.001));
+}
+
 //=========================
 // Main functionality
 //=========================
@@ -281,12 +297,6 @@ enum UnfoldingType_t {
   rg = 2
 };
 
-inline bool isPureMatch(int matchingLeading, int matchingSubleading, double hybridSubstructureVariableValue, double smearedUntaggedBinValue)
-{
-  return (((std::abs(matchingLeading - 1) < 0.001) && (std::abs(matchingSubleading - 1) < 0.001)) ||
-      (std::abs(hybridSubstructureVariableValue - smearedUntaggedBinValue) < 0.001));
-}
-
 /**
  * Wrapper around the RooUnfoldResponse. Just for convenience.
  *
@@ -321,7 +331,6 @@ ResponseResult create_response_2D(
     const std::string & hybridPrefix = "hybrid",
     const std::string & detLevelPrefix = "det_level",
     const bool usePureMatches = false,
-    const unsigned int maxNIter = 20
     )
 {
   // First, we handle the data. Setup the Reader, the columns, and store the data in the appropriate hists.
@@ -440,6 +449,133 @@ ResponseResult create_response_2D(
 
   return ResponseResult{response, responsenotrunc};
 }
+
+ResponseResult create_split_MC_response(
+    std::map<std::string, TH2D *> hists,
+    const std::string groomingMethod,
+    const std::string substructureVariableName,
+    std::vector<double> smearedJetPtBins,
+    std::vector<double> trueJetPtBins,
+    std::vector<double> smearedSplittingVariableBins,
+    std::vector<double> trueSplittingVariableBins,
+    double smearedUntaggedBinValue,
+    double minSmearedSplittingVariable,
+    double maxSmearedSplittingVariable,
+    const std::vector<std::string> & embeddedFilenames,
+    const std::string & embeddedTreeName = "tree",
+    const std::string & truePrefix = "true",
+    const std::string & hybridPrefix = "hybrid",
+    const std::string & detLevelPrefix = "det_level",
+    const bool usePureMatches = false,
+    const double fractionForResponse = 0.75
+    )
+{
+  // Setup
+  TRandom3 random(0);
+
+  // We don't have to deal with data for this closure test. It's all based around the embedded data.
+  // So we go directly to the response.
+  // First, setup the response
+  // NOTE: We allocate a shared_ptr, but don't delete here because we want to return the response
+  //       without copying. If we do copy, RooUnfold doesn't seem to behave identically. It may not make
+  //       a difference, but better not to tempt fate. Instead, we pass ownership to the caller.
+  auto response = std::make_shared<RooUnfoldResponse>();
+  auto responsenotrunc = std::make_shared<RooUnfoldResponse>();
+  response->Setup(hists["h2_smeared"], hists["h2_true"]);
+  responsenotrunc->Setup(hists["h2_smeared_no_cuts"], hists["h2_full_eff"]);
+
+  // Next, we setup the Reader, the columns, and store the data in the appropriate hists.
+  TChain embeddedChain(embeddedTreeName.c_str());
+  for (auto filename : embeddedFilenames) {
+    embeddedChain.Add(filename.c_str());
+  }
+  TTreeReader mcReader(&embeddedChain);
+
+  // Values
+  TTreeReaderValue<double> scaleFactor(mcReader, "scale_factor");
+  TTreeReaderValue<double> hybridJetPt(mcReader, (hybridPrefix + "_jet_pt").c_str());
+  TTreeReaderValue<double> hybridSubstructureVariable(mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<double> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
+  TTreeReaderValue<double> trueSubstructureVariable(mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<long long> matchingLeading(mcReader, (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
+  TTreeReaderValue<long long> matchingSubleading(mcReader, (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
+  // For the double counting cut.
+  TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
+  TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
+
+  int treeNumber = -1;
+  //double scaleFactor = 0;
+  while (mcReader.Next()) {
+    // Check if the file changed.
+    if (treeNumber < embeddedChain.GetTreeNumber()) {
+      // File changed. Update the scale factor.
+      //auto f = embeddedChain.GetFile();
+      //scaleFactor = GetScaleFactor(f);
+      // Update the tree number so we hold onto the scale factor until the next time we need to update.
+      treeNumber = embeddedChain.GetTreeNumber();
+    }
+    // Ensure that we are in the right true pt and substructure variable range.
+    if (*trueJetPt > trueJetPtBins[trueJetPtBins.size() - 1]) {
+      continue;
+    }
+    if (*trueSubstructureVariable > trueSplittingVariableBins[trueSplittingVariableBins.size() - 1]) {
+      continue;
+    }
+    // Double counting cut
+    if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
+      continue;
+    }
+
+    // Full efficiency hists (and response).
+    hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    hists["h2_smeared_no_cuts"]->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
+    responsenotrunc->Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
+
+    // Now start making cuts on the hybrid level.
+    // Jet pt
+    if (*hybridJetPt < smearedJetPtBins[0] || *hybridJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
+      continue;
+    }
+    // Also cut on hybrid substructure variable.
+    double hybridSubstructureVariableValue = *hybridSubstructureVariable;
+    if (hybridSubstructureVariableValue < 0) {
+      // Assign to the untagged bin.
+      hybridSubstructureVariableValue = smearedUntaggedBinValue;
+    }
+    else {
+      if (hybridSubstructureVariableValue < minSmearedSplittingVariable || hybridSubstructureVariableValue > maxSmearedSplittingVariable) {
+        continue;
+      }
+    }
+    // The matching cuts should only be applied to the response...
+    double random = random.Rndm();
+    if (random >= fractionForResponse) {
+      hists["h2_pseudo_data"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
+      hists["h2_pseudo_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    }
+
+    // Matching cuts: Requiring a pure match.
+    if (usePureMatches && !isPureMatch(*matchingLeading, *matchingSubleading, hybridSubstructureVariableValue, smearedUntaggedBinValue)) {
+      continue;
+    }
+
+    // At this point, we've passed all of our cuts, so we store the result.
+    // These don't matter so terribly much for our closure test, but it's not a bad thing to have.
+    hists["h2_smeared"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
+    hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    hists["h2_substructure_variable"]->Fill(hybridSubstructureVariableValue, *trueSubstructureVariable, *scaleFactor);
+
+    // We've filled the pseudo data above (before the pure matches requirement), but we still
+    // need to fill the response when appropriate.
+    if (random < fractionForResponse) {
+      response->Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt,
+             *scaleFactor);
+    }
+  }
+
+  return ResponseResult{response, responsenotrunc};
+}
+
 
 /**
  * Unfolding for a specified substructure variable. Most settings must be changed inside of the function...
@@ -794,13 +930,3 @@ void RunUnfolding(const std::string groomingMethod)
   fout->Close();
 }
 
-#ifndef __CINT__
-int RooSimplePbPb()
-{
-  // Grooming method
-  //const std::string groomingMethod = "leading_kt_z_cut_02";
-  const std::string groomingMethod = "dynamical_kt";
-  RunUnfolding(groomingMethod);
-  return 0;
-} // Main program when run stand-alone
-#endif

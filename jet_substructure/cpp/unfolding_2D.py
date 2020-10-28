@@ -248,9 +248,9 @@ def unfolding_2D(
         h_fold = response.ApplyToTruth(h_unfold, "")
 
         # Clone unfolded and refolded hists to write to the output file.
-        name = f"{tag}Bayesian_Unfoldediter{n_iter}"
+        name = f"{tag}bayesian_unfolded_iter_{n_iter}"
         output_hists[name] = h_unfold.Clone(name)
-        name = f"{tag}Bayesian_Foldediter{n_iter}"
+        name = f"{tag}bayesian_folded_iter_{n_iter}"
         output_hists[name] = h_fold.Clone(name)
 
         # Retrieve the covariance matrix. Only for a selected iteration.
@@ -311,6 +311,29 @@ def _setup_unfolding() -> None:
     ROOT.ROOT.EnableImplicitMT(1)
 
 
+def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path) -> None:
+    # Delayed import to avoid direct dependence.
+    import ROOT
+
+    # Setup
+    output_filename.parent.mkdir(parents=True, exist_ok=True)
+
+    # Uproot3 also works, but it's far less space efficient. Since we already have to import ROOT,
+    # we may as well just use it...
+    # with uproot3.recreate(settings.output_filename.with_suffix(".uproot.root")) as f:
+    #    for k, v in hists.items():
+    #        f[k] = binned_data.BinnedData.from_existing_data(v).to_numpy()
+    #    for k, v in output_hists.items():
+    #        f[k] = binned_data.BinnedData.from_existing_data(v).to_numpy()
+    f_out = ROOT.TFile(str(output_filename), "RECREATE")
+    f_out.cd()
+    for hists_dict in hists:
+        for v in hists_dict.values():
+            v.Write()
+
+    f_out.Close()
+
+
 def setup(grooming_method: str) -> Settings:
     default_settings = Settings(
         grooming_method=grooming_method,
@@ -337,7 +360,7 @@ def setup(grooming_method: str) -> Settings:
     return default_settings
 
 
-def _default_hists(settings: Settings) -> Tuple[Dict[str, TH2D], Any]:
+def _default_hists(settings: Settings) -> Dict[str, TH2D]:
     import ROOT
 
     hists = {}
@@ -398,14 +421,23 @@ def _default_hists(settings: Settings) -> Tuple[Dict[str, TH2D], Any]:
     )
 
     # Sumw2 for all hists, store for passing them...
-    hists_map_for_root = ROOT.std.map("std::string", "TH2D *")()
     for k, h in hists.items():
         h.Sumw2()
+
+    return hists
+
+
+def _hists_to_map_for_ROOT(hists: Dict[str, TH2D]) -> Any:
+    # Delayed import to avoid direct dependence.
+    import ROOT
+
+    hists_map_for_root = ROOT.std.map("std::string", "TH2D *")()
+    for k, h in hists.items():
         # Why not via __setitem__? Because that would be too easy...
         hists_map_for_root.insert((k, h))
         # hists_to_root[k] = ROOT.addressof(h, True)
 
-    return hists, hists_map_for_root
+    return hists_map_for_root
 
 
 def run_unfolding_fall_back(
@@ -420,7 +452,8 @@ def run_unfolding_fall_back(
     _setup_unfolding()
 
     # Define hists (and the map to pass them into ROOT for unfolding)
-    hists, hists_map_for_root = _default_hists(settings=settings)
+    hists = _default_hists(settings=settings)
+    hists_map_for_root = _hists_to_map_for_ROOT(hists=hists)
 
     # Create the responses. We assume some conventions about column names.
     # They should generally be reasonable, but may require tweaks from time to time.
@@ -456,23 +489,38 @@ def run_unfolding_fall_back(
             tag="hybrid_smeared_as_input",
         )
     )
+    # TODO: Additional closure tests here?
+    # For instance, closure test 4 should be trivial
+    selected_iter_for_closure = 5
+    output_hists.update(
+        unfolding_2D(
+            response=responses.response,
+            input_spectra=output_hists[f"bayesian_folded_iter_{selected_iter_for_closure}"],
+            # Don't erally matter here...
+            true_spectra=hists["h2_true"],
+            tag="closure_test_4",
+        )
+    )
 
     # Store the output hists.
-    settings.output_filename.parent.mkdir(parents=True, exist_ok=True)
-    # Uproot3 also works, but it's far less space efficient. Since we already have to import ROOT,
-    # we may as well just use it...
-    # with uproot3.recreate(settings.output_filename.with_suffix(".uproot.root")) as f:
-    #    for k, v in hists.items():
-    #        f[k] = binned_data.BinnedData.from_existing_data(v).to_numpy()
-    #    for k, v in output_hists.items():
-    #        f[k] = binned_data.BinnedData.from_existing_data(v).to_numpy()
-    f_out = ROOT.TFile(str(settings.output_filename), "RECREATE")
-    f_out.cd()
-    for v in hists.values():
-        v.Write()
-    for v in output_hists.values():
-        v.Write()
-    f_out.Close()
+    _write_hists([hists, output_hists], settings.output_filename)
+
+    return True
+
+
+def run_unfolding_split_mc_closure(settings: Settings, embedded_filenames: Sequence[Path]) -> bool:
+
+    # Define hists (and the map to pass them into ROOT for unfolding)
+    hists = _default_hists(settings=settings)
+    # Add pseudo-data and pseudo-true. They're equivalent to raw and true, so they can just be cloned.
+    hists["h2_pseudo_data"] = hists["h2_raw"].Clone("h2_pseudo_data")
+    hists["h2_pseudo_data"].Sumw2()
+    hists["h2_pseudo_true"] = hists["h2_true"].Clone("h2_pseudo_data")
+    hists["h2_pseudo_true"].Sumw2()
+
+    hists_map_for_root = _hists_to_map_for_ROOT(hists=hists)
+
+    ...
 
     return True
 
