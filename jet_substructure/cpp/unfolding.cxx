@@ -442,7 +442,6 @@ ResponseResult create_response_2D(
     // At this point, we've passed all of our cuts, so we store the result.
     hists["h2_smeared"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
     hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
-    // So we can look at the substructure variable correlation.
     hists["h2_substructure_variable"]->Fill(hybridSubstructureVariableValue, *trueSubstructureVariable, *scaleFactor);
     response->Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
   }
@@ -450,7 +449,7 @@ ResponseResult create_response_2D(
   return ResponseResult{response, responsenotrunc};
 }
 
-ResponseResult create_split_MC_response(
+ResponseResult create_split_MC_response_2D(
     std::map<std::string, TH2D *> hists,
     const std::string groomingMethod,
     const std::string substructureVariableName,
@@ -462,12 +461,12 @@ ResponseResult create_split_MC_response(
     double minSmearedSplittingVariable,
     double maxSmearedSplittingVariable,
     const std::vector<std::string> & embeddedFilenames,
+    const double fractionForResponse = 0.75,
+    const bool usePureMatches = false,
     const std::string & embeddedTreeName = "tree",
     const std::string & truePrefix = "true",
     const std::string & hybridPrefix = "hybrid",
-    const std::string & detLevelPrefix = "det_level",
-    const bool usePureMatches = false,
-    const double fractionForResponse = 0.75
+    const std::string & detLevelPrefix = "det_level"
     )
 {
   // Setup
@@ -548,8 +547,8 @@ ResponseResult create_split_MC_response(
       }
     }
     // The matching cuts should only be applied to the response...
-    double random = random.Rndm();
-    if (random >= fractionForResponse) {
+    double randomValue = random.Rndm();
+    if (randomValue >= fractionForResponse) {
       hists["h2_pseudo_data"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
       hists["h2_pseudo_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
     }
@@ -567,9 +566,178 @@ ResponseResult create_split_MC_response(
 
     // We've filled the pseudo data above (before the pure matches requirement), but we still
     // need to fill the response when appropriate.
-    if (random < fractionForResponse) {
+    if (randomValue < fractionForResponse) {
       response->Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt,
              *scaleFactor);
+    }
+  }
+
+  return ResponseResult{response, responsenotrunc};
+}
+
+/**
+ * Find reweighting bin, ensuring that we take the last good bin if we're out of range.
+ *
+ * For example, if we're below the lowest bin, then we take the first bin. Effectively,
+ * we neglect the overflow bins.
+ *
+ * @param[in] value Value that we want to reweight.
+ * @param[in] bins Binning of the reweighting hist.
+ *
+ * @returns Bin to use when retrieving the reweighting value.
+ */
+int findReweightingBin(double value, const std::vector<double>& bins)
+{
+  auto bin = std::distance(bins.begin(), std::upper_bound(bins.begin(), bins.end(), value));
+  if (bin == 0) {
+    ++bin;
+  }
+  if (bin >= bins.size()) {
+    --bin;
+  }
+
+  return bin;
+}
+
+/**
+ * Create a reweighted response (or pseudo-data).
+ *
+ * Since we utilize pseudo-data here, we split statistics according to a specified fraction.
+ *
+ */
+ResponseResult create_reweighted_response_2D(
+    std::map<std::string, TH2D *> hists,
+    TH2D * hReweighting,
+    const std::string groomingMethod,
+    const std::string substructureVariableName,
+    std::vector<double> smearedJetPtBins,
+    std::vector<double> trueJetPtBins,
+    std::vector<double> smearedSplittingVariableBins,
+    std::vector<double> trueSplittingVariableBins,
+    double smearedUntaggedBinValue,
+    double minSmearedSplittingVariable,
+    double maxSmearedSplittingVariable,
+    const std::vector<std::string> & embeddedFilenames,
+    const double fractionForResponse = 0.75,
+    const bool usePureMatches = false,
+    const std::string & embeddedTreeName = "tree",
+    const std::string & truePrefix = "true",
+    const std::string & hybridPrefix = "hybrid",
+    const std::string & detLevelPrefix = "det_level"
+    )
+{
+  // Setup
+  TRandom3 random(0);
+
+  // We don't have to deal with data for this closure test. It's all based around the embedded data.
+  // So we go directly to the response.
+  // First, setup the response
+  // NOTE: We allocate a shared_ptr, but don't delete here because we want to return the response
+  //       without copying. If we do copy, RooUnfold doesn't seem to behave identically. It may not make
+  //       a difference, but better not to tempt fate. Instead, we pass ownership to the caller.
+  auto response = std::make_shared<RooUnfoldResponse>();
+  auto responsenotrunc = std::make_shared<RooUnfoldResponse>();
+  response->Setup(hists["h2_smeared"], hists["h2_true"]);
+  responsenotrunc->Setup(hists["h2_smeared_no_cuts"], hists["h2_full_eff"]);
+
+  // Next, we setup the Reader, the columns, and store the data in the appropriate hists.
+  TChain embeddedChain(embeddedTreeName.c_str());
+  for (auto filename : embeddedFilenames) {
+    embeddedChain.Add(filename.c_str());
+  }
+  TTreeReader mcReader(&embeddedChain);
+
+  // Values
+  TTreeReaderValue<double> scaleFactor(mcReader, "scale_factor");
+  TTreeReaderValue<double> hybridJetPt(mcReader, (hybridPrefix + "_jet_pt").c_str());
+  TTreeReaderValue<double> hybridSubstructureVariable(mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<double> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
+  TTreeReaderValue<double> trueSubstructureVariable(mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<long long> matchingLeading(mcReader, (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
+  TTreeReaderValue<long long> matchingSubleading(mcReader, (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
+  // For the double counting cut.
+  TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
+  TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
+
+  int treeNumber = -1;
+  //double scaleFactor = 0;
+  while (mcReader.Next()) {
+    // Check if the file changed.
+    if (treeNumber < embeddedChain.GetTreeNumber()) {
+      // File changed. Update the scale factor.
+      //auto f = embeddedChain.GetFile();
+      //scaleFactor = GetScaleFactor(f);
+      // Update the tree number so we hold onto the scale factor until the next time we need to update.
+      treeNumber = embeddedChain.GetTreeNumber();
+    }
+    // Ensure that we are in the right true pt and substructure variable range.
+    if (*trueJetPt > trueJetPtBins[trueJetPtBins.size() - 1]) {
+      continue;
+    }
+    if (*trueSubstructureVariable > trueSplittingVariableBins[trueSplittingVariableBins.size() - 1]) {
+      continue;
+    }
+    // Double counting cut
+    if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
+      continue;
+    }
+
+    // Full efficiency hists (and response).
+    hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    hists["h2_smeared_no_cuts"]->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
+    responsenotrunc->Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
+
+    // Now start making cuts on the hybrid level.
+    // Jet pt
+    if (*hybridJetPt < smearedJetPtBins[0] || *hybridJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
+      continue;
+    }
+    // Also cut on hybrid substructure variable.
+    double hybridSubstructureVariableValue = *hybridSubstructureVariable;
+    if (hybridSubstructureVariableValue < 0) {
+      // Assign to the untagged bin.
+      hybridSubstructureVariableValue = smearedUntaggedBinValue;
+    }
+    else {
+      if (hybridSubstructureVariableValue < minSmearedSplittingVariable || hybridSubstructureVariableValue > maxSmearedSplittingVariable) {
+        continue;
+      }
+    }
+
+    // Reweight
+    // NOTE: We intentionally look at the true values even though it's binned at detector level.
+    // We need to handle the binning carefully, so we use a dedicated function.
+    int ktBin = findReweightingBin(*trueSubstructureVariable, smearedSplittingVariableBins);
+    int jetPtBin = findReweightingBin(*trueJetPt, smearedJetPtBins);
+    double reweightFactor = hRatio->GetBinContent(ktBin, jetPtBin);
+
+    // The matching cuts should only be applied to the response, so we start storing hists here.
+    double randomValue = random.Rndm();
+    if (randomValue >= fractionForResponse) {
+      // Variation 1 is where we reweight the pseudo-data.
+      double pseudoReweightFactor = closureVariation == 1 ? reweightFactor : 1;
+      hists["h2_pseudo_data"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
+      hists["h2_pseudo_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    }
+
+    // Matching cuts: Requiring a pure match.
+    if (usePureMatches && !isPureMatch(*matchingLeading, *matchingSubleading, hybridSubstructureVariableValue, smearedUntaggedBinValue)) {
+      continue;
+    }
+
+    // At this point, we've passed all of our cuts, so we store the result.
+    // These don't matter so terribly much for our closure test, but it's not a bad thing to have.
+    // Note that they will always get the full stats and correspond to the response, as is the convention for the others.
+    hists["h2_smeared"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
+    hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    hists["h2_substructure_variable"]->Fill(hybridSubstructureVariableValue, *trueSubstructureVariable, *scaleFactor);
+
+    // We've filled the pseudo data above (before the pure matches requirement), but we still
+    // need to fill the response when appropriate.
+    if (random < fractionForResponse) {
+      // Variation 2 is where we reweight the response.
+      double responseReweightFactor = closureVariation == 2 ? reweightFactor : 1;
+      response.Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor * responseReweightFactor);
     }
   }
 

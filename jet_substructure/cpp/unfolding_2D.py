@@ -5,7 +5,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Type
+from typing import Any, Dict, List, Optional, Sequence, Type
 
 import attr
 import numpy as np
@@ -496,7 +496,7 @@ def run_unfolding_fall_back(
         unfolding_2D(
             response=responses.response,
             input_spectra=output_hists[f"bayesian_folded_iter_{selected_iter_for_closure}"],
-            # Don't erally matter here...
+            # The true spectra doesn't matter here...
             true_spectra=hists["h2_true"],
             tag="closure_test_4",
         )
@@ -508,7 +508,27 @@ def run_unfolding_fall_back(
     return True
 
 
-def run_unfolding_split_mc_closure(settings: Settings, embedded_filenames: Sequence[Path]) -> bool:
+def run_unfolding_closure_split_MC(
+    settings: Settings, embedded_filenames: Sequence[Path], fraction_for_response: float = 0.75
+) -> bool:
+    """ Run unfolding for the split MC closure.
+
+    Note:
+        Must run separately with and without pure matches because the response is different.
+
+    Args:
+        settings: Unfolding settings.
+        embedded_filenames: Filenames for embedded data.
+        fraction_for_response: Fraction of statistics for the response. Default: 0.75, as determined by
+            comparing error bars in data and embedded.
+    Returns:
+        True if successful.
+    """
+    # Delayed import to avoid direct dependence.
+    import ROOT
+
+    # Setup
+    _setup_unfolding()
 
     # Define hists (and the map to pass them into ROOT for unfolding)
     hists = _default_hists(settings=settings)
@@ -520,7 +540,159 @@ def run_unfolding_split_mc_closure(settings: Settings, embedded_filenames: Seque
 
     hists_map_for_root = _hists_to_map_for_ROOT(hists=hists)
 
-    ...
+    # Create the responses. We assume some conventions about column names.
+    # They should generally be reasonable, but may require tweaks from time to time.
+    responses = ROOT.create_split_MC_response_2D(
+        hists_map_for_root,
+        settings.grooming_method,
+        settings.substructure_variable.variable_name,
+        _array_to_ROOT(settings.jet_pt.smeared_bins, "double"),
+        _array_to_ROOT(settings.jet_pt.true_bins, "double"),
+        _array_to_ROOT(settings.substructure_variable.smeared_bins, "double"),
+        _array_to_ROOT(settings.substructure_variable.true_bins, "double"),
+        settings.substructure_variable.untagged_value,
+        settings.substructure_variable.min_smeared,
+        settings.substructure_variable.max_smeared,
+        _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
+        fraction_for_response,
+        settings.use_pure_matches,
+    )
+
+    # Perform the actual unfolding.
+    # First, the standard split MC closure
+    output_hists = {}
+    tag = "closure_split_MC"
+    if settings.use_pure_matches:
+        tag = f"{tag}_pure_matches"
+    output_hists.update(
+        unfolding_2D(
+            response=responses.response,
+            input_spectra=hists["h2_pseudo_data"],
+            true_spectra=hists["h2_pseudo_true"],
+            tag=tag,
+        )
+    )
+
+    # Store the output hists.
+    _write_hists([hists, output_hists], settings.output_filename)
+
+    return True
+
+
+def get_reweighted_ratio_for_closure(
+    embedded_dataset_name: str, data_dataset_name: str, grooming_method: str, base_directory: Path = Path("output")
+) -> TH2D:
+    # Delayed import to avoid direct dependence.
+    import ROOT
+
+    # Retrieve embedded hist
+    embedded_filename = (
+        base_directory
+        / "embedPythia"
+        / "RDF"
+        / f"{embedded_dataset_name}_{grooming_method}_prefixes_hybrid_true_det_level_closure.root"
+    )
+    f_embedded = ROOT.TFile(str(embedded_filename), "READ")
+    h_embedded = f_embedded.Get(f"{grooming_method}_hybrid_kt_jet_pt")
+    # Retrieve data hist
+    data_filename = (
+        base_directory / "PbPb" / "RDF" / f"{data_dataset_name}_{grooming_method}_prefixes_data_closure.root"
+    )
+    f_PbPb = ROOT.TFile(str(data_filename), "READ")
+    h_PbPb = f_PbPb.Get(f"{grooming_method}_data_kt_jet_pt")
+
+    # Calculate the ratio and cleanup
+    h_ratio = h_embedded.Clone("h_ratio")
+    h_ratio.Divide(h_PbPb)
+    h_ratio.SetDirectory(0)
+
+    # Cleanup
+    f_embedded.Close()
+    f_PbPb.Close()
+
+    return h_ratio
+
+
+def run_unfolding_closure_reweighting(
+    settings: Settings,
+    embedded_filenames: Sequence[Path],
+    fraction_for_response: float = 0.75,
+    reweight_response: bool = False,
+) -> bool:
+    """ Run unfolding closure with reweighting.
+
+    Note:
+        Must run separately with and without pure matches because the response is different.
+
+    Args:
+        settings: Unfolding settings.
+        embedded_filenames: Filenames for embedded data.
+        fraction_for_response: Fraction of statistics for the response. Default: 0.75, as determined by
+            comparing error bars in data and embedded.
+    Returns:
+        True if successful.
+    """
+    # Delayed import to avoid direct dependence.
+    import ROOT
+
+    # TODO: Need to chain creating the reweighting hists unless they already exists.
+    # TODO: Careful - the binning needs to match!
+
+    # Setup
+    _setup_unfolding()
+
+    # Define hists (and the map to pass them into ROOT for unfolding)
+    hists = _default_hists(settings=settings)
+    # Add pseudo-data and pseudo-true. They're equivalent to raw and true, so they can just be cloned.
+    hists["h2_pseudo_data"] = hists["h2_raw"].Clone("h2_pseudo_data")
+    hists["h2_pseudo_data"].Sumw2()
+    hists["h2_pseudo_true"] = hists["h2_true"].Clone("h2_pseudo_data")
+    hists["h2_pseudo_true"].Sumw2()
+
+    hists_map_for_root = _hists_to_map_for_ROOT(hists=hists)
+
+    # Load hists for reweighting and calculate ratio.
+    h_reweighting_ratio = get_reweighted_ratio_for_closure(
+        embedded_dataset_name="LHC19f4_embedded_into_LHC18qr_5966_5985",
+        data_dataset_name="LHC18qr_5863",
+        grooming_method=settings.grooming_method,
+    )
+
+    # Create the responses. We assume some conventions about column names.
+    # They should generally be reasonable, but may require tweaks from time to time.
+    responses = ROOT.create_reweighted_response_2D(
+        hists_map_for_root,
+        h_reweighting_ratio,
+        settings.grooming_method,
+        settings.substructure_variable.variable_name,
+        _array_to_ROOT(settings.jet_pt.smeared_bins, "double"),
+        _array_to_ROOT(settings.jet_pt.true_bins, "double"),
+        _array_to_ROOT(settings.substructure_variable.smeared_bins, "double"),
+        _array_to_ROOT(settings.substructure_variable.true_bins, "double"),
+        settings.substructure_variable.untagged_value,
+        settings.substructure_variable.min_smeared,
+        settings.substructure_variable.max_smeared,
+        _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
+        fraction_for_response,
+    )
+
+    # Perform the actual unfolding.
+    # First, the standard split MC closure
+    output_hists = {}
+    tag = "closure_split_MC"
+    if settings.use_pure_matches:
+        tag = f"{tag}_pure_matches"
+    output_hists.update(
+        unfolding_2D(
+            response=responses.response,
+            input_spectra=hists["h2_pseudo_data"],
+            true_spectra=hists["h2_pseudo_true"],
+            tag=tag,
+        )
+    )
+
+    # Store the output hists.
+    _write_hists([hists, output_hists], settings.output_filename)
 
     return True
 
@@ -927,7 +1099,7 @@ if __name__ == "__main__":
     run_unfolding_fall_back(
         settings=setup("dynamical_kt"),
         # NOTE: TChain can only handle one "*" in the filename.
-        data_filenames=[Path("trains/PbPb/5863/skim/*.root"),],
+        data_filenames=[Path("trains/PbPb/5863/skim/*.root")],
         embedded_filenames=[
             Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(5966, 5986)
         ],
