@@ -1,17 +1,11 @@
 //#if !(defined(__CINT__) || defined(__CLING__)) || defined(__ACLIC__)
-#include <iostream>
-#include <memory>
-#include <vector>
-
-#include <TTree.h>
-#include <TChain.h>
-#include <TTreeReader.h>
-#include <TTreeReaderValue.h>
+#include <RooUnfoldBayes.h>
+#include <RooUnfoldResponse.h>
 #include <TCanvas.h>
+#include <TChain.h>
 #include <TFile.h>
 #include <TH1.h>
 #include <TH1D.h>
-#include <TH2D.h>
 #include <TH2D.h>
 #include <TLegend.h>
 #include <TLine.h>
@@ -23,9 +17,13 @@
 #include <TString.h>
 #include <TStyle.h>
 #include <TSystem.h>
+#include <TTree.h>
+#include <TTreeReader.h>
+#include <TTreeReaderValue.h>
 
-#include <RooUnfoldBayes.h>
-#include <RooUnfoldResponse.h>
+#include <iostream>
+#include <memory>
+#include <vector>
 //#endif
 
 //=========================
@@ -46,7 +44,8 @@
  *
  * @returns The correlation histogram.
  */
-TH2D* CorrelationHistSubstructureVar(const TMatrixD& cov, const char* name, const char* title, Int_t na, Int_t nb, Int_t kbin)
+TH2D* CorrelationHistSubstructureVar(const TMatrixD& cov, const char* name, const char* title, Int_t na, Int_t nb,
+                   Int_t kbin)
 {
   TH2D* h = new TH2D(name, title, nb, 0, nb, nb, 0, nb);
 
@@ -105,7 +104,8 @@ TH2D* CorrelationHistPt(const TMatrixD& cov, const char* name, const char* title
  *
  * @returns The correlation histogram.
  */
-TH2D* CorrelationHist(const TMatrixD& cov, const char* name, const char* title, Double_t lo, Double_t hi/*, Double_t lon, Double_t hin*/)
+TH2D* CorrelationHist(const TMatrixD& cov, const char* name, const char* title, Double_t lo,
+           Double_t hi /*, Double_t lon, Double_t hin*/)
 {
   Int_t nb = cov.GetNrows();
   Int_t na = cov.GetNcols();
@@ -163,16 +163,17 @@ void Normalize2D(TH2* h)
  *
  * @returns Pt hard scale factor.
  */
-double GetScaleFactor(TFile * f)
+double GetScaleFactor(TFile* f)
 {
   // Retrieve the embedding helper to extract the cross section and ntrials.
-  //auto task = dynamic_cast<TList*>(f->Get("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_Raw_EventSub_Incl"));
+  // auto task =
+  // dynamic_cast<TList*>(f->Get("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_Raw_EventSub_Incl"));
   auto task = dynamic_cast<TList*>(f->Get("AliAnalysisTaskEmcalEmbeddingHelper_histos"));
 
   auto hcross = dynamic_cast<TProfile*>(task->FindObject("fHistXsection"));
   auto htrials = dynamic_cast<TH1D*>(task->FindObject("fHistTrials"));
 
-  //std::cout << "hcross=" << hcross << ", htrials=" << htrials << "\n";
+  // std::cout << "hcross=" << hcross << ", htrials=" << htrials << "\n";
 
   int ptHardBin = 0;
   for (Int_t i = 1; i <= htrials->GetXaxis()->GetNbins(); i++) {
@@ -201,11 +202,13 @@ double GetScaleFactor(TFile * f)
  * @param[in] matchingLeading Matching status for the leading subjet.
  * @param[in] matchingSubleading Matching status for the subleading subjet.
  * @param[in] hybridSubstructureVariableValue Substructure variable value.
- * @param[in] smearedUntaggedBinValue Value that will be assigned to the untagged bin for checking if we have this value.
+ * @param[in] smearedUntaggedBinValue Value that will be assigned to the untagged bin for checking if we have this
+ * value.
  *
  * @returns True if we have a pure match.
  */
-inline bool isPureMatch(int matchingLeading, int matchingSubleading, double hybridSubstructureVariableValue, double smearedUntaggedBinValue)
+inline bool isPureMatch(int matchingLeading, int matchingSubleading, double hybridSubstructureVariableValue,
+            double smearedUntaggedBinValue)
 {
   return (((std::abs(matchingLeading - 1) < 0.001) && (std::abs(matchingSubleading - 1) < 0.001)) ||
       (std::abs(hybridSubstructureVariableValue - smearedUntaggedBinValue) < 0.001));
@@ -225,15 +228,18 @@ inline bool isPureMatch(int matchingLeading, int matchingSubleading, double hybr
  *
  * @param[in] response Roounfold response.
  * @param[in] h2true True spectra. Only used for binning, so retrieved as a const.
- * @param[in] inputSpectra Input spectra to be unfolded (for example, data). Spectra could be 2D: pt + kt (or Rg, etc...)
+ * @param[in] inputSpectra Input spectra to be unfolded (for example, data). Spectra could be 2D: pt + kt (or Rg,
+ * etc...)
  * @param[in] errorTreatment Roounfold error treatment.
- * @param[in] fout ROOT output file. It's never called explicitly, but I like to pass it because we're implicitly writing to it.
+ * @param[in] fout ROOT output file. It's never called explicitly, but I like to pass it because we're implicitly
+ * writing to it.
  * @param[in] tag Tag to be prepended to all histograms generated in the unfolding. Default: "".
  * @param[in] nIter Number of iterations. Default: 10.
  * @param[in] nIterForCovariance Number of iterations where we will calculate the covariance. Default: 8.
  */
-void Unfold2D(RooUnfoldResponse & response, const TH2D & h2true, TH2D & inputSpectra,
-    RooUnfold::ErrorTreatment errorTreatment, TFile * fout, std::string tag = "", const int nIter = 10, const int nIterForCovariance = 8)
+void Unfold2D(RooUnfoldResponse& response, const TH2D& h2true, TH2D& inputSpectra,
+       RooUnfold::ErrorTreatment errorTreatment, TFile* fout, std::string tag = "", const int nIter = 10,
+       const int nIterForCovariance = 8)
 {
   std::cout << "\n=======================================================\n"
        << "Unfolding for tag \"" << tag << "\".\n";
@@ -254,8 +260,10 @@ void Unfold2D(RooUnfoldResponse & response, const TH2D & h2true, TH2D & inputSpe
     TH1* hfold = response.ApplyToTruth(hunf, "");
 
     // Clone unfolded and refolded hists to write to the output file.
-    TH2D* htempUnf = dynamic_cast<TH2D*>(hunf->Clone(TString::Format("%sBayesian_Unfoldediter%d", tag.c_str(), iter)));
-    TH2D* htempFold = dynamic_cast<TH2D*>(hfold->Clone(TString::Format("%sBayesian_Foldediter%d", tag.c_str(), iter)));
+    TH2D* htempUnf =
+     dynamic_cast<TH2D*>(hunf->Clone(TString::Format("%sBayesian_Unfoldediter%d", tag.c_str(), iter)));
+    TH2D* htempFold =
+     dynamic_cast<TH2D*>(hfold->Clone(TString::Format("%sBayesian_Foldediter%d", tag.c_str(), iter)));
     htempUnf->Write();
     htempFold->Write();
 
@@ -264,18 +272,21 @@ void Unfold2D(RooUnfoldResponse & response, const TH2D & h2true, TH2D & inputSpe
       TMatrixD covmat = unfold.Ereco(RooUnfold::kCovariance);
       // Substructure variable.
       for (Int_t k = 0; k < h2true.GetNbinsX(); k++) {
-        auto hCorr = dynamic_cast<TH2D*>(CorrelationHistSubstructureVar(covmat, TString::Format("%scorr%d", tag.c_str(), k), "Covariance matrix",
-                             h2true.GetNbinsX(), h2true.GetNbinsY(), k));
+        auto hCorr = dynamic_cast<TH2D*>(
+         CorrelationHistSubstructureVar(covmat, TString::Format("%scorr%d", tag.c_str(), k),
+                         "Covariance matrix", h2true.GetNbinsX(), h2true.GetNbinsY(), k));
         auto covSubstructureVar = dynamic_cast<TH2D*>(hCorr->Clone("covSubstructureVar"));
-        covSubstructureVar->SetName(TString::Format("%spearsonmatrix_iter%d_binSubstructureVar%d", tag.c_str(), iter, k));
+        covSubstructureVar->SetName(
+         TString::Format("%spearsonmatrix_iter%d_binSubstructureVar%d", tag.c_str(), iter, k));
         covSubstructureVar->SetDrawOption("colz");
         covSubstructureVar->Write();
       }
 
       // Jet pt.
       for (Int_t k = 0; k < h2true.GetNbinsY(); k++) {
-        auto hCorr = dynamic_cast<TH2D*>(CorrelationHistPt(covmat, TString::Format("%scorr%dpt", tag.c_str(), k), "Covariance matrix",
-                            h2true.GetNbinsX(), h2true.GetNbinsY(), k));
+        auto hCorr = dynamic_cast<TH2D*>(
+         CorrelationHistPt(covmat, TString::Format("%scorr%dpt", tag.c_str(), k), "Covariance matrix",
+                  h2true.GetNbinsX(), h2true.GetNbinsY(), k));
         auto covpt = dynamic_cast<TH2D*>(hCorr->Clone("covpt"));
         covpt->SetName(TString::Format("%spearsonmatrix_iter%d_binpt%d", tag.c_str(), iter, k));
         covpt->SetDrawOption("colz");
@@ -291,11 +302,7 @@ void Unfold2D(RooUnfoldResponse & response, const TH2D & h2true, TH2D & inputSpe
 /**
  * Substructure unfolding variable.
  */
-enum UnfoldingType_t {
-  kt = 0,
-  zg = 1,
-  rg = 2
-};
+enum UnfoldingType_t { kt = 0, zg = 1, rg = 2 };
 
 /**
  * Wrapper around the RooUnfoldResponse. Just for convenience.
@@ -311,27 +318,17 @@ struct ResponseResult {
  * Interface to 2D unfolding with python.
  *
  */
-ResponseResult create_response_2D(
-    std::map<std::string, TH2D *> hists,
-    const std::string groomingMethod,
-    const std::string substructureVariableName,
-    std::vector<double> smearedJetPtBins,
-    std::vector<double> trueJetPtBins,
-    std::vector<double> smearedSplittingVariableBins,
-    std::vector<double> trueSplittingVariableBins,
-    double smearedUntaggedBinValue,
-    double minSmearedSplittingVariable,
-    double maxSmearedSplittingVariable,
-    const std::vector<std::string> & dataFilenames,
-    const std::vector<std::string> & embeddedFilenames,
-    const bool usePureMatches = false,
-    const std::string & dataTreeName = "tree",
-    const std::string & dataPrefix = "data",
-    const std::string & embeddedTreeName = "tree",
-    const std::string & truePrefix = "true",
-    const std::string & hybridPrefix = "hybrid",
-    const std::string & detLevelPrefix = "det_level"
-    )
+ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std::string groomingMethod,
+                 const std::string substructureVariableName, std::vector<double> smearedJetPtBins,
+                 std::vector<double> trueJetPtBins, std::vector<double> smearedSplittingVariableBins,
+                 std::vector<double> trueSplittingVariableBins, double smearedUntaggedBinValue,
+                 double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
+                 const std::vector<std::string>& dataFilenames,
+                 const std::vector<std::string>& embeddedFilenames, const bool usePureMatches = false,
+                 const std::string& dataTreeName = "tree", const std::string& dataPrefix = "data",
+                 const std::string& embeddedTreeName = "tree", const std::string& truePrefix = "true",
+                 const std::string& hybridPrefix = "hybrid",
+                 const std::string& detLevelPrefix = "det_level")
 {
   // First, we handle the data. Setup the Reader, the columns, and store the data in the appropriate hists.
   TChain dataChain(dataTreeName.c_str());
@@ -341,7 +338,8 @@ ResponseResult create_response_2D(
   TTreeReader dataReader(&dataChain);
 
   TTreeReaderValue<double> dataJetPt(dataReader, (dataPrefix + "_jet_pt").c_str());
-  TTreeReaderValue<double> dataSubstructureVariable(dataReader, (groomingMethod + "_" + dataPrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<double> dataSubstructureVariable(
+   dataReader, (groomingMethod + "_" + dataPrefix + "_" + substructureVariableName).c_str());
   while (dataReader.Next()) {
     // Jet pt cut.
     if (*dataJetPt < smearedJetPtBins[0] || *dataJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
@@ -352,9 +350,9 @@ ResponseResult create_response_2D(
     if (dataSubstructureVariableValue < 0) {
       // Assign to the untagged bin.
       dataSubstructureVariableValue = smearedUntaggedBinValue;
-    }
-    else {
-      if (dataSubstructureVariableValue < minSmearedSplittingVariable || dataSubstructureVariableValue > maxSmearedSplittingVariable) {
+    } else {
+      if (dataSubstructureVariableValue < minSmearedSplittingVariable ||
+        dataSubstructureVariableValue > maxSmearedSplittingVariable) {
         continue;
       }
     }
@@ -381,23 +379,27 @@ ResponseResult create_response_2D(
   // Values
   TTreeReaderValue<double> scaleFactor(mcReader, "scale_factor");
   TTreeReaderValue<double> hybridJetPt(mcReader, (hybridPrefix + "_jet_pt").c_str());
-  TTreeReaderValue<double> hybridSubstructureVariable(mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<double> hybridSubstructureVariable(
+   mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
   TTreeReaderValue<double> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
-  TTreeReaderValue<double> trueSubstructureVariable(mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
-  TTreeReaderValue<long long> matchingLeading(mcReader, (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
-  TTreeReaderValue<long long> matchingSubleading(mcReader, (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
+  TTreeReaderValue<double> trueSubstructureVariable(
+   mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<long long> matchingLeading(mcReader,
+                        (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
+  TTreeReaderValue<long long> matchingSubleading(mcReader,
+                          (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
   // For the double counting cut.
   TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
   TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
 
   int treeNumber = -1;
-  //double scaleFactor = 0;
+  // double scaleFactor = 0;
   while (mcReader.Next()) {
     // Check if the file changed.
     if (treeNumber < embeddedChain.GetTreeNumber()) {
       // File changed. Update the scale factor.
-      //auto f = embeddedChain.GetFile();
-      //scaleFactor = GetScaleFactor(f);
+      // auto f = embeddedChain.GetFile();
+      // scaleFactor = GetScaleFactor(f);
       // Update the tree number so we hold onto the scale factor until the next time we need to update.
       treeNumber = embeddedChain.GetTreeNumber();
     }
@@ -416,7 +418,8 @@ ResponseResult create_response_2D(
     // Full efficiency hists (and response).
     hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
     hists["h2_smeared_no_cuts"]->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
-    responsenotrunc->Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    responsenotrunc->Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt,
+               *scaleFactor);
 
     // Now start making cuts on the hybrid level.
     // Jet pt
@@ -428,25 +431,28 @@ ResponseResult create_response_2D(
     if (hybridSubstructureVariableValue < 0) {
       // Assign to the untagged bin.
       hybridSubstructureVariableValue = smearedUntaggedBinValue;
-    }
-    else {
-      if (hybridSubstructureVariableValue < minSmearedSplittingVariable || hybridSubstructureVariableValue > maxSmearedSplittingVariable) {
+    } else {
+      if (hybridSubstructureVariableValue < minSmearedSplittingVariable ||
+        hybridSubstructureVariableValue > maxSmearedSplittingVariable) {
         continue;
       }
     }
     // Matching cuts: Requiring a pure match.
-    if (usePureMatches && !isPureMatch(*matchingLeading, *matchingSubleading, hybridSubstructureVariableValue, smearedUntaggedBinValue)) {
+    if (usePureMatches && !isPureMatch(*matchingLeading, *matchingSubleading, hybridSubstructureVariableValue,
+                      smearedUntaggedBinValue)) {
       continue;
     }
 
     // At this point, we've passed all of our cuts, so we store the result.
     hists["h2_smeared"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
     hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
-    hists["h2_substructure_variable"]->Fill(hybridSubstructureVariableValue, *trueSubstructureVariable, *scaleFactor);
-    response->Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    hists["h2_substructure_variable"]->Fill(hybridSubstructureVariableValue, *trueSubstructureVariable,
+                        *scaleFactor);
+    response->Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt,
+            *scaleFactor);
   }
 
-  return ResponseResult{response, responsenotrunc};
+  return ResponseResult{ response, responsenotrunc };
 }
 
 /**
@@ -473,11 +479,7 @@ int findReweightingBin(double value, const std::vector<double>& bins)
   return bin;
 }
 
-enum ClosureVariation_t {
-  splitMC = 0,
-  reweightPseudoData = 1,
-  reweightResponse = 2
-};
+enum ClosureVariation_t { splitMC = 0, reweightPseudoData = 1, reweightResponse = 2 };
 
 /**
  * Create a reweighted response (or pseudo-data).
@@ -489,26 +491,14 @@ enum ClosureVariation_t {
  *
  */
 ResponseResult create_closure_response_2D(
-    std::map<std::string, TH2D *> hists,
-    const std::string groomingMethod,
-    const std::string substructureVariableName,
-    std::vector<double> smearedJetPtBins,
-    std::vector<double> trueJetPtBins,
-    std::vector<double> smearedSplittingVariableBins,
-    std::vector<double> trueSplittingVariableBins,
-    double smearedUntaggedBinValue,
-    double minSmearedSplittingVariable,
-    double maxSmearedSplittingVariable,
-    const std::vector<std::string> & embeddedFilenames,
-    const ClosureVariation_t closureVariation,
-    const double fractionForResponse = 0.75,
-    const bool usePureMatches = false,
-    TH2D * hReweighting = nullptr,
-    const std::string & embeddedTreeName = "tree",
-    const std::string & truePrefix = "true",
-    const std::string & hybridPrefix = "hybrid",
-    const std::string & detLevelPrefix = "det_level"
-    )
+ std::map<std::string, TH2D*> hists, const std::string groomingMethod, const std::string substructureVariableName,
+ std::vector<double> smearedJetPtBins, std::vector<double> trueJetPtBins,
+ std::vector<double> smearedSplittingVariableBins, std::vector<double> trueSplittingVariableBins,
+ double smearedUntaggedBinValue, double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
+ const std::vector<std::string>& embeddedFilenames, const ClosureVariation_t closureVariation,
+ const double fractionForResponse = 0.75, const bool usePureMatches = false, TH2D* hReweighting = nullptr,
+ const std::string& embeddedTreeName = "tree", const std::string& truePrefix = "true",
+ const std::string& hybridPrefix = "hybrid", const std::string& detLevelPrefix = "det_level")
 {
   // NOTE: We rely on the user to validate that the binning matches the reweighting hist.
   // Setup
@@ -535,23 +525,27 @@ ResponseResult create_closure_response_2D(
   // Values
   TTreeReaderValue<double> scaleFactor(mcReader, "scale_factor");
   TTreeReaderValue<double> hybridJetPt(mcReader, (hybridPrefix + "_jet_pt").c_str());
-  TTreeReaderValue<double> hybridSubstructureVariable(mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<double> hybridSubstructureVariable(
+   mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
   TTreeReaderValue<double> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
-  TTreeReaderValue<double> trueSubstructureVariable(mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
-  TTreeReaderValue<long long> matchingLeading(mcReader, (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
-  TTreeReaderValue<long long> matchingSubleading(mcReader, (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
+  TTreeReaderValue<double> trueSubstructureVariable(
+   mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<long long> matchingLeading(mcReader,
+                        (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
+  TTreeReaderValue<long long> matchingSubleading(mcReader,
+                          (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
   // For the double counting cut.
   TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
   TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
 
   int treeNumber = -1;
-  //double scaleFactor = 0;
+  // double scaleFactor = 0;
   while (mcReader.Next()) {
     // Check if the file changed.
     if (treeNumber < embeddedChain.GetTreeNumber()) {
       // File changed. Update the scale factor.
-      //auto f = embeddedChain.GetFile();
-      //scaleFactor = GetScaleFactor(f);
+      // auto f = embeddedChain.GetFile();
+      // scaleFactor = GetScaleFactor(f);
       // Update the tree number so we hold onto the scale factor until the next time we need to update.
       treeNumber = embeddedChain.GetTreeNumber();
     }
@@ -570,7 +564,8 @@ ResponseResult create_closure_response_2D(
     // Full efficiency hists (and response).
     hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
     hists["h2_smeared_no_cuts"]->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
-    responsenotrunc->Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    responsenotrunc->Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt,
+               *scaleFactor);
 
     // Now start making cuts on the hybrid level.
     // Jet pt
@@ -582,9 +577,9 @@ ResponseResult create_closure_response_2D(
     if (hybridSubstructureVariableValue < 0) {
       // Assign to the untagged bin.
       hybridSubstructureVariableValue = smearedUntaggedBinValue;
-    }
-    else {
-      if (hybridSubstructureVariableValue < minSmearedSplittingVariable || hybridSubstructureVariableValue > maxSmearedSplittingVariable) {
+    } else {
+      if (hybridSubstructureVariableValue < minSmearedSplittingVariable ||
+        hybridSubstructureVariableValue > maxSmearedSplittingVariable) {
         continue;
       }
     }
@@ -596,19 +591,23 @@ ResponseResult create_closure_response_2D(
     int jetPtBin = findReweightingBin(*trueJetPt, smearedJetPtBins);
     // NOTE: In the case of the split MC, both reweight factors will automatically be 1.
     //       However, we set the factor to 1 here just to be safe.
-    double reweightFactor = closureVariation == ClosureVariation_t::splitMC ? 1 : hReweighting->GetBinContent(ktBin, jetPtBin);
+    double reweightFactor =
+     closureVariation == ClosureVariation_t::splitMC ? 1 : hReweighting->GetBinContent(ktBin, jetPtBin);
 
     // The matching cuts should only be applied to the response, so we start storing hists here.
     double randomValue = random.Rndm();
     if (randomValue >= fractionForResponse) {
       // Variation 1 is where we reweight the pseudo-data.
-      double pseudoReweightFactor = closureVariation == ClosureVariation_t::reweightPseudoData ? reweightFactor : 1;
-      hists["h2_pseudo_data"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor * pseudoReweightFactor);
+      double pseudoReweightFactor =
+       closureVariation == ClosureVariation_t::reweightPseudoData ? reweightFactor : 1;
+      hists["h2_pseudo_data"]->Fill(hybridSubstructureVariableValue, *hybridJetPt,
+                     *scaleFactor * pseudoReweightFactor);
       hists["h2_pseudo_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * pseudoReweightFactor);
     }
 
     // Matching cuts: Requiring a pure match.
-    if (usePureMatches && !isPureMatch(*matchingLeading, *matchingSubleading, hybridSubstructureVariableValue, smearedUntaggedBinValue)) {
+    if (usePureMatches && !isPureMatch(*matchingLeading, *matchingSubleading, hybridSubstructureVariableValue,
+                      smearedUntaggedBinValue)) {
       continue;
     }
 
@@ -618,18 +617,21 @@ ResponseResult create_closure_response_2D(
 
     // At this point, we've passed all of our cuts, so we store the result.
     // These don't matter so terribly much for our closure test, but it's not a bad thing to have.
-    // Note that they will always get the full stats and correspond to the response, as is the convention for the others.
+    // Note that they will always get the full stats and correspond to the response, as is the convention for the
+    // others.
     hists["h2_smeared"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor * responseReweightFactor);
     hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * responseReweightFactor);
-    hists["h2_substructure_variable"]->Fill(hybridSubstructureVariableValue, *trueSubstructureVariable, *scaleFactor * responseReweightFactor);
+    hists["h2_substructure_variable"]->Fill(hybridSubstructureVariableValue, *trueSubstructureVariable,
+                        *scaleFactor * responseReweightFactor);
 
     // We've filled the pseudo data above (before the pure matches requirement), but we still
     // need to fill the response when appropriate.
     if (randomValue < fractionForResponse) {
-      response->Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt, *scaleFactor * responseReweightFactor);
+      response->Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt,
+              *scaleFactor * responseReweightFactor);
     }
   }
 
-  return ResponseResult{response, responsenotrunc};
+  return ResponseResult{ response, responsenotrunc };
 }
 
