@@ -68,13 +68,10 @@ class SubstructureVariableSettings(ParameterSettings):
             min_smeared = smeared_bins[1]
             max_smeared = smeared_bins[-1]
             untagged_bin = helpers.RangeSelector(min=smeared_bins[0], max=smeared_bins[1])
-            # TODO: Sort out
-            # untaggedBinDescription = std::to_string(static_cast<int>(smearedSplittingVariableBins[0] * printFactor)) + "_" + static_cast<int>(smearedSplittingVariableBins[1] * printFactor);
         else:
             min_smeared = smeared_bins[0]
             max_smeared = smeared_bins[-2]
             untagged_bin = helpers.RangeSelector(min=smeared_bins[-2], max=smeared_bins[-1])
-            # untaggedBinDescription = std::to_string(static_cast<int>(smearedSplittingVariableBins[lastBin - 1] * printFactor)) + "_" + static_cast<int>(smearedSplittingVariableBins[lastBin] * printFactor);
 
         return cls(
             true_bins=true_bins,
@@ -491,7 +488,7 @@ def run_unfolding_fall_back(
         )
     )
     # TODO: Additional closure tests here?
-    # For instance, closure test 4 should be trivial
+    # For instance, closure test 5 should be trivial
     selected_iter_for_closure = 5
     output_hists.update(
         unfolding_2D(
