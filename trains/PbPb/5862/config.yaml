@@ -1,0 +1,14 @@
+---
+train: "Jets_EMC_PbPb"
+number: 5862
+dataset: "LHC18{q,r}"
+aliphysics_tag: "vAN-20200512_ROOT6-1"
+alien_output_info:
+    child_1:
+        name: "LHC18r"
+        stage_to_download: "merged"
+    child_2:
+        name: "LHC18q"
+        stage_to_download: "merged"
+status: |
+    "Recorded all recursive splittings in data. Rmax=0.6 systematic. Fix for substracted constituents."

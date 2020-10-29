@@ -1,0 +1,14 @@
+---
+train: "Jets_EMC_PbPb"
+number: 5863
+dataset: "LHC18{q,r}"
+aliphysics_tag: "vAN-20200512_ROOT6-1"
+alien_output_info:
+    child_1:
+        name: "LHC18r"
+        stage_to_download: "Stage_5"
+    child_2:
+        name: "LHC18q"
+        stage_to_download: "merged"
+status: |
+    "Recorded all recursive splittings in data. Nominal settings. Fix for substracted constituents."
