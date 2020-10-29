@@ -1,4 +1,14 @@
-""" 2D substructure unfolding implemented via RooUnfold.
+""" 2D unfolding implemented via RooUnfold.
+
+The RooUnfold response is created in cxx (because we can't use ROOT DataFrames directly due
+to unresolved issues with template discovery), and then we utilize it for unfolding, closures,
+etc, in python. We have to rely on ROOT very strongly here because RooUnfold...
+
+Conventions:
+- Separate file for each result (closure or otherwise).
+- Same names for the hists in each file.
+- Standard has no tag.
+- Closures always start with "closure" in the tag.
 
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
@@ -16,7 +26,8 @@ from jet_substructure.base import helpers
 
 logger = logging.getLogger(__name__)
 
-# Type helpers
+# Type helpers.
+# We could do better, but I would prefer weak (ie. only delayed) dependence on ROOT.
 RooUnfoldErrorTreatment = Any
 RooUnfoldResponse = Any
 TH2D = Any
@@ -29,8 +40,12 @@ def _np_array_converter(value: Any, dtype: np.dtype = np.float64) -> np.ndarray:
     Normally, we would just use np.array directly as the converter function. However, mypy will complain if
     the converter is untyped. So we add (trivial) typing here.  See: https://github.com/python/mypy/issues/6172.
 
+    Note:
+        To change the dtype for the converter, one would need to use `partial`.
+
     Args:
         value: Value to be converted to a numpy array.
+        dtype: Dtype to utilize. Default: np.float64.
     Returns:
         The converted numpy array.
     """
@@ -39,12 +54,31 @@ def _np_array_converter(value: Any, dtype: np.dtype = np.float64) -> np.ndarray:
 
 @attr.s
 class ParameterSettings:
+    """ Parameter settings
+
+    Args:
+        true_bins: True bins.
+        smeared_bins: Smeared bins.
+    """
+
     true_bins: np.ndarray = attr.ib(converter=_np_array_converter)
     smeared_bins: np.ndarray = attr.ib(converter=_np_array_converter)
 
 
 @attr.s
 class SubstructureVariableSettings(ParameterSettings):
+    """ Settings specific to the substructure variable.
+
+    Supports z, Rg, and kt.
+
+    Args:
+        name: Name of the substructure variable.
+        variable_name: Name of the substructure variable in the tree.
+        min_smeared: Min smeared value. Value can change due to the location of the untagged bin.
+        max_smeared: Max smeared value. Value can change due to the location of the untagged bin.
+        untagged_bin: Untagged bin min and max.
+    """
+
     name: str = attr.ib()
     variable_name: str = attr.ib()
     min_smeared: float = attr.ib()
@@ -106,14 +140,17 @@ class Settings:
         # Then the jet pt
         base_filename += f"_smeared_jet_pt_{int(self.jet_pt.smeared_bins[0] * self.filename_padding_factor)}_{int(self.jet_pt.smeared_bins[-1] * self.filename_padding_factor)}"
         # Additional options
-        if self.use_pure_matches:
-            base_filename += "_pure_matches"
+        # Optional tag
         if self.tag:
             base_filename += f"_{self.tag}"
+        # Put other possible options after the tag so we can sort by tag if it exists.
+        if self.use_pure_matches:
+            base_filename += "_pure_matches"
         return (self.output_dir / base_filename).with_suffix(".root")
 
 
 def _pass_filenames_to_ROOT(filenames: Sequence[Path]) -> List[str]:
+    """ Helper to convert Path to str for ROOT. """
     return [str(f) for f in filenames]
 
 
@@ -309,13 +346,17 @@ def _setup_unfolding() -> None:
     ROOT.ROOT.EnableImplicitMT(1)
 
 
-def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path) -> None:
+def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path, additional_tag: str = "") -> None:
     # Delayed import to avoid direct dependence.
     import ROOT
 
     # Setup
     output_filename.parent.mkdir(parents=True, exist_ok=True)
+    # Add an additional tag if requested
+    if additional_tag:
+        output_filename = (output_filename.parent / f"{output_filename.stem}_{additional_tag}").with_suffix(".root")
 
+    logger.debug(f"Writing hists to {output_filename}")
     # Uproot3 also works, but it's far less space efficient. Since we already have to import ROOT,
     # we may as well just use it...
     # with uproot3.recreate(settings.output_filename.with_suffix(".uproot.root")) as f:
@@ -352,7 +393,7 @@ def setup(grooming_method: str) -> Settings:
         ),
         tag="broadTrueBins",
         output_dir=Path("output/PbPb/unfolding/test"),
-        use_pure_matches=False,
+        use_pure_matches=True,
     )
 
     return default_settings
@@ -472,104 +513,33 @@ def run_unfolding_fall_back(
 
     # Perform the actual unfolding.
     # First, the standard unfolding.
-    output_hists = {}
-    output_hists.update(
-        unfolding_2D(response=responses.response, input_spectra=hists["h2_raw"], true_spectra=hists["h2_true"],)
+    output_hists = unfolding_2D(
+        response=responses.response, input_spectra=hists["h2_raw"], true_spectra=hists["h2_true"]
     )
+    # Write the output before we move onto the next case.
+    _write_hists([hists, output_hists], settings.output_filename)
+
     # Next, the trivial closure test where the input is the smeared hybrid spectra.
-    output_hists.update(
-        unfolding_2D(
-            response=responses.response,
-            input_spectra=hists["h2_smeared"],
-            true_spectra=hists["h2_true"],
-            tag="hybrid_smeared_as_input",
-        )
+    output_hists = unfolding_2D(
+        response=responses.response, input_spectra=hists["h2_smeared"], true_spectra=hists["h2_true"],
     )
+    # Write the output before we move onto the next case.
+    _write_hists(
+        [hists, output_hists], settings.output_filename, additional_tag="closure_trivial_hybrid_smeared_as_input"
+    )
+
     # For instance, closure test 5 should be trivial
     selected_iter_for_closure = 5
-    output_hists.update(
-        unfolding_2D(
-            response=responses.response,
-            input_spectra=output_hists[f"bayesian_folded_iter_{selected_iter_for_closure}"],
-            # The true spectra doesn't matter here...
-            true_spectra=hists["h2_true"],
-            tag="closure_4",
-        )
+    output_hists = unfolding_2D(
+        response=responses.response,
+        input_spectra=output_hists[f"bayesian_folded_iter_{selected_iter_for_closure}"],
+        # The true spectra doesn't matter here...
+        true_spectra=hists["h2_true"],
     )
-
-    # Store the output hists.
-    _write_hists([hists, output_hists], settings.output_filename)
-
-    return True
-
-
-def run_unfolding_closure_split_MC(
-    settings: Settings, embedded_filenames: Sequence[Path], fraction_for_response: float = 0.75
-) -> bool:
-    """ Run unfolding for the split MC closure.
-
-    Note:
-        Must run separately with and without pure matches because the response is different.
-
-    Args:
-        settings: Unfolding settings.
-        embedded_filenames: Filenames for embedded data.
-        fraction_for_response: Fraction of statistics for the response. Default: 0.75, as determined by
-            comparing error bars in data and embedded.
-    Returns:
-        True if successful.
-    """
-    # Delayed import to avoid direct dependence.
-    import ROOT
-
-    # Setup
-    _setup_unfolding()
-
-    # Define hists (and the map to pass them into ROOT for unfolding)
-    hists = _default_hists(settings=settings)
-    # Add pseudo-data and pseudo-true. They're equivalent to raw and true, so they can just be cloned.
-    hists["h2_pseudo_data"] = hists["h2_raw"].Clone("h2_pseudo_data")
-    hists["h2_pseudo_data"].Sumw2()
-    hists["h2_pseudo_true"] = hists["h2_true"].Clone("h2_pseudo_data")
-    hists["h2_pseudo_true"].Sumw2()
-
-    hists_map_for_root = _hists_to_map_for_ROOT(hists=hists)
-
-    # Create the responses. We assume some conventions about column names.
-    # They should generally be reasonable, but may require tweaks from time to time.
-    responses = ROOT.create_split_MC_response_2D(
-        hists_map_for_root,
-        settings.grooming_method,
-        settings.substructure_variable.variable_name,
-        _array_to_ROOT(settings.jet_pt.smeared_bins, "double"),
-        _array_to_ROOT(settings.jet_pt.true_bins, "double"),
-        _array_to_ROOT(settings.substructure_variable.smeared_bins, "double"),
-        _array_to_ROOT(settings.substructure_variable.true_bins, "double"),
-        settings.substructure_variable.untagged_value,
-        settings.substructure_variable.min_smeared,
-        settings.substructure_variable.max_smeared,
-        _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
-        fraction_for_response,
-        settings.use_pure_matches,
+    # Write the output before we move onto the next case.
+    _write_hists(
+        [hists, output_hists], settings.output_filename, additional_tag=f"closure_5_iter_{selected_iter_for_closure}"
     )
-
-    # Perform the actual unfolding.
-    # First, the standard split MC closure
-    output_hists = {}
-    tag = "closure_split_MC"
-    if settings.use_pure_matches:
-        tag = f"{tag}_pure_matches"
-    output_hists.update(
-        unfolding_2D(
-            response=responses.response,
-            input_spectra=hists["h2_pseudo_data"],
-            true_spectra=hists["h2_pseudo_true"],
-            tag=tag,
-        )
-    )
-
-    # Store the output hists.
-    _write_hists([hists, output_hists], settings.output_filename)
 
     return True
 
@@ -687,20 +657,14 @@ def run_unfolding_closure_reweighting(
     # Perform the actual unfolding.
     # First, the standard split MC closure
     output_hists = {}
-    tag = f"closure_{closure_variation}"
-    if settings.use_pure_matches:
-        tag = f"{tag}_pure_matches"
     output_hists.update(
         unfolding_2D(
-            response=responses.response,
-            input_spectra=hists["h2_pseudo_data"],
-            true_spectra=hists["h2_pseudo_true"],
-            tag=tag,
+            response=responses.response, input_spectra=hists["h2_pseudo_data"], true_spectra=hists["h2_pseudo_true"],
         )
     )
 
     # Store the output hists.
-    _write_hists([hists, output_hists], settings.output_filename)
+    _write_hists([hists, output_hists], settings.output_filename, additional_tag=f"closure_{closure_variation}")
 
     return True
 
