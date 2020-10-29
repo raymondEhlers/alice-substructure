@@ -1,0 +1,17 @@
+---
+train: "Jets_EMC_PbPb"
+number: 5889
+dataset: "LHC18{q,r}"
+aliphysics_tag: "vAN-20200513_ROOT6-1"
+embedded_dataset: "LHC19f4"
+pt_hard_bin: 4
+alien_output_info:
+    child_1:
+        name: "LHC18r"
+        stage_to_download: "merged"
+    child_2:
+        name: "LHC18q"
+        stage_to_download: "merged"
+status: |
+    "Embedding recording all recursive splittings. Nominal settings. Fix for substracted constituents."
+    " Doesn't include the double counting cut, and can't apply it properly because we need the unsubstracted hybrid max track. Don't use."

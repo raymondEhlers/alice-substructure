@@ -1,0 +1,51 @@
+---
+train: "Jets_EMC_PbPb"
+number: 5903
+dataset: "LHC18{q,r}"
+aliphysics_tag: "vAN-20200513_ROOT6-1"
+embedded_dataset: "LHC19f4"
+pt_hard_bin: 20
+alien_output_info:
+    child_1:
+        name: "LHC18r"
+        stage_to_download: "manual"
+        manual:
+            # NOTE: The run numbers don't match up with the output directories in MonALISA. Probably due to a bug.
+            #       So I matched their merging state up to the output directories.
+            297315: "Stage_5"
+            297414: "Stage_5"
+            296935: "Stage_5"
+            296850: "Stage_5"
+            297544: "merged"
+            297481: "Stage_5"
+            297442: "Stage_5"
+            297441: "Stage_5"
+            296690: "Stage_5"
+            296941: "Stage_5"
+            297222: "Stage_5"
+            296934: "Stage_5"
+            296852: "merged"
+            297379: "merged"
+    child_2:
+        name: "LHC18q"
+        stage_to_download: "manual"
+        manual:
+            # NOTE: The run numbers don't match up with the output directories in MonALISA. Probably due to a bug.
+            #       So I matched their merging state up to the output directories.
+            296419: "Stage_5"
+            296549: "merged"
+            296377: "merged"
+            296244: "merged"
+            296194: "merged"
+            296433: "merged"
+            296196: "merged"
+            295831: "merged"
+            296551: "merged"
+            296550: "merged"
+            296246: "merged"
+            295943: "merged"
+            295854: "merged"
+            296241: "merged"
+status: |
+    "Embedding recording all recursive splittings. Nominal settings. Fix for substracted constituents."
+    " Doesn't include the double counting cut, and can't apply it properly because we need the unsubstracted hybrid max track. Don't use."
