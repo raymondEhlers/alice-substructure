@@ -7,3 +7,6 @@ output
 drafts/
 
 bak/
+
+# Ignore some generated output files
+*.html
