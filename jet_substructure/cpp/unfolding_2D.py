@@ -441,8 +441,6 @@ def _hists_to_map_for_ROOT(hists: Dict[str, TH2D]) -> Any:
 def run_unfolding_fall_back(
     settings: Settings, data_filenames: Sequence[Path], embedded_filenames: Sequence[Path]
 ) -> bool:
-    # TODO: Determine input settings, etc here. This is the point of having the python code, but calling down to c++
-
     # Delayed import to avoid direct dependence.
     import ROOT
 
@@ -487,7 +485,6 @@ def run_unfolding_fall_back(
             tag="hybrid_smeared_as_input",
         )
     )
-    # TODO: Additional closure tests here?
     # For instance, closure test 5 should be trivial
     selected_iter_for_closure = 5
     output_hists.update(
@@ -496,7 +493,7 @@ def run_unfolding_fall_back(
             input_spectra=output_hists[f"bayesian_folded_iter_{selected_iter_for_closure}"],
             # The true spectra doesn't matter here...
             true_spectra=hists["h2_true"],
-            tag="closure_test_4",
+            tag="closure_4",
         )
     )
 
@@ -739,52 +736,52 @@ def run_unfolding(
         len(smeared_jet_pt_bins) - 1,
         smeared_jet_pt_bins,
     )
-    # detector measure level (ie. hybrid)
-    h2_smeared = ROOT.TH2D(
-        "smeared",
-        "smeared",
-        len(smeared_substructure_variable_bins) - 1,
-        smeared_substructure_variable_bins,
-        len(smeared_jet_pt_bins) - 1,
-        smeared_jet_pt_bins,
-    )
-    # detector measure level no cuts (ie. hybrid, but no cuts).
-    # NOTE: Strictly speaking, the y axis binning is at the hybrid level, but we want a wider range. So we use the true_jet_pt_bins.
-    h2_smeared_no_cuts = ROOT.TH2D(
-        "smearednocuts",
-        "smearednocuts",
-        len(smeared_substructure_variable_bins) - 1,
-        smeared_substructure_variable_bins,
-        len(true_jet_pt_bins) - 1,
-        true_jet_pt_bins,
-    )
-    # true correlations with measured cuts
-    h2_true = ROOT.TH2D(
-        "true",
-        "true",
-        len(true_substructure_variable_bins) - 1,
-        true_substructure_variable_bins,
-        len(true_jet_pt_bins) - 1,
-        true_jet_pt_bins,
-    )
-    # full true correlation (without cuts)
-    h2_full_eff = ROOT.TH2D(
-        "truef",
-        "truef",
-        len(true_substructure_variable_bins) - 1,
-        true_substructure_variable_bins,
-        len(true_jet_pt_bins) - 1,
-        true_jet_pt_bins,
-    )
-    # Correlation between the splitting variables at true and hybrid (with cuts).
-    h2_substructure_variable = ROOT.TH2D(
-        "h2SplittingVariable",
-        "h2SplittingVariable",
-        len(smeared_substructure_variable_bins) - 1,
-        smeared_substructure_variable_bins,
-        len(true_substructure_variable_bins) - 1,
-        true_substructure_variable_bins,
-    )
+    ## detector measure level (ie. hybrid)
+    # h2_smeared = ROOT.TH2D(
+    #    "smeared",
+    #    "smeared",
+    #    len(smeared_substructure_variable_bins) - 1,
+    #    smeared_substructure_variable_bins,
+    #    len(smeared_jet_pt_bins) - 1,
+    #    smeared_jet_pt_bins,
+    # )
+    ## detector measure level no cuts (ie. hybrid, but no cuts).
+    ## NOTE: Strictly speaking, the y axis binning is at the hybrid level, but we want a wider range. So we use the true_jet_pt_bins.
+    # h2_smeared_no_cuts = ROOT.TH2D(
+    #    "smearednocuts",
+    #    "smearednocuts",
+    #    len(smeared_substructure_variable_bins) - 1,
+    #    smeared_substructure_variable_bins,
+    #    len(true_jet_pt_bins) - 1,
+    #    true_jet_pt_bins,
+    # )
+    ## true correlations with measured cuts
+    # h2_true = ROOT.TH2D(
+    #    "true",
+    #    "true",
+    #    len(true_substructure_variable_bins) - 1,
+    #    true_substructure_variable_bins,
+    #    len(true_jet_pt_bins) - 1,
+    #    true_jet_pt_bins,
+    # )
+    ## full true correlation (without cuts)
+    # h2_full_eff = ROOT.TH2D(
+    #    "truef",
+    #    "truef",
+    #    len(true_substructure_variable_bins) - 1,
+    #    true_substructure_variable_bins,
+    #    len(true_jet_pt_bins) - 1,
+    #    true_jet_pt_bins,
+    # )
+    ## Correlation between the splitting variables at true and hybrid (with cuts).
+    # h2_substructure_variable = ROOT.TH2D(
+    #    "h2SplittingVariable",
+    #    "h2SplittingVariable",
+    #    len(smeared_substructure_variable_bins) - 1,
+    #    smeared_substructure_variable_bins,
+    #    len(true_substructure_variable_bins) - 1,
+    #    true_substructure_variable_bins,
+    # )
 
     # TODO: Determine the untagged bin value
 
@@ -863,51 +860,51 @@ def run_unfolding_rdf(
         smeared_jet_pt_bins,
     )
     # detector measure level (ie. hybrid)
-    h2_smeared_args = (
-        "smeared",
-        "smeared",
-        len(smeared_substructure_variable_bins) - 1,
-        smeared_substructure_variable_bins,
-        len(smeared_jet_pt_bins) - 1,
-        smeared_jet_pt_bins,
-    )
-    # detector measure level no cuts (ie. hybrid, but no cuts).
-    # NOTE: Strictly speaking, the y axis binning is at the hybrid level, but we want a wider range. So we use the true_jet_pt_bins.
-    h2_smeared_no_cuts_args = (
-        "smearednocuts",
-        "smearednocuts",
-        len(smeared_substructure_variable_bins) - 1,
-        smeared_substructure_variable_bins,
-        len(true_jet_pt_bins) - 1,
-        true_jet_pt_bins,
-    )
-    # true correlations with measured cuts
-    h2_true_args = (
-        "true",
-        "true",
-        len(true_substructure_variable_bins) - 1,
-        true_substructure_variable_bins,
-        len(true_jet_pt_bins) - 1,
-        true_jet_pt_bins,
-    )
-    # full true correlation (without cuts)
-    h2_full_eff_args = (
-        "truef",
-        "truef",
-        len(true_substructure_variable_bins) - 1,
-        true_substructure_variable_bins,
-        len(true_jet_pt_bins) - 1,
-        true_jet_pt_bins,
-    )
-    # Correlation between the splitting variables at true and hybrid (with cuts).
-    h2_substructure_variable_args = (
-        "h2SplittingVariable",
-        "h2SplittingVariable",
-        len(smeared_substructure_variable_bins) - 1,
-        smeared_substructure_variable_bins,
-        len(true_substructure_variable_bins) - 1,
-        true_substructure_variable_bins,
-    )
+    # h2_smeared_args = (
+    #    "smeared",
+    #    "smeared",
+    #    len(smeared_substructure_variable_bins) - 1,
+    #    smeared_substructure_variable_bins,
+    #    len(smeared_jet_pt_bins) - 1,
+    #    smeared_jet_pt_bins,
+    # )
+    ## detector measure level no cuts (ie. hybrid, but no cuts).
+    ## NOTE: Strictly speaking, the y axis binning is at the hybrid level, but we want a wider range. So we use the true_jet_pt_bins.
+    # h2_smeared_no_cuts_args = (
+    #    "smearednocuts",
+    #    "smearednocuts",
+    #    len(smeared_substructure_variable_bins) - 1,
+    #    smeared_substructure_variable_bins,
+    #    len(true_jet_pt_bins) - 1,
+    #    true_jet_pt_bins,
+    # )
+    ## true correlations with measured cuts
+    # h2_true_args = (
+    #    "true",
+    #    "true",
+    #    len(true_substructure_variable_bins) - 1,
+    #    true_substructure_variable_bins,
+    #    len(true_jet_pt_bins) - 1,
+    #    true_jet_pt_bins,
+    # )
+    ## full true correlation (without cuts)
+    # h2_full_eff_args = (
+    #    "truef",
+    #    "truef",
+    #    len(true_substructure_variable_bins) - 1,
+    #    true_substructure_variable_bins,
+    #    len(true_jet_pt_bins) - 1,
+    #    true_jet_pt_bins,
+    # )
+    ## Correlation between the splitting variables at true and hybrid (with cuts).
+    # h2_substructure_variable_args = (
+    #    "h2SplittingVariable",
+    #    "h2SplittingVariable",
+    #    len(smeared_substructure_variable_bins) - 1,
+    #    smeared_substructure_variable_bins,
+    #    len(true_substructure_variable_bins) - 1,
+    #    true_substructure_variable_bins,
+    # )
 
     # TODO: Determine the untagged bin value
     # TODO: Make arguments, cleanup, consolidate...
@@ -1000,7 +997,7 @@ def run_unfolding_rdf(
     h2_raw = df_data.Histo2D(h2_raw_args, "data_substructure_variable", data_jet_pt_name,)
 
     logger.info("Starting calculation")
-    # logger.info(f"Entries: {h2_raw.GetEntries()}")
+    logger.info(f"Entries: {h2_raw.GetEntries()}")
 
     # Starting embedding from here, but needs cleanup...
     data_chain_embedded = ROOT.TChain("tree")
