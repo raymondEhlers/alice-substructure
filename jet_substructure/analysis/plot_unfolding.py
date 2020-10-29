@@ -98,6 +98,7 @@ def plot_unfolded(
     output_dir: Path,
     max_iter: int = 10,
     plot_png: bool = False,
+    true_hist_name: str = "true",
 ) -> None:
     """ Plot unfolded.
 
@@ -114,7 +115,7 @@ def plot_unfolded(
 
     # True
     # Project true onto the kt axis. We use boost histogram for the convince.
-    hist_true = projection_func(hists["true"], true_bin)
+    hist_true = projection_func(hists[true_hist_name], true_bin)
     # Normalize
     hist_true = _normalize_hist(hist_true)
 
@@ -260,6 +261,7 @@ def plot_refolded(
     output_dir: Path,
     max_iter: int = 10,
     plot_png: bool = False,
+    raw_hist_name: str = "raw",
 ) -> None:
     """ Plot refolded.
 
@@ -270,19 +272,21 @@ def plot_refolded(
     ax_upper, ax_lower = axes
 
     # Raw
-    hist_raw = projection_func(hists["raw"], measured_bin)
-    # Normalize
-    hist_raw = _normalize_refolded(hist_raw)
-    ax_upper.errorbar(
-        hist_raw.axes[0].bin_centers,
-        hist_raw.values,
-        xerr=hist_raw.axes[0].bin_widths / 2,
-        yerr=hist_raw.errors,
-        label="Raw",
-        marker="o",
-        linestyle="",
-        color="red",
-    )
+    hist_raw = projection_func(hists[raw_hist_name], measured_bin)
+    # Only plot if there's something meaningful to plot
+    if hist_raw.values.any():
+        # Normalize
+        hist_raw = _normalize_refolded(hist_raw)
+        ax_upper.errorbar(
+            hist_raw.axes[0].bin_centers,
+            hist_raw.values,
+            xerr=hist_raw.axes[0].bin_widths / 2,
+            yerr=hist_raw.errors,
+            label="Raw",
+            marker="o",
+            linestyle="",
+            color="red",
+        )
 
     # Smeared
     hist_smeared = projection_func(hists["smeared"], measured_bin)
@@ -616,6 +620,8 @@ class InputFile:
     smeared_input: bool = attr.ib(default=False)
     pure_matches: bool = attr.ib(default=False)
     suffix: str = attr.ib(default="")
+    true_hist_name: str = attr.ib(default="true")
+    raw_hist_name: str = attr.ib(default="raw")
 
     @property
     def identifier(self) -> str:
@@ -686,6 +692,7 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
             n_iter_for_ratio=n_iter_for_ratio,
             max_iter=input_file.max_iter,
             true_bin=helpers.RangeSelector(60, 80),
+            true_hist_name=input_file.true_hist_name,
             tag=tag,
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{input_file.substructure_variable}_true_pt_60_80",
@@ -734,6 +741,7 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
             n_iter_for_ratio=n_iter_for_ratio,
             max_iter=input_file.max_iter,
             true_bin=helpers.RangeSelector(40, 120),
+            true_hist_name=input_file.true_hist_name,
             tag=tag,
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{input_file.substructure_variable}_true_pt_40_120",
@@ -780,6 +788,7 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
             n_iter_for_ratio=n_iter_for_ratio,
             max_iter=input_file.max_iter,
             true_bin=helpers.RangeSelector(0, 25),
+            true_hist_name=input_file.true_hist_name,
             tag=tag,
             plot_config=pb.PlotConfig(
                 name="unfolded_pt",
@@ -819,7 +828,8 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
         plot_refolded(
             hists=hists,
             projection_func=_project_kt,
-            smeared_input=input_file.smeared_input,
+            smeared_input=input_file.smeared_input or input_file.suffix == "closure2",
+            raw_hist_name=input_file.raw_hist_name,
             max_iter=input_file.max_iter,
             measured_bin=helpers.RangeSelector(40, 120),
             tag=tag,
@@ -841,7 +851,9 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
                             # y label is set in the function.
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
+                                label="Ratio to smeared"
+                                if (input_file.smeared_input or input_file.suffix == "closure2")
+                                else "Ratio to data",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -856,7 +868,8 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
         plot_refolded(
             hists=hists,
             projection_func=_project_pt,
-            smeared_input=input_file.smeared_input,
+            smeared_input=input_file.smeared_input or input_file.suffix == "closure2",
+            raw_hist_name=input_file.raw_hist_name,
             max_iter=input_file.max_iter,
             measured_bin=helpers.RangeSelector(1, 15),
             tag=tag,
@@ -878,7 +891,9 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
                             # y label is set in the function.
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
+                                label="Ratio to smeared"
+                                if (input_file.smeared_input or input_file.suffix == "closure2")
+                                else "Ratio to data",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -1006,7 +1021,8 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
         hists=hists,
         efficiency_func=_efficiency_pt,
         true_bins=[
-            helpers.RangeSelector(input_file.smeared_var_range.min, input_file.smeared_var_range.max),
+            input_file.smeared_var_range,
+            # helpers.RangeSelector(input_file.smeared_var_range.min, input_file.smeared_var_range.max),
             # helpers.RangeSelector(1, 15),
             # helpers.RangeSelector(2, 13),
             # helpers.RangeSelector(2, 15),

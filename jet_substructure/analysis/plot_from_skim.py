@@ -66,6 +66,14 @@ def _project_matching(bh_hist: bh.Histogram, axis_to_keep: int) -> binned_data.B
     return binned_data.BinnedData.from_existing_data(bh_hist)
 
 
+def _project_matching_RDF(bh_hist: bh.Histogram, min_kt_hybrid: float) -> binned_data.BinnedData:
+    res = bh_hist[
+        slice(None, None, bh.rebin(5)), slice(bh.loc(min_kt_hybrid) if min_kt_hybrid > 0 else None, None, bh.sum),
+    ]
+
+    return binned_data.BinnedData.from_existing_data(res)
+
+
 def _plot_subjet_matching(
     hists: Mapping[str, bh.Histogram],
     axis_parameter: str,
@@ -76,8 +84,9 @@ def _plot_subjet_matching(
     hybrid_jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
     output_dir: Path,
-    min_hybrid_kt: float = 0,
+    min_kt_hybrid: float = 0,
     rdf_plots: bool = False,
+    plot_png: bool = False,
 ) -> None:
     fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -96,10 +105,13 @@ def _plot_subjet_matching(
     }
 
     if rdf_plots:
-        hist_name = f"{grooming_method}_{matching_level}_matching_all"
+        # hist_name = f"{grooming_method}_{matching_level}_matching_all"
+        hist_name = f"{grooming_method}_matching_{matching_level}_type_all_jet_pt_axis_det_level"
         if hist_suffix:
             hist_name += f"_{hist_suffix}"
-        normalization = binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5)])
+        # logger.debug(hist_name)
+        normalization = _project_matching_RDF(hists[hist_name], min_kt_hybrid=min_kt_hybrid)
+        # binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5), :: bh.sum])
     else:
         normalization = _project_matching(
             bh_hist=hists[f"{grooming_method}_{matching_level}_kt_response_matching_type_all"],
@@ -111,13 +123,15 @@ def _plot_subjet_matching(
         if matching_type == "all":
             continue
         logger.debug(
-            f"Plotting {axis_parameter} subjet matching for {grooming_method}, {matching_level}, {matching_type}, min_hybrid_kt: {min_hybrid_kt}, hist_suffix: {hist_suffix}"
+            f"Plotting {axis_parameter} subjet matching for {grooming_method}, {matching_level}, {matching_type}, min_kt_hybrid: {min_kt_hybrid}, hist_suffix: {hist_suffix}"
         )
         if rdf_plots:
-            hist_name = f"{grooming_method}_{matching_level}_matching_{matching_type}"
+            # hist_name = f"{grooming_method}_{matching_level}_matching_{matching_type}"
+            hist_name = f"{grooming_method}_matching_{matching_level}_type_{matching_type}_jet_pt_axis_det_level"
             if hist_suffix:
                 hist_name += f"_{hist_suffix}"
-            h = binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5)])
+            # h = binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5), :: bh.sum])
+            h = _project_matching_RDF(hists[hist_name], min_kt_hybrid=min_kt_hybrid)
         else:
             h = _project_matching(
                 hists[f"{grooming_method}_{matching_level}_kt_response_matching_type_{matching_type}"],
@@ -148,10 +162,21 @@ def _plot_subjet_matching(
     plot_config.apply(fig=fig, axes=[ax])
 
     # Store and reset
-    filename = f"{plot_config.name}_{axis_parameter}_hybrid_{hybrid_jet_pt_bin}_{grooming_method}_single_figure"
+    # filename = f"{plot_config.name}_{axis_parameter}_hybrid_{hybrid_jet_pt_bin}_{grooming_method}_single_figure"
+    filename = f"{plot_config.name}_{axis_parameter}_{grooming_method}_single_figure"
     if hist_suffix:
+        # Add the min kt hybrid into the output filename if we've set it.
+        # We can't do it before because the histogram doesn't have the min kt hybrid in the hist name.
+        if min_kt_hybrid > 0:
+            hist_suffix = f"{hist_suffix}_min_kt_hybrid_{min_kt_hybrid}"
         filename += f"_{hist_suffix}"
+
     fig.savefig(output_dir / f"{filename}.pdf")
+    logger.debug(f"filename: {filename}")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{filename}.png")
     plt.close(fig)
 
 
@@ -161,9 +186,10 @@ def plot_prong_matching(
     matching_types: Sequence[str],
     output_dir: Path,
     rdf_plots: bool,
+    plot_png: bool = False,
 ) -> None:
     # Setup
-    hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+    hybrid_jet_pt_bin = helpers.JetPtRange(min=40, max=120)
     # Just for labeling
     grooming_styling = define_grooming_styles()
 
@@ -171,76 +197,238 @@ def plot_prong_matching(
         ("hybrid_det_level", "det_level", "det"),
         ("det_level_true", "matched", "true"),
     ]:
-        for grooming_method in grooming_methods:
-            text = "Iterative splittings"
-            text += "\n" + f"${helpers.RangeSelector(40, 120).display_str(label='hybrid')}$"
-            text += "\n" + grooming_styling[grooming_method].label
-            _plot_subjet_matching(
-                hists=hists,
-                axis_parameter="pt",
-                grooming_method=grooming_method,
-                matching_types=matching_types,
-                matching_level=matching_level,
-                hist_suffix="",
-                hybrid_jet_pt_bin=hybrid_jet_pt_bin,
-                plot_config=PlotConfig(
-                    name=f"subjet_matching_{matching_level}",
-                    panels=Panel(
-                        axes=[AxisConfig("y", label="Tagging Fraction", log=True, range=(1e-3, 10))],
-                        legend=LegendConfig(location="upper left", ncol=2, font_size=14),
-                        text=TextConfig(x=0.975, y=0.8, text=text),
+        for min_kt_hybrid in [-1, 2, 3, 5]:
+            for grooming_method in grooming_methods:
+                text = "Iterative splittings"
+                text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+                text += "\n" + grooming_styling[grooming_method].label
+                hist_suffix = hybrid_jet_pt_bin.histogram_str(label="hybrid")
+                if min_kt_hybrid > 0:
+                    text += "\n" + r"$k_{\text{T}}^{\text{hybrid}} >$ " + f"{min_kt_hybrid}"
+                _plot_subjet_matching(
+                    hists=hists,
+                    axis_parameter="pt",
+                    grooming_method=grooming_method,
+                    matching_types=matching_types,
+                    matching_level=matching_level,
+                    hist_suffix=hist_suffix,
+                    hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                    min_kt_hybrid=min_kt_hybrid,
+                    plot_config=PlotConfig(
+                        name=f"subjet_matching_{matching_level}",
+                        panels=Panel(
+                            axes=[AxisConfig("y", label="Tagging Fraction", log=True, range=(1e-3, 10))],
+                            legend=LegendConfig(location="upper left", ncol=2, font_size=14),
+                            text=TextConfig(x=0.975, y=0.8, text=text),
+                        ),
+                        figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
                     ),
-                    figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
-                ),
-                output_dir=output_dir,
-                rdf_plots=rdf_plots,
-            )
-            # n_to_split < 3
-            text_n_to_split_less_than_3 = text
-            text_n_to_split_less_than_3 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{{n_split_label}}}}} < 3$"
-            _plot_subjet_matching(
-                hists=hists,
-                axis_parameter="pt",
-                grooming_method=grooming_method,
-                matching_types=matching_types,
-                matching_level=matching_level,
-                hist_suffix=f"{n_split_prefix}_n_to_split_less_than_3",
-                hybrid_jet_pt_bin=hybrid_jet_pt_bin,
-                plot_config=PlotConfig(
-                    name=f"subjet_matching_{matching_level}",
-                    panels=Panel(
-                        axes=[AxisConfig("y", label="Tagging Fraction", log=True, range=(1e-3, 10))],
-                        legend=LegendConfig(location="upper left", ncol=2, font_size=14),
-                        text=TextConfig(x=0.975, y=0.8, text=text_n_to_split_less_than_3),
+                    output_dir=output_dir,
+                    rdf_plots=rdf_plots,
+                    plot_png=plot_png,
+                )
+
+                # TEMP
+                continue
+                # ENDTEMP
+
+                # n_to_split < 3
+                text_n_to_split_less_than_3 = text
+                text_n_to_split_less_than_3 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{{n_split_label}}}}} < 3$"
+                _plot_subjet_matching(
+                    hists=hists,
+                    axis_parameter="pt",
+                    grooming_method=grooming_method,
+                    matching_types=matching_types,
+                    matching_level=matching_level,
+                    hist_suffix=f"{n_split_prefix}_n_to_split_less_than_3",
+                    hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                    plot_config=PlotConfig(
+                        name=f"subjet_matching_{matching_level}",
+                        panels=Panel(
+                            axes=[AxisConfig("y", label="Tagging Fraction", log=True, range=(1e-3, 10))],
+                            legend=LegendConfig(location="upper left", ncol=2, font_size=14),
+                            text=TextConfig(x=0.975, y=0.8, text=text_n_to_split_less_than_3),
+                        ),
+                        figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
                     ),
-                    figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
-                ),
-                output_dir=output_dir,
-                rdf_plots=rdf_plots,
-            )
-            # n to split > 4
-            text_n_to_split_greater_than_4 = text
-            text_n_to_split_greater_than_4 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{{n_split_label}}}}} > 4$"
-            _plot_subjet_matching(
-                hists=hists,
-                axis_parameter="pt",
-                grooming_method=grooming_method,
-                matching_types=matching_types,
-                matching_level=matching_level,
-                hist_suffix=f"{n_split_prefix}_n_to_split_greater_than_4",
-                hybrid_jet_pt_bin=hybrid_jet_pt_bin,
-                plot_config=PlotConfig(
-                    name=f"subjet_matching_{matching_level}",
-                    panels=Panel(
-                        axes=[AxisConfig("y", label="Tagging Fraction", log=True, range=(1e-3, 10))],
-                        legend=LegendConfig(location="upper left", ncol=2, font_size=14),
-                        text=TextConfig(x=0.975, y=0.8, text=text_n_to_split_greater_than_4),
+                    output_dir=output_dir,
+                    rdf_plots=rdf_plots,
+                    plot_png=plot_png,
+                )
+                # n to split > 4
+                text_n_to_split_greater_than_4 = text
+                text_n_to_split_greater_than_4 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{{n_split_label}}}}} > 4$"
+                _plot_subjet_matching(
+                    hists=hists,
+                    axis_parameter="pt",
+                    grooming_method=grooming_method,
+                    matching_types=matching_types,
+                    matching_level=matching_level,
+                    hist_suffix=f"{n_split_prefix}_n_to_split_greater_than_4",
+                    hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                    plot_config=PlotConfig(
+                        name=f"subjet_matching_{matching_level}",
+                        panels=Panel(
+                            axes=[AxisConfig("y", label="Tagging Fraction", log=True, range=(1e-3, 10))],
+                            legend=LegendConfig(location="upper left", ncol=2, font_size=14),
+                            text=TextConfig(x=0.975, y=0.8, text=text_n_to_split_greater_than_4),
+                        ),
+                        figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
                     ),
-                    figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
-                ),
-                output_dir=output_dir,
-                rdf_plots=rdf_plots,
-            )
+                    output_dir=output_dir,
+                    rdf_plots=rdf_plots,
+                    plot_png=plot_png,
+                )
+
+
+def _plot_subjet_matching_purity(  # noqa: C901
+    hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    matching_level: str,
+    subjet_for_purity: str,
+    hist_suffix: str,
+    hybrid_jet_pt_bin: helpers.RangeSelector,
+    plot_config: PlotConfig,
+    output_dir: Path,
+    min_kt_hybrid: float = 0,
+    plot_png: bool = False,
+) -> None:
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    matching_type_label_map = {
+        "pure": "Pure matches",
+        "leading_untagged_subleading_correct": "Leading unmatched, subleading matched",
+        "leading_correct_subleading_untagged": "Leading matched, subleading unmatched",
+        "leading_correct_subleading_mistag": "Leading matched, subleading in leading",
+        "leading_mistag_subleading_correct": "Leading in subleading, subleading matched",
+        "leading_untagged_subleading_mistag": "Leading unmatched, subleading in leading",
+        "leading_mistag_subleading_untagged": "Leading in subleading, subleading unmatched",
+        "swap": "Swaps",
+        "both_untagged": "Leading, subleading unmatched",
+    }
+
+    grooming_styling = define_grooming_styles()
+
+    for grooming_method in grooming_methods:
+        # hist_name = f"{grooming_method}_{matching_level}_matching_all"
+        hist_name = f"{grooming_method}_matching_{matching_level}_type_all_jet_pt_axis_det_level"
+        if hist_suffix:
+            hist_name += f"_{hist_suffix}"
+        # logger.debug(hist_name)
+        normalization = _project_matching_RDF(hists[hist_name], min_kt_hybrid=min_kt_hybrid)
+        # binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5), :: bh.sum])
+
+        matching_type = "pure"
+        hist_name = f"{grooming_method}_matching_{matching_level}_type_{matching_type}_jet_pt_axis_det_level"
+        if hist_suffix:
+            hist_name += f"_{hist_suffix}"
+        # First, we take the pure manually
+        purity_hist = _project_matching_RDF(hists[hist_name], min_kt_hybrid=min_kt_hybrid)
+        for matching_type in matching_type_label_map.keys():
+            # leading can end up matching to subleading, so we have to be a bit more careful for it.
+            if (subjet_for_purity == "leading" and matching_type.startswith(f"{subjet_for_purity}_correct")) or (
+                subjet_for_purity == "subleading" and f"{subjet_for_purity}_correct" in matching_type
+            ):
+                logger.debug(f"{grooming_method}: Adding matching {matching_type}")
+                hist_name = f"{grooming_method}_matching_{matching_level}_type_{matching_type}_jet_pt_axis_det_level"
+                if hist_suffix:
+                    hist_name += f"_{hist_suffix}"
+                temp_hist = _project_matching_RDF(hists[hist_name], min_kt_hybrid=min_kt_hybrid)
+                purity_hist += temp_hist
+
+        # Normalize
+        purity_hist /= normalization
+
+        # Presentation
+        style = grooming_styling[grooming_method]
+        # Plot options
+        kwargs = {
+            "markerfacecolor": "white" if style.fillstyle == "none" else style.color,
+            "alpha": 1 if style.fillstyle == "none" else 0.8,
+        }
+        if style.fillstyle != "none":
+            kwargs["markeredgewidth"] = 0
+        # And plot
+        ax.errorbar(
+            purity_hist.axes[0].bin_centers,
+            purity_hist.values,
+            yerr=purity_hist.errors,
+            xerr=purity_hist.axes[0].bin_widths / 2,
+            color=style.color,
+            marker=style.marker,
+            fillstyle=style.fillstyle,
+            linestyle="",
+            label=style.label,
+            zorder=style.zorder,
+            **kwargs,
+        )
+
+    # Presentation and labeling
+    # Axis labels
+    x_axis_label = r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$"
+    ax.set_xlabel(x_axis_label)
+    # Apply the PlotConfig
+    plot_config.apply(fig=fig, axes=[ax])
+
+    # Store and reset
+    grooming_methods_label = "_".join(grooming_methods)
+    filename = f"{plot_config.name}_{grooming_methods_label}"
+    if hist_suffix:
+        # Add the min kt hybrid into the output filename if we've set it.
+        # We can't do it before because the histogram doesn't have the min kt hybrid in the hist name.
+        if min_kt_hybrid > 0:
+            hist_suffix = f"{hist_suffix}_min_kt_hybrid_{min_kt_hybrid}"
+        filename += f"_{hist_suffix}"
+
+    fig.savefig(output_dir / f"{filename}.pdf")
+    logger.debug(f"filename: {filename}")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{filename}.png")
+    plt.close(fig)
+
+
+def plot_prong_matching_purity(
+    hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path, plot_png: bool = False,
+) -> None:
+    # Setup
+    hybrid_jet_pt_bin = helpers.JetPtRange(min=40, max=120)
+
+    for matching_level, n_split_prefix, n_split_label in [
+        ("hybrid_det_level", "det_level", "det"),
+        # TODO: Re-enable!
+        # ("det_level_true", "matched", "true"),
+    ]:
+        for min_kt_hybrid in [-1, 2, 3, 5]:
+            for subjet_for_purity in ["leading", "subleading"]:
+                text = "Iterative splittings"
+                text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+                text += "\n" + f"{subjet_for_purity.capitalize()} purity"
+                hist_suffix = hybrid_jet_pt_bin.histogram_str(label="hybrid")
+                if min_kt_hybrid > 0:
+                    text += "\n" + r"$k_{\text{T}}^{\text{hybrid}} >$ " + f"{min_kt_hybrid}"
+                _plot_subjet_matching_purity(
+                    hists=hists,
+                    grooming_methods=grooming_methods,
+                    matching_level=matching_level,
+                    subjet_for_purity=subjet_for_purity,
+                    hist_suffix=hist_suffix,
+                    hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                    min_kt_hybrid=min_kt_hybrid,
+                    plot_config=PlotConfig(
+                        name=f"subjet_matching_{subjet_for_purity}_purity_{matching_level}",
+                        panels=Panel(
+                            axes=[AxisConfig("y", label="Purity", range=(0, 1.25))],
+                            legend=LegendConfig(location="upper left", ncol=2, font_size=14),
+                            text=TextConfig(x=0.975, y=0.025, text=text),
+                        ),
+                        figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
+                    ),
+                    output_dir=output_dir,
+                    plot_png=plot_png,
+                )
 
 
 def _plot_fraction_of_subjet_pt_in_hybrid(
@@ -253,6 +441,7 @@ def _plot_fraction_of_subjet_pt_in_hybrid(
     plot_config: PlotConfig,
     output_dir: Path,
     rdf_plots: bool = False,
+    plot_png: bool = False,
 ) -> None:
     fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -310,6 +499,10 @@ def _plot_fraction_of_subjet_pt_in_hybrid(
     if hist_suffix:
         filename += f"_{hist_suffix}"
     fig.savefig(output_dir / f"{filename}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{filename}.png")
     plt.close(fig)
 
 
@@ -319,6 +512,7 @@ def plot_subjet_momentum_fraction_in_hybrid(
     matching_types: Sequence[str],
     output_dir: Path,
     rdf_plots: bool,
+    plot_png: bool = False,
 ) -> None:
     # Setup
     hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
@@ -353,6 +547,7 @@ def plot_subjet_momentum_fraction_in_hybrid(
                 ),
                 output_dir=output_dir,
                 rdf_plots=rdf_plots,
+                plot_png=plot_png,
             )
 
 
