@@ -12,6 +12,7 @@ env/
 # Misc
 temp/
 .vscode/
+bak/
 
 # Python
 __pycache__/
