@@ -12,6 +12,7 @@ include = [
 embedPythia = "jet_substructure.analysis.analyze_tree:embed_pythia_entry_point"
 splitTree = "jet_substructure.base.helpers:split_tree_entry_point"
 mergeROOTFiles = "jet_substructure.base.helpers:merge_ROOT_files_entry_point"
+downloadTrainWithConfig = "jet_substructure.base.download_train_with_config:entry_point"
 skimDataset = "jet_substructure.analysis.skim_to_flat_tree:skim_entry_point"
 processEmbeddingSkim = "jet_substructure.analysis.data_frame:process_embedding_skim_entry_point"
 processEmbeddingSkimCpp = "jet_substructure.cpp.data_frame:embed_pythia_entry_point"

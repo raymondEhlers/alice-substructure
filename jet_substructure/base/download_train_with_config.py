@@ -4,13 +4,18 @@
 
 """
 
+import argparse
+import logging
 import subprocess
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Sequence
 
 import pachyderm.alice.utils as alice_utils
 from pachyderm import yaml
+
+
+logger = logging.getLogger(__name__)
 
 
 _possible_merging_stages = ["merged", "manual", "Stage_1", "Stage_2", "Stage_5"]
@@ -56,12 +61,12 @@ def add_files_from_xml_file(
     return output
 
 
-def download() -> None:
+def download(trains: Sequence[int]) -> None:
 
     y = yaml.yaml()
 
     output = {}
-    for train_number in range(5902, 5903):
+    for train_number in trains:
         print(f"Processing train {train_number}")
         local_train_dir = Path(str(train_number))
         config_filename = local_train_dir / "config.yaml"
@@ -196,5 +201,30 @@ def download() -> None:
         y.dump(output, f)
 
 
+def entry_point():
+    logging.basicConfig(format="[%(levelname)s] %(message)s", level=logging.INFO)
+
+    parser = argparse.ArgumentParser(description=f"Split tree into chunks.")
+    parser.add_argument(
+        "--train", type=int, help="Single train to process, or first train to process.",
+    )
+    parser.add_argument(
+        "--maxTrain", type=int, default=0, help="Max train number. It will include all trains between train and maxTrain (ie. upper limit is inclusive).",
+    )
+    args = parser.parse_args()
+
+    # Determine what to download
+    trains = []
+    if not args.maxTrain:
+        trains = [args.train]
+    else:
+        # NOTE: We add +1 so that we're inclusive on this upper limit. I think this will be more intuitive.
+        trains = list(range(args.train, args.maxTrain + 1))
+
+    logger.info(f"Downloading trains: {trains}")
+
+    download(trains=trains)
+
+
 if __name__ == "__main__":
-    download()
+    entry_point()
