@@ -1,0 +1,17 @@
+---
+train: "Jets_EMC_PbPb"
+number: 6299
+dataset: "LHC18{q,r}"
+aliphysics_tag: "vAN-20201005_ROOT6-1"
+embedded_dataset: "LHC19f4"
+pt_hard_bin: 4
+alien_output_info:
+    child_1:
+        name: "LHC18r"
+        stage_to_download: "merged"
+    child_2:
+        name: "LHC18q"
+        stage_to_download: "merged"
+status: |
+    "Substructure embedding semi-central, record all splittings. Double counting cut applied (with fix),"
+    " Tracking efficiency systematic - 4%. Jalien may have caused high error rates..."
