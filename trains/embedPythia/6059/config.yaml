@@ -1,0 +1,46 @@
+---
+train: "Jets_EMC_PbPb"
+number: 6059
+dataset: "LHC18{q,r}"
+aliphysics_tag: "vAN-20200720_ROOT6-1"
+embedded_dataset: "LHC19f4"
+pt_hard_bin: 13
+alien_output_info:
+    child_1:
+        name: "LHC18r"
+        stage_to_download: "manual"
+        manual:
+            # NOTE: The run numbers don't match up with the output directories in MonALISA. Probably due to a bug.
+            #       So I matched their merging state up to the output directories.
+            297315: "merged"
+            297414: "merged"
+            296935: "merged"
+            296850: "merged"
+            297544: "merged"
+            297481: "merged"
+            297441: "merged"
+            296690: "merged"
+            296941: "merged"
+            296852: "merged"
+            297379: "merged"
+    child_2:
+        name: "LHC18q"
+        stage_to_download: "manual"
+        manual:
+            # NOTE: The run numbers don't match up with the output directories in MonALISA. Probably due to a bug.
+            #       So I matched their merging state up to the output directories.
+            296419: "merged"
+            296549: "merged"
+            296377: "merged"
+            296244: "merged"
+            296194: "merged"
+            296433: "merged"
+            296551: "merged"
+            296550: "merged"
+            296246: "merged"
+            295943: "merged"
+            295854: "merged"
+            296241: "merged"
+status: |
+    "Substructure embedding semi-central, record all splittings. Double counting cut applied (with fix),"
+    " Rmax=0.05 systematic. There were early merging problems here. Maybe from the grid?"
