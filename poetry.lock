@@ -1051,7 +1051,7 @@ description = "Physics Analysis Core for Heavy-Ions"
 category = "main"
 optional = false
 python-versions = "^3.6.1"
-develop = false
+develop = true
 
 [package.dependencies]
 attrs = ">=19.3.0"
@@ -1796,7 +1796,7 @@ testing = ["pytest (>=3.5,<3.7.3 || >3.7.3)", "pytest-checkdocs (>=1.2.3)", "pyt
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6.1"
-content-hash = "f4745aa79b7bb09ce3f1502e91246c34159144b208b756cedc16f2f9146de44d"
+content-hash = "4dd131dd17193d77b5b6059932bc84f6f40571be0e884a62ca3924114cb6a96b"
 
 [metadata.files]
 ansicon = [
