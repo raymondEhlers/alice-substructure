@@ -26,7 +26,7 @@ def add_files_from_xml_file(
 ) -> Dict[str, str]:
     output = {}
     # Download the XML file...
-    print(f"Downloading {alien_xml_file.name} file: {alien_xml_file} to file://{local_xml_file}")
+    logger.info(f"Downloading {alien_xml_file.name} file: {alien_xml_file} to file://{local_xml_file}")
     subprocess.run(
         ["alien_cp", str(alien_xml_file), f"file://{str(local_xml_file)}"],
         stdout=subprocess.PIPE,
@@ -67,7 +67,7 @@ def download(trains: Sequence[int]) -> None:
 
     output = {}
     for train_number in trains:
-        print(f"Processing train {train_number}")
+        logger.info(f"Processing train {train_number}")
         local_train_dir = Path(str(train_number))
         config_filename = local_train_dir / "config.yaml"
         with open(config_filename, "r") as f:
@@ -86,7 +86,7 @@ def download(trains: Sequence[int]) -> None:
         possible_directories = [dir for dir in train_directories_on_alien if dir.startswith(str(train_number))]
         # NOTE: There could be more than 1 directory if there are children. We only have to check for whether it's empty.
         if len(possible_directories) == 0:
-            print(f"Can't find any directories for train. Skipping {train_number}.")
+            logger.warning(f"Can't find any directories for train. Skipping {train_number}.")
             continue
 
         alien_output_info = config["alien_output_info"]
@@ -97,7 +97,7 @@ def download(trains: Sequence[int]) -> None:
             # Determine the corresponding AliEn directory.
             possible_child_directories = [dir for dir in possible_directories if dir.endswith(child_name)]
             if len(possible_child_directories) != 1:
-                print(f"Could not find train directory corresponding to child {child_name}. Continuing")
+                logger.debug(f"Could not find train directory corresponding to child {child_name}. Continuing")
                 continue
 
             # Up until now, the possible directories have been relative to the base_alien_path.
