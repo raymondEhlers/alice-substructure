@@ -305,7 +305,7 @@ def expand_wildcards_in_filenames(paths: Sequence[Path]) -> List[Path]:
     return return_paths
 
 
-def split_tree(
+def split_tree(  # noqa: C901
     filenames: Sequence[Union[str, Path]],
     tree_name: str = "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
     number_of_chunks: int = -1,
@@ -343,6 +343,11 @@ def split_tree(
     if number_of_chunks < 0:
         logger.info(f"Automatically calculating number of chunks for chunk size < {int(chunk_size / 1e6)} MB")
         auto_calculate_number_of_chunks = True
+    # Copy lists if we are just repairing. We can't do it if we're splitting into chunks
+    # because it's unclear how to split the hists...
+    attempt_to_copy_lists = False
+    if number_of_chunks == 1:
+        attempt_to_copy_lists = True
 
     # Setup
     # Delayed import since we may not want this as a hard dependency in such a base module.
@@ -367,6 +372,22 @@ def split_tree(
             # Setup input tree
             input_file = ROOT.TFile(str(filename), "READ")
             logger.debug(f"Keys in input_file: {list(input_file.GetListOfKeys())}")
+            # Lists
+            embedding_helper_hists = None
+            task_hists = None
+            if attempt_to_copy_lists:
+                embedding_helper_hists = input_file.Get("AliAnalysisTaskEmcalEmbeddingHelper_histos")
+                # This will only work for me. But this should be fine, and can be improved later if needed.
+                task_hists_name = [
+                    key.GetName()
+                    for key in input_file.GetListOfKeys()
+                    if "DynamicalGrooming" in key.GetName() and "Tree" not in key.GetName()
+                ]
+                if len(task_hists_name) != 1:
+                    logger.warning(f"Cannot find unique task name. Names: {task_hists_name}. Skipping!")
+                else:
+                    task_hists = input_file.Get(task_hists_name[0])
+            # Tree
             input_tree = input_file.Get(tree_name)
 
             number_of_entries = input_tree.GetEntries()
@@ -386,6 +407,15 @@ def split_tree(
                     new_filename = filename.with_name(f"{filename.stem}.chunk{n+1:02}.root")
                 output_filenames[filename].append(new_filename)
                 new_file = ROOT.TFile(str(new_filename), "RECREATE")
+
+                # Attempt to copy lists when appropriate.
+                if attempt_to_copy_lists:
+                    if embedding_helper_hists:
+                        embedding_helper_hists.Write(embedding_helper_hists.GetName(), ROOT.TObject.kSingleKey)
+                    if task_hists:
+                        task_hists.Write(task_hists.GetName(), ROOT.TObject.kSingleKey)
+
+                # Now handle the tree
                 new_tree = input_tree.CloneTree(0)
                 ROOT.gROOT.cd()
 
@@ -404,7 +434,9 @@ def split_tree(
                             continue
                         new_tree.Fill()
 
+                # Save the new tree.
                 new_tree.AutoSave()
+                # Cleanup
                 new_file.Close()
 
     progress_manager.stop()
