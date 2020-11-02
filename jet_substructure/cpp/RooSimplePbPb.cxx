@@ -402,8 +402,8 @@ void RunUnfolding(const std::string groomingMethod)
   // Determines the type of data that we use. Usually, this is going to be "data" for raw data.
   std::string dataPrefix = "data";
 
-  TTreeReaderValue<float> dataJetPt(dataReader, ("jet_pt_" + dataPrefix).c_str());
-  TTreeReaderValue<float> dataSubstructureVariable(dataReader, (groomingMethod + "_" + dataPrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<double> dataJetPt(dataReader, (dataPrefix + "_jet_pt").c_str());
+  TTreeReaderValue<double> dataSubstructureVariable(dataReader, (groomingMethod + "_" + dataPrefix + "_" + substructureVariableName).c_str());
   while (dataReader.Next()) {
     // Jet pt cut.
     if (*dataJetPt < smearedJetPtBins[0] || *dataJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
@@ -467,8 +467,8 @@ void RunUnfolding(const std::string groomingMethod)
   TTreeReaderValue<long long> matchingLeading(mcReader, (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
   TTreeReaderValue<long long> matchingSubleading(mcReader, (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
   // For the double counting cut.
-  TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "leading_track_pt").c_str());
-  TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "leading_track_pt").c_str());
+  TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
+  TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
 
   // Setup for the response
   RooUnfoldResponse response;
