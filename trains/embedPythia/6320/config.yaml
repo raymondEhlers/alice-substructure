@@ -4,7 +4,7 @@ number: 6320
 dataset: "LHC18{q,r}"
 aliphysics_tag: "vAN-20200720_ROOT6-1"
 embedded_dataset: "LHC19f4"
-pt_hard_bin: 5
+pt_hard_bin: 4
 alien_output_info:
     child_1:
         name: "LHC18r"
