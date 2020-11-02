@@ -488,7 +488,7 @@ def calculate_and_skim_embedding(  # noqa: C901
                 generator_like_jets_calculation=det_level_jets_calculation,
                 generator_like_jets_label="det_level",
                 grooming_method=func_name,
-                match_using_distance=True,
+                match_using_distance=False,
             )
             grooming_results.update(hybrid_det_level_matching_results)
             # Det level-true matching
