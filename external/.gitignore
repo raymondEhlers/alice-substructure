@@ -1,0 +1,5 @@
+# Ignore everything here. It's up to the user to create the symlinks for each instance of the repo
+# This isn't the cleanest thing, but otherwise we have to mirror the directory structure on different systems
+# which is even more painful. Poetry will complain if the symlinks don't exist
+*
+!.gitignore
