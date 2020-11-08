@@ -305,11 +305,39 @@ def expand_wildcards_in_filenames(paths: Sequence[Path]) -> List[Path]:
     return return_paths
 
 
+def _AliEmcalList_to_TList(
+    existing_list: Any,
+) -> Any:
+    """ Convert an `AliEmcalList` to `TList` so we don't have to deal with `AliEmcalList` later...
+
+    Ideally, we could just cast this, but I don't see how to do that with PyROOT...
+    For example, `reinterpret_cast` maintains the type of the original object.
+
+    Note:
+        This isn't recursive, so it's possible to miss a conversion. However, it isn't
+        super common to have nested `AliEmcalList` objects, so that's fine for now.
+
+    Args:
+        existing_list: Existing AliEmcalList to convert.
+    Returns:
+        TList containing the same contents.
+    """
+    # Delayed import because we want to depend on ROOT as little as possible.
+    import ROOT
+
+    temp_list = ROOT.TList()
+    temp_list.SetName(existing_list.GetName())
+    for el in existing_list:
+        temp_list.Add(el)
+    return temp_list
+
+
 def split_tree(  # noqa: C901
     filenames: Sequence[Union[str, Path]],
     tree_name: str = "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
     number_of_chunks: int = -1,
     chunk_size: float = 200e6,
+    n_cores: int = 1,
 ) -> Dict[Path, List[Path]]:
     """ Split tree into a given number of chunks.
 
@@ -329,6 +357,7 @@ def split_tree(  # noqa: C901
             chunks (ie keeping each file before 1.25 GB). Default: -1.
         chunk_size: Size of the chunks in bytes. Only considered if auto calculating the number of
             chunks. Default: 200e6 (200 MB) (driven by memory requirements on the cluster).
+        n_cores: Number of cores to utilize. Default: 1.
 
     Returns:
         Filenames of the chunked files.
@@ -357,7 +386,7 @@ def split_tree(  # noqa: C901
     import ROOT
 
     # Just in case we enable multithreading later.
-    ROOT.ROOT.EnableImplicitMT()
+    ROOT.ROOT.EnableImplicitMT(n_cores)
     # Finish setup
     output_filenames: Dict[Path, List[Path]] = {}
     progress_manager = enlighten.get_manager()
@@ -377,7 +406,9 @@ def split_tree(  # noqa: C901
             task_hists = None
             if attempt_to_copy_lists:
                 embedding_helper_hists = input_file.Get("AliAnalysisTaskEmcalEmbeddingHelper_histos")
-                # This will only work for me. But this should be fine, and can be improved later if needed.
+                if embedding_helper_hists:
+                    embedding_helper_hists = _AliEmcalList_to_TList(embedding_helper_hists)
+                # This will only work for my tasks. But this should be fine, and can be improved later if needed.
                 task_hists_name = [
                     key.GetName()
                     for key in input_file.GetListOfKeys()
@@ -387,6 +418,8 @@ def split_tree(  # noqa: C901
                     logger.warning(f"Cannot find unique task name. Names: {task_hists_name}. Skipping!")
                 else:
                     task_hists = input_file.Get(task_hists_name[0])
+                    if task_hists:
+                        task_hists = _AliEmcalList_to_TList(task_hists)
             # Tree
             input_tree = input_file.Get(tree_name)
 
@@ -417,7 +450,6 @@ def split_tree(  # noqa: C901
 
                 # Now handle the tree
                 new_tree = input_tree.CloneTree(0)
-                ROOT.gROOT.cd()
 
                 logger.info(f"Fill tree {new_filename} with entries {start}-{end}")
                 with progress_manager.counter(
@@ -435,9 +467,15 @@ def split_tree(  # noqa: C901
                         new_tree.Fill()
 
                 # Save the new tree.
-                new_tree.AutoSave()
+                # It appears that we don't even need to write the tree because it's attached to the new_file...
+                new_tree.Write()
+                # NOTE: Don't use AutoSave - it could lead to writing with memberwise splittings, which won't
+                #       be read by uproot...
                 # Cleanup
                 new_file.Close()
+
+            # Cleanup
+            input_file.Close()
 
     progress_manager.stop()
     return output_filenames
@@ -463,6 +501,13 @@ def split_tree_entry_point() -> None:
         type=str,
         help="Name of the tree to split",
     )
+    parser.add_argument(
+        "-c",
+        "--cores",
+        default=1,
+        type=int,
+        help="Number of cores to use."
+    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "-n", "--nChunks", default=-1, type=int, help="Number of chunks. Default: -1, which then uses the chunk size."
@@ -474,7 +519,7 @@ def split_tree_entry_point() -> None:
     args = parser.parse_args()
 
     output_filenames = split_tree(
-        filenames=args.filenames, tree_name=args.treeName, number_of_chunks=args.nChunks, chunk_size=args.chunkSize
+        filenames=args.filenames, tree_name=args.treeName, number_of_chunks=args.nChunks, chunk_size=args.chunkSize, n_cores=args.cores,
     )
 
     import pprint
