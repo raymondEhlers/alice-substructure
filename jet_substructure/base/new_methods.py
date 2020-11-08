@@ -489,6 +489,10 @@ def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], branches: Seque
     # Write out to parquet.
     ak.to_parquet(arrays, output_filename)
 
+    # I don't think this will really help, but it's worth a try, since memory is
+    # leaking somewhere (perhaps in awkward1 itself).
+    del arrays
+
     return True
 
 
