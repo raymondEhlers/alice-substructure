@@ -18,7 +18,7 @@ from pachyderm import yaml
 logger = logging.getLogger(__name__)
 
 
-_possible_merging_stages = ["merged", "manual", "Stage_1", "Stage_2", "Stage_5"]
+_possible_merging_stages = ["merged", "manual", "single_run_manual", "Stage_1", "Stage_2", "Stage_5"]
 
 
 def add_files_from_xml_file(
@@ -61,7 +61,7 @@ def add_files_from_xml_file(
     return output
 
 
-def download(trains: Sequence[int]) -> None:
+def download(trains: Sequence[int]) -> None:  # noqa: C901
 
     y = yaml.yaml()
 
@@ -145,7 +145,8 @@ def download(trains: Sequence[int]) -> None:
                     if manual_stage_to_download == "merged":
                         local_file = local_train_dir / f"AnalysisResults.{child_label}.{run_number}.root"
                         output[str(manual_dir / "AnalysisResults.root")] = str(local_file)
-                    else:
+                    elif "Stage" in manual_stage_to_download:
+                        # Use a stage of the merging.
                         alien_xml_file = manual_dir / f"{manual_stage_to_download}.xml"
                         local_xml_file = local_train_dir / f"{run_number}_{manual_stage_to_download}_{child_name}.xml"
                         result = add_files_from_xml_file(
@@ -156,6 +157,29 @@ def download(trains: Sequence[int]) -> None:
                             additional_label=str(run_number),
                         )
                         output.update(result)
+                    else:
+                        # Didn't even get to a stage of the merging. Take whatever is there...
+                        directories_with_output_files = alice_utils.list_alien_dir(manual_dir)
+                        directories_with_output_files = [manual_dir / d for d in directories_with_output_files]
+                        _additional_label = str(run_number)
+                        for d in directories_with_output_files:
+                            # Use having a suffix as a proxy for a file, and without a suffix as a directory.
+                            # (I think we can query AliEn, but that seems like overkill just for determining directories...
+                            if d.suffix:
+                                continue
+
+                            # AliEn filename
+                            alien_file = d / "AnalysisResults.root"
+                            # Local filename
+                            i = int(d.name)
+                            if _additional_label:
+                                label = f"{_additional_label}.{i:02}"
+                            else:
+                                label = f"{i:02}"
+                            local_file = local_train_dir / f"AnalysisResults.{child_label}.{label}.root"
+                            print(f"Adding alien://{alien_file} : {local_file}")
+                            output[str(alien_file)] = str(local_file)
+
             else:
                 alien_xml_file = alien_dir / f"{stage_to_download}.xml"
                 local_xml_file = local_train_dir / f"{stage_to_download}_{child_name}.xml"
@@ -201,7 +225,7 @@ def download(trains: Sequence[int]) -> None:
         y.dump(output, f)
 
 
-def entry_point():
+def entry_point() -> None:
     logging.basicConfig(format="[%(levelname)s] %(message)s", level=logging.INFO)
 
     parser = argparse.ArgumentParser(description=f"Split tree into chunks.")
@@ -209,7 +233,10 @@ def entry_point():
         "--train", type=int, help="Single train to process, or first train to process.",
     )
     parser.add_argument(
-        "--maxTrain", type=int, default=0, help="Max train number. It will include all trains between train and maxTrain (ie. upper limit is inclusive).",
+        "--maxTrain",
+        type=int,
+        default=0,
+        help="Max train number. It will include all trains between train and maxTrain (ie. upper limit is inclusive).",
     )
     args = parser.parse_args()
 
