@@ -158,6 +158,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                         )
                         output.update(result)
                     else:
+                        logger.info(f"Processing manual single run for child {child_label}")
                         # Didn't even get to a stage of the merging. Take whatever is there...
                         directories_with_output_files = alice_utils.list_alien_dir(manual_dir)
                         directories_with_output_files = [manual_dir / d for d in directories_with_output_files]
@@ -177,7 +178,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                             else:
                                 label = f"{i:02}"
                             local_file = local_train_dir / f"AnalysisResults.{child_label}.{label}.root"
-                            print(f"Adding alien://{alien_file} : {local_file}")
+                            logger.debug(f"Adding alien://{alien_file} : {local_file}")
                             output[str(alien_file)] = str(local_file)
 
             else:
