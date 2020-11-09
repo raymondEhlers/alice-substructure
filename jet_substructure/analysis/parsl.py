@@ -11,9 +11,9 @@ import random
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
-import numpy as np
 import parsl
 import uproot4 as uproot
+from pachyderm import yaml
 from parsl.addresses import address_by_hostname
 from parsl.app.app import python_app
 from parsl.app.futures import DataFuture
@@ -25,15 +25,14 @@ from parsl.executors import HighThroughputExecutor
 from parsl.monitoring.monitoring import MonitoringHub
 from parsl.providers import SlurmProvider
 
-from pachyderm import yaml
-
 from jet_substructure.base import helpers
+
 
 logger = logging.getLogger(__name__)
 
 
 def read_config(collision_system: str, config_path: Path = Path("config/new_config.yaml")) -> Dict[str, Any]:
-    """ Read collision system configuration from YAML file.
+    """Read collision system configuration from YAML file.
 
     The collision system specification is defined in the YAML file.
 
@@ -52,8 +51,14 @@ def read_config(collision_system: str, config_path: Path = Path("config/new_conf
     return config
 
 
-def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partition: str = "short", debug: bool = False, use_root: bool = False,)-> Config:
-    """ Setup parsl for the 587 cluster.
+def setup_parsl_587(
+    nodes_to_allocate: int = 9,
+    jobs_per_node: int = 2,
+    partition: str = "short",
+    debug: bool = False,
+    use_root: bool = False,
+) -> Config:
+    """Setup parsl for the 587 cluster.
 
     The configuration that is defined here is loaded by parsl. We also setup monitoring infrastructure.
 
@@ -86,7 +91,7 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
             dict(
                 worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv AliPhysics/latest`",
                 # Only load ROOT rather than AliPhysics to avoid any potential dictionary issues...
-                #worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv ROOT/latest`",
+                # worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv ROOT/latest`",
                 # TODO: Make into options...
             )
         )
@@ -130,7 +135,7 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
                     exclusive=True,
                     # Format: HH:MM:SS
                     walltime="01:30:00",
-                    #walltime="00:21:00",
+                    # walltime="00:21:00",
                     # See notes on machines to exclude above.
                     scheduler_options=f"#SBATCH --exclude={','.join(machines_to_exclude)}",
                     # For root
@@ -140,17 +145,14 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
         ],
         # Monitoring information
         monitoring=MonitoringHub(
-            hub_address=address_by_hostname(),
-            hub_port=55055,
-            monitoring_debug=False,
-            resource_monitoring_interval=10,
+            hub_address=address_by_hostname(), hub_port=55055, monitoring_debug=False, resource_monitoring_interval=10,
         ),
         # Disables resource scaling.
         strategy=None,
         # Enable some retries (but not too many).
         # Unclear if it will help, but worth a try.
         # Doesn't seem to help :-(
-        #retries=2,
+        # retries=2,
     )
     parsl.load(b587_executor)
 
@@ -160,22 +162,20 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
 @python_app
 def _repair_root_files(tree_name: str, n_cores: int, inputs=[], outputs=[]) -> AppFuture:
     """ Repair ROOT files app. """
-    from jet_substructure.base import helpers
     from pathlib import Path
+
+    from jet_substructure.base import helpers
+
     res = helpers.split_tree(
-        filenames=[Path(inputs[0].filepath)],
-        tree_name=tree_name,
-        number_of_chunks=1,
-        n_cores=n_cores,
+        filenames=[Path(inputs[0].filepath)], tree_name=tree_name, number_of_chunks=1, n_cores=n_cores,
     )
     return res
 
+
 def setup_repair_root_files(
-    collision_system: str,
-    jobs_per_node: int,
-    selected_train_numbers: Optional[Sequence[int]] = None,
+    collision_system: str, jobs_per_node: int, selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> List[AppFuture]:
-    """ Repair ROOT files.
+    """Repair ROOT files.
 
     Settings will be taken out of the configuration file.
 
@@ -200,7 +200,7 @@ def setup_repair_root_files(
         filenames = [f for f in filenames if int(f.parent.name) in selected_train_numbers]
     # Filter out already repaired files
     filenames = [f for f in filenames if "repaired" not in str(f.name)]
-    #logger.info(f"Repairing filenames: {filenames}")
+    # logger.info(f"Repairing filenames: {filenames}")
 
     for filename in filenames:
         # Setup file IO
@@ -208,18 +208,20 @@ def setup_repair_root_files(
         output_filename = filename.with_name(f"{filename.stem}.repaired.root")
         parsl_output_file = File(str(output_filename))
 
-        results.append(_repair_root_files(
-            tree_name=tree_name,
-            n_cores=math.floor(8 / jobs_per_node),
-            inputs=[parsl_input_file],
-            outputs=[parsl_output_file],
-        ))
+        results.append(
+            _repair_root_files(
+                tree_name=tree_name,
+                n_cores=math.floor(8 / jobs_per_node),
+                inputs=[parsl_input_file],
+                outputs=[parsl_output_file],
+            )
+        )
 
     return results
 
 
 def _determine_number_of_entries_per_file(filenames: Sequence[Path], tree_name: str) -> Dict[Path, int]:
-    """ Retrieve the number of tree entries per ROOT file.
+    """Retrieve the number of tree entries per ROOT file.
 
     Args:
         filenames: Filenames containing the trees of interest.
@@ -237,8 +239,14 @@ def _determine_number_of_entries_per_file(filenames: Sequence[Path], tree_name: 
     return number_of_entries_per_file
 
 
-def _number_of_entries_per_file(input_filenames: Sequence[Union[Path, str]], tree_name: str, collision_system: str, identifier: str, recreate: bool = False) -> Dict[Path, int]:
-    """ Determine number of entries per file.
+def _number_of_entries_per_file(
+    input_filenames: Sequence[Union[Path, str]],
+    tree_name: str,
+    collision_system: str,
+    identifier: str,
+    recreate: bool = False,
+) -> Dict[Path, int]:
+    """Determine number of entries per file.
 
     Args:
         input_filenames: Filenames to use in the number of entries determination.
@@ -274,8 +282,10 @@ def _number_of_entries_per_file(input_filenames: Sequence[Union[Path, str]], tre
     return number_of_entries_per_file
 
 
-def _distribute_entries_to_jobs(number_of_entries_per_file: Mapping[Path, int], entries_per_job: int) -> Dict[Path, List[Tuple[int, int]]]:
-    """ Distribute a specific number of entries to each job.
+def _distribute_entries_to_jobs(
+    number_of_entries_per_file: Mapping[Path, int], entries_per_job: int
+) -> Dict[Path, List[Tuple[int, int]]]:
+    """Distribute a specific number of entries to each job.
 
     We distribute based on the number of entries in a given file, so if a file doesn't contain enough for a full job,
     we assign fewer events. We lose some efficiency, but it's much simpler.
@@ -309,23 +319,36 @@ def _distribute_entries_to_jobs(number_of_entries_per_file: Mapping[Path, int], 
 
 
 @python_app
-def _convert_to_parquet(tree_name: str, prefixes: Sequence[str], branches: Sequence[str], prefix_branches: Sequence[str],
-                        event_range: Optional[Tuple[Optional[int], Optional[int]]] = None, inputs=[], outputs=[], stdout=None):
+def _convert_to_parquet(
+    tree_name: str,
+    prefixes: Sequence[str],
+    branches: Sequence[str],
+    prefix_branches: Sequence[str],
+    event_range: Optional[Tuple[Optional[int], Optional[int]]] = None,
+    inputs=[],
+    outputs=[],
+    stdout=None,
+):
     """ Convert to parquet app. """
-    from jet_substructure.base import new_methods
     from pathlib import Path
+
+    from jet_substructure.base import new_methods
+
     res = new_methods.convert_tree_to_parquet(
-        filename=Path(inputs[0].filepath), tree_name=tree_name, prefixes=prefixes,
+        filename=Path(inputs[0].filepath),
+        tree_name=tree_name,
+        prefixes=prefixes,
         branches=branches,
         prefix_branches=prefix_branches,
-        entries=event_range, output_filename=Path(outputs[0].filepath)
+        entries=event_range,
+        output_filename=Path(outputs[0].filepath),
     )
     logger.debug(outputs)
     return res
 
 
 def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1e5)) -> List[AppFuture]:
-    """ Setup convert_to_parquet app for execution with parsl.
+    """Setup convert_to_parquet app for execution with parsl.
 
     Args:
         events_per_job: Number of events to process in each job.
@@ -342,12 +365,12 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
         tree_name=dataset_config["tree_name"],
         collision_system=collision_system,
         identifier=dataset_config["name"],
-        #recreate=True,
+        # recreate=True,
     )
     job_ranges = _distribute_entries_to_jobs(
         number_of_entries_per_file=number_of_entries_per_file, entries_per_job=entries_per_job
     )
-    #logger.debug(job_ranges)
+    # logger.debug(job_ranges)
     # Sanity check.
     logger.debug(f"Total entries: {sum([len(l) for l in job_ranges.values()])}")
 
@@ -358,30 +381,110 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
             parsl_input_file = File(str(filename))
             output_filename = Path(parsl_input_file.filepath)
             # Path becomes .../parquet/events_per_job_.../filename.00.parquet
-            output_filename = output_filename.parent / "parquet" / f"events_per_job_{entries_per_job}" / output_filename.name
+            output_filename = (
+                output_filename.parent / "parquet" / f"events_per_job_{entries_per_job}" / output_filename.name
+            )
             output_filename = output_filename.with_suffix(f".{i:02}.parquet")
             parsl_output_file = File(str(output_filename))
 
-            results.append(_convert_to_parquet(
-                tree_name=dataset_config["tree_name"],
-                prefixes=list(dataset_config["prefixes"].keys()),
-                branches=dataset_config["branches"],
-                prefix_branches=dataset_config["prefix_branches"],
-                event_range=event_range,
-                inputs=[parsl_input_file],
-                outputs=[parsl_output_file],
-                stdout=f"{i_file}_{i}.log"
-            ))
+            results.append(
+                _convert_to_parquet(
+                    tree_name=dataset_config["tree_name"],
+                    prefixes=list(dataset_config["prefixes"].keys()),
+                    branches=dataset_config["branches"],
+                    prefix_branches=dataset_config["prefix_branches"],
+                    event_range=event_range,
+                    inputs=[parsl_input_file],
+                    outputs=[parsl_output_file],
+                    stdout=f"{i_file}_{i}.log",
+                )
+            )
 
     return results
 
 
 @python_app
-def _calculate_embedding_skim(dataset_config: Dict[str, Any], train_directory: Path, iterative_splittings: bool, inputs=[], outputs=[], stdout=None, stderr=None) -> AppFuture:
+def _extract_scale_factors_for_embedding(inputs=[], outputs=[], stdout=None, stderr=None) -> AppFuture:
+    from pathlib import Path
+
+    from jet_substructure.cpp import extract_scale_factors
+
+    res = extract_scale_factors.ScaleFactor.from_hists(
+        *extract_scale_factors.scale_factor_ROOT(filenames=[Path(i.filepath) for i in inputs])
+    )
+    return res
+
+
+def setup_extract_scale_factors_for_embedding(
+    collision_system: str, selected_train_numbers: Optional[Sequence[int]] = None,
+) -> None:
+    """Extract scale factors from embedding hists.
+
+    Note:
+        This is surprisingly fast, at least for the Rmax=0.6 case.
+    """
+    from jet_substructure.cpp import extract_scale_factors
+
+    # Setup
+    scale_factors = {}
+    dataset_config = read_config(collision_system=collision_system)
+
+    logger.info("Determining input files.")
+    input_files_per_pt_hard_bin = {}
+    for filename_base in dataset_config["files"]:
+        filename_base = Path(filename_base)
+
+        # Grab the pt hard bin to use as the key.
+        y = yaml.yaml()
+        with open(filename_base.parent / "config.yaml", "r") as f:
+            train_config = y.load(f)
+        train_number = train_config["number"]
+        pt_hard_bin = train_config["pt_hard_bin"]
+
+        # Validation for the train_number
+        assert train_number == int(filename_base.parent.name)
+        if selected_train_numbers and train_number not in selected_train_numbers:
+            logger.debug(f"Skipping train number {train_number}")
+            continue
+
+        # Expand the filenames
+        input_files_per_pt_hard_bin[pt_hard_bin] = helpers.expand_wildcards_in_filenames([filename_base])
+
+    for pt_hard_bin, input_files in input_files_per_pt_hard_bin.items():
+        logger.debug(f"pt_hard_bin: {pt_hard_bin}, filenames: {input_files}")
+        scale_factors[pt_hard_bin] = _extract_scale_factors_for_embedding(
+            inputs=[File(str(fname)) for fname in input_files]
+        )
+
+    # Exceptionally, collect the results here so we can record the result.
+    logger.info(f"About to ask for result. len: {len(scale_factors)}")
+    # Wait for all apps to complete, and store the results.
+    results = {k: v.result() for k, v in scale_factors.items()}
+    logger.info(results)
+
+    # Write them to YAML for later.
+    y = yaml.yaml(classes_to_register=[extract_scale_factors.ScaleFactor])
+    output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}_scale_factors.yaml")
+    with open(output_filename, "w") as f:
+        y.dump(results, f)
+
+
+@python_app
+def _calculate_embedding_skim(
+    dataset_config: Dict[str, Any],
+    train_directory: Path,
+    iterative_splittings: bool,
+    inputs=[],
+    outputs=[],
+    stdout=None,
+    stderr=None,
+) -> AppFuture:
     """ Calculate embedding skim app. """
     import traceback
     from pathlib import Path
+
     from jet_substructure.analysis import new_skim_to_flat_tree
+
     try:
         res = new_skim_to_flat_tree.calculate_embedding_skim(
             input_filename=Path(inputs[0].filepath),
@@ -408,7 +511,7 @@ def setup_calculate_embedding_skim(
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_files: Optional[Sequence[DataFuture]] = None,
 ) -> List[AppFuture]:
-    """ Setup to calculate embedding skim.
+    """Setup to calculate embedding skim.
 
     Args:
         collision_system: Collision system.
@@ -452,28 +555,36 @@ def setup_calculate_embedding_skim(
         output_dir = train_directory / "skim"
         if not output_dir.exists():
             output_dir.mkdir(parents=True, exist_ok=True)
-        output_filename = output_dir / f"{Path(parsl_input_file.filepath).stem}_{iterative_splittings_label}_splittings.root"
+        output_filename = (
+            output_dir / f"{Path(parsl_input_file.filepath).stem}_{iterative_splittings_label}_splittings.root"
+        )
         parsl_output_file = File(str(output_filename))
 
-        results.append(_calculate_embedding_skim(
-            dataset_config=dataset_config,
-            iterative_splittings=iterative_splittings,
-            train_directory=train_directory,
-            inputs=[parsl_input_file],
-            outputs=[parsl_output_file],
-            #stdout=parsl.AUTO_LOGNAME,
-            #stderr=parsl.AUTO_LOGNAME,
-        ))
+        results.append(
+            _calculate_embedding_skim(
+                dataset_config=dataset_config,
+                iterative_splittings=iterative_splittings,
+                train_directory=train_directory,
+                inputs=[parsl_input_file],
+                outputs=[parsl_output_file],
+                # stdout=parsl.AUTO_LOGNAME,
+                # stderr=parsl.AUTO_LOGNAME,
+            )
+        )
 
     return results
 
 
 @python_app()
-def _calculate_data_skim(collision_system: str, dataset_config: Dict[str, Any], iterative_splittings: bool, inputs=[], outputs=[]) -> AppFuture:
+def _calculate_data_skim(
+    collision_system: str, dataset_config: Dict[str, Any], iterative_splittings: bool, inputs=[], outputs=[]
+) -> AppFuture:
     """ Calculate data skim app. """
     import traceback
     from pathlib import Path
+
     from jet_substructure.analysis import new_skim_to_flat_tree
+
     try:
         res = new_skim_to_flat_tree.calculate_data_skim(
             input_filename=Path(inputs[0].filepath),
@@ -500,7 +611,7 @@ def setup_calculate_data_skim(
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_files: Optional[Sequence[DataFuture]] = None,
 ) -> List[AppFuture]:
-    """ Setup to calculate data skim.
+    """Setup to calculate data skim.
 
     Args:
         collision_system: Collision system.
@@ -544,27 +655,40 @@ def setup_calculate_data_skim(
         output_dir = train_directory / "skim"
         if not output_dir.exists():
             output_dir.mkdir(parents=True, exist_ok=True)
-        output_filename = output_dir / f"{Path(parsl_input_file.filepath).stem}_{iterative_splittings_label}_splittings.root"
+        output_filename = (
+            output_dir / f"{Path(parsl_input_file.filepath).stem}_{iterative_splittings_label}_splittings.root"
+        )
         parsl_output_file = File(str(output_filename))
 
-        results.append(_calculate_data_skim(
-            dataset_config=dataset_config,
-            collision_system=collision_system,
-            iterative_splittings=iterative_splittings,
-            inputs=[parsl_input_file],
-            outputs=[parsl_output_file],
-            #stdout=parsl.AUTO_LOGNAME,
-            #stderr=parsl.AUTO_LOGNAME,
-        ))
+        results.append(
+            _calculate_data_skim(
+                dataset_config=dataset_config,
+                collision_system=collision_system,
+                iterative_splittings=iterative_splittings,
+                inputs=[parsl_input_file],
+                outputs=[parsl_output_file],
+                # stdout=parsl.AUTO_LOGNAME,
+                # stderr=parsl.AUTO_LOGNAME,
+            )
+        )
 
     return results
 
 
 @python_app
-def _root_data_frame(collision_system: str, tree_name: str, prefixes: Sequence[str], grooming_method: str, jet_R: float, n_cores: int,
-                     inputs: Optional[Sequence[File]] = [], outputs: Optional[Sequence[File]] = []) -> AppFuture:
+def _root_data_frame(
+    collision_system: str,
+    tree_name: str,
+    prefixes: Sequence[str],
+    grooming_method: str,
+    jet_R: float,
+    n_cores: int,
+    inputs: Optional[Sequence[File]] = [],
+    outputs: Optional[Sequence[File]] = [],
+) -> AppFuture:
     """ ROOT data frame app. """
     from pathlib import Path
+
     from jet_substructure.cpp import data_frame
 
     res = data_frame.run(
@@ -612,34 +736,54 @@ def setup_root_data_frame(
 
     logger.info(f"N cores per job: {math.floor(8 / jobs_per_node)}")
     results = []
-    for grooming_method in ["leading_kt", "leading_kt_z_cut_02", "leading_kt_z_cut_04",
-                            "dynamical_z", "dynamical_kt", "dynamical_time",
-                            "soft_drop_z_cut_02", "soft_drop_z_cut_04"]:
+    for grooming_method in [
+        "leading_kt",
+        "leading_kt_z_cut_02",
+        "leading_kt_z_cut_04",
+        "dynamical_z",
+        "dynamical_kt",
+        "dynamical_time",
+        "soft_drop_z_cut_02",
+        "soft_drop_z_cut_04",
+    ]:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
         # Note: It randomizes in place.
         random.shuffle(input_files)
-        output_file = output_dir / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.values())}.root"
+        output_file = (
+            output_dir / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.values())}.root"
+        )
         parsl_output_file = File(str(output_file))
-        results.append(_root_data_frame(
-            collision_system=collision_system,
-            tree_name="tree",
-            prefixes=list(prefixes.values()),
-            grooming_method=grooming_method,
-            jet_R=dataset_config["jet_R"],
-            n_cores=math.floor(8 / jobs_per_node),
-            inputs=input_files,
-            outputs=[parsl_output_file],
-        ))
+        results.append(
+            _root_data_frame(
+                collision_system=collision_system,
+                tree_name="tree",
+                prefixes=list(prefixes.values()),
+                grooming_method=grooming_method,
+                jet_R=dataset_config["jet_R"],
+                n_cores=math.floor(8 / jobs_per_node),
+                inputs=input_files,
+                outputs=[parsl_output_file],
+            )
+        )
 
     return results
 
 
 @python_app
-def _root_data_frame_response(collision_system: str, tree_name: str, prefixes: Sequence[str], grooming_method: str, jet_R: float, n_cores: int,
-                              inputs: Optional[Sequence[File]] = [], outputs: Optional[Sequence[File]] = []) -> AppFuture:
+def _root_data_frame_response(
+    collision_system: str,
+    tree_name: str,
+    prefixes: Sequence[str],
+    grooming_method: str,
+    jet_R: float,
+    n_cores: int,
+    inputs: Optional[Sequence[File]] = [],
+    outputs: Optional[Sequence[File]] = [],
+) -> AppFuture:
     """ ROOT data frame response app. """
     from pathlib import Path
+
     from jet_substructure.cpp import data_frame
 
     res = data_frame.run_response(
@@ -687,34 +831,55 @@ def setup_root_data_frame_response(
 
     logger.info(f"N cores per job: {math.floor(8 / jobs_per_node)}")
     results = []
-    for grooming_method in ["leading_kt", "leading_kt_z_cut_02", "leading_kt_z_cut_04",
-                            "dynamical_z", "dynamical_kt", "dynamical_time",
-                            "soft_drop_z_cut_02", "soft_drop_z_cut_04"]:
+    for grooming_method in [
+        "leading_kt",
+        "leading_kt_z_cut_02",
+        "leading_kt_z_cut_04",
+        "dynamical_z",
+        "dynamical_kt",
+        "dynamical_time",
+        "soft_drop_z_cut_02",
+        "soft_drop_z_cut_04",
+    ]:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
         # Note: It randomizes in place.
         random.shuffle(input_files)
-        output_file = output_dir / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.values())}_response.root"
+        output_file = (
+            output_dir
+            / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.values())}_response.root"
+        )
         parsl_output_file = File(str(output_file))
-        results.append(_root_data_frame_response(
-            collision_system=collision_system,
-            tree_name="tree",
-            prefixes=list(prefixes.values()),
-            grooming_method=grooming_method,
-            jet_R=dataset_config["jet_R"],
-            n_cores=math.floor(8 / jobs_per_node),
-            inputs=input_files,
-            outputs=[parsl_output_file],
-        ))
+        results.append(
+            _root_data_frame_response(
+                collision_system=collision_system,
+                tree_name="tree",
+                prefixes=list(prefixes.values()),
+                grooming_method=grooming_method,
+                jet_R=dataset_config["jet_R"],
+                n_cores=math.floor(8 / jobs_per_node),
+                inputs=input_files,
+                outputs=[parsl_output_file],
+            )
+        )
 
     return results
 
 
 @python_app
-def _root_data_frame_closure(collision_system: str, tree_name: str, prefixes: Sequence[str], grooming_method: str, jet_R: float, n_cores: int,
-                              inputs: Optional[Sequence[File]] = [], outputs: Optional[Sequence[File]] = []) -> AppFuture:
+def _root_data_frame_closure(
+    collision_system: str,
+    tree_name: str,
+    prefixes: Sequence[str],
+    grooming_method: str,
+    jet_R: float,
+    n_cores: int,
+    inputs: Optional[Sequence[File]] = [],
+    outputs: Optional[Sequence[File]] = [],
+) -> AppFuture:
     """ ROOT data frame clsoure app. """
     from pathlib import Path
+
     from jet_substructure.cpp import data_frame
 
     res = data_frame.run_create_closure_ratio(
@@ -763,47 +928,65 @@ def setup_root_data_frame_closure(
 
     logger.info(f"N cores per job: {math.floor(8 / jobs_per_node)}")
     results = []
-    for grooming_method in ["leading_kt", "leading_kt_z_cut_02", "leading_kt_z_cut_04",
-                            "dynamical_z", "dynamical_kt", "dynamical_time",
-                            "soft_drop_z_cut_02", "soft_drop_z_cut_04"]:
+    for grooming_method in [
+        "leading_kt",
+        "leading_kt_z_cut_02",
+        "leading_kt_z_cut_04",
+        "dynamical_z",
+        "dynamical_kt",
+        "dynamical_time",
+        "soft_drop_z_cut_02",
+        "soft_drop_z_cut_04",
+    ]:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
         # Note: It randomizes in place.
         random.shuffle(input_files)
-        output_file = output_dir / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.values())}_closure.root"
+        output_file = (
+            output_dir
+            / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.values())}_closure.root"
+        )
         parsl_output_file = File(str(output_file))
-        results.append(_root_data_frame_closure(
-            collision_system=collision_system,
-            tree_name="tree",
-            prefixes=list(prefixes.values()),
-            grooming_method=grooming_method,
-            jet_R=dataset_config["jet_R"],
-            n_cores=math.floor(8 / jobs_per_node),
-            inputs=input_files,
-            outputs=[parsl_output_file],
-        ))
+        results.append(
+            _root_data_frame_closure(
+                collision_system=collision_system,
+                tree_name="tree",
+                prefixes=list(prefixes.values()),
+                grooming_method=grooming_method,
+                jet_R=dataset_config["jet_R"],
+                n_cores=math.floor(8 / jobs_per_node),
+                inputs=input_files,
+                outputs=[parsl_output_file],
+            )
+        )
 
     return results
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # noqa: C901
     # Settings
     collision_system = "embedPythia"
     jobs_to_execute = [
-        "calculate_embedding_skim",
+        "convert_to_parquet",
     ]
     entries_per_job = int(1e5)
     nodes_to_allocate = 8
-    jobs_per_node = 4
+    jobs_per_node = 2
 
     # Basic setup for jobs
     _possible_jobs = [
-        "repair_root_files", "convert_to_parquet",
-        "calculate_embedding_skim", "calculate_data_skim",
-        "root_data_frame", "root_data_frame_response", "root_data_frame_closure",
+        "repair_root_files",
+        "convert_to_parquet",
+        "extract_scale_factors_for_embedding",
+        "calculate_embedding_skim",
+        "calculate_data_skim",
+        "root_data_frame",
+        "root_data_frame_response",
+        "root_data_frame_closure",
     ]
     _jobs_requiring_root = [
         "repair_root_files",
+        "extract_scale_factors_for_embedding",
         "root_data_frame",
         "root_data_frame_response",
         "root_data_frame_closure",
@@ -812,8 +995,7 @@ if __name__ == "__main__":
     for job_name in jobs_to_execute:
         if job_name not in _possible_jobs:
             raise RuntimeError(
-                f"Requested to run job {job_name}, but the name is invalid."
-                f" Possible jobs: {_possible_jobs}"
+                f"Requested to run job {job_name}, but the name is invalid." f" Possible jobs: {_possible_jobs}"
             )
 
     # Setup parsl
@@ -836,18 +1018,20 @@ if __name__ == "__main__":
         results = setup_repair_root_files(
             collision_system=collision_system,
             jobs_per_node=jobs_per_node,
-            #selected_train_numbers=list(range(6296, 6297)),
+            # selected_train_numbers=list(range(6296, 6297)),
         )
     if "convert_to_parquet" in jobs_to_execute:
-        results = setup_convert_to_parquet(
+        results = setup_convert_to_parquet(collision_system=collision_system, entries_per_job=entries_per_job,)
+    if "extract_scale_factors_for_embedding" in jobs_to_execute:
+        setup_extract_scale_factors_for_embedding(
             collision_system=collision_system,
-            entries_per_job=entries_per_job,
+            # selected_train_numbers=list(range(6316, 6318)),
         )
     if "calculate_embedding_skim" in jobs_to_execute:
         results = setup_calculate_embedding_skim(
             collision_system=collision_system,
             entries_per_job=entries_per_job,
-            #selected_train_numbers=list(range(6296, 6300)),
+            # selected_train_numbers=list(range(6296, 6300)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
     if "calculate_data_skim" in jobs_to_execute:
@@ -860,35 +1044,36 @@ if __name__ == "__main__":
         results = setup_root_data_frame(
             collision_system=collision_system,
             jobs_per_node=jobs_per_node,
-            #selected_train_numbers=list(range(5977, 5978)),
+            # selected_train_numbers=list(range(5977, 5978)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
     if "root_data_frame_response" in jobs_to_execute:
         results = setup_root_data_frame_response(
             collision_system=collision_system,
             jobs_per_node=jobs_per_node,
-            #selected_train_numbers=list(range(5977, 5978)),
+            # selected_train_numbers=list(range(5977, 5978)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
     if "root_data_frame_closure" in jobs_to_execute:
         # We'll always want both, so let's just do both.
         temp_results = []
         for collision_system in ["PbPb", "embedPythia"]:
-            temp_results.extend(setup_root_data_frame_closure(
-                collision_system=collision_system,
-                jobs_per_node=jobs_per_node,
-                #selected_train_numbers=list(range(5977, 5978)),
-                input_files=[r.outputs[0] for r in results] if results else None,
-            ))
+            temp_results.extend(
+                setup_root_data_frame_closure(
+                    collision_system=collision_system,
+                    jobs_per_node=jobs_per_node,
+                    # selected_train_numbers=list(range(5977, 5978)),
+                    input_files=[r.outputs[0] for r in results] if results else None,
+                )
+            )
         results.extend(temp_results)
 
     logger.info(f"About to ask for result. len: {len(results)}")
     # Wait on results
     # print each job status, initially all are running
-    #print ("Job Status: {}".format([r.done() for r in results]))
+    # print ("Job Status: {}".format([r.done() for r in results]))
     # Wait for all apps to complete
     res = [r.result() for r in results]
     logger.info(res)
 
     logger.info("Done")
-

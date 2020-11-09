@@ -5,10 +5,9 @@
 
 import logging
 from pathlib import Path
-from typing import cast, Any, Type
+from typing import Any, Sequence, Tuple, Type
 
 import attr
-import numpy as np
 import uproot4 as uproot
 from pachyderm import binned_data, yaml
 
@@ -54,17 +53,20 @@ class ScaleFactor:
         return cls(
             cross_section=h_cross_section.values[pt_hard_bin],
             n_trials=h_n_trials.values[pt_hard_bin],
-            n_entries= n_entries,
+            n_entries=n_entries,
         )
 
 
-def scale_factor_ROOT(base_path: Path, train_number: int) -> float:
-    import ROOT
-
+def scale_factor_ROOT_wrapper(base_path: Path, train_number: int) -> Tuple[float, Any, Any]:
     # Setup
-    filenames = data_manager._ensure_and_expand_paths([
-        Path(str(base_path).format(train_number=train_number))
-    ])
+    filenames = data_manager._ensure_and_expand_paths([Path(str(base_path).format(train_number=train_number))])
+
+    return scale_factor_ROOT(filenames)
+
+
+def scale_factor_ROOT(filenames: Sequence[Path]) -> Tuple[float, Any, Any]:
+    # Delay import to avoid direct dependence
+    import ROOT
 
     cross_section_hists = []
     n_trials_hists = []
@@ -72,14 +74,10 @@ def scale_factor_ROOT(base_path: Path, train_number: int) -> float:
     for filename in filenames:
         f = ROOT.TFile(str(filename), "READ")
         embedding_hists = f.Get("AliAnalysisTaskEmcalEmbeddingHelper_histos")
-        cross_section_hists.append(
-            embedding_hists.FindObject("fHistXsection")
-        )
+        cross_section_hists.append(embedding_hists.FindObject("fHistXsection"))
         cross_section_hists[-1].SetDirectory(0)
         n_entries += cross_section_hists[-1].GetEntries()
-        n_trials_hists.append(
-            embedding_hists.FindObject("fHistTrials")
-        )
+        n_trials_hists.append(embedding_hists.FindObject("fHistTrials"))
         n_trials_hists[-1].SetDirectory(0)
 
         f.Close()
@@ -94,15 +92,17 @@ def scale_factor_ROOT(base_path: Path, train_number: int) -> float:
     return n_entries, cross_section, n_trials
 
 
-def scale_factor_uproot(base_path: Path, train_number: int, run_despite_issues: bool = False) -> None:
+def scale_factor_uproot_wrapper(base_path: Path, train_number: int, run_despite_issues: bool = False) -> None:
+    # Setup
+    filenames = data_manager._ensure_and_expand_paths([Path(str(base_path).format(train_number=train_number))])
+
+    return scale_factor_uproot(filenames=filenames, run_despite_issues=run_despite_issues)
+
+
+def scale_factor_uproot(filenames: Sequence[Path], run_despite_issues: bool = False) -> None:
     # Validation
     if not run_despite_issues:
         raise RuntimeError("Pachyderm binned data doesn't add profile histograms correctly...")
-
-    # Setup
-    filenames = data_manager._ensure_and_expand_paths([
-        Path(str(base_path).format(train_number=train_number))
-    ])
 
     cross_section_hists = []
     n_trials_hists = []
@@ -111,11 +111,11 @@ def scale_factor_uproot(base_path: Path, train_number: int, run_despite_issues: 
         with uproot.open(filename) as input_file:
             # Retrieve the embedding helper to extract the cross section and ntrials.
             embedding_hists = input_file["AliAnalysisTaskEmcalEmbeddingHelper_histos"]
-            cross_section_hist = [h for h in embedding_hists if h.has_member("fName") and h.member("fName") == "fHistXsection"][0]
+            cross_section_hist = [
+                h for h in embedding_hists if h.has_member("fName") and h.member("fName") == "fHistXsection"
+            ][0]
             n_entries += cross_section_hist.effective_entries()
-            cross_section_hists.append(
-                binned_data.BinnedData.from_existing_data(cross_section_hist)
-            )
+            cross_section_hists.append(binned_data.BinnedData.from_existing_data(cross_section_hist))
             n_trials_hists.append(
                 binned_data.BinnedData.from_existing_data(
                     [h for h in embedding_hists if h.has_member("fName") and h.member("fName") == "fHistTrials"][0]
@@ -127,13 +127,9 @@ def scale_factor_uproot(base_path: Path, train_number: int, run_despite_issues: 
 
 
 def scale_factor_from_hists(n_entries: int, cross_section: Any, n_trials: Any) -> float:
-    scale_factor = ScaleFactor.from_hists(
-        cross_section=cross_section,
-        n_trials=n_trials,
-        n_entries=n_entries,
-    )
+    scale_factor = ScaleFactor.from_hists(cross_section=cross_section, n_trials=n_trials, n_entries=n_entries,)
 
-    return scale_factor
+    return scale_factor.value()
 
 
 def test() -> None:
@@ -143,10 +139,14 @@ def test() -> None:
 
     base_path = Path("trains/embedPythia/{train_number}/AnalysisResults.*.repaired.root")
     for train_number in train_numbers:
-        scale_factors_ROOT[train_number] = scale_factor_from_hists(*scale_factor_ROOT(base_path=base_path, train_number=train_number))
-        scale_factors_uproot[train_number] = scale_factor_from_hists(*scale_factor_uproot(base_path=base_path, train_number=train_number, run_despite_issues=True))
-        #res_ROOT = scale_factor_ROOT(base_path=base_path, train_number=train_number)
-        #res_uproot = scale_factor_uproot(base_path=base_path, train_number=train_number)
+        scale_factors_ROOT[train_number] = scale_factor_from_hists(
+            *scale_factor_ROOT_wrapper(base_path=base_path, train_number=train_number)
+        )
+        scale_factors_uproot[train_number] = scale_factor_from_hists(
+            *scale_factor_uproot_wrapper(base_path=base_path, train_number=train_number, run_despite_issues=True)
+        )
+        # res_ROOT = scale_factor_ROOT(base_path=base_path, train_number=train_number)
+        # res_uproot = scale_factor_uproot(base_path=base_path, train_number=train_number)
 
     y = yaml.yaml(classes_to_register=[ScaleFactor])
     with open("test.yaml", "w") as f:
@@ -154,10 +154,11 @@ def test() -> None:
 
     print(f"scale_factors_ROOT: {scale_factors_ROOT}")
     print(f"scale_factors_uproot: {scale_factors_uproot}")
-    import IPython; IPython.embed()
+    import IPython
+
+    IPython.embed()
 
 
 if __name__ == "__main__":
     helpers.setup_logging()
     test()
-
