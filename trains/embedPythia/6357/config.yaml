@@ -1,0 +1,34 @@
+---
+train: "Jets_EMC_PbPb"
+number: 6357
+dataset: "LHC18{q,r}"
+aliphysics_tag: "vAN-20200720_ROOT6-1"
+embedded_dataset: "LHC19f4"
+pt_hard_bin: 20
+alien_output_info:
+    child_1:
+        name: "LHC18r"
+        stage_to_download: "manual"
+        manual:
+            # NOTE: The run numbers don't match up with the output directories in MonALISA. Probably due to a bug.
+            #       So I matched their merging state up to the output directories.
+            296690: "single_run_manual"
+            296850: "single_run_manual"
+            296852: "single_run_manual"
+            296934: "merged"
+            296935: "merged"
+            296941: "single_run_manual"
+            297222: "merged"
+            297315: "single_run_manual"
+            297379: "single_run_manual"
+            297414: "single_run_manual"
+            297441: "single_run_manual"
+            297442: "single_run_manual"
+            297481: "merged"
+            297544: "single_run_manual"
+    child_2:
+        name: "LHC18q"
+        stage_to_download: "merged"
+status: |
+    "Substructure embedding central hardest kt iterative splittings. Double counting cut applied (with fix),"
+    " Rmax=0.25 nominal."
