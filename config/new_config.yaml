@@ -90,7 +90,7 @@ available_datasets:
         jet_R: 0.4
         files:
             - "trains/PbPb/5537/AnalysisResults.*.root"
-    LHC19f4_embedded_into_LHC18qr_5966_5985: &LHC19f4_embedded_into_LHC18qr
+    LHC19f4_embedded_into_LHC18qr_5966_5985:
         name: "LHC19f4_embedded_into_LHC18qr_5966_5985"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -127,7 +127,7 @@ available_datasets:
             - "trains/embedPythia/5984/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/5985/AnalysisResults.*.repaired.root"
     # Systematics: Rmax = 0.6
-    LHC19f4_embedded_into_LHC18qr_Rmax06_6316_6335:
+    LHC19f4_embedded_into_LHC18qr_Rmax06_6316_6335: &LHC19f4_embedded_into_LHC18qr
         name: "LHC19f4_embedded_into_LHC18qr_Rmax06_6316_6335"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -165,6 +165,7 @@ available_datasets:
             - "trains/embedPythia/6335/AnalysisResults.*.repaired.root"
     # Systematics: Rmax = 0.05
     LHC19f4_embedded_into_LHC18qr_Rmax005_6046_6048_6066:
+        # NOTE: Only available for hardest kt z = 0.2, so need to rerun...
         name: "LHC19f4_embedded_into_LHC18qr_Rmax005_6046_6048_6066"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
