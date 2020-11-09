@@ -84,9 +84,10 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
     if use_root:
         slurm_kwargs.update(
             dict(
-                #worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv AliPhysics/latest`",
+                worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv AliPhysics/latest`",
                 # Only load ROOT rather than AliPhysics to avoid any potential dictionary issues...
-                worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv ROOT/latest`",
+                #worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv ROOT/latest`",
+                # TODO: Make into options...
             )
         )
 
@@ -104,6 +105,7 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
 
     b587_executor = Config(
         executors=[
+            # TODO: Add an additional executor for the other nodes with fewer jobs?
             HighThroughputExecutor(
                 label="b587",
                 worker_debug=debug,
@@ -126,8 +128,9 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
                     # Ensures that the jobs are spread out. Also means that we need to be careful
                     # when others are running to avoid running out of memory.
                     exclusive=True,
-                    # Format: HH:MM:SS, so we request one hour
+                    # Format: HH:MM:SS
                     walltime="01:30:00",
+                    #walltime="00:21:00",
                     # See notes on machines to exclude above.
                     scheduler_options=f"#SBATCH --exclude={','.join(machines_to_exclude)}",
                     # For root
@@ -144,6 +147,10 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
         ),
         # Disables resource scaling.
         strategy=None,
+        # Enable some retries (but not too many).
+        # Unclear if it will help, but worth a try.
+        # Doesn't seem to help :-(
+        #retries=2,
     )
     parsl.load(b587_executor)
 
@@ -151,7 +158,7 @@ def setup_parsl_587(nodes_to_allocate: int = 9, jobs_per_node: int = 2,  partiti
 
 
 @python_app
-def _repair_root_files(tree_name: str, inputs=[], outputs=[]) -> AppFuture:
+def _repair_root_files(tree_name: str, n_cores: int, inputs=[], outputs=[]) -> AppFuture:
     """ Repair ROOT files app. """
     from jet_substructure.base import helpers
     from pathlib import Path
@@ -159,11 +166,13 @@ def _repair_root_files(tree_name: str, inputs=[], outputs=[]) -> AppFuture:
         filenames=[Path(inputs[0].filepath)],
         tree_name=tree_name,
         number_of_chunks=1,
+        n_cores=n_cores,
     )
     return res
 
 def setup_repair_root_files(
     collision_system: str,
+    jobs_per_node: int,
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> List[AppFuture]:
     """ Repair ROOT files.
@@ -189,6 +198,9 @@ def setup_repair_root_files(
     logger.info(f"Repairing files from dataset {dataset_config['name']}")
     if selected_train_numbers:
         filenames = [f for f in filenames if int(f.parent.name) in selected_train_numbers]
+    # Filter out already repaired files
+    filenames = [f for f in filenames if "repaired" not in str(f.name)]
+    #logger.info(f"Repairing filenames: {filenames}")
 
     for filename in filenames:
         # Setup file IO
@@ -198,6 +210,7 @@ def setup_repair_root_files(
 
         results.append(_repair_root_files(
             tree_name=tree_name,
+            n_cores=math.floor(8 / jobs_per_node),
             inputs=[parsl_input_file],
             outputs=[parsl_output_file],
         ))
@@ -218,6 +231,7 @@ def _determine_number_of_entries_per_file(filenames: Sequence[Path], tree_name: 
 
     for filename in filenames:
         with uproot.open(filename) as f:
+            logger.debug(filename)
             number_of_entries_per_file[filename] = f[tree_name].num_entries
 
     return number_of_entries_per_file
@@ -246,7 +260,7 @@ def _number_of_entries_per_file(input_filenames: Sequence[Union[Path, str]], tre
     # We need the number of entries per file to be able to split up the jobs properly later.
     # If it doesn't exist, create it.
     if not number_of_entries_file.exists() or recreate:
-        logger.debug("Need to get entries from the input files.")
+        logger.info("Need to get entries from the input files.")
         number_of_entries_per_file = _determine_number_of_entries_per_file(filenames=filenames, tree_name=tree_name)
         with open(number_of_entries_file, "w") as f:
             # Explicit iteration because we need to convert from Path to str.
@@ -419,7 +433,7 @@ def setup_calculate_embedding_skim(
     if input_files is None:
         logger.info("Determining input files independently.")
         input_files = []
-        for train_directory in train_directories:
+        for train_directory in sorted(train_directories):
             # Select train numbers.
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
                 logger.debug(f"Skipping train number {train_directory.name}")
@@ -776,11 +790,11 @@ if __name__ == "__main__":
     # Settings
     collision_system = "embedPythia"
     jobs_to_execute = [
-        "root_data_frame_closure",
+        "calculate_embedding_skim",
     ]
     entries_per_job = int(1e5)
     nodes_to_allocate = 8
-    jobs_per_node = 1
+    jobs_per_node = 4
 
     # Basic setup for jobs
     _possible_jobs = [
@@ -821,7 +835,8 @@ if __name__ == "__main__":
     if "repair_root_files" in jobs_to_execute:
         results = setup_repair_root_files(
             collision_system=collision_system,
-            #selected_train_numbers=list(range(5791, 5792)),
+            jobs_per_node=jobs_per_node,
+            #selected_train_numbers=list(range(6296, 6297)),
         )
     if "convert_to_parquet" in jobs_to_execute:
         results = setup_convert_to_parquet(
@@ -832,7 +847,7 @@ if __name__ == "__main__":
         results = setup_calculate_embedding_skim(
             collision_system=collision_system,
             entries_per_job=entries_per_job,
-            #selected_train_numbers=list(range(5791, 5792)),
+            #selected_train_numbers=list(range(6296, 6300)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
     if "calculate_data_skim" in jobs_to_execute:
