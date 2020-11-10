@@ -12,12 +12,14 @@ from typing import List
 from pachyderm import yaml
 from pachyderm.alice import download
 
+from jet_substructure.base import helpers
+
 
 logger = logging.getLogger(__name__)
 
 
 def create_file_pairs() -> List[download.FilePair]:
-    """ Create file pairs.
+    """Create file pairs.
 
     YAML file is of the form:
     alien_file: local_file
@@ -36,7 +38,7 @@ def create_file_pairs() -> List[download.FilePair]:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(format="[%(levelname)s] %(message)s", level=logging.INFO)
+    helpers.setup_logging(level=logging.INFO)
 
     file_pairs = create_file_pairs()
 

@@ -14,6 +14,8 @@ from typing import Dict, Sequence
 import pachyderm.alice.utils as alice_utils
 from pachyderm import yaml
 
+from jet_substructure.base import helpers
+
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +160,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                         )
                         output.update(result)
                     else:
-                        logger.info(f"Processing manual single run for child {child_label}")
+                        logger.info(f"Processing manual single run {run_number} for child {child_label}")
                         # Didn't even get to a stage of the merging. Take whatever is there...
                         directories_with_output_files = alice_utils.list_alien_dir(manual_dir)
                         directories_with_output_files = [manual_dir / d for d in directories_with_output_files]
@@ -227,7 +229,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
 
 
 def entry_point() -> None:
-    logging.basicConfig(format="[%(levelname)s] %(message)s", level=logging.INFO)
+    helpers.setup_logging(level=logging.INFO)
 
     parser = argparse.ArgumentParser(description=f"Split tree into chunks.")
     parser.add_argument(
