@@ -35,8 +35,8 @@ _scale_factors_LHC19f4_embedded_into_LHC18qr: &scale_factors
     20: 2.0978e-06
 
 available_datasets:
-    LHC18qr: &LHC18qr
-        name: "LHC18qr_5863"
+    LHC18qr_semi_central_5863: &LHC18qr_semi_central
+        name: "LHC18qr_semi_central_5863"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
         # A map to potentially rename the branch prefix.
@@ -49,8 +49,8 @@ available_datasets:
         jet_R: 0.4
         files:
             - "trains/PbPb/5863/AnalysisResults.*.repaired.root"
-    LHC18qr_Rmax06:
-        name: "LHC18qr_5862"
+    LHC18qr_semi_central_Rmax06:
+        name: "LHC18qr_semi_central_Rmax06_5862"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
         # A map to potentially rename the branch prefix.
@@ -63,8 +63,22 @@ available_datasets:
         jet_R: 0.4
         files:
             - "trains/PbPb/5862/AnalysisResults.*.repaired.root"
-    LHC18qr_unsub: &LHC18qr_unsub
-        name: "LHC18qr_5537"
+    LHC18qr_central_6359: &LHC18qr_central
+        name: "LHC18qr_central_6359"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
+        # A map to potentially rename the branch prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.4
+        files:
+            - "trains/PbPb/6359/AnalysisResults.*.repaired.root"
+    LHC18qr_semi_central_unsub: &LHC18qr_semi_central_unsub
+        name: "LHC18qr_semi_central_5537"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
         # A map to potentially rename the branch prefix.
@@ -293,5 +307,5 @@ execution:
     embedPythia:
         dataset: *LHC19f4_embedded_into_LHC18qr
     PbPb:
-        dataset: *LHC18qr
+        dataset: *LHC18qr_semi_central
 
