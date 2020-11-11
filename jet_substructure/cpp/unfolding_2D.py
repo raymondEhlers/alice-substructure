@@ -129,7 +129,7 @@ class Settings:
     filename_padding_factor: int = attr.ib(default=1)
 
     @property
-    def output_filename(self) -> Path:
+    def output_tag(self) -> str:
         # Start with the basic information
         base_filename = f"unfolding_{self.substructure_variable.name}_grooming_method_{self.grooming_method}"
         # Then add the binning information.
@@ -146,7 +146,11 @@ class Settings:
         # Put other possible options after the tag so we can sort by tag if it exists.
         if self.use_pure_matches:
             base_filename += "_pure_matches"
-        return (self.output_dir / base_filename).with_suffix(".root")
+        return base_filename
+
+    @property
+    def output_filename(self) -> Path:
+        return (self.output_dir / self.output_tag).with_suffix(".root")
 
 
 def _pass_filenames_to_ROOT(filenames: Sequence[Path]) -> List[str]:
@@ -479,7 +483,7 @@ def _hists_to_map_for_ROOT(hists: Dict[str, TH2D]) -> Any:
     return hists_map_for_root
 
 
-def run_unfolding_fall_back(
+def run_unfolding(
     settings: Settings, data_filenames: Sequence[Path], embedded_filenames: Sequence[Path]
 ) -> bool:
     # Delayed import to avoid direct dependence.
@@ -606,7 +610,7 @@ def run_unfolding_closure_reweighting(
     _variations = {
         "split_MC": ROOT.ClosureVariation_t.splitMC,
         "reweight_pseudo_data": ROOT.ClosureVariation_t.reweightPseudoData,
-        "reweight_response": ROOT.reweightResponse,
+        "reweight_response": ROOT.ClosureVariation_t.reweightResponse,
     }
     variation = _variations[closure_variation]
 
@@ -621,6 +625,7 @@ def run_unfolding_closure_reweighting(
     # Load hists for reweighting and calculate ratio.
     h_reweighting_ratio = ROOT.nullptr
     if variation != ROOT.ClosureVariation_t.splitMC:
+        # TODO: Make thes configurable...
         h_reweighting_ratio = get_reweighted_ratio_for_closure(
             embedded_dataset_name="LHC19f4_embedded_into_LHC18qr_5966_5985",
             data_dataset_name="LHC18qr_5863",
@@ -663,13 +668,15 @@ def run_unfolding_closure_reweighting(
         )
     )
 
+    # TODO: Do I want the trivial closure for the splitMC?
+
     # Store the output hists.
     _write_hists([hists, output_hists], settings.output_filename, additional_tag=f"closure_{closure_variation}")
 
     return True
 
 
-def run_unfolding(
+def run_unfolding_tree(
     grooming_method: str,
     substructure_variable_name: str,
     smeared_substructure_variable_bins: np.ndarray,
@@ -1068,7 +1075,7 @@ if __name__ == "__main__":
     #    ),
     # )
 
-    # run_unfolding_fall_back(
+    # run_unfolding(
     #    settings=setup("dynamical_kt"),
     #    # NOTE: TChain can only handle one "*" in the filename.
     #    data_filenames=[Path("trains/PbPb/5863/skim/*.root")],

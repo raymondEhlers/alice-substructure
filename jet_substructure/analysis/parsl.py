@@ -5,12 +5,14 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+import copy
 import logging
 import math
 import random
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
+import numpy as np
 import parsl
 import uproot4 as uproot
 from pachyderm import yaml
@@ -89,10 +91,11 @@ def setup_parsl_587(
     if use_root:
         slurm_kwargs.update(
             dict(
-                worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv AliPhysics/latest`",
+                # worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv AliPhysics/latest`",
                 # Only load ROOT rather than AliPhysics to avoid any potential dictionary issues...
                 # worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv ROOT/latest`",
                 # TODO: Make into options...
+                worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv RooUnfold/latest`",
             )
         )
 
@@ -134,7 +137,7 @@ def setup_parsl_587(
                     # when others are running to avoid running out of memory.
                     exclusive=True,
                     # Format: HH:MM:SS
-                    walltime="01:30:00",
+                    walltime="02:00:00",
                     # walltime="00:21:00",
                     # See notes on machines to exclude above.
                     scheduler_options=f"#SBATCH --exclude={','.join(machines_to_exclude)}",
@@ -963,15 +966,172 @@ def setup_root_data_frame_closure(
     return results
 
 
+@python_app
+def _unfolding_standard(
+    settings: "unfolding_2D.Settings",
+    inputs = [],
+    outputs = [],
+) -> AppFuture:
+    from jet_substructure.cpp import unfolding_2D
+    from pathlib import Path
+
+    return unfolding_2D.run_unfolding(
+       settings=settings,
+        # 0 are the data filenames, 1 are the embedded filenames
+       data_filenames=[Path(f.filepath) for f in inputs[0]],
+       embedded_filenames=[Path(f.filepath) for f in inputs[1]],
+    )
+
+
+@python_app
+def _unfolding_closure(
+    settings: "unfolding_2D.Settings",
+    closure_variation: str,
+    inputs = [],
+    outputs = [],
+) -> AppFuture:
+    from jet_substructure.cpp import unfolding_2D
+    from pathlib import Path
+
+    return unfolding_2D.run_unfolding_closure_reweighting(
+        settings=settings,
+        # 0 are the data filenames, 1 are the embedded filenames
+        embedded_filenames=[Path(f.filepath) for f in inputs[1]],
+        closure_variation=closure_variation,
+    )
+
+
+def setup_unfolding(
+    grooming_methods: Sequence[str],
+    tag: str,
+) -> List[AppFuture]:
+    # Setup
+    from jet_substructure.cpp import unfolding_2D
+    # TODO: Update after testing...
+    output_dir = Path("output") / "PbPb" / "unfolding" / "testParsl"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    PbPb_dataset_config = read_config(collision_system="PbPb")
+    PbPb_train_directories = set([Path(filename).parent for filename in PbPb_dataset_config["files"]])
+    PbPb_prefixes = PbPb_dataset_config["prefixes"]
+    embedded_dataset_config = read_config(collision_system="embedPythia")
+    embedded_train_directories = set([Path(filename).parent for filename in embedded_dataset_config["files"]])
+    embedded_prefixes = embedded_dataset_config["prefixes"]
+
+    # Detemrien filenames first since they don't depend on grooming methods
+    data_files: List[File] = []
+    embedded_files: List[File] = []
+    for label, train_directories, files in [("PbPb", PbPb_train_directories, data_files), ("embedded", embedded_train_directories, embedded_files)]:
+        for train_directory in sorted(train_directories):
+            logger.info(f"Processing {label} train number {train_directory.name}")
+
+            # Then iterate over the directories.
+            for filename in Path(f"{train_directory}/skim/").glob("*.root"):
+                files.append(File(str(filename)))
+
+    # For parsl to keep track of the embedded files
+    input_files = [data_files, embedded_files]
+
+    # Then we determine the settings.
+    results = []
+    for grooming_method in grooming_methods:
+        settings = {}
+
+        # First, define the default settings.
+        _default_settings = unfolding_2D.Settings(
+            grooming_method=grooming_method,
+            jet_pt=unfolding_2D.ParameterSettings(
+                true_bins=np.array([0, 30, 40, 60, 80, 100, 120, 160], dtype=np.float64),
+                smeared_bins=np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64),
+            ),
+            substructure_variable=unfolding_2D.SubstructureVariableSettings.from_binning(
+                true_bins=np.array(
+                    # NOTE: (-0.05, 0) is the untagged bin.
+                    [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],
+                    dtype=np.float64,
+                ),
+                smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64),
+                name="kt",
+                variable_name="kt",
+                untagged_bin_below_range=True,
+            ),
+            tag=tag,
+            output_dir=output_dir,
+            use_pure_matches=False,
+        )
+        settings[_default_settings.output_tag] = _default_settings
+
+        # And then add the variations.
+        # Pure matches
+        _temp_settings = copy.deepcopy(_default_settings)
+        _temp_settings.use_pure_matches = True
+        settings[_temp_settings.output_tag] = _temp_settings
+
+        # Untagged above
+        _temp_settings = copy.deepcopy(_default_settings)
+        _smeared_bins = _temp_settings.substructure_variable.smeared_bins
+        # Replace the untagged value with our new untagged value, and then move it to the upper edge.
+        _smeared_bins[0] = 20
+        _smeared_bins = np.roll(_smeared_bins, -1)
+        _temp_settings.substructure_variable = unfolding_2D.SubstructureVariableSettings.from_binning(
+            true_bins=_temp_settings.substructure_variable.true_bins,
+            smeared_bins=_smeared_bins,
+            name=_temp_settings.substructure_variable.name,
+            variable_name=_temp_settings.substructure_variable.variable_name,
+            untagged_bin_below_range=False,
+        )
+        settings[_temp_settings.output_tag] = _temp_settings
+
+        # Setup file IO
+        for s in settings.values():
+            # Randomize the input list so we don't always hit the same files at the same time.
+            # Note: It randomizes in place.
+            #random.shuffle(data_files)
+            #random.shuffle(embedded_files)
+            random.shuffle(input_files[0])
+            random.shuffle(input_files[1])
+            logger.info(f"Adding standard unfolding: {s.output_tag}")
+            # NOTE: This is missing some output files. But good enough for now...
+            parsl_output_file = File(str(s.output_filename))
+            results.append(
+                _unfolding_standard(
+                    settings=s,
+                    inputs=input_files,
+                    outputs=[parsl_output_file],
+                )
+            )
+
+        # Skip the untagged bin moved to above the smeared range.
+        for s in list(settings.values())[:-1]:
+            for closure_variation in ["split_MC", "reweight_pseudo_data", "reweight_response"]:
+                logger.info(f"Adding unfolding closures: {s.output_tag}, variation: {closure_variation}")
+                # Setup file I/O
+                # Randomize the input list so we don't always hit the same files at the same time.
+                # Note: It randomizes in place.
+                random.shuffle(input_files[0])
+                random.shuffle(input_files[1])
+                parsl_output_file = File(f"{s.output_filename}_closure_{closure_variation}")
+                results.append(
+                    _unfolding_closure(
+                        settings=s,
+                        closure_variation=closure_variation,
+                        inputs=input_files,
+                        outputs=[parsl_output_file],
+                    )
+                )
+
+    return results
+
+
 if __name__ == "__main__":  # noqa: C901
     # Settings
-    collision_system = "embedPythia"
+    collision_system = "PbPb"
     jobs_to_execute = [
-        "convert_to_parquet",
+        "unfolding",
     ]
     entries_per_job = int(1e5)
-    nodes_to_allocate = 8
-    jobs_per_node = 2
+    nodes_to_allocate = 7
+    jobs_per_node = 5
 
     # Basic setup for jobs
     _possible_jobs = [
@@ -983,6 +1143,7 @@ if __name__ == "__main__":  # noqa: C901
         "root_data_frame",
         "root_data_frame_response",
         "root_data_frame_closure",
+        "unfolding",
     ]
     _jobs_requiring_root = [
         "repair_root_files",
@@ -990,6 +1151,7 @@ if __name__ == "__main__":  # noqa: C901
         "root_data_frame",
         "root_data_frame_response",
         "root_data_frame_closure",
+        "unfolding",
     ]
     # Validation
     for job_name in jobs_to_execute:
@@ -1057,16 +1219,31 @@ if __name__ == "__main__":  # noqa: C901
     if "root_data_frame_closure" in jobs_to_execute:
         # We'll always want both, so let's just do both.
         temp_results = []
-        for collision_system in ["PbPb", "embedPythia"]:
+        for _collision_system in ["PbPb", "embedPythia"]:
             temp_results.extend(
                 setup_root_data_frame_closure(
-                    collision_system=collision_system,
+                    collision_system=_collision_system,
                     jobs_per_node=jobs_per_node,
                     # selected_train_numbers=list(range(5977, 5978)),
                     input_files=[r.outputs[0] for r in results] if results else None,
                 )
             )
         results.extend(temp_results)
+    if "unfolding" in jobs_to_execute:
+        # TODO: Need to do the Rmax, tracking eff
+        results = setup_unfolding(
+            grooming_methods=[
+                "leading_kt",
+                #"leading_kt_z_cut_02",
+                #"leading_kt_z_cut_04",
+                "dynamical_z",
+                "dynamical_kt",
+                "dynamical_time",
+                #"soft_drop_z_cut_02",
+                #"soft_drop_z_cut_04",
+            ],
+            tag="broadTrueBins",
+        )
 
     logger.info(f"About to ask for result. len: {len(results)}")
     # Wait on results
