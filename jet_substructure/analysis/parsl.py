@@ -59,6 +59,8 @@ def setup_parsl_587(
     partition: str = "short",
     debug: bool = False,
     use_root: bool = False,
+    use_aliphysics: bool = False,
+    use_roounfold: bool = False,
 ) -> Config:
     """Setup parsl for the 587 cluster.
 
@@ -67,12 +69,16 @@ def setup_parsl_587(
     We default to allocating the entire node for simplicity. This helps address any possible memory issues.
 
     Args:
+        nodes_to_allocate: Number of nodes to allocate. Default: 9.
+        jobs_per_node: Number of jobs to run per node. Default: 2.
         partition: Partition to use with slurm. Default: "short".
         debug: If True, enable debugging on the workers. Default: False.
         use_root: If True, we intend to use ROOT in the worker jobs. In that case, we need to
             initialize the worker environment. Default: False.
-        jobs_per_node: Number of jobs to run per node. Default: 2.
-        nodes_to_allocate: Number of nodes to allocate. Default: 9.
+        use_aliphysics: If True, we intend to use AliPhysics in the worker jobs. In that case, we need to
+            initialize the worker environment. Default: False.
+        use_roounfold: If True, we intend to use RooUnfold in the worker jobs. In that case, we need to
+            initialize the worker environment. Default: False.
     Returns:
         The parsl configuration for the 587 cluster. Note that it's already been loaded by parsl.
     """
@@ -88,24 +94,33 @@ def setup_parsl_587(
 
     # Setup ROOT if necessary
     slurm_kwargs = {}
-    if use_root:
+    if any([use_root, use_aliphysics, use_roounfold]):
+        software_to_load = []
+        if use_root:
+            software_to_load.append("ROOT/latest")
+        if use_aliphysics:
+            # This is a little unconventional to redefine the list here, but ROOT is already
+            # a dependency of AliPhysics, so we redefine the list to remove ROOT.
+            software_to_load = [s for s in software_to_load if s != "ROOT"]
+            software_to_load.append("AliPhysics/latest")
+        if use_roounfold:
+            # This is a little unconventional to redefine the list here, but ROOT is already
+            # a dependency of RooUnfold, so we redefine the list to remove ROOT.
+            software_to_load = [s for s in software_to_load if s != "ROOT"]
+            software_to_load.append("RooUnfold/latest")
         slurm_kwargs.update(
             dict(
-                # worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv AliPhysics/latest`",
-                # Only load ROOT rather than AliPhysics to avoid any potential dictionary issues...
-                # worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv ROOT/latest`",
-                # TODO: Make into options...
-                worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv RooUnfold/latest`",
+                worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv {','.join(software_to_load)}`",
             )
         )
 
     machines_to_exclude = [
-        # pc051 has too much in swap right now to be useful, so let's just skip and avoid the problems.
+        # pc051 and pc075 have two OSDs, so they will always be short of memory. Better to avoid until we have more memory.
         "pc051",
-        # pc147 also struggles and we don't want that to come down because it's one of the ceph quorum machines...
-        "pc147",
-        # pc075 also has high swap right now...
         "pc075",
+        # pc147 is an mds server, and somehow load on it seems to cause problems in the ceph quorum. So we skip for now,
+        # by may be able to include later...
+        "pc147",
     ]
     if use_root:
         # pc059 to avoid causing problems on the login node when using 8 cores for root data frame.
@@ -1165,6 +1180,9 @@ if __name__ == "__main__":  # noqa: C901
         nodes_to_allocate=nodes_to_allocate,
         jobs_per_node=jobs_per_node,
         use_root=any((job in _jobs_requiring_root for job in jobs_to_execute)),
+        # We need the AliPhysics definitions for the Substructure output classes and AliEmcalList.
+        use_aliphysics=any((job == "repair_root_files" for job in jobs_to_execute)),
+        use_rooufnold=any((job == "unfold" for job in jobs_to_execute)),
     )
 
     # Setup logging. By doing it after parsl, we're able to keep it much quieter.
