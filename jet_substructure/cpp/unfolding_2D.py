@@ -516,6 +516,7 @@ def run_unfolding(
         settings.substructure_variable.smeared_range.max,
         _array_to_ROOT(_pass_filenames_to_ROOT(data_filenames), "std::string"),
         _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
+        settings.use_pure_matches,
     )
 
     logger.debug(responses)
