@@ -350,7 +350,8 @@ def _setup_unfolding() -> None:
     # This just assumes that this file is in the same directory as the unfolding.cxx file, which should
     # usually be a reasonable assumption.
     unfolding_cxx = Path(__file__).resolve().parent / "unfolding.cxx"
-    ROOT.gInterpreter.ProcessLine(f"""#include "{str(unfolding_cxx)}" """)
+    #ROOT.gInterpreter.ProcessLine(f"""#include "{str(unfolding_cxx)}" """)
+    ROOT.gInterpreter.ProcessLine(f""".L {str(unfolding_cxx)} """)
     # Nominally additional setup for MT. It's not really going to do us any good here, but it doesn't hurt anything.
     # NOTE: We do need to specify 1 to ensure that we don't use extra cores.
     ROOT.ROOT.EnableImplicitMT(1)
@@ -461,8 +462,8 @@ def _default_hists(settings: Settings) -> Dict[str, TH2D]:
     )
     # Correlation between the splitting variables at true and hybrid (with cuts).
     hists["h2_substructure_variable"] = ROOT.TH2D(
-        "h2SplittingVariable",
-        "h2SplittingVariable",
+        "h2_substructure_variable",
+        "h2_substructure_variable",
         len(settings.substructure_variable.smeared_bins) - 1,
         settings.substructure_variable.smeared_bins,
         len(settings.substructure_variable.true_bins) - 1,
@@ -551,6 +552,14 @@ def run_unfolding(
     _write_hists(
         [hists, output_hists], settings.output_filename, additional_tag=f"closure_5_iter_{selected_iter_for_closure}"
     )
+
+    # Try out ROOT based unfolding. Based on my tests, this doesn't matter...
+    #fOut = ROOT.TFile(str(settings.output_dir / "test_unfolding_cpp.root"), "RECREATE")
+    #ROOT.Unfold2D(responses.response, hists["h2_true"], hists["h2_raw"], ROOT.RooUnfold.ErrorTreatment.kCovariance, fOut, "", 20)
+    #for v in hists.values():
+    #    v.Write()
+    ##fOut.Write()
+    #fOut.Close()
 
     return True
 
