@@ -330,19 +330,45 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
                  const std::string& hybridPrefix = "hybrid",
                  const std::string& detLevelPrefix = "det_level")
 {
+  // Print out the status.
+  std::cout << "Binning and values:\n";
+  std::cout << "Smeared jet pt bins:";
+  for (auto v : smearedJetPtBins) {
+      std::cout << " " << v;
+  }
+  std::cout << "\nTrue pt bins:";
+  for (auto v : trueJetPtBins) {
+      std::cout << " " << v;
+  }
+  std::cout << "\nSmeared substructure variable bins:";
+  for (auto v : smearedSplittingVariableBins) {
+      std::cout << " " << v;
+  }
+  std::cout << "\nTrue substructure variable bins:";
+  for (auto v : trueSplittingVariableBins) {
+      std::cout << " " << v;
+  }
+  std::cout << "\n";
+  std::cout << "Smeared untagged bin value: " << smearedUntaggedBinValue << "\n";
+  std::cout << "Min smeared substructure variable: " << minSmearedSplittingVariable << "\n";
+  std::cout << "Max smeared substructure variable: " << maxSmearedSplittingVariable << "\n";
+
   // First, we handle the data. Setup the Reader, the columns, and store the data in the appropriate hists.
   TChain dataChain(dataTreeName.c_str());
+  std::cout << "Data filenames:\n";
   for (auto filename : dataFilenames) {
+    std::cout << " - " << filename << "\n";
     dataChain.Add(filename.c_str());
   }
   TTreeReader dataReader(&dataChain);
 
+  // TODO: Will need template for the cross check task...
   TTreeReaderValue<double> dataJetPt(dataReader, (dataPrefix + "_jet_pt").c_str());
   TTreeReaderValue<double> dataSubstructureVariable(
    dataReader, (groomingMethod + "_" + dataPrefix + "_" + substructureVariableName).c_str());
   while (dataReader.Next()) {
     // Jet pt cut.
-    if (*dataJetPt < smearedJetPtBins[0] || *dataJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
+    if (*dataJetPt < smearedJetPtBins.front() || *dataJetPt > smearedJetPtBins.back()) {
       continue;
     }
     // Substructure variable cut.
@@ -404,10 +430,10 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
       treeNumber = embeddedChain.GetTreeNumber();
     }
     // Ensure that we are in the right true pt and substructure variable range.
-    if (*trueJetPt > trueJetPtBins[trueJetPtBins.size() - 1]) {
+    if (*trueJetPt > trueJetPtBins.back()) {
       continue;
     }
-    if (*trueSubstructureVariable > trueSplittingVariableBins[trueSplittingVariableBins.size() - 1]) {
+    if (*trueSubstructureVariable > trueSplittingVariableBins.back()) {
       continue;
     }
     // Double counting cut
@@ -423,7 +449,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
 
     // Now start making cuts on the hybrid level.
     // Jet pt
-    if (*hybridJetPt < smearedJetPtBins[0] || *hybridJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
+    if (*hybridJetPt < smearedJetPtBins.front() || *hybridJetPt > smearedJetPtBins.back()) {
       continue;
     }
     // Also cut on hybrid substructure variable.
@@ -550,10 +576,10 @@ ResponseResult create_closure_response_2D(
       treeNumber = embeddedChain.GetTreeNumber();
     }
     // Ensure that we are in the right true pt and substructure variable range.
-    if (*trueJetPt > trueJetPtBins[trueJetPtBins.size() - 1]) {
+    if (*trueJetPt > trueJetPtBins.back()) {
       continue;
     }
-    if (*trueSubstructureVariable > trueSplittingVariableBins[trueSplittingVariableBins.size() - 1]) {
+    if (*trueSubstructureVariable > trueSplittingVariableBins.back()) {
       continue;
     }
     // Double counting cut
@@ -569,7 +595,7 @@ ResponseResult create_closure_response_2D(
 
     // Now start making cuts on the hybrid level.
     // Jet pt
-    if (*hybridJetPt < smearedJetPtBins[0] || *hybridJetPt > smearedJetPtBins[smearedJetPtBins.size() - 1]) {
+    if (*hybridJetPt < smearedJetPtBins.front() || *hybridJetPt > smearedJetPtBins.back()) {
       continue;
     }
     // Also cut on hybrid substructure variable.
