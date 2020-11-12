@@ -102,6 +102,7 @@ class SubstructureVariableSettings(ParameterSettings):
         if variable_name != "kt" and "g" not in variable_name:
             range_class_name += "g"
         range_class_name = range_class_name.capitalize()
+        range_class_name += "Range"
         range_class: Type[helpers.RangeSelector] = getattr(helpers, range_class_name)
 
         # Determine the binning
@@ -130,7 +131,7 @@ class Settings:
     tag: str = attr.ib()
     output_dir: Path = attr.ib()
     use_pure_matches: bool = attr.ib(default=False)
-    filename_padding_factor: int = attr.ib(default=1)
+    filename_padding_factor: int = attr.ib(default=0)
 
     @property
     def output_tag(self) -> str:
@@ -142,7 +143,7 @@ class Settings:
         # Then the untagged
         base_filename += f"_untagged_{self.substructure_variable.untagged_bin.zero_padded_str(self.filename_padding_factor)}"
         # Then the jet pt
-        smeared_jet_pt = helpers.JetPtRange(min=self.jet_pt.smeared_bins, max=self.jet_pt.smeared_bins[-1])
+        smeared_jet_pt = helpers.JetPtRange(min=self.jet_pt.smeared_bins[0], max=self.jet_pt.smeared_bins[-1])
         base_filename += f"_smeared_{smeared_jet_pt.zero_padded_str(self.filename_padding_factor)}"
         # Additional options
         # Optional tag
