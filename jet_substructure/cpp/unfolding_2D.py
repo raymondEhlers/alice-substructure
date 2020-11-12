@@ -1081,21 +1081,22 @@ if __name__ == "__main__":
     #    ),
     # )
 
-    # run_unfolding(
+    logger.info("Running...")
+    run_unfolding(
+       settings=setup("dynamical_kt"),
+       # NOTE: TChain can only handle one "*" in the filename.
+       data_filenames=[Path("trains/PbPb/5863/skim/*.root")],
+       embedded_filenames=[
+           Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(5966, 5986)
+       ],
+    )
+
+    #run_unfolding_closure_reweighting(
     #    settings=setup("dynamical_kt"),
     #    # NOTE: TChain can only handle one "*" in the filename.
-    #    data_filenames=[Path("trains/PbPb/5863/skim/*.root")],
     #    embedded_filenames=[
     #        Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(5966, 5986)
     #    ],
-    # )
-
-    run_unfolding_closure_reweighting(
-        settings=setup("dynamical_kt"),
-        # NOTE: TChain can only handle one "*" in the filename.
-        embedded_filenames=[
-            Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(5966, 5986)
-        ],
-        # closure_variation="reweight_pseudo_data",
-        closure_variation="split_MC",
-    )
+    #    # closure_variation="reweight_pseudo_data",
+    #    closure_variation="split_MC",
+    #)
