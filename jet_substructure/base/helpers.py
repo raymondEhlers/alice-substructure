@@ -209,6 +209,8 @@ def dict_product(input_dict: Dict[str, List[Any]]) -> Iterable[Dict[str, Any]]:
 class RangeSelector:
     min: float = attr.ib()
     max: float = attr.ib()
+    _variable_name = "jet_pt"
+    _display_name = r"p_{\text{T,ch jet}}"
 
     def mask_attribute(self, df: UprootArrays, attribute_name: str) -> UprootArray[bool]:
         """ Create a mask to given attribute to the provided range.
@@ -244,15 +246,18 @@ class RangeSelector:
         return cls(min=min(selections, key=lambda v: v.min).min, max=max(selections, key=lambda v: v.max).max,)
 
     def __str__(self) -> str:
-        return f"jetPt_{self.min}_{self.max}"
+        return f"{self._variable_name}_{self.min}_{self.max}"
 
     def histogram_str(self, label: str = "") -> str:
         if label:
             label = f"_{label}"
-        return fr"jet_pt{label}_{self.min}_{self.max}"
+        return fr"{self._variable_name}{label}_{self.min}_{self.max}"
+
+    def zero_padded_str(self, n_zeros: int = 0) -> str:
+        return f"{self._variable_name}_{int(self.min * 10 ** n_zeros)}_{int(self.max * 10 ** n_zeros)}"
 
     def display_str(self, label: str = "") -> str:
-        return fr"{self.min} < p_{{\text{{T,ch jet}}}}^{{\text{{{label}}}}} < {self.max}"
+        return fr"{self.min} < {self._display_name}^{{\text{{{label}}}}} < {self.max}"
 
 
 @attr.s(frozen=True)
@@ -262,29 +267,20 @@ class JetPtRange(RangeSelector):
 
 @attr.s(frozen=True)
 class KtRange(RangeSelector):
-    def __str__(self) -> str:
-        return f"kt_{self.min}_{self.max}"
-
-    def display_str(self, label: str = "") -> str:
-        return fr"{self.min} < k_{{\text{{T}}}}^{{\text{{{label}}}}} < {self.max}"
+    _variable_name = "kt"
+    _display_name = r"k_{\text{T}}"
 
 
 @attr.s(frozen=True)
 class RgRange(RangeSelector):
-    def __str__(self) -> str:
-        return f"delta_R_{self.min}_{self.max}"
-
-    def display_str(self, label: str = "") -> str:
-        return fr"{self.min} < {{\Delta R}}^{{\text{{{label}}}}} < {self.max}"
+    _variable_name = "delta_R"
+    _display_name = r"{\Delta R}"
 
 
 @attr.s(frozen=True)
 class ZgRange(RangeSelector):
-    def __str__(self) -> str:
-        return f"zg_{self.min}_{self.max}"
-
-    def display_str(self, label: str = "") -> str:
-        return fr"{self.min} < z_{{\text{{g}}}}^{{\text{{{label}}}}} < {self.max}"
+    _variable_name = "zg"
+    _dispaly_name = r"z_{\text{g}}"
 
 
 def expand_wildcards_in_filenames(paths: Sequence[Path]) -> List[Path]:

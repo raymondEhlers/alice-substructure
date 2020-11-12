@@ -74,15 +74,13 @@ class SubstructureVariableSettings(ParameterSettings):
     Args:
         name: Name of the substructure variable.
         variable_name: Name of the substructure variable in the tree.
-        min_smeared: Min smeared value. Value can change due to the location of the untagged bin.
-        max_smeared: Max smeared value. Value can change due to the location of the untagged bin.
+        smeared_range: Smeared binning min and max. Values vary due to the location of the untagged bin.
         untagged_bin: Untagged bin min and max.
     """
 
     name: str = attr.ib()
     variable_name: str = attr.ib()
-    min_smeared: float = attr.ib()
-    max_smeared: float = attr.ib()
+    smeared_range: helpers.RangeSelector = attr.ib()
     untagged_bin: helpers.RangeSelector = attr.ib()
 
     @property
@@ -98,13 +96,20 @@ class SubstructureVariableSettings(ParameterSettings):
         variable_name: str,
         untagged_bin_below_range: bool = True,
     ) -> "SubstructureVariableSettings":
+        # Determine the appropriate range class.
+        # Either "Kt", "Rg", or "Zg"
+        range_class_name = variable_name
+        if variable_name != "kt" and "g" not in variable_name:
+            range_class_name += "g"
+        range_class_name = range_class_name.capitalize()
+        range_class: Type[helpers.RangeSelector] = getattr(helpers, range_class_name)
+
+        # Determine the binning
         if untagged_bin_below_range:
-            min_smeared = smeared_bins[1]
-            max_smeared = smeared_bins[-1]
+            smeared_range = range_class(min=smeared_bins[1], max=smeared_bins[-1])
             untagged_bin = helpers.RangeSelector(min=smeared_bins[0], max=smeared_bins[1])
         else:
-            min_smeared = smeared_bins[0]
-            max_smeared = smeared_bins[-2]
+            smeared_range = range_class(min=smeared_bins[0], max=smeared_bins[-2])
             untagged_bin = helpers.RangeSelector(min=smeared_bins[-2], max=smeared_bins[-1])
 
         return cls(
@@ -112,8 +117,7 @@ class SubstructureVariableSettings(ParameterSettings):
             smeared_bins=smeared_bins,
             name=name,
             variable_name=variable_name,
-            min_smeared=min_smeared,
-            max_smeared=max_smeared,
+            smeared_range=smeared_range,
             untagged_bin=untagged_bin,
         )
 
@@ -134,11 +138,12 @@ class Settings:
         base_filename = f"unfolding_{self.substructure_variable.name}_grooming_method_{self.grooming_method}"
         # Then add the binning information.
         # First, the substructure edges.
-        base_filename += f"_smeared_{self.substructure_variable.variable_name}_{int(self.substructure_variable.min_smeared * self.filename_padding_factor)}_{int(self.substructure_variable.max_smeared * self.filename_padding_factor)}"
+        base_filename += f"_smeared_{self.substructure_variable.smeared_range.zero_padded_str(self.filename_padding_factor)}"
         # Then the untagged
-        base_filename += f"_untagged_{int(self.substructure_variable.untagged_bin.min * self.filename_padding_factor)}_{int(self.substructure_variable.untagged_bin.max * self.filename_padding_factor)}"
+        base_filename += f"_untagged_{self.substructure_variable.untagged_bin.zero_padded_str(self.filename_padding_factor)}"
         # Then the jet pt
-        base_filename += f"_smeared_jet_pt_{int(self.jet_pt.smeared_bins[0] * self.filename_padding_factor)}_{int(self.jet_pt.smeared_bins[-1] * self.filename_padding_factor)}"
+        smeared_jet_pt = helpers.JetPtRange(min=self.jet_pt.smeared_bins, max=self.jet_pt.smeared_bins[-1])
+        base_filename += f"_smeared_{smeared_jet_pt.zero_padded_str(self.filename_padding_factor)}"
         # Additional options
         # Optional tag
         if self.tag:
@@ -397,7 +402,7 @@ def setup(grooming_method: str) -> Settings:
         ),
         tag="broadTrueBins",
         output_dir=Path("output/PbPb/unfolding/test"),
-        use_pure_matches=True,
+        use_pure_matches=False,
     )
 
     return default_settings
@@ -507,8 +512,8 @@ def run_unfolding(
         _array_to_ROOT(settings.substructure_variable.smeared_bins, "double"),
         _array_to_ROOT(settings.substructure_variable.true_bins, "double"),
         settings.substructure_variable.untagged_value,
-        settings.substructure_variable.min_smeared,
-        settings.substructure_variable.max_smeared,
+        settings.substructure_variable.smeared_range.min,
+        settings.substructure_variable.smeared_range.max,
         _array_to_ROOT(_pass_filenames_to_ROOT(data_filenames), "std::string"),
         _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
     )
@@ -650,8 +655,8 @@ def run_unfolding_closure_reweighting(
         _array_to_ROOT(settings.substructure_variable.smeared_bins, "double"),
         _array_to_ROOT(settings.substructure_variable.true_bins, "double"),
         settings.substructure_variable.untagged_value,
-        settings.substructure_variable.min_smeared,
-        settings.substructure_variable.max_smeared,
+        settings.substructure_variable.smeared_range.min,
+        settings.substructure_variable.smeared_range.max,
         _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
         variation,
         fraction_for_response,
