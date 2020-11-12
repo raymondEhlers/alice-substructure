@@ -334,6 +334,7 @@ def run_create_closure_ratio(
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8
 ) -> bool:
+    # TODO: I think I can just refactor this in the standard case...?
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
 
     # Delay ROOT import so we don't explicitly rely on it.
@@ -370,7 +371,7 @@ def run_create_closure_ratio(
         double_counting_cut = "det_level_leading_track_pt >= hybrid_leading_track_pt"
         df_original = df_original.Filter(double_counting_cut)
         smeared_cut_prefix = "hybrid"
-        prefix_for_ratio = "det_level"
+        prefix_for_ratio = "hybrid"
     else:
         smeared_cut_prefix = "data"
         prefix_for_ratio = "data"
@@ -387,8 +388,8 @@ def run_create_closure_ratio(
     hists.append(df_original.Histo2D(
         (f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt", f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt",
          len(smeared_substructure_variable_bins) - 1, smeared_substructure_variable_bins, len(smeared_jet_pt_bins) - 1, smeared_jet_pt_bins),
-        f"{jet_pt_column_format.format(prefix=prefix_for_ratio)}",
         f"{grooming_method}_{prefix_for_ratio}_kt",
+        f"{jet_pt_column_format.format(prefix=prefix_for_ratio)}",
         "scale_factor",
     ))
 
@@ -919,7 +920,7 @@ def embed_pythia_entry_point() -> None:
         train_numbers=list(range(5966, 5986)),
         #tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
         tree_name="tree",
-        prefix="hybrid",
+        prefixes=["hybrid"],
         grooming_method=args.groomingMethod,
     )
 
