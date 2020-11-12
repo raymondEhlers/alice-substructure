@@ -121,7 +121,7 @@ def plot_unfolded(
 
     # Determine ratio denominator.
     if n_iter_for_ratio > 0:
-        hist_name = f"Bayesian_Unfoldediter{n_iter_for_ratio}"
+        hist_name = f"bayesian_unfolded_iter_{n_iter_for_ratio}"
         if tag:
             hist_name = f"{tag}_{hist_name}"
         selected_n_iter_hist = projection_func(hists[hist_name], true_bin)
@@ -132,7 +132,7 @@ def plot_unfolded(
 
     for i in range(1, max_iter):
         # Retrieve the hist and normalize it properly.
-        hist_name = f"Bayesian_Unfoldediter{i}"
+        hist_name = f"bayesian_unfolded_iter_{i}"
         if tag:
             hist_name = f"{tag}_{hist_name}"
         hist = projection_func(hists[hist_name], true_bin)
@@ -305,7 +305,7 @@ def plot_refolded(
     ratio_denominator = hist_smeared if smeared_input else hist_raw
     for i in range(1, max_iter):
         # Convert
-        hist_name = f"Bayesian_Foldediter{i}"
+        hist_name = f"bayesian_folded_iter_{i}"
         if tag:
             hist_name = f"{tag}_{hist_name}"
         hist = projection_func(hists[hist_name], measured_bin)
@@ -528,17 +528,17 @@ def plot_select_iteration(
 
     for i, iter in enumerate(range(2, max_iter - 1)):
         # Current iteration
-        hist_name = f"Bayesian_Unfoldediter{iter}"
+        hist_name = f"bayesian_unfolded_iter_{iter}"
         if tag:
             hist_name = f"{tag}_{hist_name}"
         current_iter_hist = projection_func(hists[hist_name], true_bin)
         # Previous iter hist
-        hist_name = f"Bayesian_Unfoldediter{iter-1}"
+        hist_name = f"bayesian_unfolded_iter_{iter-1}"
         if tag:
             hist_name = f"{tag}_{hist_name}"
         previous_iter_hist = projection_func(hists[hist_name], true_bin)
         # Iter + 2 hist
-        hist_name = f"Bayesian_Unfoldediter{iter+2}"
+        hist_name = f"bayesian_unfolded_iter_{iter+2}"
         if tag:
             hist_name = f"{tag}_{hist_name}"
         forward_iter_hist = projection_func(hists[hist_name], true_bin)
@@ -627,12 +627,16 @@ class InputFile:
     def identifier(self) -> str:
         name = f"{self.substructure_variable}_grooming_method_{self.grooming_method}"
         name += f"_smeared_{self.smeared_var_range}"
+        # TEMP until fixed in the unfolding code...
         name += f"_untagged_{self.smeared_untagged_var}"
+        #name += f"_untagged_{self.smeared_untagged_var.min}_{self.smeared_untagged_var.max}"
+        # TEMP until fixed in the unfolding code...
         name += f"_smeared_{self.smeared_pt_range}"
+        #name += f"_smeared_jet_pt_{self.smeared_pt_range.min}_{self.smeared_pt_range.max}"
         # if self.smeared_input:
         #    name += "_hybrid_as_input"
         if self.pure_matches:
-            name += "_pureMatches"
+            name += "_pure_matches"
         if self.suffix:
             name += f"_{self.suffix}"
         return name
@@ -643,7 +647,7 @@ class InputFile:
 
 
 def setup(input_file: InputFile, collision_system: str) -> Tuple[Dict[str, binned_data.BinnedData], Path]:
-    base_dir = Path("output") / collision_system / "unfolding"
+    base_dir = Path("output") / collision_system / "unfolding" / "parsl" / "test"
     input_filename = base_dir / input_file.filename
     output_dir = base_dir / input_file.substructure_variable / input_file.identifier
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -678,7 +682,8 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
 
     tag = ""
     if input_file.smeared_input:
-        tag = "hybridAsInput"
+        #tag = "hybridAsInput"
+        pass
 
     # with sns.color_palette("GnBu_d", n_colors=11):
     with sns.color_palette("Paired", n_colors=input_file.max_iter):
