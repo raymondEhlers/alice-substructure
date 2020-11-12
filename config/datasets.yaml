@@ -2,7 +2,7 @@
 datasets:
     PbPb:
         dataset:
-            name: "LHC18qr"
+            name: "LHC18qr_5537"
             branches:
                 - "data.fJetPt"
                 - "data.fJetConstituents.fPt"
@@ -16,6 +16,17 @@ datasets:
                 - "data.fSubjets.fPartOfIterativeSplitting"
                 - "data.fSubjets.fSplittingNodeIndex"
                 - "data.fSubjets.fConstituentIndices"
+    PbPb_hardestKt:
+        dataset:
+            name: "LHC18qr_hardestKt"
+            branches:
+                - "data_jet_pt"
+                - "leading_kt_z_cut_02_data_delta_R"
+                - "leading_kt_z_cut_02_data_kt"
+                - "leading_kt_z_cut_02_data_z"
+                - "leading_kt_z_cut_02_data_n_groomed_to_split"
+                - "leading_kt_z_cut_02_data_n_to_split"
+                - "leading_kt_z_cut_02_data_n_passed_grooming"
     embedPythia:
         dataset:
             name: "LHC19f4_embedded_into_LHC18qr"
@@ -279,7 +290,14 @@ datasets:
                 - "matched.fSubjets.fConstituentIndices"
 
 available_datasets:
-    LHC18qr:
+    LHC18qr_hardestKt:
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
+        jet_R: 0.4
+        files:
+            - "trains/PbPb/5987/AnalysisResults.18q.root"
+            - "trains/PbPb/5987/AnalysisResults.18r.root"
+    LHC18qr_5537:
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
         jet_R: 0.4
