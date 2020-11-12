@@ -108,10 +108,10 @@ class SubstructureVariableSettings(ParameterSettings):
         # Determine the binning
         if untagged_bin_below_range:
             smeared_range = range_class(min=smeared_bins[1], max=smeared_bins[-1])
-            untagged_bin = helpers.RangeSelector(min=smeared_bins[0], max=smeared_bins[1])
+            untagged_bin = range_class(min=smeared_bins[0], max=smeared_bins[1])
         else:
             smeared_range = range_class(min=smeared_bins[0], max=smeared_bins[-2])
-            untagged_bin = helpers.RangeSelector(min=smeared_bins[-2], max=smeared_bins[-1])
+            untagged_bin = range_class(min=smeared_bins[-2], max=smeared_bins[-1])
 
         return cls(
             true_bins=true_bins,
