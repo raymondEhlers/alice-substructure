@@ -11,7 +11,7 @@ import typing
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence, Tuple, TypeVar, cast
 try:
-    from typing import Final
+    from typing import Final  # type: ignore
 except ImportError:
     from typing_extensions import Final
 
@@ -540,10 +540,11 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
 
     Args:
         filename: Filename of the parquet file.
-        prefixes: Prefixes of the branches to be loaded from the parquet file. The template branches are
-            already specified - these are just to fill them in. Each prefix will create a substructure array.
+        prefixes: Prefixes of the branches to be loaded from the parquet file. The template branches
+            are already specified - these are just to fill them in. Each prefix will create a substructure array.
     Returns:
-        One substructure array per prefix.
+        One substructure array per prefix, along with a few individual columns if available in the input data
+            (related to pt hard info).
     """
     # Read all of the arrays from parquet.
     # NOTE: In principle, we could read fewer branches here. However, it doesn't seem to be necessary
@@ -564,59 +565,71 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
     fill_none_value = -9999
     arrays = ak.fill_none(arrays, fill_none_value)
 
-    additional_columns = {}
+    columns = {}
     if "ptHard" in ak.fields(arrays):
-        additional_columns = {
+        columns.update({
             "pt_hard": arrays["ptHard"],
             "pt_hard_bin": arrays["ptHardBin"],
+        })
+    additional_columns = {}
+    # Add unsubstracted leading track pt for data if it was stored.
+    # We'll need to handle this later in the skim.
+    if "data_leading_track_pt" in ak.fields(arrays):
+        additional_columns["data"] = {
+            "leading_track_pt": arrays["data_leading_track_pt"],
         }
 
+    # We use a ton of gymnastics here because I'm not confident about memory ownership here and I want to
+    # avoid copies as much as possible!
     return {
-        prefix: ak.zip(
-            {
-                "jet_pt": arrays[f"{prefix}.fJetPt"],
-                "jet_constituents": ak.zip(
-                    {
-                        "pt": arrays[f"{prefix}.fJetConstituents.fPt"],
-                        "eta": arrays[f"{prefix}.fJetConstituents.fEta"],
-                        "phi": arrays[f"{prefix}.fJetConstituents.fPhi"],
-                        "id": arrays[f"{prefix}.fJetConstituents.fID"] if f"{prefix}.fJetConstituents.fID" in ak.keys(arrays) else arrays[f"{prefix}.fJetConstituents.fGlobalIndex"],
-                    },
-                    with_name="JetConstituent",
-                    # We want to apply the behavior for each jet, and then for each constituent
-                    # in the jet, so we use a depth limit of 2.
-                    depth_limit=2,
-                ),
-                "jet_splittings": ak.zip(
-                    {
-                        "kt": arrays[f"{prefix}.fJetSplittings.fKt"],
-                        "delta_R": arrays[f"{prefix}.fJetSplittings.fDeltaR"],
-                        "z": arrays[f"{prefix}.fJetSplittings.fZ"],
-                        "parent_index": arrays[f"{prefix}.fJetSplittings.fParentIndex"],
-                    },
-                    with_name="JetSplitting",
-                    # We want to apply the behavior for each jet, and then for each splitting
-                    # in the jet, so we use a depth limit of 2.
-                    depth_limit=2,
-                ),
-                "subjets": ak.zip(
-                    {
-                        "part_of_iterative_splitting": arrays[f"{prefix}.fSubjets.fPartOfIterativeSplitting"],
-                        "parent_splitting_index": arrays[f"{prefix}.fSubjets.fSplittingNodeIndex"],
-                        "constituent_indices": arrays[f"{prefix}.fSubjets.fConstituentIndices"],
-                    },
-                    with_name="Subjet",
-                    # We want to apply the behavior for each jet, and then for each subjet
-                    # in the jet, so we use a depth limit of 2.
-                    depth_limit=2,
-                ),
-                **additional_columns,
-            },
-            # The structure of the jet pt and the other values is inherently different, so
-            # we only put them together on the jet level with a depth limit of 1.
-            depth_limit=1,
-        )
-        for prefix in prefixes
+        **columns,
+        **{
+            prefix: ak.zip(
+                {
+                    "jet_pt": arrays[f"{prefix}.fJetPt"],
+                    "jet_constituents": ak.zip(
+                        {
+                            "pt": arrays[f"{prefix}.fJetConstituents.fPt"],
+                            "eta": arrays[f"{prefix}.fJetConstituents.fEta"],
+                            "phi": arrays[f"{prefix}.fJetConstituents.fPhi"],
+                            "id": arrays[f"{prefix}.fJetConstituents.fID"] if f"{prefix}.fJetConstituents.fID" in ak.keys(arrays) else arrays[f"{prefix}.fJetConstituents.fGlobalIndex"],
+                        },
+                        with_name="JetConstituent",
+                        # We want to apply the behavior for each jet, and then for each constituent
+                        # in the jet, so we use a depth limit of 2.
+                        depth_limit=2,
+                    ),
+                    "jet_splittings": ak.zip(
+                        {
+                            "kt": arrays[f"{prefix}.fJetSplittings.fKt"],
+                            "delta_R": arrays[f"{prefix}.fJetSplittings.fDeltaR"],
+                            "z": arrays[f"{prefix}.fJetSplittings.fZ"],
+                            "parent_index": arrays[f"{prefix}.fJetSplittings.fParentIndex"],
+                        },
+                        with_name="JetSplitting",
+                        # We want to apply the behavior for each jet, and then for each splitting
+                        # in the jet, so we use a depth limit of 2.
+                        depth_limit=2,
+                    ),
+                    "subjets": ak.zip(
+                        {
+                            "part_of_iterative_splitting": arrays[f"{prefix}.fSubjets.fPartOfIterativeSplitting"],
+                            "parent_splitting_index": arrays[f"{prefix}.fSubjets.fSplittingNodeIndex"],
+                            "constituent_indices": arrays[f"{prefix}.fSubjets.fConstituentIndices"],
+                        },
+                        with_name="Subjet",
+                        # We want to apply the behavior for each jet, and then for each subjet
+                        # in the jet, so we use a depth limit of 2.
+                        depth_limit=2,
+                    ),
+                    **additional_columns.get(prefix, {}),
+                },
+                # The structure of the jet pt and the other values is inherently different, so
+                # we only put them together on the jet level with a depth limit of 1.
+                depth_limit=1,
+            )
+            for prefix in prefixes
+        }
     }
 
 
@@ -662,7 +675,6 @@ if __name__ == "__main__":
                             ],
                             entries=(0, None),
                             output_filename=Path("trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"))
-
 
     # import uproot as uproot3
     # f = uproot3.open("trains/embedPythia/5966/AnalysisResults.18q.root")
