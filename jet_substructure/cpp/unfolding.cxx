@@ -397,7 +397,9 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
 
   // Next, we setup the Reader, the columns, and store the data in the appropriate hists.
   TChain embeddedChain(embeddedTreeName.c_str());
+  std::cout << "Embedded filenames:\n";
   for (auto filename : embeddedFilenames) {
+    std::cout << " - " << filename << "\n";
     embeddedChain.Add(filename.c_str());
   }
   TTreeReader mcReader(&embeddedChain);
@@ -415,8 +417,9 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
   TTreeReaderValue<long long> matchingSubleading(mcReader,
                           (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
   // For the double counting cut.
-  TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
-  TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
+  // TEMP: Commented out. TODO: Fix!
+  //TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
+  //TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
 
   int treeNumber = -1;
   // double scaleFactor = 0;
@@ -437,9 +440,11 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
       continue;
     }
     // Double counting cut
-    if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
+    // TEMP: Commented out. Note that we don't need this right now because the double counting cut is applied at the analysis task level.
+    // TODO: However, this should be fixed...
+    /*if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
       continue;
-    }
+    }*/
 
     // Full efficiency hists (and response).
     hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
@@ -561,8 +566,9 @@ ResponseResult create_closure_response_2D(
   TTreeReaderValue<long long> matchingSubleading(mcReader,
                           (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
   // For the double counting cut.
-  TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
-  TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
+  // TEMP: Commented out. TODO: Fix!
+  //TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
+  //TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
 
   int treeNumber = -1;
   // double scaleFactor = 0;
@@ -583,9 +589,11 @@ ResponseResult create_closure_response_2D(
       continue;
     }
     // Double counting cut
-    if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
+    // TEMP: Commented out. Note that we don't need this right now because the double counting cut is applied at the analysis task level.
+    // TODO: However, this should be fixed...
+    /*if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
       continue;
-    }
+    }*/
 
     // Full efficiency hists (and response).
     hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);

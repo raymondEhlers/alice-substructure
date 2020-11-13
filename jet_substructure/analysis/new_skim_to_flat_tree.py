@@ -884,10 +884,11 @@ def calculate_embedding_skim(  # noqa: C901
             grooming_results[f"{prefix}_jet_pt"] = input_jets.jets.jet_pt
             grooming_results[f"{prefix}_jet_eta"], grooming_results[f"{prefix}_jet_phi"] = _calculate_jet_kinematics(input_jets.jets.jet_constituents)
             # Leading track
-            if prefix != "data":
-                # First, store the unsubstracted (which we use for the double counting cut).
-                if "data_leading_track_pt" in ak.fields(input_jets):
-                    grooming_results[leading_track_name] = input_jets["data_leading_track_pt"]
+            leading_track_name = f"{prefix}_leading_track_pt"
+            if prefix == "hybrid":
+                # First, store the unsubstracted (which we use for the double counting cut) as the normal leading track pt.
+                if "data_leading_track_pt" in ak.fields(input_jets.jets):
+                    grooming_results[leading_track_name] = input_jets.jets["data_leading_track_pt"]
                 # Then update the name for the substracted constituents in data.
                 leading_track_name = f"{prefix}_leading_track_pt_sub"
             grooming_results[leading_track_name] = ak.max(input_jets.jets.jet_constituents.pt, axis=1)
@@ -1106,10 +1107,10 @@ def calculate_data_skim(  # noqa: C901
             # NOTE: Since this is for data, it doesn't really matter, but better to always do the right thing.
             leading_track_name = f"{prefix}_leading_track_pt"
             # NOTE: We would include embedPythia here, but we don't run the embedding through this function, so we can ignore it.
-            if prefix != "data" and collision_system == "PbPb":
+            if prefix == "data" and collision_system == "PbPb":
                 # First, store the unsubstracted (which we use for the double counting cut).
-                if "data_leading_track_pt" in ak.fields(input_jets):
-                    grooming_results[leading_track_name] = input_jets["data_leading_track_pt"]
+                if "data_leading_track_pt" in ak.fields(input_jets.jets):
+                    grooming_results[leading_track_name] = input_jets.jets["data_leading_track_pt"]
                 # Then update the name for the substracted constituents in data.
                 leading_track_name = f"{prefix}_leading_track_pt_sub"
             grooming_results[leading_track_name] = ak.max(input_jets.jets.jet_constituents.pt, axis=1)
