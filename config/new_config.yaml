@@ -49,7 +49,7 @@ available_datasets:
         jet_R: 0.4
         files:
             - "trains/PbPb/5863/AnalysisResults.*.repaired.root"
-    LHC18qr_semi_central_Rmax06:
+    LHC18qr_semi_central_Rmax06: &LHC18qr_semi_central_Rmax06
         name: "LHC18qr_semi_central_Rmax06_5862"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
@@ -104,7 +104,7 @@ available_datasets:
         jet_R: 0.4
         files:
             - "trains/PbPb/5537/AnalysisResults.*.root"
-    LHC19f4_embedded_into_LHC18qr_5966_5985:
+    LHC19f4_embedded_into_LHC18qr_5966_5985: &LHC19f4_embedded_into_LHC18qr
         name: "LHC19f4_embedded_into_LHC18qr_5966_5985"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -141,7 +141,7 @@ available_datasets:
             - "trains/embedPythia/5984/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/5985/AnalysisResults.*.repaired.root"
     # Systematics: Rmax = 0.6
-    LHC19f4_embedded_into_LHC18qr_Rmax06_6316_6335: &LHC19f4_embedded_into_LHC18qr
+    LHC19f4_embedded_into_LHC18qr_Rmax06_6316_6335: &LHC19f4_embedded_into_LHC18qr_Rmax06
         name: "LHC19f4_embedded_into_LHC18qr_Rmax06_6316_6335"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -216,7 +216,7 @@ available_datasets:
             - "trains/embedPythia/6065/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/6066/AnalysisResults.*.repaired.root"
     # Systematics: Tracking efficiency
-    LHC19f4_embedded_into_LHC18qr_tracking_efficiency_6296_6315:
+    LHC19f4_embedded_into_LHC18qr_tracking_efficiency_6296_6315: &LHC19f4_embedded_into_LHC18qr_tracking_efficiency
         name: "LHC19f4_embedded_into_LHC18qr_tracking_efficiency_6296_6315"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
