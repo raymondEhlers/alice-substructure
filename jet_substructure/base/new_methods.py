@@ -655,7 +655,9 @@ if __name__ == "__main__":
     #IPython.embed()
 
     # An example for testing.
-    convert_tree_to_parquet(filename=Path("trains/embedPythia/5966/AnalysisResults.18q.repaired.root"),
+    from jet_substructure.base import helpers
+    helpers.setup_logging(level=logging.DEBUG)
+    convert_tree_to_parquet(filename=Path("trains/embedPythia/5966/AnalysisResults.18r.repaired.root"),
                             tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
                             prefixes={"matched": "true", "detLevel": "det_level", "data": "hybrid"},
                             branches=[],
@@ -674,7 +676,7 @@ if __name__ == "__main__":
                                 "{prefix}.fSubjets.fConstituentIndices",
                             ],
                             entries=(0, None),
-                            output_filename=Path("trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"))
+                            output_filename=Path("trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18r.repaired.00.parquet"))
 
     # import uproot as uproot3
     # f = uproot3.open("trains/embedPythia/5966/AnalysisResults.18q.root")

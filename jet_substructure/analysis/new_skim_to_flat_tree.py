@@ -1199,13 +1199,13 @@ if __name__ == "__main__":
     from jet_substructure.base import helpers
     helpers.setup_logging()
     calculate_embedding_skim(
-        input_filename=Path("trains/embedPythia/6296/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"),
+        input_filename=Path("trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"),
         iterative_splittings=True,
-        prefixes={"matched": "true", "detLevel": "det_level", "data": "hybrid"},
+        prefixes={"data": "hybrid", "matched": "true", "detLevel": "det_level"},
         scale_factors={1: 16.0695},
-        train_directory=Path("trains/embedPythia/6296/"),
+        train_directory=Path("trains/embedPythia/5966/"),
         jet_R=0.4,
-        output_filename=Path("trains/embedPythia/6296/skim/test/AnalysisResults.18q.repaired.00_iterative_splittings.root")
+        output_filename=Path("trains/embedPythia/5966/skim/test2/AnalysisResults.18q.repaired.00_iterative_splittings.root")
     )
     #collision_system = "PbPb"
     #train_number = 5863
