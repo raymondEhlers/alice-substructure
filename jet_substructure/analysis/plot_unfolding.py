@@ -374,7 +374,7 @@ def plot_response(
     # Setup
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
 
-    h = binned_data.BinnedData.from_existing_data(hists["h2_splitting_variable"])
+    h = binned_data.BinnedData.from_existing_data(hists["h2_substructure_variable"])
 
     # Normalize the response.
     normalization_values = h.values.sum(axis=0, keepdims=True)
@@ -911,7 +911,7 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
         )
 
     # Plot the response
-    if "h2_splitting_variable" in hists:
+    if "h2_substructure_variable" in hists:
         jet_pt_for_text = helpers.JetPtRange(40, 120)
         text = f"${jet_pt_for_text.display_str(label='hybrid')}$"
         plot_response(
@@ -1671,7 +1671,7 @@ def run_delta_R(collision_system: str) -> None:
             )
 
         # Plot the response
-        if "h2_splitting_variable" in hists:
+        if "h2_substructure_variable" in hists:
             jet_pt_for_text = helpers.JetPtRange(40, 120)
             text = f"${jet_pt_for_text.display_str(label='hybrid')}$"
             plot_response(
