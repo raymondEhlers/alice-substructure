@@ -101,16 +101,16 @@ def setup_parsl_587(
         if use_aliphysics:
             # This is a little unconventional to redefine the list here, but ROOT is already
             # a dependency of AliPhysics, so we redefine the list to remove ROOT.
-            software_to_load = [s for s in software_to_load if s != "ROOT"]
+            software_to_load = [s for s in software_to_load if s != "ROOT/latest"]
             software_to_load.append("AliPhysics/latest")
         if use_roounfold:
             # This is a little unconventional to redefine the list here, but ROOT is already
             # a dependency of RooUnfold, so we redefine the list to remove ROOT.
-            software_to_load = [s for s in software_to_load if s != "ROOT"]
+            software_to_load = [s for s in software_to_load if s != "ROOT/latest"]
             software_to_load.append("RooUnfold/latest")
         slurm_kwargs.update(
             dict(
-                worker_init="eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv {','.join(software_to_load)}`",
+                worker_init=f"eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv {','.join(software_to_load)}`",
             )
         )
 
@@ -398,7 +398,7 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
             # Setup file IO
             parsl_input_file = File(str(filename))
             output_filename = Path(parsl_input_file.filepath)
-            # Path becomes .../parquet/events_per_job_.../filename.00.parquet
+            # Path becomes ../parquet/events_per_job_.../filename.00.parquet
             output_filename = (
                 output_filename.parent / "parquet" / f"events_per_job_{entries_per_job}" / output_filename.name
             )
@@ -1023,7 +1023,7 @@ def setup_unfolding(
     # Setup
     from jet_substructure.cpp import unfolding_2D
     # TODO: Update after testing...
-    output_dir = Path("output") / "PbPb" / "unfolding" / "testParsl"
+    output_dir = Path("output") / "PbPb" / "unfolding" / "parsl"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     PbPb_dataset_config = read_config(collision_system="PbPb")
@@ -1097,7 +1097,7 @@ def setup_unfolding(
         )
         settings[_temp_settings.output_tag] = _temp_settings
 
-        # Setup file IO
+        # Standard unfolding
         for s in settings.values():
             # Randomize the input list so we don't always hit the same files at the same time.
             # Note: It randomizes in place.
@@ -1145,8 +1145,8 @@ if __name__ == "__main__":  # noqa: C901
         "unfolding",
     ]
     entries_per_job = int(1e5)
-    nodes_to_allocate = 7
-    jobs_per_node = 5
+    nodes_to_allocate = 6
+    jobs_per_node = 6
 
     # Basic setup for jobs
     _possible_jobs = [
@@ -1182,7 +1182,7 @@ if __name__ == "__main__":  # noqa: C901
         use_root=any((job in _jobs_requiring_root for job in jobs_to_execute)),
         # We need the AliPhysics definitions for the Substructure output classes and AliEmcalList.
         use_aliphysics=any((job == "repair_root_files" for job in jobs_to_execute)),
-        use_rooufnold=any((job == "unfold" for job in jobs_to_execute)),
+        use_roounfold=any((job == "unfolding" for job in jobs_to_execute)),
     )
 
     # Setup logging. By doing it after parsl, we're able to keep it much quieter.
@@ -1211,7 +1211,7 @@ if __name__ == "__main__":  # noqa: C901
         results = setup_calculate_embedding_skim(
             collision_system=collision_system,
             entries_per_job=entries_per_job,
-            # selected_train_numbers=list(range(6296, 6300)),
+            # selected_train_numbers=list(range(5966, 5967)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
     if "calculate_data_skim" in jobs_to_execute:
@@ -1248,7 +1248,6 @@ if __name__ == "__main__":  # noqa: C901
             )
         results.extend(temp_results)
     if "unfolding" in jobs_to_execute:
-        # TODO: Need to do the Rmax, tracking eff
         results = setup_unfolding(
             grooming_methods=[
                 "leading_kt",
