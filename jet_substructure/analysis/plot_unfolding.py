@@ -24,61 +24,100 @@ from jet_substructure.base import helpers
 logger = logging.getLogger(__name__)
 
 
-def _efficiency_kt(
-    hists: Mapping[str, binned_data.BinnedData], true_jet_pt_bin: helpers.RangeSelector
+def _efficiency_substructure_variable(
+    hists: Mapping[str, binned_data.BinnedData], true_jet_pt_range: helpers.RangeSelector
 ) -> binned_data.BinnedData:
-    """
+    """ Efficiency for the substructure variable.
 
+    Note:
+        Since we need a set of hists, we just pass all of them.
+
+    Args:
+        hists: Input histograms.
+        true_jet_pt_range: True jet pt range over which we will integrate.
+    Returns:
+        Efficiency hist for the substructure variable.
     """
-    # For convenience
+    # Assign them for convenience
     bh_cut_efficiency = hists["true"].to_boost_histogram()
     bh_full_efficiency = hists["truef"].to_boost_histogram()
 
     # Select true pt range.
-    selection = slice(bh.loc(true_jet_pt_bin.min), bh.loc(true_jet_pt_bin.max), bh.sum)
+    selection = slice(bh.loc(true_jet_pt_range.min), bh.loc(true_jet_pt_range.max), bh.sum)
     cut = binned_data.BinnedData.from_existing_data(bh_cut_efficiency[:, selection])
     full = binned_data.BinnedData.from_existing_data(bh_full_efficiency[:, selection])
 
     return cut / full
 
 
-def _project_kt(input_hist: binned_data.BinnedData, true_jet_pt_bin: helpers.RangeSelector) -> binned_data.BinnedData:
+def _project_substructure_variable(input_hist: binned_data.BinnedData, jet_pt_range: helpers.RangeSelector) -> binned_data.BinnedData:
+    """ Project the hist to the substructure variable.
+
+    Args:
+        input_hist: Hist to be projected.
+        jet_pt_range: True jet pt range over which we will integrate.
+    Returns:
+        The input hist projected onto the the substructure variable axis.
+    """
     # For convenience
     bh_hist = input_hist.to_boost_histogram()
 
-    selection = slice(bh.loc(true_jet_pt_bin.min), bh.loc(true_jet_pt_bin.max), bh.sum)
+    selection = slice(bh.loc(jet_pt_range.min), bh.loc(jet_pt_range.max), bh.sum)
     return binned_data.BinnedData.from_existing_data(bh_hist[:, selection])
 
 
 def _efficiency_pt(
-    hists: Mapping[str, binned_data.BinnedData], true_kt_bin: helpers.RangeSelector
+    hists: Mapping[str, binned_data.BinnedData], true_substructure_variable_range: helpers.RangeSelector
 ) -> binned_data.BinnedData:
-    """
+    """ Efficiency for the jet pt.
 
+    Note:
+        Since we need a set of hists, we just pass all of them.
+
+    Args:
+        hists: Input histograms.
+        true_substructure_variable_range: True substructure variable range over which we will integrate.
+    Returns:
+        Efficiency hist for jet pt.
     """
     # For convenience
     bh_cut_efficiency = hists["true"].to_boost_histogram()
     bh_full_efficiency = hists["truef"].to_boost_histogram()
 
     # Select true pt range.
-    selection = slice(bh.loc(true_kt_bin.min), bh.loc(true_kt_bin.max), bh.sum)
+    selection = slice(bh.loc(true_substructure_variable_range.min), bh.loc(true_substructure_variable_range.max), bh.sum)
     cut = binned_data.BinnedData.from_existing_data(bh_cut_efficiency[selection, :])
     full = binned_data.BinnedData.from_existing_data(bh_full_efficiency[selection, :])
 
     return cut / full
 
 
-def _project_pt(input_hist: binned_data.BinnedData, true_kt_bin: helpers.RangeSelector) -> binned_data.BinnedData:
-    """
+def _project_jet_pt(input_hist: binned_data.BinnedData, substructure_variable_bin: helpers.RangeSelector) -> binned_data.BinnedData:
+    """ Project the hist to the jet pt.
 
+    Args:
+        input_hist: Hist to be projected.
+        substructure_variable_range: True substructure variable range over which we will integrate.
+    Returns:
+        The input hist projected onto the the jet pt axis.
     """
     bh_hist = input_hist.to_boost_histogram()
 
-    selection = slice(bh.loc(true_kt_bin.min), bh.loc(true_kt_bin.max), bh.sum)
+    selection = slice(bh.loc(substructure_variable_bin.min), bh.loc(substructure_variable_bin.max), bh.sum)
     return binned_data.BinnedData.from_existing_data(bh_hist[selection, :])
 
 
 def _normalize_unfolded(hist: binned_data.BinnedData, efficiency: binned_data.BinnedData) -> binned_data.BinnedData:
+    """ Normalized unfolded hist.
+
+    This involves applying the efficiency and then normalizing by the integral and the bin width.
+
+    Args:
+        hist: Histogram to be normalized.
+        efficiency: Efficiency histogram with the same binning as the input hist.
+    Returns:
+        The normalized histogram.
+    """
     # Apply the efficiency.
     hist /= efficiency
     # Then normalize by the integral (sum) and bin width.
@@ -615,6 +654,7 @@ class InputFile:
     smeared_var_range: helpers.RangeSelector = attr.ib()
     smeared_untagged_var: helpers.RangeSelector = attr.ib()
     smeared_pt_range: helpers.RangeSelector = attr.ib()
+    base_dir: Path = attr.ib()
     n_iter_compare: int = attr.ib(default=4)
     max_iter: int = attr.ib(default=10)
     smeared_input: bool = attr.ib(default=False)
@@ -622,6 +662,16 @@ class InputFile:
     suffix: str = attr.ib(default="")
     true_hist_name: str = attr.ib(default="true")
     raw_hist_name: str = attr.ib(default="raw")
+    hists: Mapping[str, binned_data.BinnedData] = attr.ib(factory=dict)
+
+    def __attrs_post_init__(self) -> None:
+        # Initialize the file if the histograms aren't specified.
+        if not self.hists:
+            f = uproot.open(self.input_filename)
+            for k in f.keys():
+                hist_key = k.decode("utf-8")
+                hist_key = hist_key[: hist_key.find(";")]
+                self.hists[hist_key] = binned_data.BinnedData.from_existing_data(f[k])
 
     @property
     def identifier(self) -> str:
@@ -644,6 +694,93 @@ class InputFile:
     @property
     def filename(self) -> str:
         return f"unfolding_{self.identifier}.root"
+
+    @property
+    def output_dir(self) -> Path:
+        p = self.base_dir / self.substructure_variable / self.identifer
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def unfolded_substructure(self, n_iter: int, true_jet_pt_range: helpers.JetPtRange = helpers.JetPtRange(60, 80)) -> binned_data.BinnedData:
+        return _unfolded(
+            hists=self.hists,
+            hist_name=f"bayesian_unfolded_iter_{n_iter}",
+            projection_func=_project_substructure_variable,
+            efficiency_func=_efficiency_substructure_variable,
+            true_range_to_integrate_over=true_jet_pt_range,
+        )
+
+    def unfolded_jet_pt(self, n_iter: int, substructure_variable: helpers.RangeSelector) -> binned_data.BinnedData:
+        return _unfolded(
+            hists=self.hists,
+            hist_name=f"bayesian_unfolded_iter_{n_iter}",
+            projection_func=_project_jet_pt,
+            efficiency_func=_efficiency_pt,
+            true_range_to_integrate_over=substructure_variable,
+        )
+
+    def refolded_substructure(self, n_iter: int, measured_bin: helpers.RangeSelector) -> binned_data.BinnedData:
+        return _refolded(
+            hists=self.hists,
+            hist_name=f"bayesian_folded_iter_{n_iter}",
+            projection_func=_project_substructure_variable,
+            measured_bin=measured_bin,
+        )
+
+    def refolded_jet_pt(self, n_iter: int, measured_bin: helpers.JetPtRange) -> binned_data.BinnedData:
+        return _refolded(
+            hists=self.hists,
+            hist_name=f"bayesian_folded_iter_{n_iter}",
+            projection_func=_project_jet_pt,
+            measured_bin=measured_bin,
+        )
+
+    # TODO: Probably a map of hist names...
+    # TODO: And make the project functions somehow accessible so that manual things can be done when necessary.
+
+
+def _refolded(
+    hists: Mapping[str, binned_data.BinnedData],
+    hist_name: str,
+    projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
+    measured_bin: helpers.RangeSelector,
+) -> binned_data.BinnedData:
+    return projection_func(hists[hist_name], measured_bin)
+
+
+def _unfolded(
+    hists: Mapping[str, binned_data.BinnedData],
+    hist_name: str,
+    projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
+    efficiency_func: Callable[[Mapping[str, binned_data.BinnedData], helpers.RangeSelector], binned_data.BinnedData],
+    true_range_to_integrate_over: helpers.RangeSelector,
+) -> binned_data.BinnedData:
+    #efficiency = efficiency_func(hists, true_bin)
+    ## For convenience in normalizing.
+    #_normalize_hist = functools.partial(_normalize_unfolded, efficiency=efficiency)
+    hist = projection_func(hists[hist_name], true_range_to_integrate_over)
+    #hist = _normalize_hist(hist)
+    return _normalize_unfolded(hist=hist, efficiency=efficiency_func(hists, true_range_to_integrate_over))
+
+
+@attr.s
+class SingleResult:
+    data: binned_data.BinnedData = attr.ib()
+    n_iter: int = attr.ib()
+    ranges: Sequence[helpers.RangeSelector] = attr.ib(factory=list)
+
+@attr.s
+class Result:
+    unfolded: SingleResult = attr.ib()
+    # TODO: Better to call it smeared or refolded?
+    smeared: SingleResult = attr.ib()
+    # TODO: Need ranges attached here...?
+
+@attr.s
+class UnfoldingResult:
+    substructure: Result = attr.ib()
+    jet_pt: Result = attr.ib()
+    ...
 
 
 def setup(input_file: InputFile, collision_system: str) -> Tuple[Dict[str, binned_data.BinnedData], Path]:
@@ -692,8 +829,8 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
         text = f"${jet_pt_for_text.display_str(label='true')}$"
         plot_unfolded(
             hists=hists,
-            projection_func=_project_kt,
-            efficiency_func=_efficiency_kt,
+            projection_func=_project_substructure_variable,
+            efficiency_func=_efficiency_substructure_variable,
             n_iter_for_ratio=n_iter_for_ratio,
             max_iter=input_file.max_iter,
             true_bin=helpers.RangeSelector(60, 80),
@@ -741,8 +878,8 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
         text = f"${jet_pt_for_text.display_str(label='true')}$"
         plot_unfolded(
             hists=hists,
-            projection_func=_project_kt,
-            efficiency_func=_efficiency_kt,
+            projection_func=_project_substructure_variable,
+            efficiency_func=_efficiency_substructure_variable,
             n_iter_for_ratio=n_iter_for_ratio,
             max_iter=input_file.max_iter,
             true_bin=helpers.RangeSelector(40, 120),
@@ -788,7 +925,7 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
         text = ""
         plot_unfolded(
             hists=hists,
-            projection_func=_project_pt,
+            projection_func=_project_jet_pt,
             efficiency_func=_efficiency_pt,
             n_iter_for_ratio=n_iter_for_ratio,
             max_iter=input_file.max_iter,
@@ -832,7 +969,7 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
         text = f"${jet_pt_for_text.display_str(label='data')}$"
         plot_refolded(
             hists=hists,
-            projection_func=_project_kt,
+            projection_func=_project_substructure_variable,
             smeared_input=input_file.smeared_input or input_file.suffix == "closure2",
             raw_hist_name=input_file.raw_hist_name,
             max_iter=input_file.max_iter,
@@ -872,7 +1009,7 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
         text = ""
         plot_refolded(
             hists=hists,
-            projection_func=_project_pt,
+            projection_func=_project_jet_pt,
             smeared_input=input_file.smeared_input or input_file.suffix == "closure2",
             raw_hist_name=input_file.raw_hist_name,
             max_iter=input_file.max_iter,
@@ -978,7 +1115,7 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
     text = f"${jet_pt_for_text.display_str(label='true')}$"
     plot_select_iteration(
         hists=hists,
-        projection_func=_project_kt,
+        projection_func=_project_substructure_variable,
         max_iter=19,
         true_bin=helpers.JetPtRange(60, 80),
         tag=tag,
@@ -1000,7 +1137,7 @@ def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bo
     # Efficiency
     plot_efficiency(
         hists=hists,
-        efficiency_func=_efficiency_kt,
+        efficiency_func=_efficiency_substructure_variable,
         true_bins=[
             helpers.RangeSelector(40, 120),
             helpers.RangeSelector(40, 60),
@@ -1492,8 +1629,8 @@ def run_delta_R(collision_system: str) -> None:
             text = f"${jet_pt_for_text.display_str(label='true')}$"
             plot_unfolded(
                 hists=hists,
-                projection_func=_project_kt,
-                efficiency_func=_efficiency_kt,
+                projection_func=_project_substructure_variable,
+                efficiency_func=_efficiency_substructure_variable,
                 n_iter_for_ratio=n_iter_for_ratio,
                 max_iter=input_file.max_iter,
                 true_bin=helpers.RangeSelector(60, 80),
@@ -1527,8 +1664,8 @@ def run_delta_R(collision_system: str) -> None:
             text = f"${jet_pt_for_text.display_str(label='true')}$"
             plot_unfolded(
                 hists=hists,
-                projection_func=_project_kt,
-                efficiency_func=_efficiency_kt,
+                projection_func=_project_substructure_variable,
+                efficiency_func=_efficiency_substructure_variable,
                 n_iter_for_ratio=n_iter_for_ratio,
                 max_iter=input_file.max_iter,
                 true_bin=helpers.RangeSelector(40, 120),
@@ -1565,7 +1702,7 @@ def run_delta_R(collision_system: str) -> None:
             text = ""
             plot_unfolded(
                 hists=hists,
-                projection_func=_project_pt,
+                projection_func=_project_jet_pt,
                 efficiency_func=_efficiency_pt,
                 n_iter_for_ratio=n_iter_for_ratio,
                 max_iter=input_file.max_iter,
@@ -1602,7 +1739,7 @@ def run_delta_R(collision_system: str) -> None:
             text = f"${jet_pt_for_text.display_str(label='data')}$"
             plot_refolded(
                 hists=hists,
-                projection_func=_project_kt,
+                projection_func=_project_substructure_variable,
                 smeared_input=input_file.smeared_input,
                 max_iter=input_file.max_iter,
                 measured_bin=helpers.RangeSelector(40, 120),
@@ -1635,7 +1772,7 @@ def run_delta_R(collision_system: str) -> None:
             text = ""
             plot_refolded(
                 hists=hists,
-                projection_func=_project_pt,
+                projection_func=_project_jet_pt,
                 smeared_input=input_file.smeared_input,
                 max_iter=input_file.max_iter,
                 measured_bin=helpers.RangeSelector(0, 0.35),
@@ -1696,7 +1833,7 @@ def run_delta_R(collision_system: str) -> None:
         text = f"${jet_pt_for_text.display_str(label='true')}$"
         plot_select_iteration(
             hists=hists,
-            projection_func=_project_kt,
+            projection_func=_project_substructure_variable,
             max_iter=19,
             true_bin=helpers.JetPtRange(60, 80),
             tag=tag,
