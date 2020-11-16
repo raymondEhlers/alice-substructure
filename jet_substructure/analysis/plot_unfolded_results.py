@@ -4,7 +4,6 @@
 """
 
 import logging
-from functools import reduce
 from pathlib import Path
 from typing import Dict, Sequence
 
@@ -17,6 +16,7 @@ import uproot
 from pachyderm import binned_data
 
 import jet_substructure.analysis.plot_base as pb
+from jet_substructure.analysis.unfolding_base import AsymmetricErrors, ErrorInput, relative_error
 from jet_substructure.base import helpers
 
 
@@ -27,29 +27,6 @@ logger = logging.getLogger(__name__)
 class Result:
     data: binned_data.BinnedData = attr.ib()
     pythia: binned_data.BinnedData = attr.ib()
-
-
-@attr.s
-class AsymmetricErrors:
-    low: np.ndarray = attr.ib()
-    high: np.ndarray = attr.ib()
-
-
-@attr.s
-class ErrorInput:
-    value: np.ndarray = attr.ib()
-    error: np.ndarray = attr.ib()
-
-
-def relative_error(*inputs: ErrorInput) -> np.ndarray:
-    if len(inputs) == 0:
-        raise ValueError("Must pass at least one ErrorInput")
-    if len(inputs) > 1:
-        relative_error_squared = reduce(lambda x, y: ((x.error / x.value) ** 2) + ((y.error / y.value) ** 2), inputs)  # type: ignore
-    else:
-        relative_error_squared = (inputs[0].error / inputs[0].value) ** 2
-    # import IPython; IPython.embed()
-    return np.sqrt(relative_error_squared)
 
 
 def select_hist_in_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelector) -> binned_data.BinnedData:

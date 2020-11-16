@@ -11,6 +11,7 @@ import attr
 import boost_histogram as bh
 import matplotlib
 import matplotlib.pyplot as plt
+import pachyderm.plot
 import numpy as np
 import seaborn as sns
 import uproot
@@ -21,6 +22,8 @@ from jet_substructure.base import helpers
 
 
 logger = logging.getLogger(__name__)
+
+pachyderm.plot.configure()
 
 
 def _efficiency_substructure_variable(
@@ -322,6 +325,96 @@ class UnfoldingOutput:
             projection_func=_project_jet_pt,
             smeared_range_to_integrate_over=smeared_substructure_variable_range,
         )
+
+
+@attr.s
+class SingleResult:
+    data: binned_data.BinnedData = attr.ib()
+    n_iter: int = attr.ib()
+    ranges: Sequence[helpers.RangeSelector] = attr.ib(factory=list)
+
+@attr.s
+class Result:
+    unfolded: SingleResult = attr.ib()
+    # TODO: Better to call it smeared or refolded?
+    #smeared: SingleResult = attr.ib()
+    # TODO: Need ranges attached here...?
+
+@attr.s
+class UnfoldingResult:
+    substructure: Result = attr.ib()
+    jet_pt: Result = attr.ib()
+    ...
+
+
+def plot_systematic(
+    unfolded: "SingleResult",
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+    plot_png: bool = False,
+) -> None:
+    """ Plot systematic
+
+    Initial version to play around with.
+    """
+    # Setup
+    logger.debug("Plotting systematic.")
+    fig, ax = plt.subplots(figsize=(10, 8))
+    #fig, axes = plt.subplots(3, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+    #ax_upper, ax_ratio_iter, ax_ratio_true = axes
+
+    p = ax.errorbar(
+        unfolded.data.axes[0].bin_centers,
+        unfolded.data.values,
+        yerr=unfolded.data.errors,
+        xerr=unfolded.data.axes[0].bin_widths / 2,
+        #color=style.color,
+        marker="o",
+        linestyle="",
+    )
+
+    # This isn't really right, but it's a first pass. Let's see...
+    # Rmax06
+    pachyderm.plot.error_boxes(
+        ax=ax,
+        x_data=unfolded.data.axes[0].bin_centers,
+        y_data=unfolded.data.values,
+        x_errors=unfolded.data.axes[0].bin_widths / 2,
+        y_errors=unfolded.data.metadata["y_systematic_Rmax06"],
+        #y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+        #color=style.color,
+        #color=p[0].get_color(),
+        linewidth=0,
+        label="RMax06",
+        color="red",
+    )
+    # Tracking efficiency
+    pachyderm.plot.error_boxes(
+        ax=ax,
+        x_data=unfolded.data.axes[0].bin_centers,
+        y_data=unfolded.data.values,
+        x_errors=unfolded.data.axes[0].bin_widths / 2,
+        y_errors=unfolded.data.metadata["y_systematic_tracking_efficiency"],
+        #y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+        #color=style.color,
+        #color=p[0].get_color(),
+        linewidth=0,
+        label="Tracking Eff.",
+        color="green",
+    )
+
+    # Label and layout
+    plot_config.apply(fig=fig, ax=ax)
+
+    figure_name = f"{plot_config.name}"
+    logger.info(f"Writing plot to {output_dir / figure_name}.pdf")
+    fig.savefig(output_dir / f"{figure_name}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{figure_name}.png")
+
+    plt.close(fig)
 
 
 def plot_unfolded(
@@ -829,26 +922,6 @@ def plot_select_iteration(
         output_dir_png.mkdir(parents=True, exist_ok=True)
         fig.savefig(output_dir_png / f"{figure_name}.png")
     plt.close(fig)
-
-
-@attr.s
-class SingleResult:
-    data: binned_data.BinnedData = attr.ib()
-    n_iter: int = attr.ib()
-    ranges: Sequence[helpers.RangeSelector] = attr.ib(factory=list)
-
-@attr.s
-class Result:
-    unfolded: SingleResult = attr.ib()
-    # TODO: Better to call it smeared or refolded?
-    smeared: SingleResult = attr.ib()
-    # TODO: Need ranges attached here...?
-
-@attr.s
-class UnfoldingResult:
-    substructure: Result = attr.ib()
-    jet_pt: Result = attr.ib()
-    ...
 
 
 def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False) -> Path:
