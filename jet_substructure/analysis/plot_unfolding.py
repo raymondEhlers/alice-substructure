@@ -3,10 +3,9 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
-import functools
 import logging
 from pathlib import Path
-from typing import Callable, Dict, Mapping, Sequence, Tuple
+from typing import Callable, Mapping, Sequence
 
 import attr
 import boost_histogram as bh
@@ -201,7 +200,7 @@ class UnfoldingOutput:
     suffix: str = attr.ib(default="")
     n_iter_compare: int = attr.ib(default=4)
     raw_hist_name: str = attr.ib(default="raw")
-    smeared_hist_name: str = attr.ib(default="h2_smeared")
+    smeared_hist_name: str = attr.ib(default="smeared")
     true_hist_name: str = attr.ib(default="true")
     hists: Mapping[str, binned_data.BinnedData] = attr.ib(factory=dict)
 
@@ -250,12 +249,13 @@ class UnfoldingOutput:
         return self._max_n_iter
 
     @property
-    def filename(self) -> str:
-        return f"unfolding_{self.identifier}.root"
+    def input_filename(self) -> Path:
+        # TODO: Fix.
+        return self.base_dir / "parsl" / f"unfolding_{self.identifier}.root"
 
     @property
     def output_dir(self) -> Path:
-        p = self.base_dir / self.substructure_variable / self.identifer
+        p = self.base_dir / self.substructure_variable / "test" / self.identifier
         p.mkdir(parents=True, exist_ok=True)
         return p
 
@@ -263,7 +263,7 @@ class UnfoldingOutput:
         """ Helper to retrieve the unfolded substructure directly """
         return self.true_substructure(
             hist_name=f"bayesian_unfolded_iter_{n_iter}",
-            true_range_to_integrate_over=true_jet_pt_range,
+            true_jet_pt_range=true_jet_pt_range,
         )
 
     def true_substructure(self, hist_name: str, true_jet_pt_range: helpers.JetPtRange) -> binned_data.BinnedData:
@@ -279,7 +279,7 @@ class UnfoldingOutput:
     def unfolded_jet_pt(self, n_iter: int, true_substructure_variable_range: helpers.RangeSelector) -> binned_data.BinnedData:
         return self.true_jet_pt(
             hist_name=f"bayesian_unfolded_iter_{n_iter}",
-            true_range_to_integrate_over=true_substructure_variable_range,
+            true_substructure_variable_range=true_substructure_variable_range,
         )
 
     def true_jet_pt(self, hist_name: str, true_substructure_variable_range: helpers.RangeSelector) -> binned_data.BinnedData:
@@ -604,7 +604,6 @@ def plot_refolded(
 
 def plot_response(
     hists: Mapping[str, binned_data.BinnedData],
-    tag: str,
     plot_config: pb.PlotConfig,
     output_dir: Path,
     plot_png: bool = False,
@@ -639,8 +638,6 @@ def plot_response(
     plot_config.apply(fig=fig, ax=ax)
 
     figure_name = f"{plot_config.name}"
-    if tag:
-        figure_name = f"{tag}_{figure_name}"
     fig.savefig(output_dir / f"{figure_name}.pdf")
     if plot_png:
         output_dir_png = output_dir / "png"
@@ -652,7 +649,6 @@ def plot_response(
 def plot_jet_pt_vs_substructure(
     hists: Mapping[str, binned_data.BinnedData],
     hist_name: str,
-    tag: str,
     plot_config: pb.PlotConfig,
     output_dir: Path,
     plot_png: bool = False,
@@ -681,8 +677,6 @@ def plot_jet_pt_vs_substructure(
     plot_config.apply(fig=fig, ax=ax)
 
     figure_name = f"{plot_config.name}"
-    if tag:
-        figure_name = f"{tag}_{figure_name}"
     fig.savefig(output_dir / f"{figure_name}.pdf")
     if plot_png:
         output_dir_png = output_dir / "png"
@@ -740,7 +734,6 @@ def plot_select_iteration(
     projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
     max_iter: int,
     true_bin: helpers.RangeSelector,
-    tag: str,
     plot_config: pb.PlotConfig,
     output_dir: Path,
     plot_png: bool = False,
@@ -752,8 +745,8 @@ def plot_select_iteration(
     # Setup
     fig, ax = plt.subplots(figsize=(8, 6))
 
-    # -2 because we go two above, and then -1 because we start at 2
-    n_bins = max_iter - 2 - 1
+    # -2 because we go two above, and then -2 because we start at 2
+    n_bins = max_iter - 2 - 2
     hist_reg = binned_data.BinnedData(
         axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)], values=np.zeros(n_bins), variances=np.ones(n_bins),
     )
@@ -764,21 +757,15 @@ def plot_select_iteration(
         axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)], values=np.zeros(n_bins), variances=np.ones(n_bins),
     )
 
-    for i, iter in enumerate(range(2, max_iter - 1)):
+    for i, iter in enumerate(range(2, max_iter - 2)):
         # Current iteration
         hist_name = f"bayesian_unfolded_iter_{iter}"
-        if tag:
-            hist_name = f"{tag}_{hist_name}"
         current_iter_hist = projection_func(hists[hist_name], true_bin)
         # Previous iter hist
         hist_name = f"bayesian_unfolded_iter_{iter-1}"
-        if tag:
-            hist_name = f"{tag}_{hist_name}"
         previous_iter_hist = projection_func(hists[hist_name], true_bin)
         # Iter + 2 hist
         hist_name = f"bayesian_unfolded_iter_{iter+2}"
-        if tag:
-            hist_name = f"{tag}_{hist_name}"
         forward_iter_hist = projection_func(hists[hist_name], true_bin)
 
         # hist = _normalize_hist(hist)
@@ -807,7 +794,7 @@ def plot_select_iteration(
         hist_total.axes[0].bin_centers,
         hist_total.values,
         xerr=hist_total.axes[0].bin_widths / 2,
-        label=f"Total",
+        label="Total",
         marker="o",
         linestyle="",
     )
@@ -816,7 +803,7 @@ def plot_select_iteration(
         hist_reg.axes[0].bin_centers,
         hist_reg.values,
         xerr=hist_reg.axes[0].bin_widths / 2,
-        label=f"Regularization",
+        label="Regularization",
         marker="o",
         linestyle="",
     )
@@ -825,7 +812,7 @@ def plot_select_iteration(
         hist_stat.axes[0].bin_centers,
         hist_stat.values,
         xerr=hist_stat.axes[0].bin_widths / 2,
-        label=f"Statistical",
+        label="Statistical",
         marker="o",
         linestyle="",
     )
@@ -836,8 +823,6 @@ def plot_select_iteration(
     ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=2.0))
 
     figure_name = f"{plot_config.name}"
-    if tag:
-        figure_name = f"{tag}_{figure_name}"
     fig.savefig(output_dir / f"{figure_name}.pdf")
     if plot_png:
         output_dir_png = output_dir / "png"
@@ -869,11 +854,12 @@ class UnfoldingResult:
 #def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bool = False) -> Path:
 def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False) -> Path:
     # with sns.color_palette("GnBu_d", n_colors=11):
-    with sns.color_palette("Paired", n_colors=unfolding_output.max_iter):
+    with sns.color_palette("Paired", n_colors=unfolding_output.max_n_iter):
         # Main unfolded plot.
         true_jet_pt_range = helpers.JetPtRange(60, 80)
         text = f"${true_jet_pt_range.display_str(label='true')}$"
         plot_unfolded(
+            unfolding_output=unfolding_output,
             hist_true = unfolding_output.true_substructure(unfolding_output.true_hist_name, true_jet_pt_range=true_jet_pt_range),
             hist_n_iter_compare = unfolding_output.unfolded_substructure(unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range),
             unfolded_hists=[
@@ -919,6 +905,7 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
         true_jet_pt_range = helpers.JetPtRange(40, 120)
         text = f"${true_jet_pt_range.display_str(label='true')}$"
         plot_unfolded(
+            unfolding_output=unfolding_output,
             hist_true = unfolding_output.true_substructure(unfolding_output.true_hist_name, true_jet_pt_range=true_jet_pt_range),
             hist_n_iter_compare = unfolding_output.unfolded_substructure(unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range),
             unfolded_hists=[
@@ -964,6 +951,7 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
         true_substructure_variable_range = helpers.KtRange(-1, 100)
         text = f"${true_substructure_variable_range.display_str(label='true')}$"
         plot_unfolded(
+            unfolding_output=unfolding_output,
             hist_true = unfolding_output.true_jet_pt(unfolding_output.true_hist_name, true_substructure_variable_range=true_substructure_variable_range),
             hist_n_iter_compare = unfolding_output.unfolded_jet_pt(unfolding_output.n_iter_compare, true_substructure_variable_range=true_substructure_variable_range),
             unfolded_hists=[
@@ -1040,13 +1028,13 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
             plot_png=plot_png,
         )
         # Jet pt
-        text = f"${unfolding_output.smeared_substructure_variable_range.display_str(label='data')}$"
+        text = f"${unfolding_output.smeared_var_range.display_str(label='data')}$"
         plot_refolded(
             unfolding_output=unfolding_output,
-            hist_raw=unfolding_output.smeared_jet_pt(hist_name=unfolding_output.raw_hist_name, smeared_substructure_variable_range=unfolding_output.smeared_substructure_variable_range),
-            hist_smeared=unfolding_output.smeared_jet_pt(hist_name=unfolding_output.smeared_hist_name, smeared_substructure_variable_range=unfolding_output.smeared_substructure_variable_range),
+            hist_raw=unfolding_output.smeared_jet_pt(hist_name=unfolding_output.raw_hist_name, smeared_substructure_variable_range=unfolding_output.smeared_var_range),
+            hist_smeared=unfolding_output.smeared_jet_pt(hist_name=unfolding_output.smeared_hist_name, smeared_substructure_variable_range=unfolding_output.smeared_var_range),
             refolded_hists=[
-                unfolding_output.refolded_jet_pt(n_iter=n_iter, smeared_substructure_variable_range=unfolding_output.smeared_substructure_variable_range) for n_iter in range(1, unfolding_output.max_n_iter)
+                unfolding_output.refolded_jet_pt(n_iter=n_iter, smeared_substructure_variable_range=unfolding_output.smeared_var_range) for n_iter in range(1, unfolding_output.max_n_iter)
             ],
             plot_config=pb.PlotConfig(
                 name="refolded_pt",
