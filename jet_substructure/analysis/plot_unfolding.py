@@ -206,7 +206,8 @@ class UnfoldingOutput:
 
     def __attrs_post_init__(self) -> None:
         # Fully setup base dir.
-        self.base_dir = self.base_dir / self.collision_system / "unfolding"
+        # NOTE: Added "parsl" for the newer output results.
+        self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl"
 
         # Initialize the file if the histograms aren't specified.
         if not self.hists:
@@ -250,12 +251,11 @@ class UnfoldingOutput:
 
     @property
     def input_filename(self) -> Path:
-        # TODO: Fix.
-        return self.base_dir / "parsl" / f"unfolding_{self.identifier}.root"
+        return self.base_dir / f"unfolding_{self.identifier}.root"
 
     @property
     def output_dir(self) -> Path:
-        p = self.base_dir / self.substructure_variable / "test" / self.identifier
+        p = self.base_dir / self.substructure_variable / self.identifier
         p.mkdir(parents=True, exist_ok=True)
         return p
 
@@ -851,7 +851,6 @@ class UnfoldingResult:
     ...
 
 
-#def plot_kt_unfolding(input_file: InputFile, collision_system: str, plot_png: bool = False) -> Path:
 def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False) -> Path:
     # with sns.color_palette("GnBu_d", n_colors=11):
     with sns.color_palette("Paired", n_colors=unfolding_output.max_n_iter):
@@ -1073,7 +1072,7 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
         plot_response(
             hists=unfolding_output.hists,
             plot_config=pb.PlotConfig(
-                name=f"response_{unfolding_output.substructure_variable}_hybrid_40_120",
+                name=f"response_{unfolding_output.substructure_variable}_hybrid_{unfolding_output.smeared_jet_pt_range}",
                 panels=pb.Panel(
                     axes=[
                         pb.AxisConfig("x", label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$"),
