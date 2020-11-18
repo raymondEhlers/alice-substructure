@@ -150,7 +150,8 @@ def setup_parsl_587(
                     cores_per_node=jobs_per_node,
                     # Ensures that the jobs are spread out. Also means that we need to be careful
                     # when others are running to avoid running out of memory.
-                    exclusive=True,
+                    # TODO: TEMP
+                    #exclusive=True,
                     # Format: HH:MM:SS
                     walltime="02:00:00",
                     # walltime="00:21:00",
@@ -984,6 +985,7 @@ def setup_root_data_frame_closure(
 @python_app
 def _unfolding_standard(
     settings: "unfolding_2D.Settings",
+    reweight_prior: bool,
     inputs = [],
     outputs = [],
 ) -> AppFuture:
@@ -991,10 +993,11 @@ def _unfolding_standard(
     from pathlib import Path
 
     return unfolding_2D.run_unfolding(
-       settings=settings,
+        settings=settings,
         # 0 are the data filenames, 1 are the embedded filenames
-       data_filenames=[Path(f.filepath) for f in inputs[0]],
-       embedded_filenames=[Path(f.filepath) for f in inputs[1]],
+        data_filenames=[Path(f.filepath) for f in inputs[0]],
+        embedded_filenames=[Path(f.filepath) for f in inputs[1]],
+        reweight_prior=reweight_prior,
     )
 
 
@@ -1019,6 +1022,8 @@ def _unfolding_closure(
 def setup_unfolding(
     grooming_methods: Sequence[str],
     tag: str,
+    run_closures: bool = True,
+    reweight_prior: bool = False,
 ) -> List[AppFuture]:
     # Setup
     from jet_substructure.cpp import unfolding_2D
@@ -1075,27 +1080,32 @@ def setup_unfolding(
             use_pure_matches=False,
         )
         settings[_default_settings.output_tag] = _default_settings
+        # NOTE: Generate 5 random edges of 5% (+/-, so 10% total) with:
+        #       np.random.random_sample(5) / 10 + 0.95
+        #       it can then be multiplied with the inner binning.
+        #       Used: smeared_bins=np.array([1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15], dtype=np.float64),
 
-        # And then add the variations.
-        # Pure matches
-        _temp_settings = copy.deepcopy(_default_settings)
-        _temp_settings.use_pure_matches = True
-        settings[_temp_settings.output_tag] = _temp_settings
+        if run_closures:
+            # And then add the variations.
+            # Pure matches
+            _temp_settings = copy.deepcopy(_default_settings)
+            _temp_settings.use_pure_matches = True
+            settings[_temp_settings.output_tag] = _temp_settings
 
-        # Untagged above
-        _temp_settings = copy.deepcopy(_default_settings)
-        _smeared_bins = _temp_settings.substructure_variable.smeared_bins
-        # Replace the untagged value with our new untagged value, and then move it to the upper edge.
-        _smeared_bins[0] = 20
-        _smeared_bins = np.roll(_smeared_bins, -1)
-        _temp_settings.substructure_variable = unfolding_2D.SubstructureVariableSettings.from_binning(
-            true_bins=_temp_settings.substructure_variable.true_bins,
-            smeared_bins=_smeared_bins,
-            name=_temp_settings.substructure_variable.name,
-            variable_name=_temp_settings.substructure_variable.variable_name,
-            untagged_bin_below_range=False,
-        )
-        settings[_temp_settings.output_tag] = _temp_settings
+            # Untagged above
+            _temp_settings = copy.deepcopy(_default_settings)
+            _smeared_bins = _temp_settings.substructure_variable.smeared_bins
+            # Replace the untagged value with our new untagged value, and then move it to the upper edge.
+            _smeared_bins[0] = 20
+            _smeared_bins = np.roll(_smeared_bins, -1)
+            _temp_settings.substructure_variable = unfolding_2D.SubstructureVariableSettings.from_binning(
+                true_bins=_temp_settings.substructure_variable.true_bins,
+                smeared_bins=_smeared_bins,
+                name=_temp_settings.substructure_variable.name,
+                variable_name=_temp_settings.substructure_variable.variable_name,
+                untagged_bin_below_range=False,
+            )
+            settings[_temp_settings.output_tag] = _temp_settings
 
         # Standard unfolding
         for s in settings.values():
@@ -1113,27 +1123,29 @@ def setup_unfolding(
                     settings=s,
                     inputs=input_files,
                     outputs=[parsl_output_file],
+                    reweight_prior=reweight_prior,
                 )
             )
 
         # Skip the untagged bin moved to above the smeared range.
-        for s in list(settings.values())[:-1]:
-            for closure_variation in ["split_MC", "reweight_pseudo_data", "reweight_response"]:
-                logger.info(f"Adding unfolding closures: {s.output_tag}, variation: {closure_variation}")
-                # Setup file I/O
-                # Randomize the input list so we don't always hit the same files at the same time.
-                # Note: It randomizes in place.
-                random.shuffle(input_files[0])
-                random.shuffle(input_files[1])
-                parsl_output_file = File(f"{s.output_filename}_closure_{closure_variation}")
-                results.append(
-                    _unfolding_closure(
-                        settings=s,
-                        closure_variation=closure_variation,
-                        inputs=input_files,
-                        outputs=[parsl_output_file],
+        if run_closures:
+            for s in list(settings.values())[:-1]:
+                for closure_variation in ["split_MC", "reweight_pseudo_data", "reweight_response"]:
+                    logger.info(f"Adding unfolding closures: {s.output_tag}, variation: {closure_variation}")
+                    # Setup file I/O
+                    # Randomize the input list so we don't always hit the same files at the same time.
+                    # Note: It randomizes in place.
+                    random.shuffle(input_files[0])
+                    random.shuffle(input_files[1])
+                    parsl_output_file = File(f"{s.output_filename}_closure_{closure_variation}")
+                    results.append(
+                        _unfolding_closure(
+                            settings=s,
+                            closure_variation=closure_variation,
+                            inputs=input_files,
+                            outputs=[parsl_output_file],
+                        )
                     )
-                )
 
     return results
 
@@ -1145,7 +1157,7 @@ if __name__ == "__main__":  # noqa: C901
         "unfolding",
     ]
     entries_per_job = int(1e5)
-    nodes_to_allocate = 6
+    nodes_to_allocate = 1
     jobs_per_node = 6
 
     # Basic setup for jobs
@@ -1259,7 +1271,9 @@ if __name__ == "__main__":  # noqa: C901
                 #"soft_drop_z_cut_02",
                 #"soft_drop_z_cut_04",
             ],
-            tag="broadTrueBins",
+            run_closures=False,
+            reweight_prior=True,
+            tag="reweight_prior",
         )
 
     logger.info(f"About to ask for result. len: {len(results)}")
