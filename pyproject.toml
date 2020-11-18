@@ -37,6 +37,7 @@ pyarrow = "^2.0"
 numba = "^0.51.0"
 uproot4 = "^0"
 parsl = {extras = ["monitoring"], version = "^1.0.0"}
+mplhep = "^0.2"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.790"
