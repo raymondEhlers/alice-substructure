@@ -401,6 +401,125 @@ def plot_relative_individual_systematics(
     plt.close(fig)
 
 
+def _plot_compare_kt_with_systematics(
+    hists: Mapping[str, SingleResult],
+    grooming_methods: Sequence[str],
+    set_zero_to_nan: bool,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+) -> None:
+    """Plot PbPb with systematics for a set of grooming methods."""
+    logger.info("Plotting grooming method comparison for kt with systematics")
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    grooming_styling = pb.define_grooming_styles()
+
+    for grooming_method in grooming_methods:
+        # Setup
+        style = grooming_styling[grooming_method]
+
+        # Axes: jet_pt, attr_name
+        h = hists[grooming_method].data
+
+        # Set 0s to NaN (for example, in z_g where have a good portion of the range cut off).
+        if set_zero_to_nan:
+            h.errors[h.values == 0] = np.nan
+            h.values[h.values == 0] = np.nan
+
+        # Plot options
+        kwargs = {
+            "markerfacecolor": "white" if style.fillstyle == "none" else style.color,
+            "alpha": 1 if style.fillstyle == "none" else 0.8,
+        }
+        if style.fillstyle != "none":
+            kwargs["markeredgewidth"] = 0
+
+        # Main data point
+        ax.errorbar(
+            h.axes[0].bin_centers,
+            h.values,
+            yerr=h.errors,
+            xerr=h.axes[0].bin_widths / 2,
+            color=style.color,
+            marker=style.marker,
+            fillstyle=style.fillstyle,
+            linestyle="",
+            label=style.label,
+            zorder=style.zorder,
+            **kwargs,
+        )
+
+        # Systematic uncertainty
+        pachyderm.plot.error_boxes(
+            ax=ax,
+            x_data=h.axes[0].bin_centers,
+            y_data=h.values,
+            x_errors=h.axes[0].bin_widths / 2,
+            y_errors=np.array(
+                [
+                    h.metadata["y_systematic"]["quadrature"].low,
+                    h.metadata["y_systematic"]["quadrature"].high,
+                ]
+            ),
+            # y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+            # color=style.color,
+            # color=p[0].get_color(),
+            color=style.color,
+            linewidth=0,
+        )
+
+    # Labeling and presentation
+    plot_config.apply(fig=fig, ax=ax)
+
+    filename = f"{plot_config.name}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def plot_PbPb_systematics(
+    hists: Mapping[str, SingleResult],
+    grooming_methods: Sequence[str],
+    centrality: str,
+    output_dir: Path,
+) -> None:
+    """"""
+    jet_pt_bin = hists[grooming_methods[0]].ranges[0]
+    centrality_map = {
+        "central": r"0-10\%",
+        "semi_central": r"30-50\%",
+    }
+
+    text = pb.label_to_display_string["ALICE"]["work_in_progress"]
+    text += "\n" + pb.label_to_display_string["collision_system"]["PbPb"] + f", {centrality_map[centrality]}"
+    text += "\n" + pb.label_to_display_string["jets"]["general"]
+    text += "\n" + pb.label_to_display_string["jets"]["R04"]
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    _plot_compare_kt_with_systematics(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        set_zero_to_nan=False,
+        plot_config=pb.PlotConfig(
+            name=f"unfolded_kt_systematics_{centrality}",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(1.5, 15)),
+                    pb.AxisConfig(
+                        "y",
+                        label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                        log=True,
+                        range=(1e-3, 0.5),
+                    ),
+                ],
+                text=pb.TextConfig(x=0.97, y=0.97, text=text),
+                legend=pb.LegendConfig(location="lower left", font_size=14),
+            ),
+            figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+        ),
+        output_dir=output_dir,
+    )
+
+
 def plot_systematic(
     unfolded: SingleResult,
     plot_config: pb.PlotConfig,
