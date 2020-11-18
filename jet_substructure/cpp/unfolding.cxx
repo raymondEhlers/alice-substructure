@@ -214,6 +214,30 @@ inline bool isPureMatch(int matchingLeading, int matchingSubleading, double hybr
       (std::abs(hybridSubstructureVariableValue - smearedUntaggedBinValue) < 0.001));
 }
 
+/**
+ * Find reweighting bin, ensuring that we take the last good bin if we're out of range.
+ *
+ * For example, if we're below the lowest bin, then we take the first bin. Effectively,
+ * we neglect the overflow bins.
+ *
+ * @param[in] value Value that we want to reweight.
+ * @param[in] bins Binning of the reweighting hist.
+ *
+ * @returns Bin to use when retrieving the reweighting value.
+ */
+int findReweightingBin(double value, const std::vector<double>& bins)
+{
+  auto bin = std::distance(bins.begin(), std::upper_bound(bins.begin(), bins.end(), value));
+  if (bin == 0) {
+    ++bin;
+  }
+  if (bin >= bins.size()) {
+    --bin;
+  }
+
+  return bin;
+}
+
 //=========================
 // Main functionality
 //=========================
@@ -325,6 +349,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
                  double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
                  const std::vector<std::string>& dataFilenames,
                  const std::vector<std::string>& embeddedFilenames, const bool usePureMatches = false,
+                 TH2D* hReweightingResponse = nullptr,
                  const std::string& dataTreeName = "tree", const std::string& dataPrefix = "data",
                  const std::string& embeddedTreeName = "tree", const std::string& truePrefix = "true",
                  const std::string& hybridPrefix = "hybrid",
@@ -446,11 +471,21 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
       continue;
     }*/
 
+    // Potentially Reweight
+    double reweightFactor = 1;
+    if (hReweightingResponse) {
+        // NOTE: We intentionally look at the true values even though it's binned at detector level.
+        // We need to handle the binning carefully, so we use a dedicated function.
+        int ktBin = findReweightingBin(*trueSubstructureVariable, smearedSplittingVariableBins);
+        int jetPtBin = findReweightingBin(*trueJetPt, smearedJetPtBins);
+        reweightFactor = hReweightingResponse->GetBinContent(ktBin, jetPtBin);
+    }
+
     // Full efficiency hists (and response).
-    hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
-    hists["h2_smeared_no_cuts"]->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
+    hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * reweightFactor);
+    hists["h2_smeared_no_cuts"]->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor * reweightFactor);
     responsenotrunc->Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt,
-               *scaleFactor);
+               *scaleFactor * reweightFactor);
 
     // Now start making cuts on the hybrid level.
     // Jet pt
@@ -475,39 +510,15 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
     }
 
     // At this point, we've passed all of our cuts, so we store the result.
-    hists["h2_smeared"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor);
-    hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
+    hists["h2_smeared"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor * reweightFactor);
+    hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * reweightFactor);
     hists["h2_substructure_variable"]->Fill(hybridSubstructureVariableValue, *trueSubstructureVariable,
-                        *scaleFactor);
+                        *scaleFactor * reweightFactor);
     response->Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt,
-            *scaleFactor);
+            *scaleFactor * reweightFactor);
   }
 
   return ResponseResult{ response, responsenotrunc };
-}
-
-/**
- * Find reweighting bin, ensuring that we take the last good bin if we're out of range.
- *
- * For example, if we're below the lowest bin, then we take the first bin. Effectively,
- * we neglect the overflow bins.
- *
- * @param[in] value Value that we want to reweight.
- * @param[in] bins Binning of the reweighting hist.
- *
- * @returns Bin to use when retrieving the reweighting value.
- */
-int findReweightingBin(double value, const std::vector<double>& bins)
-{
-  auto bin = std::distance(bins.begin(), std::upper_bound(bins.begin(), bins.end(), value));
-  if (bin == 0) {
-    ++bin;
-  }
-  if (bin >= bins.size()) {
-    --bin;
-  }
-
-  return bin;
 }
 
 enum ClosureVariation_t { splitMC = 0, reweightPseudoData = 1, reweightResponse = 2 };

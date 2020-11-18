@@ -491,7 +491,7 @@ def _hists_to_map_for_ROOT(hists: Dict[str, TH2D]) -> Any:
 
 
 def run_unfolding(
-    settings: Settings, data_filenames: Sequence[Path], embedded_filenames: Sequence[Path]
+    settings: Settings, data_filenames: Sequence[Path], embedded_filenames: Sequence[Path], reweight_prior: bool = False,
 ) -> bool:
     # Delayed import to avoid direct dependence.
     import ROOT
@@ -502,6 +502,22 @@ def run_unfolding(
     # Define hists (and the map to pass them into ROOT for unfolding)
     hists = _default_hists(settings=settings)
     hists_map_for_root = _hists_to_map_for_ROOT(hists=hists)
+
+    h_reweighting_response_ratio = ROOT.nullptr
+    if reweight_prior:
+        # TODO: Make thes configurable...
+        h_reweighting_response_ratio = get_reweighted_ratio(
+            embedded_dataset_name="LHC19f4_embedded_into_LHC18qr_5966_5985",
+            data_dataset_name="LHC18qr_5863",
+            grooming_method=settings.grooming_method,
+        )
+
+        # Validate the reweighting ratio
+        # x axis should contain the smeared substructure variable
+        # y axis contains the smeared jet pt.
+        temp_hist = binned_data.BinnedData.from_existing_data(h_reweighting_response_ratio)
+        np.testing.assert_allclose(temp_hist.axes[0].bin_edges, settings.substructure_variable.smeared_bins)
+        np.testing.assert_allclose(temp_hist.axes[1].bin_edges, settings.jet_pt.smeared_bins)
 
     # Create the responses. We assume some conventions about column names.
     # They should generally be reasonable, but may require tweaks from time to time.
@@ -519,6 +535,7 @@ def run_unfolding(
         _array_to_ROOT(_pass_filenames_to_ROOT(data_filenames), "std::string"),
         _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
         settings.use_pure_matches,
+        h_reweighting_response_ratio,
     )
 
     logger.debug(responses)
@@ -564,7 +581,7 @@ def run_unfolding(
     return True
 
 
-def get_reweighted_ratio_for_closure(
+def get_reweighted_ratio(
     embedded_dataset_name: str, data_dataset_name: str, grooming_method: str, base_directory: Path = Path("output")
 ) -> TH2D:
     # Delayed import to avoid direct dependence.
@@ -642,7 +659,7 @@ def run_unfolding_closure_reweighting(
     h_reweighting_ratio = ROOT.nullptr
     if variation != ROOT.ClosureVariation_t.splitMC:
         # TODO: Make thes configurable...
-        h_reweighting_ratio = get_reweighted_ratio_for_closure(
+        h_reweighting_ratio = get_reweighted_ratio(
             embedded_dataset_name="LHC19f4_embedded_into_LHC18qr_5966_5985",
             data_dataset_name="LHC18qr_5863",
             grooming_method=settings.grooming_method,
