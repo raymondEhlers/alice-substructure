@@ -5,14 +5,14 @@
 
 import logging
 from pathlib import Path
-from typing import Callable, Mapping, Sequence
+from typing import Callable, Mapping, MutableMapping, Sequence
 
 import attr
 import boost_histogram as bh
 import matplotlib
 import matplotlib.pyplot as plt
-import pachyderm.plot
 import numpy as np
+import pachyderm.plot
 import seaborn as sns
 import uproot
 from pachyderm import binned_data
@@ -29,7 +29,7 @@ pachyderm.plot.configure()
 def _efficiency_substructure_variable(
     hists: Mapping[str, binned_data.BinnedData], true_jet_pt_range: helpers.RangeSelector
 ) -> binned_data.BinnedData:
-    """ Efficiency for the substructure variable.
+    """Efficiency for the substructure variable.
 
     Note:
         Since we need a set of hists, we just pass all of them.
@@ -52,8 +52,10 @@ def _efficiency_substructure_variable(
     return cut / full
 
 
-def _project_substructure_variable(input_hist: binned_data.BinnedData, jet_pt_range: helpers.RangeSelector) -> binned_data.BinnedData:
-    """ Project the hist to the substructure variable.
+def _project_substructure_variable(
+    input_hist: binned_data.BinnedData, jet_pt_range: helpers.RangeSelector
+) -> binned_data.BinnedData:
+    """Project the hist to the substructure variable.
 
     Args:
         input_hist: Hist to be projected.
@@ -71,7 +73,7 @@ def _project_substructure_variable(input_hist: binned_data.BinnedData, jet_pt_ra
 def _efficiency_pt(
     hists: Mapping[str, binned_data.BinnedData], true_substructure_variable_range: helpers.RangeSelector
 ) -> binned_data.BinnedData:
-    """ Efficiency for the jet pt.
+    """Efficiency for the jet pt.
 
     Note:
         Since we need a set of hists, we just pass all of them.
@@ -87,15 +89,19 @@ def _efficiency_pt(
     bh_full_efficiency = hists["truef"].to_boost_histogram()
 
     # Select true pt range.
-    selection = slice(bh.loc(true_substructure_variable_range.min), bh.loc(true_substructure_variable_range.max), bh.sum)
+    selection = slice(
+        bh.loc(true_substructure_variable_range.min), bh.loc(true_substructure_variable_range.max), bh.sum
+    )
     cut = binned_data.BinnedData.from_existing_data(bh_cut_efficiency[selection, :])
     full = binned_data.BinnedData.from_existing_data(bh_full_efficiency[selection, :])
 
     return cut / full
 
 
-def _project_jet_pt(input_hist: binned_data.BinnedData, substructure_variable_bin: helpers.RangeSelector) -> binned_data.BinnedData:
-    """ Project the hist to the jet pt.
+def _project_jet_pt(
+    input_hist: binned_data.BinnedData, substructure_variable_bin: helpers.RangeSelector
+) -> binned_data.BinnedData:
+    """Project the hist to the jet pt.
 
     Args:
         input_hist: Hist to be projected.
@@ -110,7 +116,7 @@ def _project_jet_pt(input_hist: binned_data.BinnedData, substructure_variable_bi
 
 
 def _normalize_unfolded(hist: binned_data.BinnedData, efficiency: binned_data.BinnedData) -> binned_data.BinnedData:
-    """ Normalized unfolded hist.
+    """Normalized unfolded hist.
 
     This involves applying the efficiency and then normalizing by the integral and the bin width.
 
@@ -129,7 +135,7 @@ def _normalize_unfolded(hist: binned_data.BinnedData, efficiency: binned_data.Bi
 
 
 def _normalize_refolded(hist: binned_data.BinnedData) -> binned_data.BinnedData:
-    """ Normalize refolded hist.
+    """Normalize refolded hist.
 
     This involves normalizing by the integral and the bin width.
 
@@ -149,7 +155,7 @@ def _smeared(
     projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
     smeared_range_to_integrate_over: helpers.RangeSelector,
 ) -> binned_data.BinnedData:
-    """ Helper function to get a smeared hist along a desired axis.
+    """Helper function to get a smeared hist along a desired axis.
 
     Args:
         hists: Input hists.
@@ -170,7 +176,7 @@ def _unfolded(
     efficiency_func: Callable[[Mapping[str, binned_data.BinnedData], helpers.RangeSelector], binned_data.BinnedData],
     true_range_to_integrate_over: helpers.RangeSelector,
 ) -> binned_data.BinnedData:
-    """ Helper function to get an unfolded hist along a desired axis.
+    """Helper function to get an unfolded hist along a desired axis.
 
     Args:
         hists: Input hists.
@@ -180,11 +186,11 @@ def _unfolded(
     Returns:
         The desired unfolded histogram.
     """
-    #efficiency = efficiency_func(hists, true_bin)
+    # efficiency = efficiency_func(hists, true_bin)
     ## For convenience in normalizing.
-    #_normalize_hist = functools.partial(_normalize_unfolded, efficiency=efficiency)
+    # _normalize_hist = functools.partial(_normalize_unfolded, efficiency=efficiency)
     hist = projection_func(hists[hist_name], true_range_to_integrate_over)
-    #hist = _normalize_hist(hist)
+    # hist = _normalize_hist(hist)
     efficiency = efficiency_func(hists, true_range_to_integrate_over)
     return _normalize_unfolded(hist=hist, efficiency=efficiency)
 
@@ -195,7 +201,7 @@ class UnfoldingOutput:
     grooming_method: str = attr.ib()
     smeared_var_range: helpers.RangeSelector = attr.ib()
     smeared_untagged_var: helpers.RangeSelector = attr.ib()
-    smeared_jet_pt_range: helpers.RangeSelector = attr.ib()
+    smeared_jet_pt_range: helpers.JetPtRange = attr.ib()
     collision_system: str = attr.ib()
     base_dir: Path = attr.ib(converter=Path)
     smeared_input: bool = attr.ib(default=False)
@@ -205,7 +211,7 @@ class UnfoldingOutput:
     raw_hist_name: str = attr.ib(default="raw")
     smeared_hist_name: str = attr.ib(default="smeared")
     true_hist_name: str = attr.ib(default="true")
-    hists: Mapping[str, binned_data.BinnedData] = attr.ib(factory=dict)
+    hists: MutableMapping[str, binned_data.BinnedData] = attr.ib(factory=dict)
 
     def __attrs_post_init__(self) -> None:
         # Fully setup base dir.
@@ -226,10 +232,10 @@ class UnfoldingOutput:
         name += f"_smeared_{self.smeared_var_range}"
         # TEMP until fixed in the unfolding code...
         name += f"_untagged_{self.smeared_untagged_var}"
-        #name += f"_untagged_{self.smeared_untagged_var.min}_{self.smeared_untagged_var.max}"
+        # name += f"_untagged_{self.smeared_untagged_var.min}_{self.smeared_untagged_var.max}"
         # TEMP until fixed in the unfolding code...
         name += f"_smeared_{self.smeared_jet_pt_range}"
-        #name += f"_smeared_jet_pt_{self.smeared_jet_pt_range.min}_{self.smeared_jet_pt_range.max}"
+        # name += f"_smeared_jet_pt_{self.smeared_jet_pt_range.min}_{self.smeared_jet_pt_range.max}"
         # if self.smeared_input:
         #    name += "_hybrid_as_input"
         if self.pure_matches:
@@ -249,7 +255,7 @@ class UnfoldingOutput:
                 if "bayesian_folded_iter_" in hist_name:
                     # We add a +1 so we can use it easily with range(...).
                     n = max(n, int(hist_name.split("_")[-1]) + 1)
-            self._max_n_iter = n
+            self._max_n_iter: int = n
         return self._max_n_iter
 
     @property
@@ -283,13 +289,17 @@ class UnfoldingOutput:
             true_range_to_integrate_over=true_jet_pt_range,
         )
 
-    def unfolded_jet_pt(self, n_iter: int, true_substructure_variable_range: helpers.RangeSelector) -> binned_data.BinnedData:
+    def unfolded_jet_pt(
+        self, n_iter: int, true_substructure_variable_range: helpers.RangeSelector
+    ) -> binned_data.BinnedData:
         return self.true_jet_pt(
             hist_name=f"bayesian_unfolded_iter_{n_iter}",
             true_substructure_variable_range=true_substructure_variable_range,
         )
 
-    def true_jet_pt(self, hist_name: str, true_substructure_variable_range: helpers.RangeSelector) -> binned_data.BinnedData:
+    def true_jet_pt(
+        self, hist_name: str, true_substructure_variable_range: helpers.RangeSelector
+    ) -> binned_data.BinnedData:
         return _unfolded(
             hists=self.hists,
             hist_name=hist_name,
@@ -314,14 +324,18 @@ class UnfoldingOutput:
             smeared_range_to_integrate_over=smeared_jet_pt_range,
         )
 
-    def refolded_jet_pt(self, n_iter: int, smeared_substructure_variable_range: helpers.RangeSelector) -> binned_data.BinnedData:
+    def refolded_jet_pt(
+        self, n_iter: int, smeared_substructure_variable_range: helpers.RangeSelector
+    ) -> binned_data.BinnedData:
         """ Helper to retrieve the refolded jet pt directly. """
         return self.smeared_jet_pt(
             hist_name=f"bayesian_folded_iter_{n_iter}",
             smeared_substructure_variable_range=smeared_substructure_variable_range,
         )
 
-    def smeared_jet_pt(self, hist_name: str, smeared_substructure_variable_range: helpers.RangeSelector) -> binned_data.BinnedData:
+    def smeared_jet_pt(
+        self, hist_name: str, smeared_substructure_variable_range: helpers.RangeSelector
+    ) -> binned_data.BinnedData:
         """ Retrieve a smeared jet pt hist. """
         return _smeared(
             hists=self.hists,
@@ -334,6 +348,7 @@ class UnfoldingOutput:
 @attr.s
 class SingleResult:
     """ Container for a single unfolding result. """
+
     data: binned_data.BinnedData = attr.ib()
     n_iter: int = attr.ib()
     ranges: Sequence[helpers.RangeSelector] = attr.ib(factory=list)
@@ -345,9 +360,7 @@ def plot_relative_individual_systematics(
     output_dir: Path,
     plot_png: bool = False,
 ) -> None:
-    """ Plot relative individual systematic errors.
-
-    """
+    """Plot relative individual systematic errors."""
     import mplhep as hep
 
     # Setup
@@ -358,7 +371,7 @@ def plot_relative_individual_systematics(
         hep.histplot(
             H=np.maximum(systematic.low, systematic.high) / unfolded.data.values,
             bins=unfolded.data.axes[0].bin_edges,
-            #color=style.color,
+            # color=style.color,
             label=name.replace("_", " "),
             alpha=0.8,
         )
@@ -367,10 +380,10 @@ def plot_relative_individual_systematics(
     hep.histplot(
         H=unfolded.data.errors / unfolded.data.values,
         bins=unfolded.data.axes[0].bin_edges,
-        #color=style.color,
+        # color=style.color,
         label="Statistical (for comparison)",
-        #marker="o",
-        #linestyle="",
+        # marker="o",
+        # linestyle="",
         alpha=0.8,
     )
 
@@ -387,28 +400,29 @@ def plot_relative_individual_systematics(
 
     plt.close(fig)
 
+
 def plot_systematic(
     unfolded: SingleResult,
     plot_config: pb.PlotConfig,
     output_dir: Path,
     plot_png: bool = False,
 ) -> None:
-    """ Plot systematic
+    """Plot systematic
 
     Initial version to play around with.
     """
     # Setup
     logger.debug("Plotting systematic.")
     fig, ax = plt.subplots(figsize=(10, 8))
-    #fig, axes = plt.subplots(3, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
-    #ax_upper, ax_ratio_iter, ax_ratio_true = axes
+    # fig, axes = plt.subplots(3, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+    # ax_upper, ax_ratio_iter, ax_ratio_true = axes
 
-    p = ax.errorbar(
+    ax.errorbar(
         unfolded.data.axes[0].bin_centers,
         unfolded.data.values,
         yerr=unfolded.data.errors,
         xerr=unfolded.data.axes[0].bin_widths / 2,
-        #color=style.color,
+        # color=style.color,
         marker="o",
         linestyle="",
     )
@@ -418,17 +432,22 @@ def plot_systematic(
         x_data=unfolded.data.axes[0].bin_centers,
         y_data=unfolded.data.values,
         x_errors=unfolded.data.axes[0].bin_widths / 2,
-        y_errors=np.array([unfolded.data.metadata["y_systematic"]["quadrature"].low, unfolded.data.metadata["y_systematic"]["quadrature"].high]),
-        #y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
-        #color=style.color,
-        #color=p[0].get_color(),
+        y_errors=np.array(
+            [
+                unfolded.data.metadata["y_systematic"]["quadrature"].low,
+                unfolded.data.metadata["y_systematic"]["quadrature"].high,
+            ]
+        ),
+        # y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+        # color=style.color,
+        # color=p[0].get_color(),
         linewidth=0,
         color="red",
     )
 
     # This isn't really right, but it's a first pass. Let's see...
     # Rmax06
-    #pachyderm.plot.error_boxes(
+    # pachyderm.plot.error_boxes(
     #    ax=ax,
     #    x_data=unfolded.data.axes[0].bin_centers,
     #    y_data=unfolded.data.values,
@@ -440,9 +459,9 @@ def plot_systematic(
     #    linewidth=0,
     #    label="RMax06",
     #    color="red",
-    #)
+    # )
     ## Tracking efficiency
-    #pachyderm.plot.error_boxes(
+    # pachyderm.plot.error_boxes(
     #    ax=ax,
     #    x_data=unfolded.data.axes[0].bin_centers,
     #    y_data=unfolded.data.values,
@@ -454,7 +473,7 @@ def plot_systematic(
     #    linewidth=0,
     #    label="Tracking Eff.",
     #    color="green",
-    #)
+    # )
 
     # Label and layout
     plot_config.apply(fig=fig, ax=ax)
@@ -478,12 +497,16 @@ def plot_unfolded(
     plot_config: pb.PlotConfig,
     plot_png: bool = False,
 ) -> None:
-    """ Plot unfolded.
-
-    """
+    """Plot unfolded."""
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
     # Setup
-    fig, axes = plt.subplots(3, 1, figsize=(10, 12), gridspec_kw={"height_ratios": [4, 1, 1]}, sharex=True,)
+    fig, axes = plt.subplots(
+        3,
+        1,
+        figsize=(10, 12),
+        gridspec_kw={"height_ratios": [4, 1, 1]},
+        sharex=True,
+    )
     ax_upper, ax_ratio_iter, ax_ratio_true = axes
 
     for i, hist in enumerate(unfolded_hists, start=1):
@@ -597,12 +620,16 @@ def plot_refolded(
     plot_config: pb.PlotConfig,
     plot_png: bool = False,
 ) -> None:
-    """ Plot refolded.
-
-    """
+    """Plot refolded."""
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
     # Setup
-    fig, axes = plt.subplots(2, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+    fig, axes = plt.subplots(
+        2,
+        1,
+        figsize=(10, 10),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
     ax_upper, ax_lower = axes
 
     # Raw
@@ -676,7 +703,7 @@ def plot_refolded(
     plot_config.apply(fig=fig, axes=[ax_upper, ax_lower])
 
     figure_name = f"{plot_config.name}"
-    #if tag:
+    # if tag:
     #    figure_name = f"{tag}_{figure_name}"
     fig.savefig(unfolding_output.output_dir / f"{figure_name}.pdf")
     if plot_png:
@@ -715,7 +742,10 @@ def plot_response(
 
     # Plot
     mesh = ax.pcolormesh(
-        h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+        h.axes[0].bin_edges.T,
+        h.axes[1].bin_edges.T,
+        h.values.T,
+        norm=matplotlib.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -754,7 +784,10 @@ def plot_jet_pt_vs_substructure(
 
     # Plot
     mesh = ax.pcolormesh(
-        h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+        h.axes[0].bin_edges.T,
+        h.axes[1].bin_edges.T,
+        h.values.T,
+        norm=matplotlib.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -779,9 +812,7 @@ def plot_efficiency(
     output_dir: Path,
     plot_png: bool = False,
 ) -> None:
-    """ Plot kinematic efficiency.
-
-    """
+    """Plot kinematic efficiency."""
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
     # Setup
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -823,9 +854,7 @@ def plot_select_iteration(
     output_dir: Path,
     plot_png: bool = False,
 ) -> None:
-    """ Plot selected iteration.
-
-    """
+    """Plot selected iteration."""
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
     # Setup
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -833,13 +862,19 @@ def plot_select_iteration(
     # -2 because we go two above, and then -2 because we start at 2
     n_bins = max_iter - 2 - 2
     hist_reg = binned_data.BinnedData(
-        axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)], values=np.zeros(n_bins), variances=np.ones(n_bins),
+        axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)],
+        values=np.zeros(n_bins),
+        variances=np.ones(n_bins),
     )
     hist_stat = binned_data.BinnedData(
-        axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)], values=np.zeros(n_bins), variances=np.ones(n_bins),
+        axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)],
+        values=np.zeros(n_bins),
+        variances=np.ones(n_bins),
     )
     hist_total = binned_data.BinnedData(
-        axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)], values=np.zeros(n_bins), variances=np.ones(n_bins),
+        axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)],
+        values=np.zeros(n_bins),
+        variances=np.ones(n_bins),
     )
 
     for i, iter in enumerate(range(2, max_iter - 2)):
@@ -924,10 +959,15 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
         text = f"${true_jet_pt_range.display_str(label='true')}$"
         plot_unfolded(
             unfolding_output=unfolding_output,
-            hist_true = unfolding_output.true_substructure(unfolding_output.true_hist_name, true_jet_pt_range=true_jet_pt_range),
-            hist_n_iter_compare = unfolding_output.unfolded_substructure(unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range),
+            hist_true=unfolding_output.true_substructure(
+                unfolding_output.true_hist_name, true_jet_pt_range=true_jet_pt_range
+            ),
+            hist_n_iter_compare=unfolding_output.unfolded_substructure(
+                unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range
+            ),
             unfolded_hists=[
-                unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range) for n_iter in range(1, unfolding_output.max_n_iter)
+                unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
+                for n_iter in range(1, unfolding_output.max_n_iter)
             ],
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
@@ -937,7 +977,7 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
                         axes=[
                             pb.AxisConfig(
                                 "y",
-                                label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",
+                                label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",  # noqa: F541
                                 log=True,
                             )
                         ],
@@ -957,7 +997,11 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
                     pb.Panel(
                         axes=[
                             pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
-                            pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to true",
+                                range=(0.5, 1.5),
+                            ),
                         ],
                     ),
                 ],
@@ -970,10 +1014,15 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
         text = f"${true_jet_pt_range.display_str(label='true')}$"
         plot_unfolded(
             unfolding_output=unfolding_output,
-            hist_true = unfolding_output.true_substructure(unfolding_output.true_hist_name, true_jet_pt_range=true_jet_pt_range),
-            hist_n_iter_compare = unfolding_output.unfolded_substructure(unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range),
+            hist_true=unfolding_output.true_substructure(
+                unfolding_output.true_hist_name, true_jet_pt_range=true_jet_pt_range
+            ),
+            hist_n_iter_compare=unfolding_output.unfolded_substructure(
+                unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range
+            ),
             unfolded_hists=[
-                unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range) for n_iter in range(1, unfolding_output.max_n_iter)
+                unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
+                for n_iter in range(1, unfolding_output.max_n_iter)
             ],
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
@@ -983,7 +1032,7 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
                         axes=[
                             pb.AxisConfig(
                                 "y",
-                                label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",
+                                label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",  # noqa: F541
                                 log=True,
                             )
                         ],
@@ -1003,7 +1052,11 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
                     pb.Panel(
                         axes=[
                             pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
-                            pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to true",
+                                range=(0.5, 1.5),
+                            ),
                         ],
                     ),
                 ],
@@ -1016,10 +1069,17 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
         text = f"${true_substructure_variable_range.display_str(label='true')}$"
         plot_unfolded(
             unfolding_output=unfolding_output,
-            hist_true = unfolding_output.true_jet_pt(unfolding_output.true_hist_name, true_substructure_variable_range=true_substructure_variable_range),
-            hist_n_iter_compare = unfolding_output.unfolded_jet_pt(unfolding_output.n_iter_compare, true_substructure_variable_range=true_substructure_variable_range),
+            hist_true=unfolding_output.true_jet_pt(
+                unfolding_output.true_hist_name, true_substructure_variable_range=true_substructure_variable_range
+            ),
+            hist_n_iter_compare=unfolding_output.unfolded_jet_pt(
+                unfolding_output.n_iter_compare, true_substructure_variable_range=true_substructure_variable_range
+            ),
             unfolded_hists=[
-                unfolding_output.unfolded_jet_pt(n_iter=n_iter, true_substructure_variable_range=true_substructure_variable_range) for n_iter in range(1, unfolding_output.max_n_iter)
+                unfolding_output.unfolded_jet_pt(
+                    n_iter=n_iter, true_substructure_variable_range=true_substructure_variable_range
+                )
+                for n_iter in range(1, unfolding_output.max_n_iter)
             ],
             plot_config=pb.PlotConfig(
                 name="unfolded_pt",
@@ -1045,7 +1105,11 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
                     pb.Panel(
                         axes=[
                             pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
-                            pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to true",
+                                range=(0.5, 1.5),
+                            ),
                         ],
                     ),
                 ],
@@ -1058,10 +1122,17 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
         text = f"${unfolding_output.smeared_jet_pt_range.display_str(label='data')}$"
         plot_refolded(
             unfolding_output=unfolding_output,
-            hist_raw=unfolding_output.smeared_substructure(hist_name=unfolding_output.raw_hist_name, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range),
-            hist_smeared=unfolding_output.smeared_substructure(hist_name=unfolding_output.smeared_hist_name, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range),
+            hist_raw=unfolding_output.smeared_substructure(
+                hist_name=unfolding_output.raw_hist_name, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range
+            ),
+            hist_smeared=unfolding_output.smeared_substructure(
+                hist_name=unfolding_output.smeared_hist_name, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range
+            ),
             refolded_hists=[
-                unfolding_output.refolded_substructure(n_iter=n_iter, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range) for n_iter in range(1, unfolding_output.max_n_iter)
+                unfolding_output.refolded_substructure(
+                    n_iter=n_iter, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range
+                )
+                for n_iter in range(1, unfolding_output.max_n_iter)
             ],
             plot_config=pb.PlotConfig(
                 name=f"refolded_{unfolding_output.substructure_variable}",
@@ -1095,10 +1166,19 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
         text = f"${unfolding_output.smeared_var_range.display_str(label='data')}$"
         plot_refolded(
             unfolding_output=unfolding_output,
-            hist_raw=unfolding_output.smeared_jet_pt(hist_name=unfolding_output.raw_hist_name, smeared_substructure_variable_range=unfolding_output.smeared_var_range),
-            hist_smeared=unfolding_output.smeared_jet_pt(hist_name=unfolding_output.smeared_hist_name, smeared_substructure_variable_range=unfolding_output.smeared_var_range),
+            hist_raw=unfolding_output.smeared_jet_pt(
+                hist_name=unfolding_output.raw_hist_name,
+                smeared_substructure_variable_range=unfolding_output.smeared_var_range,
+            ),
+            hist_smeared=unfolding_output.smeared_jet_pt(
+                hist_name=unfolding_output.smeared_hist_name,
+                smeared_substructure_variable_range=unfolding_output.smeared_var_range,
+            ),
             refolded_hists=[
-                unfolding_output.refolded_jet_pt(n_iter=n_iter, smeared_substructure_variable_range=unfolding_output.smeared_var_range) for n_iter in range(1, unfolding_output.max_n_iter)
+                unfolding_output.refolded_jet_pt(
+                    n_iter=n_iter, smeared_substructure_variable_range=unfolding_output.smeared_var_range
+                )
+                for n_iter in range(1, unfolding_output.max_n_iter)
             ],
             plot_config=pb.PlotConfig(
                 name="refolded_pt",
@@ -1719,7 +1799,13 @@ def run_delta_R(collision_system: str) -> None:
                     panels=[
                         # Main panel
                         pb.Panel(
-                            axes=[pb.AxisConfig("y", label=r"$\text{d}N/\text{d}\Delta R$", log=True,)],
+                            axes=[
+                                pb.AxisConfig(
+                                    "y",
+                                    label=r"$\text{d}N/\text{d}\Delta R$",
+                                    log=True,
+                                )
+                            ],
                             # legend=pb.LegendConfig(location="lower left"),
                             legend=pb.LegendConfig(location="center right"),
                             text=pb.TextConfig(text, 0.97, 0.97),
@@ -1731,7 +1817,11 @@ def run_delta_R(collision_system: str) -> None:
                         pb.Panel(
                             axes=[
                                 pb.AxisConfig("x", label=r"$\Delta R$"),
-                                pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
+                                pb.AxisConfig(
+                                    "y",
+                                    label="Ratio to true",
+                                    range=(0.5, 1.5),
+                                ),
                             ],
                         ),
                     ],
@@ -1771,7 +1861,11 @@ def run_delta_R(collision_system: str) -> None:
                         pb.Panel(
                             axes=[
                                 pb.AxisConfig("x", label=r"$\Delta R$"),
-                                pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
+                                pb.AxisConfig(
+                                    "y",
+                                    label="Ratio to true",
+                                    range=(0.5, 1.5),
+                                ),
                             ],
                         ),
                     ],
@@ -1807,7 +1901,11 @@ def run_delta_R(collision_system: str) -> None:
                         pb.Panel(
                             axes=[
                                 pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
-                                pb.AxisConfig("y", label="Ratio to true", range=(0.5, 1.5),),
+                                pb.AxisConfig(
+                                    "y",
+                                    label="Ratio to true",
+                                    range=(0.5, 1.5),
+                                ),
                             ],
                         ),
                     ],
