@@ -478,20 +478,6 @@ def plot_unfolded(
     plot_config: pb.PlotConfig,
     plot_png: bool = False,
 ) -> None:
-
-    #def plot_unfolded(
-    #    hists: Mapping[str, binned_data.BinnedData],
-    #    projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
-    #    efficiency_func: Callable[[Mapping[str, binned_data.BinnedData], helpers.RangeSelector], binned_data.BinnedData],
-    #    n_iter_for_ratio: int,
-    #    true_bin: helpers.RangeSelector,
-    #    tag: str,
-    #    plot_config: pb.PlotConfig,
-    #    output_dir: Path,
-    #    max_iter: int = 10,
-    #    plot_png: bool = False,
-    #    true_hist_name: str = "true",
-    #) -> None:
     """ Plot unfolded.
 
     """
@@ -500,37 +486,7 @@ def plot_unfolded(
     fig, axes = plt.subplots(3, 1, figsize=(10, 12), gridspec_kw={"height_ratios": [4, 1, 1]}, sharex=True,)
     ax_upper, ax_ratio_iter, ax_ratio_true = axes
 
-    # We need the efficiency in the true bin that we actually want to measure.
-    #efficiency = efficiency_func(hists, true_bin)
-    ## For convenience in normalizing.
-    #_normalize_hist = functools.partial(_normalize_unfolded, efficiency=efficiency)
-
-    # True
-    # Project true onto the kt axis. We use boost histogram for the convince.
-    #hist_true = projection_func(hists[true_hist_name], true_bin)
-    ## Normalize
-    #hist_true = _normalize_hist(hist_true)
-
-    # Determine ratio denominator.
-    #if n_iter_for_ratio > 0:
-    #    hist_name = f"bayesian_unfolded_iter_{n_iter_for_ratio}"
-    #    if tag:
-    #        hist_name = f"{tag}_{hist_name}"
-    #    selected_n_iter_hist = projection_func(hists[hist_name], true_bin)
-    #    selected_n_iter_hist = _normalize_hist(selected_n_iter_hist)
-    #    h_ratio_denominator = selected_n_iter_hist
-    #else:
-    #    h_ratio_denominator = hist_true
-
-    #for i in range(1, max_iter):
     for i, hist in enumerate(unfolded_hists, start=1):
-        # Retrieve the hist and normalize it properly.
-        #hist_name = f"bayesian_unfolded_iter_{i}"
-        #if tag:
-        #    hist_name = f"{tag}_{hist_name}"
-        #hist = projection_func(hists[hist_name], true_bin)
-        #hist = _normalize_hist(hist)
-
         ax_upper.errorbar(
             hist.axes[0].bin_centers,
             hist.values,
@@ -641,21 +597,6 @@ def plot_refolded(
     plot_config: pb.PlotConfig,
     plot_png: bool = False,
 ) -> None:
-
-    #def plot_refolded(
-    #    unfolding_output: UnfoldingOutput,
-    #    #hists: Mapping[str, binned_data.BinnedData],
-    #    #projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
-    #    smeared_input: bool,
-    #    #measured_bin: helpers.RangeSelector,
-    #    smeared_range: helpers.RangeSelector,
-    #    #tag: str,
-    #    plot_config: pb.PlotConfig,
-    #    output_dir: Path,
-    #    #max_iter: int = 10,
-    #    plot_png: bool = False,
-    #    raw_hist_name: str = "raw",
-    #) -> None:
     """ Plot refolded.
 
     """
@@ -665,8 +606,6 @@ def plot_refolded(
     ax_upper, ax_lower = axes
 
     # Raw
-    #hist_raw = projection_func(hists[raw_hist_name], measured_bin)
-    #hist_raw = unfolding_output.smeared_substructure(unfolding_output.raw_hist_name, smeared_jet_pt_range=smeared_jet_pt_range)
     # Only plot if there's something meaningful to plot
     if hist_raw.values.any():
         ax_upper.errorbar(
