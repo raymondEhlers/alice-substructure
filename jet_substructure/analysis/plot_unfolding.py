@@ -262,6 +262,10 @@ class UnfoldingOutput:
         p.mkdir(parents=True, exist_ok=True)
         return p
 
+    @property
+    def output_dir_png(self) -> Path:
+        return self.output_dir / "png"
+
     def unfolded_substructure(self, n_iter: int, true_jet_pt_range: helpers.JetPtRange) -> binned_data.BinnedData:
         """ Helper to retrieve the unfolded substructure directly """
         return self.true_substructure(
@@ -356,31 +360,29 @@ def plot_relative_individual_systematics(
     """ Plot relative individual systematic errors.
 
     """
+    import mplhep as hep
+
     # Setup
     logger.debug("Plotting systematic relative errors.")
     fig, ax = plt.subplots(figsize=(10, 7.5))
 
     for name, systematic in unfolded.data.metadata["y_systematic"].items():
-        ax.errorbar(
-            unfolded.data.axes[0].bin_centers,
-            np.maximum(systematic.low, systematic.high) / unfolded.data.values,
-            xerr=unfolded.data.axes[0].bin_widths / 2,
+        hep.histplot(
+            H=np.maximum(systematic.low, systematic.high) / unfolded.data.values,
+            bins=unfolded.data.axes[0].bin_edges,
             #color=style.color,
             label=name.replace("_", " "),
-            marker="o",
-            linestyle="",
             alpha=0.8,
         )
 
     # For comparison, add the statistical too
-    ax.errorbar(
-        unfolded.data.axes[0].bin_centers,
-        unfolded.data.errors / unfolded.data.values,
-        xerr=unfolded.data.axes[0].bin_widths / 2,
+    hep.histplot(
+        H=unfolded.data.errors / unfolded.data.values,
+        bins=unfolded.data.axes[0].bin_edges,
         #color=style.color,
         label="Statistical (for comparison)",
-        marker="o",
-        linestyle="",
+        #marker="o",
+        #linestyle="",
         alpha=0.8,
     )
 
