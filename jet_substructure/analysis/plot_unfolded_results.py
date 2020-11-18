@@ -38,7 +38,10 @@ def select_hist_in_range(hist: binned_data.BinnedData, x_range: helpers.RangeSel
     metadata = {}
     for k, v in hist.metadata.items():
         if isinstance(v, AsymmetricErrors):
-            metadata[k] = AsymmetricErrors(low=v.low[bin_center_mask], high=v.high[bin_center_mask],)
+            metadata[k] = AsymmetricErrors(
+                low=v.low[bin_center_mask],
+                high=v.high[bin_center_mask],
+            )
 
     return binned_data.BinnedData(
         axes=[hist.axes[0].bin_edges[first_bin_edge:last_bin_edge]],
@@ -84,10 +87,19 @@ def get_unfolded_pp_data_leticia(grooming_method: str, x_range: helpers.RangeSel
 
 
 def plot_comparison_pythia(
-    hists: Dict[str, Result], grooming_methods: Sequence[str], plot_config: pb.PlotConfig, output_dir: Path,
+    hists: Dict[str, Result],
+    grooming_methods: Sequence[str],
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
 ) -> None:
     # Setup
-    fig, (ax, ax_ratio) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+    fig, (ax, ax_ratio) = plt.subplots(
+        2,
+        1,
+        figsize=(8, 6),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
     grooming_styles = pb.define_grooming_styles()
 
     for grooming_method in grooming_methods:
@@ -204,7 +216,8 @@ def plot_comparison_pythia(
         np.testing.assert_allclose(y_relative_error_high, test_relative_y_error_high)
         # From error prop, pythia has no systematic error, so we just convert the relative errors.
         ratio.metadata["y_systematic_errors"] = AsymmetricErrors(
-            low=y_relative_error_low * ratio.values, high=y_relative_error_high * ratio.values,
+            low=y_relative_error_low * ratio.values,
+            high=y_relative_error_high * ratio.values,
         )
         y_systematic_errors = ratio.metadata["y_systematic_errors"]
         pachyderm.plot.error_boxes(
@@ -241,7 +254,13 @@ def plot_comparison(
     output_dir: Path,
 ) -> None:
     # Setup
-    fig, (ax, ax_ratio) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+    fig, (ax, ax_ratio) = plt.subplots(
+        2,
+        1,
+        figsize=(8, 6),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
     grooming_styles = pb.define_grooming_styles()
 
     ratio_reference_hist = hists[comparison_grooming_method]
@@ -371,7 +390,8 @@ def plot_comparison(
         np.testing.assert_allclose(y_relative_error_high, test_relative_y_error_high)
         # From error prop, pythia has no systematic error, so we just convert the relative errors.
         ratio.metadata["y_systematic_errors"] = AsymmetricErrors(
-            low=y_relative_error_low * ratio.values, high=y_relative_error_high * ratio.values,
+            low=y_relative_error_low * ratio.values,
+            high=y_relative_error_high * ratio.values,
         )
         y_systematic_errors = ratio.metadata["y_systematic_errors"]
         pachyderm.plot.error_boxes(
@@ -430,7 +450,7 @@ def run() -> None:
     text += "\n" + pb.label_to_display_string["collision_system"]["pp_5TeV"]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"]["R04"]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='ch')}\:\text{{GeV}}/c$"
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     plot_comparison_pythia(
         hists=hists,
         grooming_methods=list(hists.keys()),
@@ -530,7 +550,7 @@ def run() -> None:
         grooming_methods=list(hists.keys()),
         comparison_grooming_method="leading_kt",
         plot_config=pb.PlotConfig(
-            name=f"kt_comparison",
+            name="kt_comparison",
             panels=[
                 # Main axis.
                 pb.Panel(
