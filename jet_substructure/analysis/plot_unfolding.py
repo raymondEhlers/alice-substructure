@@ -347,6 +347,56 @@ class UnfoldingResult:
     ...
 
 
+def plot_relative_individual_systematics(
+    unfolded: "SingleResult",
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+    plot_png: bool = False,
+) -> None:
+    """ Plot relative individual systematic errors.
+
+    """
+    # Setup
+    logger.debug("Plotting systematic relative errors.")
+    fig, ax = plt.subplots(figsize=(10, 7.5))
+
+    for name, systematic in unfolded.data.metadata["y_systematic"].items():
+        ax.errorbar(
+            unfolded.data.axes[0].bin_centers,
+            np.maximum(systematic.low, systematic.high) / unfolded.data.values,
+            xerr=unfolded.data.axes[0].bin_widths / 2,
+            #color=style.color,
+            label=name.replace("_", " "),
+            marker="o",
+            linestyle="",
+            alpha=0.8,
+        )
+
+    # For comparison, add the statistical too
+    ax.errorbar(
+        unfolded.data.axes[0].bin_centers,
+        unfolded.data.errors / unfolded.data.values,
+        xerr=unfolded.data.axes[0].bin_widths / 2,
+        #color=style.color,
+        label="Statistical (for comparison)",
+        marker="o",
+        linestyle="",
+        alpha=0.8,
+    )
+
+    # Label and layout
+    plot_config.apply(fig=fig, ax=ax)
+
+    figure_name = f"{plot_config.name}"
+    logger.info(f"Writing plot to {output_dir / figure_name}.pdf")
+    fig.savefig(output_dir / f"{figure_name}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{figure_name}.png")
+
+    plt.close(fig)
+
 def plot_systematic(
     unfolded: "SingleResult",
     plot_config: pb.PlotConfig,
@@ -372,36 +422,49 @@ def plot_systematic(
         marker="o",
         linestyle="",
     )
+    # Systematic
+    pachyderm.plot.error_boxes(
+        ax=ax,
+        x_data=unfolded.data.axes[0].bin_centers,
+        y_data=unfolded.data.values,
+        x_errors=unfolded.data.axes[0].bin_widths / 2,
+        y_errors=np.array([unfolded.data.metadata["y_systematic"]["quadrature"].low, unfolded.data.metadata["y_systematic"]["quadrature"].high]),
+        #y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+        #color=style.color,
+        #color=p[0].get_color(),
+        linewidth=0,
+        color="red",
+    )
 
     # This isn't really right, but it's a first pass. Let's see...
     # Rmax06
-    pachyderm.plot.error_boxes(
-        ax=ax,
-        x_data=unfolded.data.axes[0].bin_centers,
-        y_data=unfolded.data.values,
-        x_errors=unfolded.data.axes[0].bin_widths / 2,
-        y_errors=unfolded.data.metadata["y_systematic_Rmax06"],
-        #y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
-        #color=style.color,
-        #color=p[0].get_color(),
-        linewidth=0,
-        label="RMax06",
-        color="red",
-    )
-    # Tracking efficiency
-    pachyderm.plot.error_boxes(
-        ax=ax,
-        x_data=unfolded.data.axes[0].bin_centers,
-        y_data=unfolded.data.values,
-        x_errors=unfolded.data.axes[0].bin_widths / 2,
-        y_errors=unfolded.data.metadata["y_systematic_tracking_efficiency"],
-        #y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
-        #color=style.color,
-        #color=p[0].get_color(),
-        linewidth=0,
-        label="Tracking Eff.",
-        color="green",
-    )
+    #pachyderm.plot.error_boxes(
+    #    ax=ax,
+    #    x_data=unfolded.data.axes[0].bin_centers,
+    #    y_data=unfolded.data.values,
+    #    x_errors=unfolded.data.axes[0].bin_widths / 2,
+    #    y_errors=unfolded.data.metadata["y_systematic_Rmax06"],
+    #    #y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+    #    #color=style.color,
+    #    #color=p[0].get_color(),
+    #    linewidth=0,
+    #    label="RMax06",
+    #    color="red",
+    #)
+    ## Tracking efficiency
+    #pachyderm.plot.error_boxes(
+    #    ax=ax,
+    #    x_data=unfolded.data.axes[0].bin_centers,
+    #    y_data=unfolded.data.values,
+    #    x_errors=unfolded.data.axes[0].bin_widths / 2,
+    #    y_errors=unfolded.data.metadata["y_systematic_tracking_efficiency"],
+    #    #y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+    #    #color=style.color,
+    #    #color=p[0].get_color(),
+    #    linewidth=0,
+    #    label="Tracking Eff.",
+    #    color="green",
+    #)
 
     # Label and layout
     plot_config.apply(fig=fig, ax=ax)

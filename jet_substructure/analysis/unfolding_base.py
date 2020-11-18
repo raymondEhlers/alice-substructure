@@ -3,7 +3,7 @@ from functools import reduce
 
 import attr
 import numpy as np
-from pachyerm import binned_data
+from pachyderm import binned_data
 
 
 @attr.s
