@@ -333,26 +333,14 @@ class UnfoldingOutput:
 
 @attr.s
 class SingleResult:
+    """ Container for a single unfolding result. """
     data: binned_data.BinnedData = attr.ib()
     n_iter: int = attr.ib()
     ranges: Sequence[helpers.RangeSelector] = attr.ib(factory=list)
 
-@attr.s
-class Result:
-    unfolded: SingleResult = attr.ib()
-    # TODO: Better to call it smeared or refolded?
-    #smeared: SingleResult = attr.ib()
-    # TODO: Need ranges attached here...?
-
-@attr.s
-class UnfoldingResult:
-    substructure: Result = attr.ib()
-    jet_pt: Result = attr.ib()
-    ...
-
 
 def plot_relative_individual_systematics(
-    unfolded: "SingleResult",
+    unfolded: SingleResult,
     plot_config: pb.PlotConfig,
     output_dir: Path,
     plot_png: bool = False,
@@ -400,7 +388,7 @@ def plot_relative_individual_systematics(
     plt.close(fig)
 
 def plot_systematic(
-    unfolded: "SingleResult",
+    unfolded: SingleResult,
     plot_config: pb.PlotConfig,
     output_dir: Path,
     plot_png: bool = False,
