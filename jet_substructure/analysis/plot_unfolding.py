@@ -18,6 +18,7 @@ import uproot
 from pachyderm import binned_data
 
 from jet_substructure.analysis import plot_base as pb
+from jet_substructure.analysis import unfolding_base
 from jet_substructure.base import helpers
 
 
@@ -403,6 +404,7 @@ def plot_relative_individual_systematics(
 
 def _plot_compare_kt_with_systematics(
     hists: Mapping[str, SingleResult],
+    reference: Mapping[str, binned_data.BinnedData],
     grooming_methods: Sequence[str],
     set_zero_to_nan: bool,
     plot_config: pb.PlotConfig,
@@ -411,7 +413,14 @@ def _plot_compare_kt_with_systematics(
     """Plot PbPb with systematics for a set of grooming methods."""
     logger.info("Plotting grooming method comparison for kt with systematics")
 
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, axes = plt.subplots(
+        2,
+        1,
+        figsize=(9, 10),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
+    ax, ax_ratio = axes
 
     grooming_styling = pb.define_grooming_styles()
 
@@ -435,7 +444,7 @@ def _plot_compare_kt_with_systematics(
         if style.fillstyle != "none":
             kwargs["markeredgewidth"] = 0
 
-        # Main data point
+        # Main data points
         ax.errorbar(
             h.axes[0].bin_centers,
             h.values,
@@ -469,8 +478,48 @@ def _plot_compare_kt_with_systematics(
             linewidth=0,
         )
 
+        # Ratio + statistical error bars from unfolding
+        ratio = reference[grooming_method] / h
+        ax_ratio.errorbar(
+            ratio.axes[0].bin_centers,
+            ratio.values,
+            yerr=ratio.errors,
+            xerr=ratio.axes[0].bin_widths / 2,
+            color=style.color,
+            marker=style.marker,
+            fillstyle=style.fillstyle,
+            linestyle="",
+            zorder=style.zorder,
+            **kwargs,
+        )
+        # Systematic errors.
+        y_relative_error_low = unfolding_base.relative_error(
+            unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low)
+        )
+        y_relative_error_high = unfolding_base.relative_error(
+            unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high)
+        )
+        # From error prop, pythia has no systematic error, so we just convert the relative errors.
+        ratio.metadata["y_systematic"] = unfolding_base.AsymmetricErrors(
+            low=y_relative_error_low * ratio.values,
+            high=y_relative_error_high * ratio.values,
+        )
+        pachyderm.plot.error_boxes(
+            ax=ax_ratio,
+            x_data=ratio.axes[0].bin_centers,
+            y_data=ratio.values,
+            x_errors=ratio.axes[0].bin_widths / 2,
+            y_errors=np.array([ratio.metadata["y_systematic"].low, ratio.metadata["y_systematic"].high]),
+            color=style.color,
+            linewidth=0,
+            # label = "Background", color = plot_base.AnalysisColors.fit,
+        )
+
+    # Reference value for ratio
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+
     # Labeling and presentation
-    plot_config.apply(fig=fig, ax=ax)
+    plot_config.apply(fig=fig, axes=[ax, ax_ratio])
 
     filename = f"{plot_config.name}"
     fig.savefig(output_dir / f"{filename}.pdf")
@@ -479,11 +528,12 @@ def _plot_compare_kt_with_systematics(
 
 def plot_PbPb_systematics(
     hists: Mapping[str, SingleResult],
+    reference: Mapping[str, binned_data.BinnedData],
     grooming_methods: Sequence[str],
     centrality: str,
     output_dir: Path,
 ) -> None:
-    """"""
+    """Plot PbPb unfolded results with systematics."""
     jet_pt_bin = hists[grooming_methods[0]].ranges[0]
     centrality_map = {
         "central": r"0-10\%",
@@ -499,22 +549,36 @@ def plot_PbPb_systematics(
         hists=hists,
         grooming_methods=grooming_methods,
         set_zero_to_nan=False,
+        reference=reference,
         plot_config=pb.PlotConfig(
             name=f"unfolded_kt_systematics_{centrality}",
-            panels=pb.Panel(
-                axes=[
-                    pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(1.5, 15)),
-                    pb.AxisConfig(
-                        "y",
-                        label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
-                        log=True,
-                        range=(1e-3, 0.5),
-                    ),
-                ],
-                text=pb.TextConfig(x=0.97, y=0.97, text=text),
-                legend=pb.LegendConfig(location="lower left", font_size=14),
-            ),
-            figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+            panels=[
+                # Main panel
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                            log=True,
+                            range=(1e-3, 0.5),
+                        ),
+                    ],
+                    text=pb.TextConfig(x=0.97, y=0.97, text=text),
+                    legend=pb.LegendConfig(location="lower left", font_size=14),
+                ),
+                # Ratio
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(1.5, 15)),
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$\frac{\text{PYTHIA}}{\text{data}}$",
+                            range=(0.65, 1.35),
+                        ),
+                    ]
+                ),
+            ],
+            figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.06)),
         ),
         output_dir=output_dir,
     )
