@@ -128,7 +128,13 @@ def new_matching_hists(
         for subjet_name in ["leading", "subleading"]:
             name = f"{grooming_method}_{subjet_name}_{matching_index.generator_like_prefix}_subjet_momentum_fraction_in_{matching_index.measured_like_prefix}_matching_{matching_index.matching_level}_type_{matching_index.matching_type}{hist_suffix}"
             h_subjet_pt_fraction = df.Histo1D(
-                (name, name, 50, 0, 1,),
+                (
+                    name,
+                    name,
+                    50,
+                    0,
+                    1,
+                ),
                 f"{grooming_method}_{matching_index.generator_like_prefix}_{subjet_name}_subjet_momentum_fraction_in_{matching_index.measured_like_prefix}_jet",
                 "scale_factor",
             )
@@ -208,7 +214,16 @@ def matching_hists(  # noqa: C901
         if hist_suffix:
             name += f"_{hist_suffix}"
         kt_hybrid_true_response = df_selection.Histo2D(
-            (name, name, 26, -1, 25, 26, -1, 25,),
+            (
+                name,
+                name,
+                26,
+                -1,
+                25,
+                26,
+                -1,
+                25,
+            ),
             f"{grooming_method}_hybrid_kt",
             f"{grooming_method}_true_kt",
             "scale_factor",
@@ -220,7 +235,16 @@ def matching_hists(  # noqa: C901
             if hist_suffix:
                 name += f"_{hist_suffix}"
             kt_hybrid_det_level_response = df_selection.Histo2D(
-                (name, name, 26, -1, 25, 26, -1, 25,),
+                (
+                    name,
+                    name,
+                    26,
+                    -1,
+                    25,
+                    26,
+                    -1,
+                    25,
+                ),
                 f"{grooming_method}_hybrid_kt",
                 f"{grooming_method}_det_level_kt",
                 "scale_factor",
@@ -232,7 +256,16 @@ def matching_hists(  # noqa: C901
             if hist_suffix:
                 name += f"_{hist_suffix}"
             kt_det_level_true_response = df_selection.Histo2D(
-                (name, name, 26, -1, 25, 26, -1, 25,),
+                (
+                    name,
+                    name,
+                    26,
+                    -1,
+                    25,
+                    26,
+                    -1,
+                    25,
+                ),
                 f"{grooming_method}_det_level_kt",
                 f"{grooming_method}_true_kt",
                 "scale_factor",
@@ -248,7 +281,13 @@ def matching_hists(  # noqa: C901
                 if hist_suffix:
                     name += f"_{hist_suffix}"
                 h_subjet_pt_fraction = df_selection.Histo1D(
-                    (name, name, 50, 0, 1,),
+                    (
+                        name,
+                        name,
+                        50,
+                        0,
+                        1,
+                    ),
                     f"{grooming_method}_{generator_like_prefix}_{subjet_name}_subjet_momentum_fraction_in_{measured_like_prefix}_jet",
                     "scale_factor",
                 )
@@ -436,8 +475,14 @@ def run_create_closure_ratio(
         smeared_cut_prefix = "data"
         prefix_for_ratio = "data"
 
-    smeared_substructure_variable_bins = np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64,)
-    smeared_jet_pt_bins = np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64,)
+    smeared_substructure_variable_bins = np.array(
+        [1, 2, 3, 4, 5, 7, 10, 15],
+        dtype=np.float64,
+    )
+    smeared_jet_pt_bins = np.array(
+        [30, 40, 50, 60, 80, 100, 120],
+        dtype=np.float64,
+    )
     hists = []
     hists.append(
         df_original.Histo2D(
@@ -669,7 +714,9 @@ def run_response(
                     generator_like_prefix=generator_like_prefix,
                     matching_type=matching_type,
                 )
-            ] = (df_require_splittings.Filter(selection) if selection else df_require_splittings)
+            ] = (
+                df_require_splittings.Filter(selection) if selection else df_require_splittings
+            )
 
     for matching_index, df_base in matching_dfs.items():
         # Setup

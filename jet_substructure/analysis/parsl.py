@@ -163,7 +163,10 @@ def setup_parsl_587(
         ],
         # Monitoring information
         monitoring=MonitoringHub(
-            hub_address=address_by_hostname(), hub_port=55055, monitoring_debug=False, resource_monitoring_interval=10,
+            hub_address=address_by_hostname(),
+            hub_port=55055,
+            monitoring_debug=False,
+            resource_monitoring_interval=10,
         ),
         # Disables resource scaling.
         strategy=None,
@@ -185,13 +188,18 @@ def _repair_root_files(tree_name: str, n_cores: int, inputs=[], outputs=[]) -> A
     from jet_substructure.base import helpers
 
     res = helpers.split_tree(
-        filenames=[Path(inputs[0].filepath)], tree_name=tree_name, number_of_chunks=1, n_cores=n_cores,
+        filenames=[Path(inputs[0].filepath)],
+        tree_name=tree_name,
+        number_of_chunks=1,
+        n_cores=n_cores,
     )
     return res
 
 
 def setup_repair_root_files(
-    collision_system: str, jobs_per_node: int, selected_train_numbers: Optional[Sequence[int]] = None,
+    collision_system: str,
+    jobs_per_node: int,
+    selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> List[AppFuture]:
     """Repair ROOT files.
 
@@ -434,7 +442,8 @@ def _extract_scale_factors_for_embedding(inputs=[], outputs=[], stdout=None, std
 
 
 def setup_extract_scale_factors_for_embedding(
-    collision_system: str, selected_train_numbers: Optional[Sequence[int]] = None,
+    collision_system: str,
+    selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> None:
     """Extract scale factors from embedding hists.
 
@@ -759,13 +768,13 @@ def setup_root_data_frame(
     cross_check_task = dataset_config.get("cross_check_task", False)
     for grooming_method in [
         "leading_kt",
-        #"leading_kt_z_cut_02",
-        #"leading_kt_z_cut_04",
-        #"dynamical_z",
-        #"dynamical_kt",
-        #"dynamical_time",
-        #"soft_drop_z_cut_02",
-        #"soft_drop_z_cut_04",
+        # "leading_kt_z_cut_02",
+        # "leading_kt_z_cut_04",
+        # "dynamical_z",
+        # "dynamical_kt",
+        # "dynamical_time",
+        # "soft_drop_z_cut_02",
+        # "soft_drop_z_cut_04",
     ]:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
@@ -858,13 +867,13 @@ def setup_root_data_frame_response(
     cross_check_task = dataset_config.get("cross_check_task", False)
     for grooming_method in [
         "leading_kt",
-        #"leading_kt_z_cut_02",
-        #"leading_kt_z_cut_04",
-        #"dynamical_z",
-        #"dynamical_kt",
-        #"dynamical_time",
-        #"soft_drop_z_cut_02",
-        #"soft_drop_z_cut_04",
+        # "leading_kt_z_cut_02",
+        # "leading_kt_z_cut_04",
+        # "dynamical_z",
+        # "dynamical_kt",
+        # "dynamical_time",
+        # "soft_drop_z_cut_02",
+        # "soft_drop_z_cut_04",
     ]:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
@@ -959,13 +968,13 @@ def setup_root_data_frame_closure(
     cross_check_task = dataset_config.get("cross_check_task", False)
     for grooming_method in [
         "leading_kt",
-        #"leading_kt_z_cut_02",
-        #"leading_kt_z_cut_04",
-        #"dynamical_z",
-        #"dynamical_kt",
-        #"dynamical_time",
-        #"soft_drop_z_cut_02",
-        #"soft_drop_z_cut_04",
+        # "leading_kt_z_cut_02",
+        # "leading_kt_z_cut_04",
+        # "dynamical_z",
+        # "dynamical_kt",
+        # "dynamical_time",
+        # "soft_drop_z_cut_02",
+        # "soft_drop_z_cut_04",
     ]:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
@@ -997,11 +1006,12 @@ def setup_root_data_frame_closure(
 def _unfolding_standard(
     settings: "unfolding_2D.Settings",
     reweight_prior: bool,
-    inputs = [],
-    outputs = [],
+    inputs=[],
+    outputs=[],
 ) -> AppFuture:
-    from jet_substructure.cpp import unfolding_2D
     from pathlib import Path
+
+    from jet_substructure.cpp import unfolding_2D
 
     return unfolding_2D.run_unfolding(
         settings=settings,
@@ -1016,11 +1026,12 @@ def _unfolding_standard(
 def _unfolding_closure(
     settings: "unfolding_2D.Settings",
     closure_variation: str,
-    inputs = [],
-    outputs = [],
+    inputs=[],
+    outputs=[],
 ) -> AppFuture:
-    from jet_substructure.cpp import unfolding_2D
     from pathlib import Path
+
+    from jet_substructure.cpp import unfolding_2D
 
     return unfolding_2D.run_unfolding_closure_reweighting(
         settings=settings,
@@ -1038,6 +1049,7 @@ def setup_unfolding(
 ) -> List[AppFuture]:
     # Setup
     from jet_substructure.cpp import unfolding_2D
+
     # TODO: Update after testing...
     output_dir = Path("output") / "PbPb" / "unfolding" / "parsl"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1052,7 +1064,10 @@ def setup_unfolding(
     # Detemrien filenames first since they don't depend on grooming methods
     data_files: List[File] = []
     embedded_files: List[File] = []
-    for label, train_directories, files in [("PbPb", PbPb_train_directories, data_files), ("embedded", embedded_train_directories, embedded_files)]:
+    for label, train_directories, files in [
+        ("PbPb", PbPb_train_directories, data_files),
+        ("embedded", embedded_train_directories, embedded_files),
+    ]:
         for train_directory in sorted(train_directories):
             logger.info(f"Processing {label} train number {train_directory.name}")
 
@@ -1122,8 +1137,8 @@ def setup_unfolding(
         for s in settings.values():
             # Randomize the input list so we don't always hit the same files at the same time.
             # Note: It randomizes in place.
-            #random.shuffle(data_files)
-            #random.shuffle(embedded_files)
+            # random.shuffle(data_files)
+            # random.shuffle(embedded_files)
             random.shuffle(input_files[0])
             random.shuffle(input_files[1])
             logger.info(f"Adding standard unfolding: {s.output_tag}")
@@ -1224,7 +1239,10 @@ if __name__ == "__main__":  # noqa: C901
             # selected_train_numbers=list(range(6296, 6297)),
         )
     if "convert_to_parquet" in jobs_to_execute:
-        results = setup_convert_to_parquet(collision_system=collision_system, entries_per_job=entries_per_job,)
+        results = setup_convert_to_parquet(
+            collision_system=collision_system,
+            entries_per_job=entries_per_job,
+        )
     if "extract_scale_factors_for_embedding" in jobs_to_execute:
         setup_extract_scale_factors_for_embedding(
             collision_system=collision_system,
@@ -1254,7 +1272,7 @@ if __name__ == "__main__":  # noqa: C901
         results = setup_root_data_frame_response(
             collision_system=collision_system,
             jobs_per_node=jobs_per_node,
-            #selected_train_numbers=list(range(6338, 6339)),
+            # selected_train_numbers=list(range(6338, 6339)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
     if "root_data_frame_closure" in jobs_to_execute:
@@ -1274,13 +1292,13 @@ if __name__ == "__main__":  # noqa: C901
         results = setup_unfolding(
             grooming_methods=[
                 "leading_kt",
-                #"leading_kt_z_cut_02",
-                #"leading_kt_z_cut_04",
+                # "leading_kt_z_cut_02",
+                # "leading_kt_z_cut_04",
                 "dynamical_z",
                 "dynamical_kt",
                 "dynamical_time",
-                #"soft_drop_z_cut_02",
-                #"soft_drop_z_cut_04",
+                # "soft_drop_z_cut_02",
+                # "soft_drop_z_cut_04",
             ],
             run_closures=False,
             reweight_prior=False,
