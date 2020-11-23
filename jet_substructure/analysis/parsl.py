@@ -150,8 +150,7 @@ def setup_parsl_587(
                     cores_per_node=jobs_per_node,
                     # Ensures that the jobs are spread out. Also means that we need to be careful
                     # when others are running to avoid running out of memory.
-                    # TODO: TEMP
-                    #exclusive=True,
+                    exclusive=True,
                     # Format: HH:MM:SS
                     walltime="02:00:00",
                     # walltime="00:21:00",
@@ -409,7 +408,7 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
             results.append(
                 _convert_to_parquet(
                     tree_name=dataset_config["tree_name"],
-                    prefixes=list(dataset_config["prefixes"].keys()),
+                    prefixes=list(dataset_config["prefixes"].values()),
                     branches=dataset_config["branches"],
                     prefix_branches=dataset_config["prefix_branches"],
                     event_range=event_range,
@@ -655,7 +654,7 @@ def setup_calculate_data_skim(
     if input_files is None:
         logger.info("Determining input files independently.")
         input_files = []
-        for train_directory in train_directories:
+        for train_directory in sorted(train_directories):
             # Select train numbers.
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
                 logger.debug(f"Skipping train number {train_directory.name}")
@@ -702,6 +701,7 @@ def _root_data_frame(
     grooming_method: str,
     jet_R: float,
     n_cores: int,
+    cross_check_task: bool,
     inputs: Optional[Sequence[File]] = [],
     outputs: Optional[Sequence[File]] = [],
 ) -> AppFuture:
@@ -720,6 +720,7 @@ def _root_data_frame(
         output_filename=Path(outputs[0].filepath),
         jet_pt_prefix_first=True,
         n_cores=n_cores,
+        cross_check_task=cross_check_task,
     )
 
     return res
@@ -742,7 +743,7 @@ def setup_root_data_frame(
     if input_files is None:
         logger.info("Determining input files independently.")
         input_files = []
-        for train_directory in train_directories:
+        for train_directory in sorted(train_directories):
             # Select train numbers.
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
                 logger.debug(f"Skipping train number {train_directory.name}")
@@ -755,15 +756,16 @@ def setup_root_data_frame(
 
     logger.info(f"N cores per job: {math.floor(8 / jobs_per_node)}")
     results = []
+    cross_check_task = dataset_config.get("cross_check_task", False)
     for grooming_method in [
         "leading_kt",
-        "leading_kt_z_cut_02",
-        "leading_kt_z_cut_04",
-        "dynamical_z",
-        "dynamical_kt",
-        "dynamical_time",
-        "soft_drop_z_cut_02",
-        "soft_drop_z_cut_04",
+        #"leading_kt_z_cut_02",
+        #"leading_kt_z_cut_04",
+        #"dynamical_z",
+        #"dynamical_kt",
+        #"dynamical_time",
+        #"soft_drop_z_cut_02",
+        #"soft_drop_z_cut_04",
     ]:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
@@ -776,11 +778,12 @@ def setup_root_data_frame(
         results.append(
             _root_data_frame(
                 collision_system=collision_system,
-                tree_name="tree",
+                tree_name="tree" if not cross_check_task else dataset_config["tree_name"],
                 prefixes=list(prefixes.values()),
                 grooming_method=grooming_method,
                 jet_R=dataset_config["jet_R"],
                 n_cores=math.floor(8 / jobs_per_node),
+                cross_check_task=dataset_config.get("cross_check_task", False),
                 inputs=input_files,
                 outputs=[parsl_output_file],
             )
@@ -797,6 +800,7 @@ def _root_data_frame_response(
     grooming_method: str,
     jet_R: float,
     n_cores: int,
+    cross_check_task: bool,
     inputs: Optional[Sequence[File]] = [],
     outputs: Optional[Sequence[File]] = [],
 ) -> AppFuture:
@@ -815,6 +819,7 @@ def _root_data_frame_response(
         output_filename=Path(outputs[0].filepath),
         jet_pt_prefix_first=True,
         n_cores=n_cores,
+        cross_check_task=cross_check_task,
     )
 
     return res
@@ -837,7 +842,7 @@ def setup_root_data_frame_response(
     if input_files is None:
         logger.info("Determining input files independently.")
         input_files = []
-        for train_directory in train_directories:
+        for train_directory in sorted(train_directories):
             # Select train numbers.
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
                 logger.debug(f"Skipping train number {train_directory.name}")
@@ -850,15 +855,16 @@ def setup_root_data_frame_response(
 
     logger.info(f"N cores per job: {math.floor(8 / jobs_per_node)}")
     results = []
+    cross_check_task = dataset_config.get("cross_check_task", False)
     for grooming_method in [
         "leading_kt",
-        "leading_kt_z_cut_02",
-        "leading_kt_z_cut_04",
-        "dynamical_z",
-        "dynamical_kt",
-        "dynamical_time",
-        "soft_drop_z_cut_02",
-        "soft_drop_z_cut_04",
+        #"leading_kt_z_cut_02",
+        #"leading_kt_z_cut_04",
+        #"dynamical_z",
+        #"dynamical_kt",
+        #"dynamical_time",
+        #"soft_drop_z_cut_02",
+        #"soft_drop_z_cut_04",
     ]:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
@@ -872,11 +878,12 @@ def setup_root_data_frame_response(
         results.append(
             _root_data_frame_response(
                 collision_system=collision_system,
-                tree_name="tree",
+                tree_name="tree" if not cross_check_task else dataset_config["tree_name"],
                 prefixes=list(prefixes.values()),
                 grooming_method=grooming_method,
                 jet_R=dataset_config["jet_R"],
                 n_cores=math.floor(8 / jobs_per_node),
+                cross_check_task=dataset_config.get("cross_check_task", False),
                 inputs=input_files,
                 outputs=[parsl_output_file],
             )
@@ -893,6 +900,7 @@ def _root_data_frame_closure(
     grooming_method: str,
     jet_R: float,
     n_cores: int,
+    cross_check_task: bool,
     inputs: Optional[Sequence[File]] = [],
     outputs: Optional[Sequence[File]] = [],
 ) -> AppFuture:
@@ -911,6 +919,7 @@ def _root_data_frame_closure(
         output_filename=Path(outputs[0].filepath),
         jet_pt_prefix_first=True,
         n_cores=n_cores,
+        cross_check_task=cross_check_task,
     )
 
     return res
@@ -934,7 +943,7 @@ def setup_root_data_frame_closure(
     if input_files is None:
         logger.info("Determining input files independently.")
         input_files = []
-        for train_directory in train_directories:
+        for train_directory in sorted(train_directories):
             # Select train numbers.
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
                 logger.debug(f"Skipping train number {train_directory.name}")
@@ -947,15 +956,16 @@ def setup_root_data_frame_closure(
 
     logger.info(f"N cores per job: {math.floor(8 / jobs_per_node)}")
     results = []
+    cross_check_task = dataset_config.get("cross_check_task", False)
     for grooming_method in [
         "leading_kt",
-        "leading_kt_z_cut_02",
-        "leading_kt_z_cut_04",
-        "dynamical_z",
-        "dynamical_kt",
-        "dynamical_time",
-        "soft_drop_z_cut_02",
-        "soft_drop_z_cut_04",
+        #"leading_kt_z_cut_02",
+        #"leading_kt_z_cut_04",
+        #"dynamical_z",
+        #"dynamical_kt",
+        #"dynamical_time",
+        #"soft_drop_z_cut_02",
+        #"soft_drop_z_cut_04",
     ]:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
@@ -969,11 +979,12 @@ def setup_root_data_frame_closure(
         results.append(
             _root_data_frame_closure(
                 collision_system=collision_system,
-                tree_name="tree",
+                tree_name="tree" if not cross_check_task else dataset_config["tree_name"],
                 prefixes=list(prefixes.values()),
                 grooming_method=grooming_method,
                 jet_R=dataset_config["jet_R"],
                 n_cores=math.floor(8 / jobs_per_node),
+                cross_check_task=dataset_config.get("cross_check_task", False),
                 inputs=input_files,
                 outputs=[parsl_output_file],
             )
@@ -1154,11 +1165,11 @@ if __name__ == "__main__":  # noqa: C901
     # Settings
     collision_system = "PbPb"
     jobs_to_execute = [
-        "unfolding",
+        "root_data_frame",
     ]
     entries_per_job = int(1e5)
     nodes_to_allocate = 1
-    jobs_per_node = 6
+    jobs_per_node = 1
 
     # Basic setup for jobs
     _possible_jobs = [
@@ -1243,7 +1254,7 @@ if __name__ == "__main__":  # noqa: C901
         results = setup_root_data_frame_response(
             collision_system=collision_system,
             jobs_per_node=jobs_per_node,
-            # selected_train_numbers=list(range(5977, 5978)),
+            #selected_train_numbers=list(range(6338, 6339)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
     if "root_data_frame_closure" in jobs_to_execute:
@@ -1272,8 +1283,8 @@ if __name__ == "__main__":  # noqa: C901
                 #"soft_drop_z_cut_04",
             ],
             run_closures=False,
-            reweight_prior=True,
-            tag="reweight_prior",
+            reweight_prior=False,
+            tag="",
         )
 
     logger.info(f"About to ask for result. len: {len(results)}")

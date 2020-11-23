@@ -380,6 +380,7 @@ def run_create_closure_ratio(
     output_filename: Path,
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
+    cross_check_task: bool = False,
 ) -> bool:
     # TODO: I think I can just refactor this in the standard case...?
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
@@ -402,10 +403,22 @@ def run_create_closure_ratio(
     main_tree = ROOT.TChain(tree_name)
     for filename in input_filenames:
         main_tree.Add(str(filename))
+    if cross_check_task:
+        friend_tree = ROOT.TChain("tree")
+        for filename in input_filenames:
+            friend_tree.Add(str(filename.parent.parent / "scale_factor" / filename.name))
+        # Add friends with scale factors
+        main_tree.AddFriend(friend_tree)
 
     # Keep the fully original DF so we can see everything applied to it.
     df_true_original = ROOT.RDataFrame(main_tree)
     df_original = df_true_original
+
+    if cross_check_task:
+        # Add the aliases. This has to be done after the df is defined because apparently they don't carry over.
+        renames = cross_check_task_renames(grooming_method=grooming_method, input_branches=df_original.GetColumnNames())
+        for k, v in renames.items():
+            df_original = df_original.Alias(k, v)
 
     # Add scale factor column with 1s if it doesn't exist yet.
     if "scale_factor" not in df_original.GetColumnNames():
@@ -824,6 +837,7 @@ def run(
     output_filename: Path,
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
+    cross_check_task: bool = False,
 ) -> bool:
     # Delay ROOT import so we don't explicitly rely on it.
     import ROOT
@@ -844,7 +858,7 @@ def run(
     for filename in input_filenames:
         main_tree.Add(str(filename))
     # if collision_system == "embedPythia":
-    if False:
+    if cross_check_task:
         friend_tree = ROOT.TChain("tree")
         for filename in input_filenames:
             friend_tree.Add(str(filename.parent / "scale_factor" / filename.name))
@@ -853,6 +867,12 @@ def run(
 
     df_original = ROOT.RDataFrame(main_tree)
     # df = ROOT.RDataFrame("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl", "")
+
+    if cross_check_task:
+        # Add the aliases. This has to be done after the df is defined because apparently they don't carry over.
+        renames = cross_check_task_renames(grooming_method=grooming_method, input_branches=df_original.GetColumnNames())
+        for k, v in renames.items():
+            df_original = df_original.Alias(k, v)
 
     # Add scale factor column with 1s if it doesn't exist yet.
     if "scale_factor" not in df_original.GetColumnNames():
