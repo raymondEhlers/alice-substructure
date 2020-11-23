@@ -11,7 +11,7 @@ from typing import Any, Dict, Sequence, List, Optional, Tuple
 import attr
 import numpy as np
 
-from jet_substructure.base import data_manager, helpers
+from jet_substructure.base import helpers
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,29 @@ class MatchingIndex:
     @property
     def matching_level(self) -> str:
         return f"{self.measured_like_prefix}_{self.generator_like_prefix}"
+
+
+def cross_check_task_renames(grooming_method: str, input_branches: Sequence[str]) -> Dict[str, str]:
+    # Validation
+    input_branches = list(input_branches)
+
+    renames = {}
+    # First, some specifics:
+    for subjet_name in ["leading", "subleading"]:
+        renames[f"{grooming_method}_det_level_{subjet_name}_subjet_momentum_fraction_in_hybrid_jet"] = f"{grooming_method}_hybrid_det_level_matching_{subjet_name}_pt_fraction_in_hybrid_jet"
+
+    for branch_name in input_branches:
+        new_branch_name = branch_name
+        # data -> hybrid
+        # matched -> true
+        # det_level -> det_level
+        for old, new in [("data", "hybrid"), ("matched", "true"), ("det_level", "det_level")]:
+            new_branch_name = new_branch_name.replace(old, new)
+
+        if new_branch_name != branch_name and "subjet_momentum_fraction" not in new_branch_name:
+            renames[new_branch_name] = branch_name
+
+    return renames
 
 
 def new_matching_hists(
@@ -424,7 +447,8 @@ def run_response(
     jet_R: float,
     output_filename: Path,
     jet_pt_prefix_first: bool = False,
-    n_cores: int = 8
+    n_cores: int = 8,
+    cross_check_task: bool = False,
 ) -> bool:
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
 
@@ -447,17 +471,31 @@ def run_response(
     for filename in input_filenames:
         main_tree.Add(str(filename))
     #if collision_system == "embedPythia":
-    if False:
+    if cross_check_task:
         friend_tree = ROOT.TChain("tree")
         for filename in input_filenames:
-            friend_tree.Add(str(filename.parent / "scale_factor" / filename.name))
+            friend_tree.Add(str(filename.parent.parent / "scale_factor" / filename.name))
         # Add friends with scale factors
         main_tree.AddFriend(friend_tree)
+
+        # Could add the alises here. However, they don't seem to propagate to the df, so we wait.
+        #renames = cross_check_task_renames(grooming_method=grooming_method, input_branches=[b.GetName() for b in main_tree.GetListOfBranches()])
+        #for k, v in renames.items():
+        #    if not main_tree.SetAlias(k, v):
+        #        raise RuntimeError(f"wat? {k}, {v}")
 
     # Keep the fully original DF so we can see everything applied to it.
     df_true_original = ROOT.RDataFrame(main_tree)
     df_original = df_true_original
     # df = ROOT.RDataFrame("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl", "")
+
+    if cross_check_task:
+        # Add the aliases. This has to be done after the df is defined because apparently they don't carry over.
+        renames = cross_check_task_renames(grooming_method=grooming_method, input_branches=df_original.GetColumnNames())
+        for k, v in renames.items():
+            df_original = df_original.Alias(k, v)
+
+    import IPython; IPython.embed()
 
     # Scale factors _must_ be defined here, so we don't provide a fall back.
 
@@ -870,12 +908,12 @@ def run(
     return True
 
 
-def run_standalone(collision_system: str, train_numbers: Sequence[int], tree_name: str, prefixes: Sequence[str], grooming_method: str, jet_R: float, jet_pt_prefix_first: bool = False, n_cores: int = 8) -> bool:
+def run_standalone(collision_system: str, train_numbers: Sequence[int], tree_name: str, prefixes: Sequence[str], grooming_method: str, jet_R: float, jet_pt_prefix_first: bool = False, n_cores: int = 8, cross_check_task: bool = False) -> bool:
     # Determine the filenames based on the train numbers and predefined path here.
     base_path = Path("trains/") / collision_system / "{train_number}/skim/AnalysisResults.*.root"
     # TODO: Fix this bullshit!
     # base_path = Path("../../clusterfs4/rehlers/substructure/trains/") / collision_system / "{train_number}/AnalysisResults.*.root"
-    filenames = data_manager._ensure_and_expand_paths(
+    filenames = helpers.expand_wildcards_in_filenames(
         [Path(str(base_path).format(train_number=train_number)) for train_number in train_numbers]
     )
 
@@ -888,7 +926,7 @@ def run_standalone(collision_system: str, train_numbers: Sequence[int], tree_nam
     base_filename.mkdir(parents=True, exist_ok=True)
     output_filename = base_filename / f"{grooming_method}_{'_'.join(prefixes)}_closure.root"
 
-    return run_create_closure_ratio(
+    return run_response(
         collision_system=collision_system,
         input_filenames=filenames,
         tree_name=tree_name,
@@ -897,7 +935,8 @@ def run_standalone(collision_system: str, train_numbers: Sequence[int], tree_nam
         jet_R=jet_R,
         output_filename=output_filename,
         jet_pt_prefix_first=jet_pt_prefix_first,
-        n_cores=n_cores
+        n_cores=n_cores,
+        cross_check_task=cross_check_task,
     )
 
 
@@ -928,33 +967,34 @@ def embed_pythia_entry_point() -> None:
 if __name__ == "__main__":
     helpers.setup_logging()
     prefixes = ["hybrid", "true", "det_level"]
+    run_standalone(
+        collision_system="embedPythia",
+        #train_numbers=list(range(5791, 5792)),
+        #train_numbers=list(range(5966, 5968)),
+        train_numbers=list(range(6338, 6339)),
+        # train_numbers=list(range(6017, 6018)),
+        # train_numbers=list(range(5988, 5989)),
+        tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+        #tree_name="tree",
+        # prefix="det_level",
+        prefixes=prefixes,
+        grooming_method="leading_kt",
+        jet_R=0.4,
+        n_cores=2,
+        jet_pt_prefix_first=True,
+        cross_check_task=True,
+    )
+    # for grooming_method in ["leading_kt", "leading_kt_z_cut_02", "leading_kt_z_cut_04", "dynamical_z", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02", "soft_drop_z_cut_04"]:
     #run_standalone(
-    #    collision_system="embedPythia",
-    #    #train_numbers=list(range(5791, 5792)),
-    #    #train_numbers=list(range(5966, 5968)),
-    #    train_numbers=list(range(5977, 5978)),
-    #    # train_numbers=list(range(6017, 6018)),
-    #    # train_numbers=list(range(5988, 5989)),
-    #    #tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+    #    collision_system="PbPb",
+    #    train_numbers=[5537],
+    #    #tree_name="AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl",
     #    tree_name="tree",
-    #    # prefix="det_level",
-    #    prefixes=prefixes,
+    #    prefixes=["data"],
+    #    #grooming_method=grooming_method,
     #    grooming_method="leading_kt",
     #    jet_R=0.4,
     #    n_cores=6,
     #    jet_pt_prefix_first=True,
     #)
-    # for grooming_method in ["leading_kt", "leading_kt_z_cut_02", "leading_kt_z_cut_04", "dynamical_z", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02", "soft_drop_z_cut_04"]:
-    run_standalone(
-        collision_system="PbPb",
-        train_numbers=[5537],
-        #tree_name="AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl",
-        tree_name="tree",
-        prefixes=["data"],
-        #grooming_method=grooming_method,
-        grooming_method="leading_kt",
-        jet_R=0.4,
-        n_cores=6,
-        jet_pt_prefix_first=True,
-    )
 
