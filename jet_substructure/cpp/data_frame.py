@@ -6,7 +6,7 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import Any, Dict, Sequence, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import attr
 import numpy as np
@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # Typing helpers
 RDF = Any
 RootHist = Any
+
 
 @attr.s(frozen=True)
 class MatchingIndex:
@@ -38,7 +39,9 @@ def cross_check_task_renames(grooming_method: str, input_branches: Sequence[str]
     renames = {}
     # First, some specifics:
     for subjet_name in ["leading", "subleading"]:
-        renames[f"{grooming_method}_det_level_{subjet_name}_subjet_momentum_fraction_in_hybrid_jet"] = f"{grooming_method}_hybrid_det_level_matching_{subjet_name}_pt_fraction_in_hybrid_jet"
+        renames[
+            f"{grooming_method}_det_level_{subjet_name}_subjet_momentum_fraction_in_hybrid_jet"
+        ] = f"{grooming_method}_hybrid_det_level_matching_{subjet_name}_pt_fraction_in_hybrid_jet"
 
     for branch_name in input_branches:
         new_branch_name = branch_name
@@ -192,7 +195,11 @@ def matching_hists(  # noqa: C901
         name = f"{grooming_method}_{matching_level}_matching_{matching_type}"
         if hist_suffix:
             name += f"_{hist_suffix}"
-        h_matching = df_selection.Histo1D((name, name, *matching_jet_pt_axis), jet_pt_column_format.format(prefix=matching_jet_pt_prefix), "scale_factor",)
+        h_matching = df_selection.Histo1D(
+            (name, name, *matching_jet_pt_axis),
+            jet_pt_column_format.format(prefix=matching_jet_pt_prefix),
+            "scale_factor",
+        )
         hists.append(h_matching)
 
         # Responses
@@ -278,7 +285,14 @@ def _substructure_hists(
     )
     hists.append(kt)
     delta_R = df.Histo2D(
-        (f"{grooming_method}_{prefix}_delta_R{tag}", f"{grooming_method}_{prefix}_delta_R{tag}", *jet_pt_axis, 21, -0.02, jet_R),
+        (
+            f"{grooming_method}_{prefix}_delta_R{tag}",
+            f"{grooming_method}_{prefix}_delta_R{tag}",
+            *jet_pt_axis,
+            21,
+            -0.02,
+            jet_R,
+        ),
         jet_pt_column,
         f"{grooming_method}_{prefix}_delta_R",
         "scale_factor",
@@ -337,7 +351,16 @@ def _substructure_hists(
         f"{grooming_method}_{prefix}_log_kt", f"log({grooming_method}_{prefix}_kt)"
     )
     lund_plane = df_lund_plane.Histo2D(
-        (f"{grooming_method}_{prefix}_lund_plane{tag}", f"{grooming_method}_{prefix}_lund_plane{tag}", 100, 0, 5, 100, -5.0, 5.0),
+        (
+            f"{grooming_method}_{prefix}_lund_plane{tag}",
+            f"{grooming_method}_{prefix}_lund_plane{tag}",
+            100,
+            0,
+            5,
+            100,
+            -5.0,
+            5.0,
+        ),
         "lund_plane_x_axis",
         f"{grooming_method}_{prefix}_log_kt",
         "scale_factor",
@@ -345,6 +368,7 @@ def _substructure_hists(
     hists.append(lund_plane)
 
     return hists
+
 
 def run_create_closure_ratio(
     collision_system: str,
@@ -355,7 +379,7 @@ def run_create_closure_ratio(
     jet_R: float,
     output_filename: Path,
     jet_pt_prefix_first: bool = False,
-    n_cores: int = 8
+    n_cores: int = 8,
 ) -> bool:
     # TODO: I think I can just refactor this in the standard case...?
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
@@ -399,22 +423,24 @@ def run_create_closure_ratio(
         smeared_cut_prefix = "data"
         prefix_for_ratio = "data"
 
-    smeared_substructure_variable_bins=np.array(
-        [1, 2, 3, 4, 5, 7, 10, 15],
-        dtype=np.float64,
-    )
-    smeared_jet_pt_bins=np.array(
-        [30, 40, 50, 60, 80, 100, 120],
-        dtype=np.float64,
-    )
+    smeared_substructure_variable_bins = np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64,)
+    smeared_jet_pt_bins = np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64,)
     hists = []
-    hists.append(df_original.Histo2D(
-        (f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt", f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt",
-         len(smeared_substructure_variable_bins) - 1, smeared_substructure_variable_bins, len(smeared_jet_pt_bins) - 1, smeared_jet_pt_bins),
-        f"{grooming_method}_{prefix_for_ratio}_kt",
-        f"{jet_pt_column_format.format(prefix=prefix_for_ratio)}",
-        "scale_factor",
-    ))
+    hists.append(
+        df_original.Histo2D(
+            (
+                f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt",
+                f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt",
+                len(smeared_substructure_variable_bins) - 1,
+                smeared_substructure_variable_bins,
+                len(smeared_jet_pt_bins) - 1,
+                smeared_jet_pt_bins,
+            ),
+            f"{grooming_method}_{prefix_for_ratio}_kt",
+            f"{jet_pt_column_format.format(prefix=prefix_for_ratio)}",
+            "scale_factor",
+        )
+    )
 
     # Calculate the DataFrame by forcing it determine a property.
     # Discard the result - we don't really care. We just need a meaningless property.
@@ -470,7 +496,7 @@ def run_response(
     main_tree = ROOT.TChain(tree_name)
     for filename in input_filenames:
         main_tree.Add(str(filename))
-    #if collision_system == "embedPythia":
+    # if collision_system == "embedPythia":
     if cross_check_task:
         friend_tree = ROOT.TChain("tree")
         for filename in input_filenames:
@@ -479,8 +505,8 @@ def run_response(
         main_tree.AddFriend(friend_tree)
 
         # Could add the alises here. However, they don't seem to propagate to the df, so we wait.
-        #renames = cross_check_task_renames(grooming_method=grooming_method, input_branches=[b.GetName() for b in main_tree.GetListOfBranches()])
-        #for k, v in renames.items():
+        # renames = cross_check_task_renames(grooming_method=grooming_method, input_branches=[b.GetName() for b in main_tree.GetListOfBranches()])
+        # for k, v in renames.items():
         #    if not main_tree.SetAlias(k, v):
         #        raise RuntimeError(f"wat? {k}, {v}")
 
@@ -495,7 +521,9 @@ def run_response(
         for k, v in renames.items():
             df_original = df_original.Alias(k, v)
 
-    import IPython; IPython.embed()
+    import IPython
+
+    IPython.embed()
 
     # Scale factors _must_ be defined here, so we don't provide a fall back.
 
@@ -593,8 +621,7 @@ def run_response(
     # First, setup the dataframes. We only want to apply this complex filtering once since
     # it takes so many filtering calls.
     matching_dfs = {}
-    for measured_like_prefix, generator_like_prefix in [("hybrid", "det_level"),
-                                                        ("det_level", "true")]:
+    for measured_like_prefix, generator_like_prefix in [("hybrid", "det_level"), ("det_level", "true")]:
         # NOTE: We explicitly require splittings at both the det level (generator-like) and hybrid level (measured-like).
         #       This excludes matching_leading and matching_subleading == 0.
         require_splittings_filter = f"({grooming_method}_{measured_like_prefix}_n_passed_grooming > 0) && ({grooming_method}_{generator_like_prefix}_n_passed_grooming > 0)"
@@ -623,19 +650,23 @@ def run_response(
         }
         for matching_type, selection in matching_map.items():
             # Empty string will break the filter, so we need to only apply it if there is a valid selection.
-            matching_dfs[MatchingIndex(
-                measured_like_prefix=measured_like_prefix, generator_like_prefix=generator_like_prefix, matching_type=matching_type
-            )] = df_require_splittings.Filter(selection) if selection else df_require_splittings
+            matching_dfs[
+                MatchingIndex(
+                    measured_like_prefix=measured_like_prefix,
+                    generator_like_prefix=generator_like_prefix,
+                    matching_type=matching_type,
+                )
+            ] = (df_require_splittings.Filter(selection) if selection else df_require_splittings)
 
     for matching_index, df_base in matching_dfs.items():
         # Setup
         # As of 21 September 2020, this is only for hybrid <-> det level
-        create_generator_subjet_in_measured_jet_hists = (matching_index.measured_like_prefix == "hybrid")
+        create_generator_subjet_in_measured_jet_hists = matching_index.measured_like_prefix == "hybrid"
 
         # We explicitly require splittings at both the det level (generator-like) and hybrid level (measured-like).
         # This excludes matching_leading and matching_subleading == 0.
-        #require_splittings_filter = f"{grooming_method}_{measured_like_prefix}_n_passed_grooming > 0 && {grooming_method}_{generator_like_prefix}_n_passed_grooming > 0"
-        #df_selection = df.Filter(require_splittings_filter)
+        # require_splittings_filter = f"{grooming_method}_{measured_like_prefix}_n_passed_grooming > 0 && {grooming_method}_{generator_like_prefix}_n_passed_grooming > 0"
+        # df_selection = df.Filter(require_splittings_filter)
 
         # We want to match without the hybrid jet pt cut as a function of hybrid jet pt. So do that first before we cut.
         # Matching
@@ -657,17 +688,19 @@ def run_response(
         jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= 40 && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < 120"
         df_selection = df_base.Filter(jet_pt_cut)
 
-        hists.extend(new_matching_hists(
-            df=df_selection,
-            grooming_method=grooming_method,
-            hist_suffix=tag,
-            matching_index=matching_index,
-            jet_pt_column_format=jet_pt_column_format,
-            create_generator_subjet_in_measured_jet_hists=create_generator_subjet_in_measured_jet_hists,
-        ))
+        hists.extend(
+            new_matching_hists(
+                df=df_selection,
+                grooming_method=grooming_method,
+                hist_suffix=tag,
+                matching_index=matching_index,
+                jet_pt_column_format=jet_pt_column_format,
+                create_generator_subjet_in_measured_jet_hists=create_generator_subjet_in_measured_jet_hists,
+            )
+        )
 
         # Measured kt selections
-        #for measured_min_kt in [-1, 2, 3, 5]:
+        # for measured_min_kt in [-1, 2, 3, 5]:
         #    # kt == -1 is the cause that includes the untagged. There, we don't want to include any kt tag.
         #    selection_tag = tag
         #    kt_smeared_selection_filter = f"{grooming_method}_{smeared_cut_prefix}_kt > {measured_min_kt}"
@@ -728,8 +761,8 @@ def run_response(
         # )
 
         # n_to_split > 4
-        #hist_suffix = f"{tag}_{generator_like_prefix}_n_to_split_greater_than_4"
-        #hists.extend(
+        # hist_suffix = f"{tag}_{generator_like_prefix}_n_to_split_greater_than_4"
+        # hists.extend(
         #    matching_hists(
         #        df=df_selection,
         #        grooming_method=grooming_method,
@@ -740,10 +773,10 @@ def run_response(
         #        jet_pt_column_format=jet_pt_column_format,
         #        create_generator_subjet_in_measured_jet_hists=create_generator_subjet_in_measured_jet_hists,
         #    )
-        #)
+        # )
         ## n_to_split < 3
-        #hist_suffix = f"{tag}_{generator_like_prefix}_n_to_split_less_than_3"
-        #hists.extend(
+        # hist_suffix = f"{tag}_{generator_like_prefix}_n_to_split_less_than_3"
+        # hists.extend(
         #    matching_hists(
         #        df=df_selection,
         #        grooming_method=grooming_method,
@@ -754,10 +787,10 @@ def run_response(
         #        jet_pt_column_format=jet_pt_column_format,
         #        create_generator_subjet_in_measured_jet_hists=create_generator_subjet_in_measured_jet_hists,
         #    )
-        #)
+        # )
 
     # If we want to save the dot graph. Unfortunately, it won't really be so insightful because we create many branches for the histograms.
-    #ROOT.RDF.SaveGraph(df_true_original, "graph.dot")
+    # ROOT.RDF.SaveGraph(df_true_original, "graph.dot")
 
     # Calculate the DataFrame by forcing it determine a property.
     # Discard the result - we don't really care. We just need a meaningless property.
@@ -790,7 +823,7 @@ def run(
     jet_R: float,
     output_filename: Path,
     jet_pt_prefix_first: bool = False,
-    n_cores: int = 8
+    n_cores: int = 8,
 ) -> bool:
     # Delay ROOT import so we don't explicitly rely on it.
     import ROOT
@@ -810,7 +843,7 @@ def run(
     main_tree = ROOT.TChain(tree_name)
     for filename in input_filenames:
         main_tree.Add(str(filename))
-    #if collision_system == "embedPythia":
+    # if collision_system == "embedPythia":
     if False:
         friend_tree = ROOT.TChain("tree")
         for filename in input_filenames:
@@ -855,7 +888,8 @@ def run(
         for prefix in prefixes:
             hists.extend(
                 _substructure_hists(
-                    df=df, jet_pt_column_format=jet_pt_column_format,
+                    df=df,
+                    jet_pt_column_format=jet_pt_column_format,
                     jet_pt_axis=jet_pt_axis,
                     jet_R=jet_R,
                     prefix=prefix,
@@ -869,20 +903,25 @@ def run(
     if collision_system == "embedPythia":
         # Plot all substructure variables, but instead with a constant generator level pt cut.
         # Apply generator level jet pt cut
-        jet_pt_cut = f"{jet_pt_column_format.format(prefix='true')} >= 40 && {jet_pt_column_format.format(prefix='true')} < 140"
+        jet_pt_cut = (
+            f"{jet_pt_column_format.format(prefix='true')} >= 40 && {jet_pt_column_format.format(prefix='true')} < 140"
+        )
         tag = "_jet_pt_true_40_140"
         df = df_original.Filter(jet_pt_cut)
 
         for prefix in prefixes:
-            hists.extend(_substructure_hists(
-                df=df, jet_pt_column_format=jet_pt_column_format,
-                jet_pt_axis=jet_pt_axis,
-                jet_R=jet_R,
-                prefix=prefix,
-                grooming_method=grooming_method,
-                tag=tag,
-                jet_pt_prefix="true",
-            ))
+            hists.extend(
+                _substructure_hists(
+                    df=df,
+                    jet_pt_column_format=jet_pt_column_format,
+                    jet_pt_axis=jet_pt_axis,
+                    jet_R=jet_R,
+                    prefix=prefix,
+                    grooming_method=grooming_method,
+                    tag=tag,
+                    jet_pt_prefix="true",
+                )
+            )
 
     # If we want to save the dot graph. Unfortunately, it won't really be so insightful because we create many branches for the histograms.
     # ROOT.RDF.SaveGraph(df)
@@ -908,7 +947,17 @@ def run(
     return True
 
 
-def run_standalone(collision_system: str, train_numbers: Sequence[int], tree_name: str, prefixes: Sequence[str], grooming_method: str, jet_R: float, jet_pt_prefix_first: bool = False, n_cores: int = 8, cross_check_task: bool = False) -> bool:
+def run_standalone(
+    collision_system: str,
+    train_numbers: Sequence[int],
+    tree_name: str,
+    prefixes: Sequence[str],
+    grooming_method: str,
+    jet_R: float,
+    jet_pt_prefix_first: bool = False,
+    n_cores: int = 8,
+    cross_check_task: bool = False,
+) -> bool:
     # Determine the filenames based on the train numbers and predefined path here.
     base_path = Path("trains/") / collision_system / "{train_number}/skim/AnalysisResults.*.root"
     # TODO: Fix this bullshit!
@@ -941,7 +990,7 @@ def run_standalone(collision_system: str, train_numbers: Sequence[int], tree_nam
 
 
 def embed_pythia_entry_point() -> None:
-    """ Allow processing one pt hard bin at a time.
+    """Allow processing one pt hard bin at a time.
 
     Why? Because RDF has awful performance for jitted filter statements. See: https://root-forum.cern.ch/t/rdataframe-is-very-slow-for-many-histograms/37875/15
     """
@@ -955,9 +1004,9 @@ def embed_pythia_entry_point() -> None:
 
     run_standalone(
         collision_system="embedPythia",
-        #train_numbers=[args.trainNumber],
+        # train_numbers=[args.trainNumber],
         train_numbers=list(range(5966, 5986)),
-        #tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+        # tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
         tree_name="tree",
         prefixes=["hybrid"],
         grooming_method=args.groomingMethod,
@@ -969,13 +1018,13 @@ if __name__ == "__main__":
     prefixes = ["hybrid", "true", "det_level"]
     run_standalone(
         collision_system="embedPythia",
-        #train_numbers=list(range(5791, 5792)),
-        #train_numbers=list(range(5966, 5968)),
+        # train_numbers=list(range(5791, 5792)),
+        # train_numbers=list(range(5966, 5968)),
         train_numbers=list(range(6338, 6339)),
         # train_numbers=list(range(6017, 6018)),
         # train_numbers=list(range(5988, 5989)),
         tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
-        #tree_name="tree",
+        # tree_name="tree",
         # prefix="det_level",
         prefixes=prefixes,
         grooming_method="leading_kt",
@@ -985,7 +1034,7 @@ if __name__ == "__main__":
         cross_check_task=True,
     )
     # for grooming_method in ["leading_kt", "leading_kt_z_cut_02", "leading_kt_z_cut_04", "dynamical_z", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02", "soft_drop_z_cut_04"]:
-    #run_standalone(
+    # run_standalone(
     #    collision_system="PbPb",
     #    train_numbers=[5537],
     #    #tree_name="AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl",
@@ -996,5 +1045,4 @@ if __name__ == "__main__":
     #    jet_R=0.4,
     #    n_cores=6,
     #    jet_pt_prefix_first=True,
-    #)
-
+    # )
