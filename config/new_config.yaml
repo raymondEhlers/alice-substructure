@@ -66,8 +66,9 @@ available_datasets:
             - "trains/PbPb/5862/AnalysisResults.*.repaired.root"
     LHC18qr_central_6359: &LHC18qr_central
         name: "LHC18qr_central_6359"
+        cross_check_task: true
         # yamllint disable-line rule:line-length
-        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
+        tree_name: "AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
         # A map to potentially rename the branch prefix.
         prefixes:
             data: "data"
@@ -306,11 +307,12 @@ available_datasets:
     # R = 0.2 central to test if unfolding is possible. Leading kt, z_cut = 0
     LHC19f4_embedded_into_LHC18qr_central_6338_6357: &LHC19f4_embedded_into_LHC18qr_central
         name: "LHC19f4_embedded_into_LHC18qr_central_6338_6357"
+        cross_check_task: true
         # yamllint disable-line rule:line-length
-        tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        tree_name: "AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
         # A map to potentially rename the branch prefix.
         prefixes:
-            data: "hybrid"
+            data: "data"
             matched: "matched"
             detLevel: "det_level"
         # Branches which don't contain a prefix
@@ -345,4 +347,4 @@ execution:
     embedPythia:
         dataset: *LHC19f4_embedded_into_LHC18qr_central
     PbPb:
-        dataset: *LHC18qr_semi_central
+        dataset: *LHC18qr_central
