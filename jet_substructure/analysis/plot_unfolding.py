@@ -5,7 +5,7 @@
 
 import logging
 from pathlib import Path
-from typing import Callable, Mapping, MutableMapping, Sequence
+from typing import Callable, Mapping, MutableMapping, Optional, Sequence
 
 import attr
 import boost_histogram as bh
@@ -1036,6 +1036,7 @@ def plot_select_iteration(
     plot_config: pb.PlotConfig,
     output_dir: Path,
     plot_png: bool = False,
+    reweighted_prior_output: Optional[UnfoldingOutput] = None,
 ) -> None:
     """Plot selected iteration."""
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
@@ -1050,6 +1051,11 @@ def plot_select_iteration(
         variances=np.ones(n_bins),
     )
     hist_stat = binned_data.BinnedData(
+        axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)],
+        values=np.zeros(n_bins),
+        variances=np.ones(n_bins),
+    )
+    hist_prior = binned_data.BinnedData(
         axes=[np.linspace(1.5, 1.5 + n_bins, n_bins + 1)],
         values=np.zeros(n_bins),
         variances=np.ones(n_bins),
@@ -1088,9 +1094,15 @@ def plot_select_iteration(
         # Calculate and store stat error
         stat_value = np.sum(current_iter_hist.errors / current_iter_hist.values)
         hist_stat.values[i] = stat_value
+        # If prior is provided, calculate.
+        prior_value = 0
+        if reweighted_prior_output:
+            prior = reweighted_prior_output.unfolded_substructure(n_iter=iter, true_jet_pt_range=true_bin)  # type: ignore
+            prior_value = np.sum(np.abs(current_iter_hist.values - prior.values) / current_iter_hist.values)
+            hist_prior.values[i] = prior_value
 
         # Total
-        hist_total.values[i] = np.sqrt(regularization_value ** 2 + stat_value ** 2)
+        hist_total.values[i] = np.sqrt(regularization_value ** 2 + stat_value ** 2 + prior_value ** 2)
 
     # Plot the total errors
     ax.errorbar(
@@ -1119,6 +1131,16 @@ def plot_select_iteration(
         marker="o",
         linestyle="",
     )
+    # And the prior values, if they were provided
+    if reweighted_prior_output:
+        ax.errorbar(
+            hist_prior.axes[0].bin_centers,
+            hist_prior.values,
+            xerr=hist_prior.axes[0].bin_widths / 2,
+            label="Prior",
+            marker="o",
+            linestyle="",
+        )
 
     # Label and layout
     plot_config.apply(fig=fig, ax=ax)
@@ -1134,7 +1156,9 @@ def plot_select_iteration(
     plt.close(fig)
 
 
-def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False) -> Path:
+def plot_kt_unfolding(
+    unfolding_output: UnfoldingOutput, plot_png: bool = False, reweighted_prior_output: Optional[UnfoldingOutput] = None
+) -> Path:
     # with sns.color_palette("GnBu_d", n_colors=11):
     with sns.color_palette("Paired", n_colors=unfolding_output.max_n_iter):
         # Main unfolded plot.
@@ -1474,6 +1498,7 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
         ),
         output_dir=unfolding_output.output_dir,
         plot_png=plot_png,
+        reweighted_prior_output=reweighted_prior_output,
     )
 
     # Efficiency
@@ -2009,6 +2034,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                     ),
                 ],
             ),
+            plot_png=plot_png,
         )
         # Check a broader true jet pt range: 40-120
         true_jet_pt_range = helpers.JetPtRange(40, 120)
@@ -2061,6 +2087,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                     ),
                 ],
             ),
+            plot_png=plot_png,
         )
         # Unfolded jet pt
         true_substructure_variable_range = helpers.RgRange(-1, 100)
@@ -2111,6 +2138,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                     ),
                 ],
             ),
+            plot_png=plot_png,
         )
 
         # Now, on to the refolded.
@@ -2152,6 +2180,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                     ),
                 ],
             ),
+            plot_png=plot_png,
         )
         # Jet pt
         text = f"${unfolding_output.smeared_var_range.display_str(label='data')}$"
@@ -2196,6 +2225,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                     ),
                 ],
             ),
+            plot_png=plot_png,
         )
 
     # Plot the response
@@ -2216,6 +2246,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                 figure=pb.Figure(edge_padding={"left": 0.11, "bottom": 0.10}),
             ),
             output_dir=unfolding_output.output_dir,
+            plot_png=plot_png,
         )
 
     # Select the n_iter iteration
@@ -2238,6 +2269,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
             ),
         ),
         output_dir=unfolding_output.output_dir,
+        plot_png=plot_png,
     )
 
     return unfolding_output.output_dir
