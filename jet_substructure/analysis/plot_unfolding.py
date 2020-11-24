@@ -1535,10 +1535,11 @@ def plot_kt_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False)
 
 
 def run(collision_system: str) -> None:
-    for input_file in [
+    base_dir = Path("output")
+    for unfolding_output in [
         ###################### kt smeared = 2-10 ##########################
         ## 2-10, 1-2, 30-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -1546,7 +1547,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(30, 120),
         #    n_iter_compare=7,
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -1556,7 +1557,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 2-10, 1-2, 40-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -1564,7 +1565,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         #    n_iter_compare=3,
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -1574,7 +1575,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 2-10, 10-13, 30-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -1582,7 +1583,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(30, 120),
         #    n_iter_compare=7,
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -1592,7 +1593,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 2-10, 10-13, 40-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -1600,7 +1601,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         #    n_iter_compare=3,
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -1611,7 +1612,7 @@ def run(collision_system: str) -> None:
         # ),
         ###################### kt smeared = 3-10 ##########################
         ## 3-10, 2-3, 30-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1619,7 +1620,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(30, 120),
         #    n_iter_compare=4,
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1629,7 +1630,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         # 3-10, 2-3, 40-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1637,7 +1638,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         #    n_iter_compare=3,
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1647,7 +1648,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-10, 10-13, 30-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1655,7 +1656,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(30, 120),
         #    n_iter_compare=4,
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1665,7 +1666,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-10, 10-13, 40-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1673,7 +1674,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         #    n_iter_compare=3,
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1683,7 +1684,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         # 3-10, 2-3, 40-120, pure matches
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1693,7 +1694,7 @@ def run(collision_system: str) -> None:
         #    n_iter_compare=11,
         #    max_iter=15,
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1706,7 +1707,7 @@ def run(collision_system: str) -> None:
         # ),
         ###################### kt smeared = 3-10, broad true bins ##########################
         ## 3-10, 2-3, 30-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1715,7 +1716,7 @@ def run(collision_system: str) -> None:
         #    n_iter_compare=4,
         #    suffix="broadTrueBins",
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1726,7 +1727,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-10, 2-3, 40-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1735,7 +1736,7 @@ def run(collision_system: str) -> None:
         #    n_iter_compare=3,
         #    suffix="broadTrueBins",
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -1746,14 +1747,14 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-11, 30-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 11),
         #    smeared_untagged_var=helpers.KtRange(2, 3),
         #    smeared_jet_pt_range=helpers.JetPtRange(30, 120),
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 11),
@@ -1762,14 +1763,14 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-11, 40-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 11),
         #    smeared_untagged_var=helpers.KtRange(2, 3),
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 11),
@@ -1778,14 +1779,14 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-15, 30-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 15),
         #    smeared_untagged_var=helpers.KtRange(2, 3),
         #    smeared_jet_pt_range=helpers.JetPtRange(30, 120),
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 15),
@@ -1794,7 +1795,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-15, 40-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 15),
@@ -1803,7 +1804,7 @@ def run(collision_system: str) -> None:
         #    n_iter_compare=3,
         #    pure_matches=True,
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 15),
@@ -1815,7 +1816,7 @@ def run(collision_system: str) -> None:
         # ),
         ###################### kt smeared = 5-15 ##########################
         ## 4-15, 3-4, 40-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(4, 15),
@@ -1823,7 +1824,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         #    n_iter_compare=3,
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(4, 15),
@@ -1833,7 +1834,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 5-15, 4-5, 40-120
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(5, 15),
@@ -1841,7 +1842,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         #    n_iter_compare=3,
         # ),
-        # InputFile(
+        # UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(5, 15),
@@ -1852,7 +1853,7 @@ def run(collision_system: str) -> None:
         # ),
         ####### Dynamical kt ##########
         # 3-15, 2-3, 40-120
-        InputFile(
+        UnfoldingOutput(
             "kt",
             "dynamical_kt",
             smeared_var_range=helpers.KtRange(3, 15),
@@ -1860,8 +1861,10 @@ def run(collision_system: str) -> None:
             smeared_jet_pt_range=helpers.JetPtRange(40, 120),
             n_iter_compare=3,
             suffix="broadTrueBins",
+            collision_system=collision_system,
+            base_dir=base_dir,
         ),
-        InputFile(
+        UnfoldingOutput(
             "kt",
             "dynamical_kt",
             smeared_var_range=helpers.KtRange(3, 15),
@@ -1870,9 +1873,11 @@ def run(collision_system: str) -> None:
             n_iter_compare=3,
             suffix="broadTrueBins",
             smeared_input=True,
+            collision_system=collision_system,
+            base_dir=base_dir,
         ),
         # 2-15, 1-2, 30-120
-        InputFile(
+        UnfoldingOutput(
             "kt",
             "dynamical_kt",
             smeared_var_range=helpers.KtRange(2, 15),
@@ -1880,8 +1885,10 @@ def run(collision_system: str) -> None:
             smeared_jet_pt_range=helpers.JetPtRange(30, 120),
             n_iter_compare=3,
             suffix="broadTrueBins",
+            collision_system=collision_system,
+            base_dir=base_dir,
         ),
-        InputFile(
+        UnfoldingOutput(
             "kt",
             "dynamical_kt",
             smeared_var_range=helpers.KtRange(2, 15),
@@ -1890,10 +1897,12 @@ def run(collision_system: str) -> None:
             n_iter_compare=3,
             suffix="broadTrueBins",
             smeared_input=True,
+            collision_system=collision_system,
+            base_dir=base_dir,
         ),
         ####### Dynamical time ##########
         # 3-15, 2-3, 40-120
-        InputFile(
+        UnfoldingOutput(
             "kt",
             "dynamical_time",
             smeared_var_range=helpers.KtRange(3, 15),
@@ -1901,8 +1910,10 @@ def run(collision_system: str) -> None:
             smeared_jet_pt_range=helpers.JetPtRange(40, 120),
             n_iter_compare=3,
             suffix="broadTrueBins",
+            collision_system=collision_system,
+            base_dir=base_dir,
         ),
-        InputFile(
+        UnfoldingOutput(
             "kt",
             "dynamical_time",
             smeared_var_range=helpers.KtRange(3, 15),
@@ -1911,10 +1922,12 @@ def run(collision_system: str) -> None:
             n_iter_compare=3,
             suffix="broadTrueBins",
             smeared_input=True,
+            collision_system=collision_system,
+            base_dir=base_dir,
         ),
         ####### Leading kt ##########
         # 3-15, 2-3, 40-120
-        InputFile(
+        UnfoldingOutput(
             "kt",
             "leading_kt",
             smeared_var_range=helpers.KtRange(3, 15),
@@ -1922,8 +1935,10 @@ def run(collision_system: str) -> None:
             smeared_jet_pt_range=helpers.JetPtRange(40, 120),
             n_iter_compare=3,
             suffix="broadTrueBins",
+            collision_system=collision_system,
+            base_dir=base_dir,
         ),
-        InputFile(
+        UnfoldingOutput(
             "kt",
             "leading_kt",
             smeared_var_range=helpers.KtRange(3, 15),
@@ -1932,22 +1947,316 @@ def run(collision_system: str) -> None:
             n_iter_compare=3,
             suffix="broadTrueBins",
             smeared_input=True,
+            collision_system=collision_system,
+            base_dir=base_dir,
         ),
     ]:
-        plot_kt_unfolding(input_file=input_file, collision_system=collision_system)
+        plot_kt_unfolding(unfolding_output=unfolding_output)
+
+
+def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False) -> Path:
+    # with sns.color_palette("GnBu_d", n_colors=11):
+    with sns.color_palette("Paired", n_colors=unfolding_output.max_n_iter):
+        # Main unfolded plot.
+        true_jet_pt_range = helpers.JetPtRange(60, 80)
+        text = f"${true_jet_pt_range.display_str(label='true')}$"
+        plot_unfolded(
+            unfolding_output=unfolding_output,
+            hist_true=unfolding_output.true_substructure(
+                unfolding_output.true_hist_name, true_jet_pt_range=true_jet_pt_range
+            ),
+            hist_n_iter_compare=unfolding_output.unfolded_substructure(
+                unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range
+            ),
+            unfolded_hists=[
+                unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
+                for n_iter in range(1, unfolding_output.max_n_iter)
+            ],
+            plot_config=pb.PlotConfig(
+                name=f"unfolded_{unfolding_output.substructure_variable}_true_pt_60_80",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=r"$\text{d}N/\text{d}\Delta R$",
+                                log=True,
+                            )
+                        ],
+                        # legend=pb.LegendConfig(location="lower left"),
+                        legend=pb.LegendConfig(location="center right"),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"Ratio to iter {unfolding_output.n_iter_compare}",
+                            )
+                        ],
+                    ),
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$\Delta R$"),
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to true",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+        # Check a broader true jet pt range: 40-120
+        true_jet_pt_range = helpers.JetPtRange(40, 120)
+        text = f"${true_jet_pt_range.display_str(label='true')}$"
+        plot_unfolded(
+            unfolding_output=unfolding_output,
+            hist_true=unfolding_output.true_substructure(
+                unfolding_output.true_hist_name, true_jet_pt_range=true_jet_pt_range
+            ),
+            hist_n_iter_compare=unfolding_output.unfolded_substructure(
+                unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range
+            ),
+            unfolded_hists=[
+                unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
+                for n_iter in range(1, unfolding_output.max_n_iter)
+            ],
+            plot_config=pb.PlotConfig(
+                name=f"unfolded_{unfolding_output.substructure_variable}_true_pt_40_120",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=r"$\text{d}N/\text{d}\Delta R$",
+                                log=True,
+                            )
+                        ],
+                        legend=pb.LegendConfig(location="center right"),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"Ratio to iter {unfolding_output.n_iter_compare}",
+                            )
+                        ],
+                    ),
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$\Delta R$"),
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to true",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+        # Unfolded jet pt
+        true_substructure_variable_range = helpers.RgRange(-1, 100)
+        text = f"${true_substructure_variable_range.display_str(label='true')}$"
+        plot_unfolded(
+            unfolding_output=unfolding_output,
+            hist_true=unfolding_output.true_jet_pt(
+                unfolding_output.true_hist_name, true_substructure_variable_range=true_substructure_variable_range
+            ),
+            hist_n_iter_compare=unfolding_output.unfolded_jet_pt(
+                unfolding_output.n_iter_compare, true_substructure_variable_range=true_substructure_variable_range
+            ),
+            unfolded_hists=[
+                unfolding_output.unfolded_jet_pt(
+                    n_iter=n_iter, true_substructure_variable_range=true_substructure_variable_range
+                )
+                for n_iter in range(1, unfolding_output.max_n_iter)
+            ],
+            plot_config=pb.PlotConfig(
+                name="unfolded_pt",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
+                        ],
+                        legend=pb.LegendConfig(location="lower left"),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"Ratio to iter {unfolding_output.n_iter_compare}",
+                            )
+                        ],
+                    ),
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to true",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+
+        # Now, on to the refolded.
+        text = f"${unfolding_output.smeared_jet_pt_range.display_str(label='data')}$"
+        plot_refolded(
+            unfolding_output=unfolding_output,
+            hist_raw=unfolding_output.smeared_substructure(
+                hist_name=unfolding_output.raw_hist_name, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range
+            ),
+            hist_smeared=unfolding_output.smeared_substructure(
+                hist_name=unfolding_output.smeared_hist_name, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range
+            ),
+            refolded_hists=[
+                unfolding_output.refolded_substructure(
+                    n_iter=n_iter, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range
+                )
+                for n_iter in range(1, unfolding_output.max_n_iter)
+            ],
+            plot_config=pb.PlotConfig(
+                name=f"refolded_{unfolding_output.substructure_variable}",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[pb.AxisConfig("y", label=r"$\text{d}N/\text{d}\Delta R$", log=True)],
+                        legend=pb.LegendConfig(location="lower left"),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$\Delta R$"),
+                            # y label is set in the function.
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to smeared" if unfolding_output.smeared_input else "Ratio to data",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+        # Jet pt
+        text = f"${unfolding_output.smeared_var_range.display_str(label='data')}$"
+        plot_refolded(
+            unfolding_output=unfolding_output,
+            hist_raw=unfolding_output.smeared_jet_pt(
+                hist_name=unfolding_output.raw_hist_name,
+                smeared_substructure_variable_range=unfolding_output.smeared_var_range,
+            ),
+            hist_smeared=unfolding_output.smeared_jet_pt(
+                hist_name=unfolding_output.smeared_hist_name,
+                smeared_substructure_variable_range=unfolding_output.smeared_var_range,
+            ),
+            refolded_hists=[
+                unfolding_output.refolded_jet_pt(
+                    n_iter=n_iter, smeared_substructure_variable_range=unfolding_output.smeared_var_range
+                )
+                for n_iter in range(1, unfolding_output.max_n_iter)
+            ],
+            plot_config=pb.PlotConfig(
+                name="refolded_pt",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
+                        ],
+                        legend=pb.LegendConfig(location="lower left"),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
+                            # y label is set in the function.
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to smeared" if unfolding_output.smeared_input else "Ratio to data",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+
+    # Plot the response
+    if "h2_substructure_variable" in unfolding_output.hists:
+        jet_pt_for_text = helpers.JetPtRange(40, 120)
+        text = f"${jet_pt_for_text.display_str(label='hybrid')}$"
+        plot_response(
+            hists=unfolding_output.hists,
+            plot_config=pb.PlotConfig(
+                name=f"response_{unfolding_output.substructure_variable}_hybrid_40_120",
+                panels=pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$\Delta R^{\text{hybrid}}\:(\text{GeV}/c)$"),
+                        pb.AxisConfig("y", label=r"$\Delta R^{\text{true}}\:(\text{GeV}/c)$", range=(0, 0.4)),
+                    ],
+                    text=pb.TextConfig(text, 0.97, 0.03),
+                ),
+                figure=pb.Figure(edge_padding={"left": 0.11, "bottom": 0.10}),
+            ),
+            output_dir=unfolding_output.output_dir,
+        )
+
+    # Select the n_iter iteration
+    jet_pt_for_text = helpers.JetPtRange(60, 80)
+    text = f"${jet_pt_for_text.display_str(label='true')}$"
+    plot_select_iteration(
+        hists=unfolding_output.hists,
+        projection_func=_project_substructure_variable,
+        max_iter=unfolding_output.max_n_iter,
+        true_bin=helpers.JetPtRange(60, 80),
+        plot_config=pb.PlotConfig(
+            name=f"select_iteration_{unfolding_output.substructure_variable}_true_pt_60_80",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label="Iteration"),
+                    pb.AxisConfig("y", label="Summed Error", range=(0, None)),
+                ],
+                legend=pb.LegendConfig(location="center right"),
+                text=pb.TextConfig(text, 0.03, 0.03),
+            ),
+        ),
+        output_dir=unfolding_output.output_dir,
+    )
+
+    return unfolding_output.output_dir
 
 
 def run_delta_R(collision_system: str) -> None:
-    for input_file in [
-        InputFile(
+    base_dir = Path("output")
+    for unfolding_output in [
+        UnfoldingOutput(
             "delta_R",
             "leading_kt_z_cut_02",
             # Hack until the labeling is fixed...
             smeared_var_range=helpers.RgRange(0, 350),
             smeared_untagged_var=helpers.RgRange(-50, 0),
             smeared_jet_pt_range=helpers.JetPtRange(40, 120),
+            collision_system=collision_system,
+            base_dir=base_dir,
         ),
-        InputFile(
+        UnfoldingOutput(
             "delta_R",
             "leading_kt_z_cut_02",
             # Hack until the labeling is fixed...
@@ -1955,261 +2264,11 @@ def run_delta_R(collision_system: str) -> None:
             smeared_untagged_var=helpers.RgRange(-50, 0),
             smeared_jet_pt_range=helpers.JetPtRange(40, 120),
             smeared_input=True,
+            collision_system=collision_system,
+            base_dir=base_dir,
         ),
     ]:
-        # Setup
-        hists, output_dir = setup(input_file=input_file, collision_system=collision_system)
-
-        tag = ""
-        if input_file.smeared_input:
-            tag = "hybridAsInput"
-
-        # with sns.color_palette("GnBu_d", n_colors=11):
-        with sns.color_palette("Paired", n_colors=input_file.max_iter):
-            n_iter_for_ratio = 6
-            jet_pt_for_text = helpers.RangeSelector(60, 80)
-            text = f"${jet_pt_for_text.display_str(label='true')}$"
-            plot_unfolded(
-                hists=hists,
-                projection_func=_project_substructure_variable,
-                efficiency_func=_efficiency_substructure_variable,
-                n_iter_for_ratio=n_iter_for_ratio,
-                max_iter=input_file.max_iter,
-                true_bin=helpers.RangeSelector(60, 80),
-                tag=tag,
-                plot_config=pb.PlotConfig(
-                    name=f"unfolded_{input_file.substructure_variable}_true_pt_60_80",
-                    panels=[
-                        # Main panel
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y",
-                                    label=r"$\text{d}N/\text{d}\Delta R$",
-                                    log=True,
-                                )
-                            ],
-                            # legend=pb.LegendConfig(location="lower left"),
-                            legend=pb.LegendConfig(location="center right"),
-                            text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                        # Ratio
-                        pb.Panel(
-                            axes=[pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0.5, 1.5))],
-                        ),
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$\Delta R$"),
-                                pb.AxisConfig(
-                                    "y",
-                                    label="Ratio to true",
-                                    range=(0.5, 1.5),
-                                ),
-                            ],
-                        ),
-                    ],
-                ),
-                output_dir=output_dir,
-            )
-            # 40-120 true pt.
-            jet_pt_for_text = helpers.RangeSelector(40, 120)
-            text = f"${jet_pt_for_text.display_str(label='true')}$"
-            plot_unfolded(
-                hists=hists,
-                projection_func=_project_substructure_variable,
-                efficiency_func=_efficiency_substructure_variable,
-                n_iter_for_ratio=n_iter_for_ratio,
-                max_iter=input_file.max_iter,
-                true_bin=helpers.RangeSelector(40, 120),
-                tag=tag,
-                plot_config=pb.PlotConfig(
-                    name=f"unfolded_{input_file.substructure_variable}_true_pt_40_120",
-                    panels=[
-                        # Main panel
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y",
-                                    label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",
-                                    log=True,
-                                )
-                            ],
-                            legend=pb.LegendConfig(location="center right"),
-                            text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                        # Ratio
-                        pb.Panel(
-                            axes=[pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0.5, 1.5))],
-                        ),
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$\Delta R$"),
-                                pb.AxisConfig(
-                                    "y",
-                                    label="Ratio to true",
-                                    range=(0.5, 1.5),
-                                ),
-                            ],
-                        ),
-                    ],
-                ),
-                output_dir=output_dir,
-            )
-            text = ""
-            plot_unfolded(
-                hists=hists,
-                projection_func=_project_jet_pt,
-                efficiency_func=_efficiency_pt,
-                n_iter_for_ratio=n_iter_for_ratio,
-                max_iter=input_file.max_iter,
-                true_bin=helpers.RangeSelector(0, 0.6),
-                tag=tag,
-                plot_config=pb.PlotConfig(
-                    name="unfolded_pt",
-                    panels=[
-                        # Main panel
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
-                                )
-                            ],
-                            legend=pb.LegendConfig(location="lower left"),
-                            text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                        # Ratio
-                        pb.Panel(
-                            axes=[pb.AxisConfig("y", label=fr"Ratio to iter {n_iter_for_ratio}", range=(0.5, 1.5))],
-                        ),
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
-                                pb.AxisConfig(
-                                    "y",
-                                    label="Ratio to true",
-                                    range=(0.5, 1.5),
-                                ),
-                            ],
-                        ),
-                    ],
-                ),
-                output_dir=output_dir,
-            )
-            jet_pt_for_text = helpers.RangeSelector(40, 120)
-            text = f"${jet_pt_for_text.display_str(label='data')}$"
-            plot_refolded(
-                hists=hists,
-                projection_func=_project_substructure_variable,
-                smeared_input=input_file.smeared_input,
-                max_iter=input_file.max_iter,
-                measured_bin=helpers.RangeSelector(40, 120),
-                tag=tag,
-                plot_config=pb.PlotConfig(
-                    name=f"refolded_{input_file.substructure_variable}",
-                    panels=[
-                        # Main panel
-                        pb.Panel(
-                            axes=[pb.AxisConfig("y", label=r"$\text{d}N/\text{d}\Delta R$", log=True)],
-                            legend=pb.LegendConfig(location="lower left"),
-                            text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                        # Ratio
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$\Delta R$"),
-                                # y label is set in the function.
-                                pb.AxisConfig(
-                                    "y",
-                                    label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
-                                    range=(0.5, 1.5),
-                                ),
-                            ],
-                        ),
-                    ],
-                ),
-                output_dir=output_dir,
-            )
-            text = ""
-            plot_refolded(
-                hists=hists,
-                projection_func=_project_jet_pt,
-                smeared_input=input_file.smeared_input,
-                max_iter=input_file.max_iter,
-                measured_bin=helpers.RangeSelector(0, 0.35),
-                tag=tag,
-                plot_config=pb.PlotConfig(
-                    name="refolded_pt",
-                    panels=[
-                        # Main panel
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
-                                )
-                            ],
-                            legend=pb.LegendConfig(location="lower left"),
-                            text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                        # Ratio
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
-                                # y label is set in the function.
-                                pb.AxisConfig(
-                                    "y",
-                                    label="Ratio to smeared" if input_file.smeared_input else "Ratio to data",
-                                    range=(0.5, 1.5),
-                                ),
-                            ],
-                        ),
-                    ],
-                ),
-                output_dir=output_dir,
-            )
-
-        # Plot the response
-        if "h2_substructure_variable" in hists:
-            jet_pt_for_text = helpers.JetPtRange(40, 120)
-            text = f"${jet_pt_for_text.display_str(label='hybrid')}$"
-            plot_response(
-                hists=hists,
-                tag=tag,
-                plot_config=pb.PlotConfig(
-                    name=f"response_{input_file.substructure_variable}_hybrid_40_120",
-                    panels=pb.Panel(
-                        axes=[
-                            pb.AxisConfig("x", label=r"$\Delta R^{\text{hybrid}}\:(\text{GeV}/c)$"),
-                            pb.AxisConfig("y", label=r"$\Delta R^{\text{true}}\:(\text{GeV}/c)$", range=(0, 0.4)),
-                        ],
-                        text=pb.TextConfig(text, 0.97, 0.03),
-                    ),
-                    figure=pb.Figure(edge_padding={"left": 0.11, "bottom": 0.10}),
-                ),
-                output_dir=output_dir,
-            )
-
-        # Select the n_iter iteration
-        jet_pt_for_text = helpers.JetPtRange(60, 80)
-        text = f"${jet_pt_for_text.display_str(label='true')}$"
-        plot_select_iteration(
-            hists=hists,
-            projection_func=_project_substructure_variable,
-            max_iter=19,
-            true_bin=helpers.JetPtRange(60, 80),
-            tag=tag,
-            plot_config=pb.PlotConfig(
-                name=f"select_iteration_{input_file.substructure_variable}_true_pt_60_80",
-                panels=pb.Panel(
-                    axes=[
-                        pb.AxisConfig("x", label="Iteration"),
-                        pb.AxisConfig("y", label="Summed Error", range=(0, None)),
-                    ],
-                    legend=pb.LegendConfig(location="center right"),
-                    text=pb.TextConfig(text, 0.03, 0.03),
-                ),
-            ),
-            output_dir=output_dir,
-        )
+        plot_delta_R_unfolding(unfolding_output=unfolding_output)
 
 
 if __name__ == "__main__":
