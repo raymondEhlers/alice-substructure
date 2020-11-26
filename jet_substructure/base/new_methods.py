@@ -10,6 +10,8 @@ import logging
 import typing
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence, Tuple, TypeVar, cast
+
+
 try:
     from typing import Final  # type: ignore
 except ImportError:
@@ -48,7 +50,7 @@ def _dynamical_hardness_measure(delta_R: float, z: float, parent_pt: float, R: f
 
 
 def _dynamical_hardness_measure(delta_R, z, parent_pt, R, a):  # type: ignore
-    """ Implements the dynamical hardness measure used in dynamical grooming.
+    """Implements the dynamical hardness measure used in dynamical grooming.
 
     Args:
         delta_R: Splitting delta R.
@@ -103,7 +105,7 @@ Returns:
 
 
 def find_leading(values: UprootArray[_T]) -> Tuple[np.ndarray, UprootArray[int]]:
-    """ Calculate hardest value given a set of values.
+    """Calculate hardest value given a set of values.
 
     Used for dynamical grooming, hardest kt, etc.
 
@@ -138,7 +140,7 @@ class JetConstituentCommon:
 
 
 class JetConstituent(ak.Record, JetConstituentCommon):  # type: ignore
-    """ A single jet constituent.
+    """A single jet constituent.
 
     Args:
         pt: Jet constituent pt.
@@ -158,7 +160,7 @@ class JetConstituent(ak.Record, JetConstituentCommon):  # type: ignore
 
 
 class JetConstituentArray(ak.Array, JetConstituentCommon):  # type: ignore
-    """ Methods for operating on jet constituents arrays.
+    """Methods for operating on jet constituents arrays.
 
     These methods operate on externally stored arrays. This is solely a mixin.
 
@@ -209,7 +211,7 @@ class SubjetCommon:
         ...
 
     def parent_splitting(self, splittings):  # type: ignore
-        """ Retrieve the parent splitting of this subjet.
+        """Retrieve the parent splitting of this subjet.
 
         Args:
             splittings: All of the splittings from the overall jet.
@@ -250,7 +252,7 @@ class JetSplittingCommon:
 
     @property
     def parent_pt(self) -> UprootArray[float]:
-        """ Pt of the (parent) subjets which lead to the splittings.
+        """Pt of the (parent) subjets which lead to the splittings.
 
         The pt can be calculated from the splitting properties via:
 
@@ -265,7 +267,7 @@ class JetSplittingCommon:
         return cast(UprootArray[float], self.kt / np.sin(self.delta_R) / self.z)
 
     def theta(self, jet_R: float) -> float:
-        """ Theta of the splitting.
+        """Theta of the splitting.
 
         This is defined as delta_R normalized by the jet resolution parameter.
 
@@ -287,7 +289,7 @@ class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
 
     @property
     def parent_pt(self) -> ArrayOrScalar[float]:
-        """ Pt of the (parent) subjet which lead to the splitting.
+        """Pt of the (parent) subjet which lead to the splitting.
 
         The pt can be calculated from the splitting properties via:
 
@@ -302,7 +304,7 @@ class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
         return cast(float, self.kt / np.sin(self.delta_R) / self.z)
 
     def dynamical_z(self, R: float) -> float:
-        """ Dynamical z of the splitting.
+        """Dynamical z of the splitting.
 
         See the definition for further information.
 
@@ -314,7 +316,7 @@ class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
         return dynamical_z(self.delta_R, self.z, self.parent_pt, R)  # type: ignore
 
     def dynamical_kt(self, R: float) -> float:
-        """ Dynamical kt of the splitting.
+        """Dynamical kt of the splitting.
 
         See the definition for further information.
 
@@ -326,7 +328,7 @@ class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
         return dynamical_kt(self.delta_R, self.z, self.parent_pt, R)  # type: ignore
 
     def dynamical_time(self, R: float) -> float:
-        """ Dynamical time of the splitting.
+        """Dynamical time of the splitting.
 
         See the definition for further information.
 
@@ -347,7 +349,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
     parent_index: UprootArray[int]
 
     def iterative_splittings(self, subjets: SubjetArray) -> SubjetArray:
-        """ Retrieve the iterative splittings.
+        """Retrieve the iterative splittings.
 
         Args:
             subjets: Subjets of the jets which containing the iterative splitting information.
@@ -357,7 +359,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
         return cast(SubjetArray, self[subjets.iterative_splitting_index])
 
     def dynamical_z(self, R: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
-        """ Dynamical z of the jet splittings.
+        """Dynamical z of the jet splittings.
 
         Args:
             R: Jet resolution parameter.
@@ -368,7 +370,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
         return values, indices, ak.Array(self.z.layout.localindex())
 
     def dynamical_kt(self, R: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
-        """ Dynamical kt of the jet splittings.
+        """Dynamical kt of the jet splittings.
 
         Args:
             R: Jet resolution parameter.
@@ -379,7 +381,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
         return values, indices, ak.Array(self.z.layout.localindex())
 
     def dynamical_time(self, R: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
-        """ Dynamical time of the jet splittings.
+        """Dynamical time of the jet splittings.
 
         Args:
             R: Jet resolution parameter.
@@ -392,7 +394,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
     def leading_kt(
         self, z_cutoff: Optional[float] = None
     ) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
-        """ Leading kt of the jet splittings.
+        """Leading kt of the jet splittings.
 
         Args:
             z_cutoff: Z cutoff to be applied before calculating the leading kt.
@@ -410,7 +412,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
         return values, indices_passing_cutoff[indices], indices_passing_cutoff
 
     def soft_drop(self, z_cutoff: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
-        """ Calculate soft drop of the splittings.
+        """Calculate soft drop of the splittings.
 
         Note:
             z_g is filled with the `UNFILLED_VALUE` if a splitting wasn't selected. In that case, there is
@@ -438,9 +440,16 @@ ak.behavior["JetSplitting"] = JetSplitting
 ak.behavior["*", "JetSplitting"] = JetSplittingArray
 
 
-def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], branches: Sequence[str], prefix_branches: Sequence[str],
-                             output_filename: Path, entries: Tuple[Optional[int], Optional[int]], verbose: bool = False) -> bool:
-    """ Convert open tree to parquet.
+def _convert_tree_to_parquet(
+    tree: Any,
+    prefixes: Sequence[str],
+    branches: Sequence[str],
+    prefix_branches: Sequence[str],
+    output_filename: Path,
+    entries: Tuple[Optional[int], Optional[int]],
+    verbose: bool = False,
+) -> bool:
+    """Convert open tree to parquet.
 
     The template of the branch names to include are defined here.
 
@@ -473,17 +482,13 @@ def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], branches: Seque
     all_branches = []
     all_branches.extend(branches)
     for prefix in prefixes:
-        all_branches.extend([
-            b.format(prefix=prefix) for b in prefix_branches
-        ])
+        all_branches.extend([b.format(prefix=prefix) for b in prefix_branches])
     logger.debug(all_branches)
 
     # Extract arrays
     additional_kwargs = {}
     if entries:
-        additional_kwargs.update({
-            "entry_start": entries[0], "entry_stop": entries[1]
-        })
+        additional_kwargs.update({"entry_start": entries[0], "entry_stop": entries[1]})
     arrays = tree.arrays(all_branches, **additional_kwargs)
 
     # Write out to parquet.
@@ -497,10 +502,15 @@ def _convert_tree_to_parquet(tree: Any, prefixes: Sequence[str], branches: Seque
 
 
 def convert_tree_to_parquet(
-    filename: Path, tree_name: str, prefixes: Sequence[str], branches: Sequence[str], prefix_branches: Sequence[str],
-    output_filename: Optional[Path] = None, entries: Optional[Tuple[Optional[int], Optional[int]]] = None
+    filename: Path,
+    tree_name: str,
+    prefixes: Sequence[str],
+    branches: Sequence[str],
+    prefix_branches: Sequence[str],
+    output_filename: Optional[Path] = None,
+    entries: Optional[Tuple[Optional[int], Optional[int]]] = None,
 ) -> Tuple[bool, Path]:
-    """ Convert a ROOT tree to a parquet file using awkward.
+    """Convert a ROOT tree to a parquet file using awkward.
 
     The main benefit is that it can open _much_ faster via parquet compared to uproot because it doesn't
     appear to need to use a python loop overly the doubly jagged arrays. This saves _huge_ amounts of time.
@@ -531,12 +541,19 @@ def convert_tree_to_parquet(
 
     with uproot.open(filename) as f:
         tree = f[tree_name]
-        result = _convert_tree_to_parquet(tree=tree, prefixes=prefixes, branches=branches, prefix_branches=prefix_branches, output_filename=output_filename, entries=entries)
+        result = _convert_tree_to_parquet(
+            tree=tree,
+            prefixes=prefixes,
+            branches=branches,
+            prefix_branches=prefix_branches,
+            output_filename=output_filename,
+            entries=entries,
+        )
     return result, output_filename
 
 
 def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) -> Dict[str, ak.Array]:
-    """ Convert an existing parquet file to arrays for substructure analysis.
+    """Convert an existing parquet file to arrays for substructure analysis.
 
     Args:
         filename: Filename of the parquet file.
@@ -567,10 +584,12 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
 
     columns = {}
     if "ptHard" in ak.fields(arrays):
-        columns.update({
-            "pt_hard": arrays["ptHard"],
-            "pt_hard_bin": arrays["ptHardBin"],
-        })
+        columns.update(
+            {
+                "pt_hard": arrays["ptHard"],
+                "pt_hard_bin": arrays["ptHardBin"],
+            }
+        )
     additional_columns = {}
     # Add unsubstracted leading track pt for data if it was stored.
     # We'll need to handle this later in the skim.
@@ -592,7 +611,9 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
                             "pt": arrays[f"{prefix}.fJetConstituents.fPt"],
                             "eta": arrays[f"{prefix}.fJetConstituents.fEta"],
                             "phi": arrays[f"{prefix}.fJetConstituents.fPhi"],
-                            "id": arrays[f"{prefix}.fJetConstituents.fID"] if f"{prefix}.fJetConstituents.fID" in ak.fields(arrays) else arrays[f"{prefix}.fJetConstituents.fGlobalIndex"],
+                            "id": arrays[f"{prefix}.fJetConstituents.fID"]
+                            if f"{prefix}.fJetConstituents.fID" in ak.fields(arrays)
+                            else arrays[f"{prefix}.fJetConstituents.fGlobalIndex"],
                         },
                         with_name="JetConstituent",
                         # We want to apply the behavior for each jet, and then for each constituent
@@ -629,54 +650,59 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
                 depth_limit=1,
             )
             for prefix in prefixes
-        }
+        },
     }
 
 
 if __name__ == "__main__":
 
-    #import time
+    # import time
 
-    #start = time.perf_counter()
-    #convert_tree_to_parquet(
+    # start = time.perf_counter()
+    # convert_tree_to_parquet(
     #    filename=Path("trains/embedPythia/5966/AnalysisResults.18q.repaired.root"),
     #    tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
     #    prefixes=["data", "matched", "detLevel"],
-    #)
-    #(arrays,) = parquet_to_substructure_analysis(
+    # )
+    # (arrays,) = parquet_to_substructure_analysis(
     #    filename=Path("trains/embedPythia/5966/AnalysisResults.18q.repaired.parquet"), prefixes=["data"]
-    #)
-    #finish = time.perf_counter()
-    #print(f"Uproot4: Length: {ak.num(arrays, axis=0)}, time: {finish-start}")
+    # )
+    # finish = time.perf_counter()
+    # print(f"Uproot4: Length: {ak.num(arrays, axis=0)}, time: {finish-start}")
     ## Sanity check if the fill_none is a problem
-    #assert not ak.any(arrays == -9999)
-    #import IPython
+    # assert not ak.any(arrays == -9999)
+    # import IPython
 
-    #IPython.embed()
+    # IPython.embed()
 
     # An example for testing.
     from jet_substructure.base import helpers
+
     helpers.setup_logging(level=logging.DEBUG)
-    convert_tree_to_parquet(filename=Path("trains/embedPythia/5966/AnalysisResults.18r.repaired.root"),
-                            tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
-                            prefixes={"matched": "true", "detLevel": "det_level", "data": "hybrid"},
-                            branches=[],
-                            prefix_branches=[
-                                "{prefix}.fJetPt",
-                                "{prefix}.fJetConstituents.fPt",
-                                "{prefix}.fJetConstituents.fEta",
-                                "{prefix}.fJetConstituents.fPhi",
-                                "{prefix}.fJetConstituents.fID",
-                                "{prefix}.fJetSplittings.fKt",
-                                "{prefix}.fJetSplittings.fDeltaR",
-                                "{prefix}.fJetSplittings.fZ",
-                                "{prefix}.fJetSplittings.fParentIndex",
-                                "{prefix}.fSubjets.fPartOfIterativeSplitting",
-                                "{prefix}.fSubjets.fSplittingNodeIndex",
-                                "{prefix}.fSubjets.fConstituentIndices",
-                            ],
-                            entries=(0, None),
-                            output_filename=Path("trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18r.repaired.00.parquet"))
+    convert_tree_to_parquet(
+        filename=Path("trains/embedPythia/5966/AnalysisResults.18r.repaired.root"),
+        tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+        prefixes={"matched": "true", "detLevel": "det_level", "data": "hybrid"},
+        branches=[],
+        prefix_branches=[
+            "{prefix}.fJetPt",
+            "{prefix}.fJetConstituents.fPt",
+            "{prefix}.fJetConstituents.fEta",
+            "{prefix}.fJetConstituents.fPhi",
+            "{prefix}.fJetConstituents.fID",
+            "{prefix}.fJetSplittings.fKt",
+            "{prefix}.fJetSplittings.fDeltaR",
+            "{prefix}.fJetSplittings.fZ",
+            "{prefix}.fJetSplittings.fParentIndex",
+            "{prefix}.fSubjets.fPartOfIterativeSplitting",
+            "{prefix}.fSubjets.fSplittingNodeIndex",
+            "{prefix}.fSubjets.fConstituentIndices",
+        ],
+        entries=(0, None),
+        output_filename=Path(
+            "trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18r.repaired.00.parquet"
+        ),
+    )
 
     # import uproot as uproot3
     # f = uproot3.open("trains/embedPythia/5966/AnalysisResults.18q.root")
