@@ -592,7 +592,7 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
                             "pt": arrays[f"{prefix}.fJetConstituents.fPt"],
                             "eta": arrays[f"{prefix}.fJetConstituents.fEta"],
                             "phi": arrays[f"{prefix}.fJetConstituents.fPhi"],
-                            "id": arrays[f"{prefix}.fJetConstituents.fID"] if f"{prefix}.fJetConstituents.fID" in ak.keys(arrays) else arrays[f"{prefix}.fJetConstituents.fGlobalIndex"],
+                            "id": arrays[f"{prefix}.fJetConstituents.fID"] if f"{prefix}.fJetConstituents.fID" in ak.fields(arrays) else arrays[f"{prefix}.fJetConstituents.fGlobalIndex"],
                         },
                         with_name="JetConstituent",
                         # We want to apply the behavior for each jet, and then for each constituent
