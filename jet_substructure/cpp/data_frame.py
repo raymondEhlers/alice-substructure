@@ -299,7 +299,7 @@ def matching_hists(  # noqa: C901
 def _substructure_hists(
     df: RDF,
     jet_pt_column_format: str,
-    jet_pt_axis: Tuple[float],
+    jet_pt_axis: Tuple[int, float, float],
     jet_R: float,
     prefix: str,
     grooming_method: str,
@@ -323,12 +323,14 @@ def _substructure_hists(
         "scale_factor",
     )
     hists.append(kt)
+    # Use 0.02 for the bin width.
+    n_bins_delta_R = round((jet_R + 0.02) / 0.02)
     delta_R = df.Histo2D(
         (
             f"{grooming_method}_{prefix}_delta_R{tag}",
             f"{grooming_method}_{prefix}_delta_R{tag}",
             *jet_pt_axis,
-            21,
+            n_bins_delta_R,
             -0.02,
             jet_R,
         ),
@@ -469,10 +471,10 @@ def run_create_closure_ratio(
     if collision_system == "embedPythia":
         double_counting_cut = "det_level_leading_track_pt >= hybrid_leading_track_pt"
         df_original = df_original.Filter(double_counting_cut)
-        smeared_cut_prefix = "hybrid"
+        # smeared_cut_prefix = "hybrid"
         prefix_for_ratio = "hybrid"
     else:
-        smeared_cut_prefix = "data"
+        # smeared_cut_prefix = "data"
         prefix_for_ratio = "data"
 
     smeared_substructure_variable_bins = np.array(
@@ -522,7 +524,7 @@ def run_create_closure_ratio(
     return True
 
 
-def run_response(
+def run_response(  # noqa: C901
     collision_system: str,
     input_filenames: Sequence[Path],
     tree_name: str,
@@ -874,7 +876,7 @@ def run_response(
     return True
 
 
-def run(
+def run(  # noqa: C901
     collision_system: str,
     input_filenames: Sequence[Path],
     tree_name: str,
@@ -908,7 +910,7 @@ def run(
     if cross_check_task:
         friend_tree = ROOT.TChain("tree")
         for filename in input_filenames:
-            friend_tree.Add(str(filename.parent / "scale_factor" / filename.name))
+            friend_tree.Add(str(filename.parent.parent / "scale_factor" / filename.name))
         # Add friends with scale factors
         main_tree.AddFriend(friend_tree)
 
@@ -1077,6 +1079,7 @@ def embed_pythia_entry_point() -> None:
         tree_name="tree",
         prefixes=["hybrid"],
         grooming_method=args.groomingMethod,
+        jet_R=0.4,
     )
 
 
