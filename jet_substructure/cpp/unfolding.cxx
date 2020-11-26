@@ -351,8 +351,9 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
                  const std::vector<std::string>& embeddedFilenames, const bool usePureMatches = false,
                  TH2D* hReweightingResponse = nullptr,
                  const std::string& dataTreeName = "tree", const std::string& dataPrefix = "data",
-                 const std::string& embeddedTreeName = "tree", const std::string& truePrefix = "true",
+                 const std::string& embeddedTreeName = "tree",
                  const std::string& hybridPrefix = "hybrid",
+                 const std::string& truePrefix = "true",
                  const std::string& detLevelPrefix = "det_level")
 {
   // Print out the status.
@@ -427,6 +428,21 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
     std::cout << " - " << filename << "\n";
     embeddedChain.Add(filename.c_str());
   }
+  // TODO: Add friend with scale factors!
+  TChain embeddedScaleFactors("tree");
+  for (const auto filename : embeddedFilenames) {
+      // This is supposed to be equivalent to python with:
+      // friend_tree.Add(str(filename.parent.parent / "scale_factor" / filename.name))
+      std::string temp = filename;
+      // Remove entries from the end of the path.
+      // This depends on passing the directory in the "skim" directory.
+      // +1 to skip over the "/"
+      std::string name = temp.substr(temp.rfind("/") + 1);
+      temp.erase(temp.rfind("/"));
+      temp.erase(temp.rfind("/"));
+      embeddedScaleFactors.Add((temp + "/scale_factor/" + name).c_str());
+  }
+  embeddedChain.AddFriend(&embeddedScaleFactors);
   TTreeReader mcReader(&embeddedChain);
 
   // Values
