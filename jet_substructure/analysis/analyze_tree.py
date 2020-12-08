@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
 
 import attr
-import awkward as ak
+import awkward0 as ak
 import enlighten
 import IPython
 import numpy as np

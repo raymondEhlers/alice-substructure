@@ -9,7 +9,7 @@ import math
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 
-import uproot as uproot3
+import uproot3
 from pachyderm import binned_data
 
 

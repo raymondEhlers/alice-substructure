@@ -23,7 +23,7 @@ import enlighten
 import IPython
 import numpy as np
 import pandas as pd
-import uproot
+import uproot3
 
 from jet_substructure.base import analysis_objects, data_manager, helpers, skim_analysis_objects
 
@@ -125,7 +125,7 @@ def _merge_hists(a: Dict[str, bh.Histogram], b: Dict[str, bh.Histogram]) -> Dict
 
 
 def dask_df_from_file() -> None:
-    df = uproot.tree.daskframe(
+    df = uproot3.tree.daskframe(
         path=[
             "temp_cache/embedPythia/55*/skim/*_iterative_splittings.root",
             "trains/embedPythia/55*/skim/*_iterative_splittings.root",
@@ -145,7 +145,7 @@ def dask_df_from_delayed() -> None:
 
     @delayed  # type: ignore
     def get_df(file: Path, treepath: str, branches: Sequence[str]) -> pd.DataFrame:
-        tree = uproot.open(file)[treepath]
+        tree = uproot3.open(file)[treepath]
         return tree.pandas.df(branches=branches)
 
     path_list = data_manager._ensure_and_expand_paths(
@@ -166,7 +166,7 @@ def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Pat
     # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
     from pathlib import Path  # noqa: F401
 
-    data_frames = uproot.pandas.iterate(
+    data_frames = uproot3.pandas.iterate(
         path=dataset.path_list,
         treepath="tree",
         namedecode="utf-8",
@@ -186,7 +186,7 @@ def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Pat
         # entrysteps=float("inf"),
     )
     # NOTE: One needs to be careful here if iterating over many files. The friends may not match up in the entries!!
-    # data_frames_friends = uproot.pandas.iterate(
+    # data_frames_friends = uproot3.pandas.iterate(
     #    path=path_list_friends,
     #    treepath="tree",
     #    namedecode="utf-8",
@@ -511,7 +511,7 @@ def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Pat
 
 
 def map_reduce_pandas_concat() -> None:
-    data_frames = uproot.pandas.iterate(
+    data_frames = uproot3.pandas.iterate(
         path=[
             "temp_cache/embedPythia/55*/skim/*_iterative_splittings.root",
             "trains/embedPythia/55*/skim/*_iterative_splittings.root",
@@ -607,10 +607,10 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
     if dataset.collision_system == "embedPythia":
         branches.append("det_level_leading_track_pt")
         branches.append("data_leading_track_pt")
-    #data_frames = uproot.pandas.iterate(
+    #data_frames = uproot3.pandas.iterate(
     # Using entrysteps=float("inf") is imperative for uproot.pandas.iterate to get reasonable performance!
     # TODO: Make tree name configurable...
-    data_frames = uproot.tree.iterate(
+    data_frames = uproot3.tree.iterate(
         outputtype=pd.DataFrame,
         #path=dataset.path_list, treepath="tree", namedecode="utf-8", branches=branches, reportpath=True,
         #path=dataset.path_list, treepath="AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl",

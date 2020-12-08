@@ -1463,9 +1463,13 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
 
     # We want to plot the 2D hist, so no need for any projections.
     # However, first we need to rebin
-    bh_hist = hists[f"{grooming_method}_{prefix}_kt"]
+    tag = f"_{jet_pt_bin.histogram_str(label=prefix)}" if rdf_plots else ""
+    bh_hist = hists[f"{grooming_method}_{prefix}_kt{tag}"]
+    #h = binned_data.BinnedData.from_existing_data(
+    #    bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1 :: bh.rebin(2)]  # noqa: E203
+    #)
     h = binned_data.BinnedData.from_existing_data(
-        bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1 :: bh.rebin(2)]  # noqa: E203
+        bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1:15]  # noqa: E203
     )
 
     # Plot

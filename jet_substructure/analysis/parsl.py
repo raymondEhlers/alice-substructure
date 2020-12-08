@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import parsl
-import uproot4 as uproot
+import uproot
 from pachyderm import yaml
 from parsl.addresses import address_by_hostname
 from parsl.app.app import python_app

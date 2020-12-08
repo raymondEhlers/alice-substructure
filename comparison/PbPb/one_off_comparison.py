@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
 import pandas as pd
-import uproot
+import uproot3
 from pachyderm import binned_data
 
 
@@ -97,18 +97,18 @@ def plot_attribute_compare(
 
 
 print("Loading Laura's...")
-print(uproot.open("laura/AnalysisResults.5403.18q.root").keys())
-laura_df = uproot.open("laura/AnalysisResults.5403.18q.root")[
+print(uproot3.open("laura/AnalysisResults.5403.18q.root").keys())
+laura_df = uproot3.open("laura/AnalysisResults.5403.18q.root")[
     "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_TCRawTree_Data_ConstSub_Incl"
 ].pandas.df()
 print(laura_df.columns)
 print("Loading mine...")
-mine_iter = uproot.pandas.iterate("mine/AnalysisResults.18*.root", "tree")
+mine_iter = uproot3.pandas.iterate("mine/AnalysisResults.18*.root", "tree")
 dfs = [df for df in mine_iter]
 mine_df = pd.concat(dfs)
 print(f"Number of files: {len(dfs)}")
 print(mine_df.keys())
-# leticia_iter = uproot.pandas.iterate("leticia/Ev_13_*.root", "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_scheme_TCRawTree_PythiaDef_NoSub_Incl")
+# leticia_iter = uproot3.pandas.iterate("leticia/Ev_13_*.root", "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_scheme_TCRawTree_PythiaDef_NoSub_Incl")
 # leticia_df = pd.concat([df for df in leticia_iter])
 # print(leticia_df)
 

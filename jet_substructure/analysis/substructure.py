@@ -9,7 +9,7 @@ import functools
 from typing import Callable, Dict, Tuple, Type, TypeVar, Union
 
 import attr
-import awkward as ak
+import awkward0 as ak
 import numpy as np
 
 # T_Input = TypeVar("T_Input")

@@ -7,7 +7,7 @@
 from typing import Any, Dict, Sequence, Tuple
 
 import IPython
-import uproot
+import uproot3
 
 from jet_substructure.base import substructure_methods
 
@@ -50,15 +50,15 @@ def convert_flat_to_tree(parent_label: int, relationships: Sequence[Tuple[int, i
 
 
 def run() -> None:
-    # f = uproot.open("../temp/AnalysisResults.root")
+    # f = uproot3.open("../temp/AnalysisResults.root")
     # t = f["AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"]
-    f = uproot.open("../trains/embedPythia/5521/gridTestTrain/AnalysisResults.root")
+    f = uproot3.open("../trains/embedPythia/5521/gridTestTrain/AnalysisResults.root")
     t = f[
         "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
     ]
-    # f = uproot.open("../trains/embedPythia/5491/AnalysisResults.LHC18q.root")
+    # f = uproot3.open("../trains/embedPythia/5491/AnalysisResults.LHC18q.root")
     # t = f["AliAnalysisTaskJetDynamicalGrooming_RawTree_EventSub_Incl"]
-    f = uproot.open("../trains/pythia/2110/gridTestTrain/AnalysisResults.root")
+    f = uproot3.open("../trains/pythia/2110/gridTestTrain/AnalysisResults.root")
     t = f[
         "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
     ]

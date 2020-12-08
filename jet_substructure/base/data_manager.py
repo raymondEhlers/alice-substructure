@@ -26,9 +26,9 @@ from typing import (
 )
 
 import attr
-import awkward as ak
+import awkward0 as ak
 import h5py
-import uproot
+import uproot3
 from typing_extensions import Literal
 
 from jet_substructure.base.helpers import UprootArray, UprootArrays, expand_wildcards_in_filenames
@@ -134,13 +134,13 @@ class UprootTreeWrapper(TreeMixin, Mapping[str, UprootArray[Any]]):
     """
 
     _filename: Path = attr.ib(converter=Path)
-    _file: uproot.rootio.ROOTDirectory = attr.ib()
+    _file: uproot3.rootio.ROOTDirectory = attr.ib()
     _tree_name: str = attr.ib()
     # _tree: Mapping[str, UprootArray[Any]] = attr.ib()
-    _tree: uproot.tree.TTreeMethods = attr.ib()
+    _tree: uproot3.tree.TTreeMethods = attr.ib()
     _branches: FrozenSet[str] = attr.ib(converter=frozenset, default=frozenset())
-    _cache: MutableMapping[str, UprootArray[Any]] = attr.ib(factory=partial(uproot.ThreadSafeArrayCache, "1 GB"))
-    _key_cache: MutableMapping[str, UprootArray[Any]] = attr.ib(factory=partial(uproot.ThreadSafeArrayCache, "100 MB"))
+    _cache: MutableMapping[str, UprootArray[Any]] = attr.ib(factory=partial(uproot3.ThreadSafeArrayCache, "1 GB"))
+    _key_cache: MutableMapping[str, UprootArray[Any]] = attr.ib(factory=partial(uproot3.ThreadSafeArrayCache, "100 MB"))
 
     def _retrieve_branch_names(self) -> FrozenSet[str]:
         return frozenset([name.decode("utf-8") for name in self._tree.allkeys()])
@@ -173,7 +173,7 @@ class UprootTreeWrapper(TreeMixin, Mapping[str, UprootArray[Any]]):
             Wrapped around the tree stored in HDF5, ready to provide data.
         """
         # Will be closed when this tree wrapper goes out of scope.
-        f = uproot.open(filename)
+        f = uproot3.open(filename)
 
         return cls(file=f, tree=f[tree_name], filename=filename, tree_name=tree_name, branches=frozenset(), **kwargs,)
 
@@ -242,13 +242,13 @@ class HDF5TreeWrapper(TreeMixin, MutableMapping[str, UprootArray[Any]]):
 class UprootTreeIterator:
     _filenames: Sequence[Path] = attr.ib(converter=_ensure_and_expand_paths)
     _tree_name: str = attr.ib()
-    _cache: MutableMapping[str, UprootArray[Any]] = attr.ib(factory=partial(uproot.ThreadSafeArrayCache, "1 GB"))
-    _key_cache: MutableMapping[str, UprootArray[Any]] = attr.ib(factory=partial(uproot.ThreadSafeArrayCache, "100 MB"))
+    _cache: MutableMapping[str, UprootArray[Any]] = attr.ib(factory=partial(uproot3.ThreadSafeArrayCache, "1 GB"))
+    _key_cache: MutableMapping[str, UprootArray[Any]] = attr.ib(factory=partial(uproot3.ThreadSafeArrayCache, "100 MB"))
 
     def __iter__(self) -> Iterator[UprootTreeWrapper]:
         # NOTE: If the file sizes get too big, can set entrysteps to something like `entrysteps=100000`, which
         #       is large, but less than the size of the file. We want to keep it as large as possible.
-        for f, filename, tree in uproot.iterate(
+        for f, filename, tree in uproot3.iterate(
             path=self._filenames,
             treepath=self._tree_name,
             namedecode="utf-8",
@@ -375,8 +375,8 @@ class IterateTrees:
 
         """
         # Allocate cache here so we only create it once.
-        uproot_cache = uproot.ThreadSafeArrayCache("1 GB")
-        uproot_key_cache = uproot.ThreadSafeArrayCache("100 MB")
+        uproot_cache = uproot3.ThreadSafeArrayCache("1 GB")
+        uproot_key_cache = uproot3.ThreadSafeArrayCache("100 MB")
 
         for filename in self._filenames:
             self._current_tree = Tree(

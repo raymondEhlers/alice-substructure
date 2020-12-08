@@ -13,7 +13,7 @@ import boost_histogram as bh
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import uproot
+import uproot3
 from pachyderm import binned_data
 
 import jet_substructure.analysis.plot_base as pb
@@ -269,7 +269,7 @@ def plot_subjet_matching(
 
 
 def plot(grooming_method: str, output_dir: Path) -> None:
-    f = uproot.open(f"embeddingResponse_kt_grooming_method_{grooming_method}.root")
+    f = uproot3.open(f"embeddingResponse_kt_grooming_method_{grooming_method}.root")
     temp_hists = {k.decode("utf-8"): binned_data.BinnedData.from_existing_data(f[k]) for k in f.keys()}
     hists = {}
     # Remove the cycle, which we don't care about.
@@ -747,7 +747,7 @@ def load_pythia_hists(grooming_methods: Sequence[str]) -> Dict[str, Dict[str, bi
     hists_full = {}
 
     for grooming_method in grooming_methods:
-        f = uproot.open(f"pythia_kt_grooming_method_{grooming_method}.root")
+        f = uproot3.open(f"pythia_kt_grooming_method_{grooming_method}.root")
         temp_hists = {k.decode("utf-8"): binned_data.BinnedData.from_existing_data(f[k]) for k in f.keys()}
         hists = {}
         # Remove the cycle, which we don't care about.

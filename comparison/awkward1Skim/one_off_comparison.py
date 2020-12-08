@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
 import pandas as pd
-import uproot4 as uproot
+import uproot3
 from pachyderm import binned_data
 
 
@@ -103,11 +103,11 @@ def plot_attribute_compare(
 
 
 # Same input file for both of ours.
-original_skim_file = uproot.open(
+original_skim_file = uproot3.open(
     "../../trains/embedPythia/5966/skim/AnalysisResults.18q.repaired_iterative_splittings.root"
 )
 # And then there is my separate skim input.
-input_skim = uproot.open(
+input_skim = uproot3.open(
     "../../trains/embedPythia/5966/skim/AnalysisResults.18q.repaired_iterative_splittings_new.root"
 )
 
@@ -126,7 +126,7 @@ mine_df = input_skim["tree"].arrays(input_skim["tree"].keys(), library="pd")
 print(list(mine_df.keys()))
 mine_dc_mask = mine_df["leading_track_det_level"] >= mine_df["leading_track_hybrid"]
 mine_df = mine_df[mine_dc_mask]
-# leticia_iter = uproot.pandas.iterate("leticia/Ev_13_*.root", "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_scheme_TCRawTree_PythiaDef_NoSub_Incl")
+# leticia_iter = uproot3.pandas.iterate("leticia/Ev_13_*.root", "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_scheme_TCRawTree_PythiaDef_NoSub_Incl")
 # leticia_df = pd.concat([df for df in leticia_iter])
 # print(leticia_df)
 # Apply the double counting cut, but between hybrid and true to match Laura's.

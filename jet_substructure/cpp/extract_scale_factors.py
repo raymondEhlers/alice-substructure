@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Sequence, Tuple, Type
 
 import attr
-import uproot4 as uproot
+import uproot
 from pachyderm import binned_data, yaml
 
 from jet_substructure.base import data_manager, helpers

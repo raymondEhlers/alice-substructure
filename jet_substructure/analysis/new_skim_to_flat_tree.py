@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, Iterable, Mapping, Optional, Sequence, Tuple, cast
 
 import attr
-import awkward1 as ak
+import awkward as ak
 import IPython
 import numba as nb
 import numpy as np

@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
 import pandas as pd
-import uproot
+import uproot3
 from pachyderm import binned_data
 
 
@@ -109,14 +109,14 @@ pt_hard_to_train_number = {
 pt_hard_bin = 14
 dm_train_number, lm_train_number = pt_hard_to_train_number[pt_hard_bin]
 
-distance_matching_file = uproot.open(f"../../trains/embedPythia/{dm_train_number}/AnalysisResults.18q.root")
+distance_matching_file = uproot3.open(f"../../trains/embedPythia/{dm_train_number}/AnalysisResults.18q.root")
 df_dm = distance_matching_file[
     "AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
 ].pandas.df()
 # Double counting cut
 df_dm = df_dm[df_dm["det_level_leading_track_pt"] >= df_dm["data_leading_track_pt"]]
 print("Done loading distance matching (dm)!")
-label_matching_file = uproot.open(f"../../trains/embedPythia/{lm_train_number}/AnalysisResults.18q.root")
+label_matching_file = uproot3.open(f"../../trains/embedPythia/{lm_train_number}/AnalysisResults.18q.root")
 df_lm = label_matching_file[
     "AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
 ].pandas.df()

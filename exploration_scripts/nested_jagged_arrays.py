@@ -5,7 +5,7 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
-import awkward as ak
+import awkward0 as ak
 
 all_jagged_indices = ak.fromiter([[0, 1, 4], [0, 1, 2, 3]])
 all_constituents = ak.fromiter([[12, 14, 3, 4], [2, 8, 3]])

@@ -14,9 +14,9 @@ from typing import TYPE_CHECKING, Callable, Optional, Tuple, Type, TypeVar, cast
 from typing_extensions import Final
 
 import attr
-import awkward as ak
+import awkward0 as ak
 import numpy as np
-import uproot_methods
+import uproot3_methods as uproot_methods
 
 from jet_substructure.base.helpers import ArrayOrScalar, UprootArray
 

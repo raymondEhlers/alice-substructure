@@ -5,8 +5,8 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
-import awkward as ak
-import uproot
+import awkward0 as ak
+import uproot3 as uproot
 
 class ArrayMethods(ak.Methods):
     # Seems to be required for creating JaggedArray elements within an Array.

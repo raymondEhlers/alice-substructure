@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import IPython
-import uproot
+import uproot3
 from pachyderm import binned_data
 
 from jet_substructure.analysis import data_frame
@@ -25,7 +25,7 @@ def hists_from_file(
         grooming_methods = ["leading_kt_z_cut_02"]
 
     # for grooming_method in grooming_methods:
-    f = uproot.open(filename)
+    f = uproot3.open(filename)
     temp_hists = {
         k.decode("utf-8"): binned_data.BinnedData.from_existing_data(f[k]).to_boost_histogram() for k in f.keys()
     }

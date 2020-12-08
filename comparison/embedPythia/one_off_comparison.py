@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
 import pandas as pd
-import uproot
+import uproot3
 from pachyderm import binned_data
 
 
@@ -157,7 +157,7 @@ def plot_centrality_hist(hist: binned_data.BinnedData, output_name: str) -> None
     plt.close(fig)
 
 
-laura_hists = uproot.open("laura/AnalysisResults_PbPbMC_pThard13.root")[
+laura_hists = uproot3.open("laura/AnalysisResults_PbPbMC_pThard13.root")[
     "JetSubstructure_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_TCRaw_EventSub_Incl"
 ]
 print(laura_hists)
@@ -165,7 +165,7 @@ print(laura_hists)
 laura_centrality = binned_data.BinnedData.from_existing_data(
     [h for h in laura_hists if hasattr(h, "name") and h.name == b"MultCentCorrelation_selected"][0]
 )
-mine_hists = uproot.open("mine/hists/hists.root")
+mine_hists = uproot3.open("mine/hists/hists.root")
 print(mine_hists.keys())
 # Mine is easier, for some reason.
 mine_centrality = binned_data.BinnedData.from_existing_data(mine_hists[b"MultCentCorrelation_selected"])
@@ -182,8 +182,8 @@ plot_centrality_hist(hist=laura_centrality, output_name="laura")
 plot_centrality_hist(hist=mine_centrality, output_name="mine")
 
 print("Loading Laura's...")
-# laura_df = uproot.open("laura/AnalysisResults_PbPbMC_pThard13.root")["JetSubstructure_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_TCRawTree_EventSub_Incl"].pandas.df()
-laura_df = uproot.open("laura/5570_AnalysisResults.18q.root")[
+# laura_df = uproot3.open("laura/AnalysisResults_PbPbMC_pThard13.root")["JetSubstructure_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_TCRawTree_EventSub_Incl"].pandas.df()
+laura_df = uproot3.open("laura/5570_AnalysisResults.18q.root")[
     "JetSubstructure_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_TCRawTree_EventSub_Incl"
 ].pandas.df()
 print(laura_df.columns)
@@ -195,10 +195,10 @@ laura_df = laura_df[laura_dc_mask]
 
 IPython.embed()
 print("Loading mine...")
-mine_iter = uproot.pandas.iterate("mine/AnalysisResults.18q.01.chunk*_iterative_splittings.root", "tree")
+mine_iter = uproot3.pandas.iterate("mine/AnalysisResults.18q.01.chunk*_iterative_splittings.root", "tree")
 mine_df = pd.concat([df for df in mine_iter])
 print(mine_df.keys())
-# leticia_iter = uproot.pandas.iterate("leticia/Ev_13_*.root", "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_scheme_TCRawTree_PythiaDef_NoSub_Incl")
+# leticia_iter = uproot3.pandas.iterate("leticia/Ev_13_*.root", "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_scheme_TCRawTree_PythiaDef_NoSub_Incl")
 # leticia_df = pd.concat([df for df in leticia_iter])
 # print(leticia_df)
 # Apply the double counting cut, but between hybrid and true to match Laura's.

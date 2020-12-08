@@ -12,7 +12,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
-import uproot
+import uproot3
 from pachyderm import binned_data
 
 import jet_substructure.analysis.plot_base as pb
@@ -62,7 +62,7 @@ def get_unfolded_pp_data_leticia(grooming_method: str, x_range: helpers.RangeSel
     }
 
     input_path = Path("output/pp/unfolding/leticia")
-    f = uproot.open(input_path / f"result_{grooming_method_map[grooming_method]}.root")
+    f = uproot3.open(input_path / f"result_{grooming_method_map[grooming_method]}.root")
 
     # This is the main data, giving the statistical uncertaintines.
     # For some reason, the name sometimes changes (apparently for the z_cut)

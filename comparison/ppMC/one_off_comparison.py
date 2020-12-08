@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
 import pandas as pd
-import uproot
+import uproot3
 from pachyderm import binned_data
 
 
@@ -96,13 +96,13 @@ def plot_attribute_compare(
     plt.close(fig)
 
 
-laura_df = uproot.open("ppMC_pThard13.root")[
+laura_df = uproot3.open("ppMC_pThard13.root")[
     "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_scheme_TCRawTree_PythiaDef_NoSub_Incl"
 ].pandas.df()
 print(laura_df.columns)
-mine_df = uproot.open("AnalysisResults.ptHard.13.chunk1_iterative_splittings.root")["tree"].pandas.df()
+mine_df = uproot3.open("AnalysisResults.ptHard.13.chunk1_iterative_splittings.root")["tree"].pandas.df()
 print(mine_df.keys())
-leticia_iter = uproot.pandas.iterate(
+leticia_iter = uproot3.pandas.iterate(
     "leticia/Ev_13_*.root", "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_scheme_TCRawTree_PythiaDef_NoSub_Incl"
 )
 leticia_df = pd.concat([df for df in leticia_iter])

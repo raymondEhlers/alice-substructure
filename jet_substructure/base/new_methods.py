@@ -17,9 +17,9 @@ try:
 except ImportError:
     from typing_extensions import Final
 
-import awkward1 as ak
+import awkward as ak
 import numpy as np
-import uproot4 as uproot
+import uproot
 
 from jet_substructure.base.helpers import ArrayOrScalar, UprootArray
 

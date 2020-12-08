@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
 import seaborn as sns
-import uproot
+import uproot3
 from pachyderm import binned_data
 
 from jet_substructure.analysis import plot_base as pb
@@ -221,7 +221,7 @@ class UnfoldingOutput:
 
         # Initialize the file if the histograms aren't specified.
         if not self.hists:
-            f = uproot.open(self.input_filename)
+            f = uproot3.open(self.input_filename)
             for k in f.keys():
                 hist_key = k.decode("utf-8")
                 hist_key = hist_key[: hist_key.find(";")]

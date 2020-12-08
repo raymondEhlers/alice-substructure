@@ -1,6 +1,6 @@
 # Reported and resolved at https://github.com/scikit-hep/awkward-1.0/issues/395
 
-import awkward1 as ak
+import awkward as ak
 import numba as nb
 
 

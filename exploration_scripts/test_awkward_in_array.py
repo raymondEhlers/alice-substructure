@@ -7,17 +7,17 @@ Posted as a question to StackOverflow: https://stackoverflow.com/q/61289810/1290
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+import awkward0 as ak0
 import awkward as ak
-import awkward1 as ak1
 import IPython
 
 
 # Example arrays:
-desired_output = ak.fromiter([True, False, False])
-full_array = ak.fromiter([[1, 2, 3], [], [0, 1, 2, 3, 4, 5]])
-selected_array = ak.fromiter([[2], [], [7]])
-ak1_full_array = ak1.from_awkward0(full_array)
-ak1_selected_array = ak1.from_awkward0(selected_array)
+desired_output = ak0.fromiter([True, False, False])
+full_array = ak0.fromiter([[1, 2, 3], [], [0, 1, 2, 3, 4, 5]])
+selected_array = ak0.fromiter([[2], [], [7]])
+ak1_full_array = ak.from_awkward0(full_array)
+ak1_selected_array = ak.from_awkward0(selected_array)
 
 try:
     selected_array in full_array

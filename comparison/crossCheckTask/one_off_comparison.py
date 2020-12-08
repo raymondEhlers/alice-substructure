@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
 import pandas as pd
-import uproot
+import uproot3
 from pachyderm import binned_data
 
 
@@ -136,9 +136,9 @@ def plot_centrality_hist(hist: binned_data.BinnedData, output_name: str) -> None
 
 
 # Same input file for both of ours.
-input_file = uproot.open("AnalysisResults.root")
+input_file = uproot3.open("AnalysisResults.root")
 # And then there is my separate skim input.
-input_skim = uproot.open("AnalysisResults_iterative_splittings.root")
+input_skim = uproot3.open("AnalysisResults_iterative_splittings.root")
 
 print("Loading cross check...")
 cross_check_df = input_file[
@@ -156,7 +156,7 @@ cross_check_df = cross_check_df[cross_check_dc_mask]
 print("Loading skim...")
 mine_df = input_skim["tree"].pandas.df()
 print(mine_df.keys())
-# leticia_iter = uproot.pandas.iterate("leticia/Ev_13_*.root", "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_scheme_TCRawTree_PythiaDef_NoSub_Incl")
+# leticia_iter = uproot3.pandas.iterate("leticia/Ev_13_*.root", "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_scheme_TCRawTree_PythiaDef_NoSub_Incl")
 # leticia_df = pd.concat([df for df in leticia_iter])
 # print(leticia_df)
 # Apply the double counting cut, but between hybrid and true to match Laura's.

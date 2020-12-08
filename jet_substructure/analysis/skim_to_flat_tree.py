@@ -18,7 +18,7 @@ import attr
 import enlighten
 import IPython
 import numpy as np
-import uproot
+import uproot3
 from pachyderm import yaml
 from pathos.multiprocessing import ProcessingPool as Pool
 
@@ -552,8 +552,8 @@ def calculate_and_skim_embedding(  # noqa: C901
 
     branches = {k: v.dtype for k, v in grooming_results.items()}
     logger.info(f"Writing skim to {output_filename}")
-    with uproot.recreate(output_filename) as output_file:
-        output_file["tree"] = uproot.newtree(branches)
+    with uproot3.recreate(output_filename) as output_file:
+        output_file["tree"] = uproot3.newtree(branches)
         # Write all of the calculations
         output_file["tree"].extend(grooming_results)
 
@@ -690,8 +690,8 @@ def calculate_and_skim_data(
 
     branches = {k: v.dtype for k, v in grooming_results.items()}
     logger.info(f"Writing skim to {output_filename}")
-    with uproot.recreate(output_filename) as output_file:
-        output_file["tree"] = uproot.newtree(branches)
+    with uproot3.recreate(output_filename) as output_file:
+        output_file["tree"] = uproot3.newtree(branches)
         # Write all of the calculations
         output_file["tree"].extend(grooming_results)
 
