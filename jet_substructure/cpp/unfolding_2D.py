@@ -384,32 +384,6 @@ def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path, additi
     f_out.Close()
 
 
-def setup(grooming_method: str) -> Settings:
-    default_settings = Settings(
-        grooming_method=grooming_method,
-        jet_pt=ParameterSettings(
-            true_bins=np.array([0, 30, 40, 60, 80, 100, 120, 160], dtype=np.float64),
-            smeared_bins=np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64),
-        ),
-        substructure_variable=SubstructureVariableSettings.from_binning(
-            true_bins=np.array(
-                # NOTE: (-0.05, 0) is the untagged bin.
-                [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],
-                dtype=np.float64,
-            ),
-            smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64),
-            name="kt",
-            variable_name="kt",
-            untagged_bin_below_range=True,
-        ),
-        tag="broadTrueBins",
-        output_dir=Path("output/PbPb/unfolding/test"),
-        use_pure_matches=False,
-    )
-
-    return default_settings
-
-
 def _default_hists(settings: Settings) -> Dict[str, TH2D]:
     import ROOT
 
@@ -519,6 +493,13 @@ def run_unfolding(
         np.testing.assert_allclose(temp_hist.axes[0].bin_edges, settings.substructure_variable.smeared_bins)
         np.testing.assert_allclose(temp_hist.axes[1].bin_edges, settings.jet_pt.smeared_bins)
 
+    # TODO: Make configurable...
+    data_tree_name = "tree"
+    data_prefix = "data"
+    embedded_tree_name = "AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+    embedded_hybrid_prefix = "data"
+    embedded_true_prefix = "matched"
+    embedded_det_level_prefix = "det_level"
     # Create the responses. We assume some conventions about column names.
     # They should generally be reasonable, but may require tweaks from time to time.
     responses = ROOT.create_response_2D(
@@ -536,6 +517,12 @@ def run_unfolding(
         _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
         settings.use_pure_matches,
         h_reweighting_response_ratio,
+        data_tree_name,
+        data_prefix,
+        embedded_tree_name,
+        embedded_hybrid_prefix,
+        embedded_true_prefix,
+        embedded_det_level_prefix,
     )
 
     logger.debug(responses)
@@ -1108,13 +1095,36 @@ if __name__ == "__main__":
     #    ),
     # )
 
+    grooming_method = "leading_kt"
+    default_settings = Settings(
+        grooming_method=grooming_method,
+        jet_pt=ParameterSettings(
+            true_bins=np.array([0, 30, 40, 60, 80, 100, 120, 160], dtype=np.float64),
+            smeared_bins=np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64),
+        ),
+        substructure_variable=SubstructureVariableSettings.from_binning(
+            true_bins=np.array(
+                # NOTE: (-0.05, 0) is the untagged bin.
+                [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],
+                dtype=np.float64,
+            ),
+            smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64),
+            name="kt",
+            variable_name="kt",
+            untagged_bin_below_range=True,
+        ),
+        tag="central",
+        output_dir=Path("output/PbPb/unfolding/test"),
+        use_pure_matches=False,
+    )
+
     logger.info("Running...")
     run_unfolding(
-       settings=setup("dynamical_kt"),
+       settings=default_settings,
        # NOTE: TChain can only handle one "*" in the filename.
-       data_filenames=[Path("trains/PbPb/5863/skim/*.root")],
+       data_filenames=[Path("trains/PbPb/6359/skim/*.root")],
        embedded_filenames=[
-           Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(5966, 5986)
+           Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(6338, 6358)
        ],
     )
 
