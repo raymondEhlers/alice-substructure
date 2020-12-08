@@ -17,7 +17,7 @@ import numpy as np
 import pachyderm.plot
 from pachyderm import binned_data
 
-from jet_substructure.analysis import analysis_methods
+# from jet_substructure.analysis import analysis_methods
 from jet_substructure.base import analysis_objects, helpers
 
 
@@ -42,7 +42,7 @@ class PlotConfig:
     log_y: bool = attr.ib(default=True)
 
 
-def _plot_distribution(
+def _plot_distribution(  # noqa: C901
     attribute_name: str,
     hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
     identifier: analysis_objects.Identifier,
@@ -53,7 +53,13 @@ def _plot_distribution(
 ) -> None:
     # Setup
     if ratio_denominator_hists:
-        fig, axes = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+        fig, axes = plt.subplots(
+            2,
+            1,
+            figsize=(8, 6),
+            gridspec_kw={"height_ratios": [3, 1]},
+            sharex=True,
+        )
         ax, ax_ratio = axes
     else:
         fig, ax = plt.subplots(figsize=(8, 6))
@@ -180,7 +186,13 @@ def _plot_total_number_of_splittings(
     path: Path,
 ) -> None:
     # Setup
-    fig, axes = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+    fig, axes = plt.subplots(
+        2,
+        1,
+        figsize=(8, 6),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
     ax, ax_ratio = axes
     logger.info(f"Plotting total_number_of_splittings, {identifier} with ratio")
 
@@ -395,7 +407,10 @@ def _plot_lund_plane(
 
     # Make the plot
     mesh = ax.pcolormesh(
-        h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+        h.axes[0].bin_edges.T,
+        h.axes[1].bin_edges.T,
+        h.values.T,
+        norm=matplotlib.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -450,7 +465,10 @@ def lund_plane(  # noqa: C901
         legend_location="lower left",
     )
     z_label = PlotConfig(
-        name="z", x_label=r"$z$", y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$", legend_location="lower right",
+        name="z",
+        x_label=r"$z$",
+        y_label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}z$",
+        legend_location="lower right",
     )
     delta_R_label = PlotConfig(
         name="delta_R",
@@ -658,7 +676,9 @@ def _plot_matching(
     # axes[0, 1].set_visible(False)
     # Leading wasn't tagged, but subleading was correctly tagged as subleading.
     leading_untagged_subleading_correct = _project_matching(
-        hists.leading_untagged_subleading_correct, axis_to_keep=axis_to_keep, identifier=identifier,
+        hists.leading_untagged_subleading_correct,
+        axis_to_keep=axis_to_keep,
+        identifier=identifier,
     )
     leading_untagged_subleading_correct /= normalization
     axes[0, 2].errorbar(
@@ -896,10 +916,12 @@ def _plot_matching_response_pt(
         # Determine the range for hybrid jet pt.
         epsilon = 0.00001
         hybrid_jet_pt_range = slice(
-            h.axes[2].find_bin(identifier.jet_pt_bin.min + epsilon), h.axes[2].find_bin(identifier.jet_pt_bin.max),
+            h.axes[2].find_bin(identifier.jet_pt_bin.min + epsilon),
+            h.axes[2].find_bin(identifier.jet_pt_bin.max),
         )
         hybrid_jet_pt_axis_range = slice(
-            h.axes[2].find_bin(identifier.jet_pt_bin.min + epsilon), h.axes[2].find_bin(identifier.jet_pt_bin.max) + 1,
+            h.axes[2].find_bin(identifier.jet_pt_bin.min + epsilon),
+            h.axes[2].find_bin(identifier.jet_pt_bin.max) + 1,
         )
 
         # Project into our axes of interest (namely, the attribute at hybrid and true level).
@@ -1010,7 +1032,8 @@ def _plot_matching_response_kt(
         # Determine the range for hybrid jet pt.
         epsilon = 0.00001
         hybrid_jet_pt_range = slice(
-            h.axes[2].find_bin(identifier.jet_pt_bin.min + epsilon), h.axes[2].find_bin(identifier.jet_pt_bin.max),
+            h.axes[2].find_bin(identifier.jet_pt_bin.min + epsilon),
+            h.axes[2].find_bin(identifier.jet_pt_bin.max),
         )
         # hybrid_jet_pt_axis_range = slice(
         #    h.axes[2].find_bin(identifier.jet_pt_bin.min + epsilon), h.axes[2].find_bin(identifier.jet_pt_bin.max) + 1,
@@ -1174,21 +1197,21 @@ def _plot_toy(
 
     # Scale by bin width
     x_bin_widths, y_bin_widths = np.meshgrid(*h.axes.bin_widths)
-    bin_widths = x_bin_widths * y_bin_widths
+    # bin_widths = x_bin_widths * y_bin_widths
     # print(f"x_bin_widths: {x_bin_widths.size}")
     # print(f"y_bin_widths: {y_bin_widths.size}")
     # print(f"bin_widths size: {bin_widths.size}")
-    #h /= bin_widths
+    # h /= bin_widths
 
     # Determine the normalization range
     z_axis_range = {
         "vmin": h.values[h.values > 0].min(),
         "vmax": h.values.max(),
     }
-    #z_axis_range = {
+    # z_axis_range = {
     #    "vmin": 1e-2,
     #    "vmax": h.values.max(),
-    #}
+    # }
     # if technique == "inclusive":
     #    z_axis_range = {
     #        "vmin": 10e-3,
@@ -1197,7 +1220,10 @@ def _plot_toy(
 
     # Make the plot
     mesh = ax.pcolormesh(
-        h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+        h.axes[0].bin_edges.T,
+        h.axes[1].bin_edges.T,
+        h.values.T,
+        norm=matplotlib.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -1432,7 +1458,7 @@ def _plot_response_pt(
         iterative_splittings=identifier.iterative_splittings, jet_pt_bin=helpers.RangeSelector(min=40, max=120)
     )
     # Use this to select the right hybrid range.
-    epsilon = 0.00001
+    # epsilon = 0.00001
     # hybrid_jet_pt_range = slice(
     #    h.axes[0].find_bin(identifier.jet_pt_bin.min + epsilon),
     #    h.axes[0].find_bin(identifier.jet_pt_bin.max),
@@ -1474,7 +1500,10 @@ def _plot_response_pt(
 
     # Make the plot
     mesh = ax.pcolormesh(
-        h.axes[0].bin_edges.T, h.axes[2].bin_edges.T, h_proj.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+        h.axes[0].bin_edges.T,
+        h.axes[2].bin_edges.T,
+        h_proj.values.T,
+        norm=matplotlib.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -1701,11 +1730,25 @@ def responses(
         x_label=r"$k_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$",
         y_label=r"$k_{\text{T}}^{\text{part}}\:(\text{GeV}/c)$",
     )
-    z_label = PlotConfig(name="z", x_label=r"$z^{\text{hybrid}}$", y_label=r"$z^{\text{part}}$",)
-    delta_R_label = PlotConfig(name="delta_R", x_label=r"$R^{\text{hybrid}}$", y_label=r"$R^{\text{part}}$",)
-    theta_label = PlotConfig(name="theta", x_label=r"$\theta^{\text{hybrid}}$", y_label=r"$\theta^{\text{part}}$",)
+    z_label = PlotConfig(
+        name="z",
+        x_label=r"$z^{\text{hybrid}}$",
+        y_label=r"$z^{\text{part}}$",
+    )
+    delta_R_label = PlotConfig(
+        name="delta_R",
+        x_label=r"$R^{\text{hybrid}}$",
+        y_label=r"$R^{\text{part}}$",
+    )
+    theta_label = PlotConfig(
+        name="theta",
+        x_label=r"$\theta^{\text{hybrid}}$",
+        y_label=r"$\theta^{\text{part}}$",
+    )
     splitting_number_label = PlotConfig(
-        name="splitting_number", x_label=r"$n^{\text{hybrid}}$", y_label=r"$n^{\text{part}}$",
+        name="splitting_number",
+        x_label=r"$n^{\text{hybrid}}$",
+        y_label=r"$n^{\text{part}}$",
     )
 
     distributions: List[Tuple[str, PlotConfig]] = [
@@ -1786,7 +1829,13 @@ def _plot_compare_kt(
     path: Path,
 ) -> None:
     # Setup
-    fig, (ax, ax_ratio) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+    fig, (ax, ax_ratio) = plt.subplots(
+        2,
+        1,
+        figsize=(8, 6),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
     logger.info(f"Plotting response kt spectra for {technique}, {identifier}, kt")
 
     h_data = binned_data.BinnedData.from_existing_data(data_hists.kt)

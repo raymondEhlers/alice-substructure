@@ -50,7 +50,7 @@ def _ensure_hdf5_path(path: Union[str, Path]) -> Path:
 
 
 class TreeMixin:
-    """ Wrapper around an open tree.
+    """Wrapper around an open tree.
 
     It keeps track of the tree itself, as well as tree metadata such as the available branches
     or the filename where it is stored.
@@ -76,7 +76,7 @@ class TreeMixin:
 
     @property
     def branches(self) -> FrozenSet[str]:
-        """ Branches stored in the tree.
+        """Branches stored in the tree.
 
         Accessing them in this manner allows them to be set externally, but then we calculate
         them if they're not already set.
@@ -157,7 +157,7 @@ class UprootTreeWrapper(TreeMixin, Mapping[str, UprootArray[Any]]):
     def from_filename(
         cls: Type["UprootTreeWrapper"], filename: Path, tree_name: str, **kwargs: MutableMapping[str, UprootArray[Any]]
     ) -> "UprootTreeWrapper":
-        """ Open a tree stored in a given file and wrap around the tree for a uniform API.
+        """Open a tree stored in a given file and wrap around the tree for a uniform API.
 
         Note:
             If iterating over many files, it's best to create the caches externally. Otherwise, we keep creating
@@ -175,7 +175,14 @@ class UprootTreeWrapper(TreeMixin, Mapping[str, UprootArray[Any]]):
         # Will be closed when this tree wrapper goes out of scope.
         f = uproot3.open(filename)
 
-        return cls(file=f, tree=f[tree_name], filename=filename, tree_name=tree_name, branches=frozenset(), **kwargs,)
+        return cls(
+            file=f,
+            tree=f[tree_name],
+            filename=filename,
+            tree_name=tree_name,
+            branches=frozenset(),
+            **kwargs,
+        )
 
 
 @attr.s
@@ -198,7 +205,7 @@ class HDF5TreeWrapper(TreeMixin, MutableMapping[str, UprootArray[Any]]):
     def from_filename(
         cls: Type["HDF5TreeWrapper"], filename: Union[Path, str], tree_name: str, file_mode: str = "a"
     ) -> "HDF5TreeWrapper":
-        """ Open a tree stored in a given file and wrap around the tree for a uniform API.
+        """Open a tree stored in a given file and wrap around the tree for a uniform API.
 
         Args:
             filename: Filename which contains the tree.
@@ -231,7 +238,7 @@ class HDF5TreeWrapper(TreeMixin, MutableMapping[str, UprootArray[Any]]):
         )
 
     def flush(self) -> None:
-        """ Flush the HDF5 to ensure that everything is written out.
+        """Flush the HDF5 to ensure that everything is written out.
 
         Otherwise, the file may not close safely. See: https://github.com/h5py/h5py/issues/714.
         """
@@ -293,7 +300,7 @@ class Tree(MutableMapping[str, UprootArray[Any]]):
 
     @property
     def filename(self) -> Path:
-        """ The filename of the (uproot) tree.
+        """The filename of the (uproot) tree.
 
         The HDF5 filename is the same, just with the extension replaced with `.h5`.
         """
@@ -301,7 +308,7 @@ class Tree(MutableMapping[str, UprootArray[Any]]):
 
     @property
     def tree_name(self) -> str:
-        """ The filename of the (uproot) tree.
+        """The filename of the (uproot) tree.
 
         The HDF5 tree name is the same.
         """
@@ -371,9 +378,7 @@ class IterateTrees:
         return Path(key) in self._filenames
 
     def __iter__(self) -> Iterator[Tree]:
-        """ Iterate over lazy trees.
-
-        """
+        """Iterate over lazy trees."""
         # Allocate cache here so we only create it once.
         uproot_cache = uproot3.ThreadSafeArrayCache("1 GB")
         uproot_key_cache = uproot3.ThreadSafeArrayCache("100 MB")
@@ -397,7 +402,7 @@ class IterateTrees:
             uproot_key_cache.clear()
 
     def _fully_lazy_iteration(self) -> Iterator[Callable[[], Tree]]:
-        """ Fully lazy iterator over trees.
+        """Fully lazy iterator over trees.
 
         Requires the calling function to call the return value to actually generate the tree. This way,
         we can pass the wrapper function via multiprocessing, and then instantiate it there.
@@ -409,7 +414,7 @@ class IterateTrees:
         """
 
         def _wrap(filename: Path) -> Tree:
-            """ Wrap creation of the Tree.
+            """Wrap creation of the Tree.
 
             Note:
                 We don't yet add this as a Tree classmethod because we only want to support a subset
@@ -456,7 +461,7 @@ class IterateTrees:
             yield from self
 
     def active_iteration(self) -> Iterator[Tree]:
-        """ Iterate over actively loaded trees.
+        """Iterate over actively loaded trees.
 
         It is recommended to use lazy iteration via `__iter__`!
         """

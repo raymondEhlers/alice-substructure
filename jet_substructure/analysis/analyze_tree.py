@@ -82,8 +82,11 @@ def _convert_and_write_hists(
     return hists
 
 
-def _construct_jets_from_tree(prefix: str, tree: data_manager.Tree,) -> substructure_methods.SubstructureJetArray:
-    """ Construct the substructure jet objects for data stored under a given prefix in a tree.
+def _construct_jets_from_tree(
+    prefix: str,
+    tree: data_manager.Tree,
+) -> substructure_methods.SubstructureJetArray:
+    """Construct the substructure jet objects for data stored under a given prefix in a tree.
 
     Ideally, the object has already been created and stored. If not, it will be created and then
     stored in the tree for the future (where retrieving the created object from a file is far faster).
@@ -135,7 +138,7 @@ def _construct_jets_from_tree(prefix: str, tree: data_manager.Tree,) -> substruc
 def load_jets_from_tree(
     tree: data_manager.Tree, prefixes: Sequence[str]
 ) -> Tuple[bool, Tuple[substructure_methods.SubstructureJetArray, ...]]:
-    """ Create jets from a tree with given prefix(es).
+    """Create jets from a tree with given prefix(es).
 
     Args:
         tree: Input tree.
@@ -168,7 +171,7 @@ def load_jets_from_tree(
 def _calculate_inclusive(
     splittings: substructure_methods.JetSplittingArray,
 ) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
-    """ Calculate the inclusive splittings.
+    """Calculate the inclusive splittings.
 
     Note:
         This is a fake calculation to provide the same type of output as the actual calculations for compatibility.
@@ -193,7 +196,7 @@ def _define_calculation_funcs(
     functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
     functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
 ]:
-    """ Define the calculation functions of interest.
+    """Define the calculation functions of interest.
 
     Note:
         The type of the inclusive is different, but it takes and returns the same sets of arguments
@@ -210,7 +213,9 @@ def _define_calculation_funcs(
     dynamical_time_func = functools.partial(
         substructure_methods.JetSplittingArray.dynamical_time, R=dataset.settings.jet_R
     )
-    leading_kt_func = functools.partial(substructure_methods.JetSplittingArray.leading_kt,)
+    leading_kt_func = functools.partial(
+        substructure_methods.JetSplittingArray.leading_kt,
+    )
     leading_kt_hard_cutoff_func = functools.partial(
         substructure_methods.JetSplittingArray.leading_kt, z_cutoff=dataset.settings.z_cutoff
     )
@@ -235,13 +240,17 @@ def _fill_substructure_hists_with_calculation(
 ) -> None:
     # Calculate the inputs
     inputs = analysis_objects.FillHistogramInput(
-        restricted_jets, restricted_jets_splittings, *calculation(restricted_jets_splittings)[:2],
+        restricted_jets,
+        restricted_jets_splittings,
+        *calculation(restricted_jets_splittings)[:2],
     )
     # And fill the results.
     # NOTE: cast is to help out mypy.
     selected_hists = cast(analysis_objects.SubstructureHists, getattr(hists, fill_attr_name))
     selected_hists.fill(
-        inputs=inputs, jet_R=jet_R, weight=weight,
+        inputs=inputs,
+        jet_R=jet_R,
+        weight=weight,
     )
 
 
@@ -286,7 +295,9 @@ def analyze_single_tree(
         logger.debug("Checking iterative splittings are calculated correctly.")
         # The jet_pt_mask is just a hack for selecting everything.
         _, temp_iterative_splittings = _select_and_retrieve_splittings(
-            jets, jet_pt_mask=np.ones_like(jets) > 0, iterative_splittings=True,
+            jets,
+            jet_pt_mask=np.ones_like(jets) > 0,
+            iterative_splittings=True,
         )
         assert (jets.splittings[iterative_splittings_mask] == temp_iterative_splittings).all().all()
     except KeyError:
@@ -356,18 +367,25 @@ def _fill_toy_hists_with_calculation(
 ) -> None:
     # Calculate the inputs
     data_inputs = analysis_objects.FillHistogramInput(
-        restricted_data_jets, restricted_data_jets_splittings, *calculation(restricted_data_jets_splittings)[:2],
+        restricted_data_jets,
+        restricted_data_jets_splittings,
+        *calculation(restricted_data_jets_splittings)[:2],
     )
     # TODO: We absolutely shouldn't be calculating the splitting properties here!
     # TODO: If we take the leading, we already know that it was only one splitting, and we already
     # TODO: know the values...
     true_inputs = analysis_objects.FillHistogramInput(
-        restricted_true_jets, restricted_true_jets_splittings, *calculation(restricted_true_jets_splittings)[:2],
+        restricted_true_jets,
+        restricted_true_jets_splittings,
+        *calculation(restricted_true_jets_splittings)[:2],
     )
     # NOTE: cast is to help out mypy.
     selected_toy_hists = cast(analysis_objects.SubstructureToyHists, getattr(hists, fill_attr_name))
     selected_toy_hists.fill(
-        data_inputs=data_inputs, true_inputs=true_inputs, jet_R=jet_R, weight=weight,
+        data_inputs=data_inputs,
+        true_inputs=true_inputs,
+        jet_R=jet_R,
+        weight=weight,
     )
 
 
@@ -491,7 +509,7 @@ def _select_and_retrieve_splittings(
 def _subjets_contributing_to_splittings(
     inputs: analysis_objects.FillHistogramInput,
 ) -> substructure_methods.SubjetArray:
-    """ Determine which subjets contribute to the selected splitting.
+    """Determine which subjets contribute to the selected splitting.
 
     We do this by looking for subjets with a parent splitting index that is equal to the selected index.
 
@@ -509,7 +527,7 @@ def _subjets_contributing_to_splittings(
 def _get_leading_and_subleading_subjets(
     subjets_unsorted: substructure_methods.SubjetArray,
 ) -> Tuple[substructure_methods.SubjetArray, substructure_methods.SubjetArray]:
-    """ Determine the leading and subleading subjets based on the sum of subjet constituents pt.
+    """Determine the leading and subleading subjets based on the sum of subjet constituents pt.
 
     Args:
         subjets_unsorted: Unsorted subjets of a given splitting. There are two subjets by definition.
@@ -536,7 +554,7 @@ def _get_leading_and_subleading_subjets(
 def _split_array(
     a: substructure_methods.SubjetArray, n: int
 ) -> Iterable[Tuple[substructure_methods.SubjetArray, slice]]:
-    """ Split an array into n chunks.
+    """Split an array into n chunks.
 
     Currently the typing suggests that it will only work for SubjetArray, but it should work for any array.
 
@@ -557,7 +575,7 @@ def _determine_matching_types(
     hybrid_subjets: substructure_methods.SubjetArray,
     match_using_distance: bool = False,
 ) -> UprootArray[bool]:
-    """ Determine whether the given subjets match.
+    """Determine whether the given subjets match.
 
     Note:
         Matching by global index only works for det-hybrid matching. For part-det matching, matching must be performed
@@ -607,9 +625,11 @@ def _determine_matching_types(
     #       This is handled differently than for finding the leading subjet.
     if (shared_constituents_pts > matched_subjets.constituents.pt.sum()).any():
         mask_excess = shared_constituents_pts > matched_subjets.constituents.pt.sum()
-        logger.warning(f"Constituent pts are greater than the subjet pts. Fraction: {np.count_nonzero(mask_excess) / len(mask_excess)}")
-        #IPython.embed()
-        #raise ValueError("Constituent pts are greater than the subjet pts...")
+        logger.warning(
+            f"Constituent pts are greater than the subjet pts. Fraction: {np.count_nonzero(mask_excess) / len(mask_excess)}"
+        )
+        # IPython.embed()
+        # raise ValueError("Constituent pts are greater than the subjet pts...")
 
     matched = (shared_constituents_pts / matched_subjets.constituents.pt.sum()) > 0.5
     return cast(UprootArray[bool], matched)
@@ -620,7 +640,7 @@ def determine_matched_jets(
     matched_inputs: analysis_objects.FillHistogramInput,
     match_using_distance: bool = False,
 ) -> Tuple[analysis_objects.MatchingResult, analysis_objects.MatchingResult]:
-    """ Determine the matching between subjets.
+    """Determine the matching between subjets.
 
     The passed jets need to have the selected indices already applied.
     We need to work with the indices applied to these jets.
@@ -701,7 +721,9 @@ def _fill_embedded_hists_with_calculation(
 ) -> None:
     # Calculate the inputs
     true_inputs = analysis_objects.FillHistogramInput(
-        restricted_true_jets, restricted_true_jets_splittings, *calculation(restricted_true_jets_splittings)[:2],
+        restricted_true_jets,
+        restricted_true_jets_splittings,
+        *calculation(restricted_true_jets_splittings)[:2],
     )
     det_level_inputs = analysis_objects.FillHistogramInput(
         restricted_det_level_jets,
@@ -709,21 +731,29 @@ def _fill_embedded_hists_with_calculation(
         *calculation(restricted_det_level_jets_splittings)[:2],
     )
     hybrid_inputs = analysis_objects.FillHistogramInput(
-        restricted_hybrid_jets, restricted_hybrid_jets_splittings, *calculation(restricted_hybrid_jets_splittings)[:2],
+        restricted_hybrid_jets,
+        restricted_hybrid_jets_splittings,
+        *calculation(restricted_hybrid_jets_splittings)[:2],
     )
     # And fill the results.
     # NOTE: casts are to help out mypy.
     selected_true_hists = cast(analysis_objects.SubstructureHists, getattr(true_hists, fill_attr_name))
     selected_true_hists.fill(
-        inputs=true_inputs, jet_R=jet_R, weight=weight,
+        inputs=true_inputs,
+        jet_R=jet_R,
+        weight=weight,
     )
     selected_det_hists = cast(analysis_objects.SubstructureHists, getattr(det_level_hists, fill_attr_name))
     selected_det_hists.fill(
-        inputs=det_level_inputs, jet_R=jet_R, weight=weight,
+        inputs=det_level_inputs,
+        jet_R=jet_R,
+        weight=weight,
     )
     selected_hybrid_hists = cast(analysis_objects.SubstructureHists, getattr(hybrid_hists, fill_attr_name))
     selected_hybrid_hists.fill(
-        inputs=hybrid_inputs, jet_R=jet_R, weight=weight,
+        inputs=hybrid_inputs,
+        jet_R=jet_R,
+        weight=weight,
     )
 
     # Validation
@@ -817,7 +847,7 @@ def analyze_single_tree_embedding(  # noqa: C901
     force_reprocessing: bool = False,
     scale_n_jets_when_loading_hists: bool = False,
 ) -> analysis_objects.SingleTreeEmbeddingResult:
-    """ Determine the response and prong matching for jets substructure techniques.
+    """Determine the response and prong matching for jets substructure techniques.
 
     Why combine them together? Because then we only have to open and process a tree once.
     At a future date (beyond the start of April 2020), it would be better to refactor them more separately,
@@ -1072,7 +1102,7 @@ def _wrap_multiprocessing(
         Sequence[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]],
     ],
 ) -> Sequence[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]]:
-    """ Wrap analysis function to instantiate the fully lazy tree.
+    """Wrap analysis function to instantiate the fully lazy tree.
 
     To be used in conjunction with multiprocessing (which is why we need to delay instantiating the tree).
 
@@ -1123,7 +1153,8 @@ _T_Result = TypeVar("_T_Result", bound=analysis_objects.SingleTreeResultBase)
 def run_shared(  # noqa: C901
     collision_system: str,
     analysis_function: Callable[
-        [data_manager.Tree, analysis_objects.Dataset, Sequence[helpers.RangeSelector], str, bool], _T_Result,
+        [data_manager.Tree, analysis_objects.Dataset, Sequence[helpers.RangeSelector], str, bool],
+        _T_Result,
     ],
     dataset_config_filename: Path,
     hists_filename: str,
@@ -1135,10 +1166,8 @@ def run_shared(  # noqa: C901
     number_of_cores: int = 1,
     override_filenames: Optional[Sequence[Union[str, Path]]] = None,
     additional_kwargs_for_analysis: Optional[Dict[str, str]] = None,
-) -> Tuple[
-    _T_Result, analysis_objects.Dataset,
-]:
-    """ Run the given analysis function.
+) -> Tuple[_T_Result, analysis_objects.Dataset]:
+    """Run the given analysis function.
 
     Args:
         collision_system: Name of the collision system.
@@ -1219,7 +1248,8 @@ def run_shared(  # noqa: C901
         **additional_kwargs_for_analysis,
     )
     analyze_single_tree_func_multiprocessing = functools.partial(
-        _wrap_multiprocessing, analysis_function=analyze_single_tree_func,
+        _wrap_multiprocessing,
+        analysis_function=analyze_single_tree_func,
     )
 
     # Iterate over trees.
@@ -1232,10 +1262,14 @@ def run_shared(  # noqa: C901
             with Pool(nodes=number_of_cores) as pool:
                 # merge_results if store_results else lambda x, y: None,
                 output_hists = functools.reduce(
-                    merge_results, tree_counter(pool.imap(analyze_single_tree_func_multiprocessing, dm_iterator)),
+                    merge_results,
+                    tree_counter(pool.imap(analyze_single_tree_func_multiprocessing, dm_iterator)),
                 )
         else:
-            output_hists = functools.reduce(merge_results, tree_counter(map(analyze_single_tree_func, dm_iterator)),)
+            output_hists = functools.reduce(
+                merge_results,
+                tree_counter(map(analyze_single_tree_func, dm_iterator)),
+            )
 
     # Write out the merged hists
     # Write with pkl because yaml is super slow for hists that are this large.

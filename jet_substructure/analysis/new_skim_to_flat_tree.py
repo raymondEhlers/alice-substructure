@@ -10,7 +10,7 @@ from __future__ import annotations
 import functools
 import logging
 from pathlib import Path
-from typing import Dict, Iterable, Mapping, Optional, Sequence, Tuple, cast
+from typing import Dict, Iterable, Mapping, Optional, Sequence, Tuple
 
 import attr
 import awkward as ak
@@ -21,7 +21,7 @@ import uproot as uproot3
 from pachyderm import yaml
 
 from jet_substructure.analysis import analyze_tree
-from jet_substructure.base import analysis_objects, data_manager, new_methods
+from jet_substructure.base import analysis_objects, new_methods
 from jet_substructure.base.helpers import UprootArray
 
 
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 @attr.s
 class Calculation:
-    """ Similar to `FillHistogramInput`, but adds the splittings indices.
+    """Similar to `FillHistogramInput`, but adds the splittings indices.
 
     Note:
         The splitting indices are the overall indices of the input splittings within
@@ -84,7 +84,7 @@ class Calculation:
 
 @attr.s
 class MaskedJets:
-    """ Container for masked jets.
+    """Container for masked jets.
 
     This just provides a consistent named interface to keep track of everything.
     """
@@ -114,9 +114,10 @@ class GroomingResultForTree:
 
 
 def _define_calculation_functions(
-    jet_R: float, iterative_splittings: bool,
+    jet_R: float,
+    iterative_splittings: bool,
 ) -> Dict[str, functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]]]:
-    """ Define the calculation functions of interest.
+    """Define the calculation functions of interest.
 
     Note:
         The type of the inclusive is different, but it takes and returns the same sets of arguments
@@ -132,7 +133,9 @@ def _define_calculation_functions(
         "dynamical_z": functools.partial(new_methods.JetSplittingArray.dynamical_z, R=jet_R),
         "dynamical_kt": functools.partial(new_methods.JetSplittingArray.dynamical_kt, R=jet_R),
         "dynamical_time": functools.partial(new_methods.JetSplittingArray.dynamical_time, R=jet_R),
-        "leading_kt": functools.partial(new_methods.JetSplittingArray.leading_kt,),
+        "leading_kt": functools.partial(
+            new_methods.JetSplittingArray.leading_kt,
+        ),
         "leading_kt_z_cut_02": functools.partial(new_methods.JetSplittingArray.leading_kt, z_cutoff=0.2),
         "leading_kt_z_cut_04": functools.partial(new_methods.JetSplittingArray.leading_kt, z_cutoff=0.4),
     }
@@ -147,9 +150,7 @@ def _define_calculation_functions(
 def _select_and_retrieve_splittings(
     jets: ak.Array, mask: UprootArray[bool], iterative_splittings: bool
 ) -> Tuple[ak.Array, new_methods.JetSplittingArray, UprootArray[int]]:
-    """ Generalization of the function in analyze_tree to add the splitting index.
-
-    """
+    """Generalization of the function in analyze_tree to add the splitting index."""
     # Ensure that there are sufficient counts
     restricted_jets = jets[mask]
 
@@ -195,7 +196,7 @@ def _select_and_retrieve_splittings(
 
 
 @nb.njit
-def calculate_splitting_number(
+def calculate_splitting_number(  # noqa: C901
     all_splittings: new_methods.JetSplittingArray,
     selected_splittings: new_methods.JetSplittingArray,
     restricted_splittings_indices: UprootArray[int],
@@ -524,7 +525,7 @@ def prong_matching_numba_wrapper(
     grooming_method: str,
     match_using_distance: bool = False,
 ) -> Dict[str, np.ndarray]:
-    """ Performs prong matching for the provided collections.
+    """Performs prong matching for the provided collections.
 
     Note:
         0 is there were insufficient constituents to form a splitting, 1 is properly matched, 2 is mistagged
@@ -585,7 +586,7 @@ def _subjet_momentum_fraction_in_jet(
     measured_like_jet,
     match_using_distance: bool = False,
 ):
-    """ Calculate subjet momentum fraction contained within another jet.
+    """Calculate subjet momentum fraction contained within another jet.
 
     Unfortunately, we can't blindly use the `_subjet_shared_momentum` function because
     the interfaces vary between jet constituents and subjet constituents. We could refactor them,
@@ -621,7 +622,7 @@ def generator_subjet_momentum_fraction_in_measured_jet_numba(
     generator_like_groomed_indices,
     measured_like_jets,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """ Determine the generator-like subjet momentum fraction stored in a measured-like jet.
+    """Determine the generator-like subjet momentum fraction stored in a measured-like jet.
 
     Note:
         This isn't looking at the measured-like subjet. It's about finding where subjets go,
@@ -694,7 +695,10 @@ def generator_subjet_momentum_fraction_in_measured_jet_numba_wrapper(
         measured_like_jets=measured_like_jets_calculation.input_jets,
     )
 
-    for label, momentum_fraction in [("leading", leading_momentum_fraction), ("subleading", subleading_momentum_fraction)]:
+    for label, momentum_fraction in [
+        ("leading", leading_momentum_fraction),
+        ("subleading", subleading_momentum_fraction),
+    ]:
         # groomingMethod + "_hybrid_det_level_matching_leading_pt_fraction_in_hybrid_jet"
         # NOTE: This is different than the name in the hardest kt cross check task. Since I had more time to think about it,
         #       this name makes more sense to me.
@@ -713,7 +717,7 @@ def prong_matching(
     grooming_method: str,
     match_using_distance: bool = True,
 ) -> Dict[str, np.ndarray]:
-    """ Performs prong matching for the provided collections.
+    """Performs prong matching for the provided collections.
 
     Note:
         0 is there were insufficient constituents to form a splitting, 1 is properly matched, 2 is mistagged
@@ -775,7 +779,7 @@ def prong_matching(
 
 
 def _calculate_jet_kinematics(constituents: new_methods.JetConstituentArray) -> Tuple[ak.Array, ak.Array]:
-    """ Calculate jet kinematics.
+    """Calculate jet kinematics.
 
     Since `vector` isn't yet available, we perform the four vector calculations by hand.
 
@@ -807,7 +811,7 @@ def calculate_embedding_skim(  # noqa: C901
     create_friend_tree: bool = False,
     draw_example_splittings: bool = False,
 ) -> Tuple[bool, str]:
-    """ Determine the response and prong matching for jets substructure techniques.
+    """Determine the response and prong matching for jets substructure techniques.
 
     Args:
         input_filename: Input file path.
@@ -825,7 +829,7 @@ def calculate_embedding_skim(  # noqa: C901
     # Use the train configuration to extract the train number and pt hard bin, which are used to get the scale factor.
     y = yaml.yaml()
     with open(train_directory / "config.yaml", "r") as f:
-       train_config = y.load(f)
+        train_config = y.load(f)
     train_number = train_config["number"]
     pt_hard_bin = train_config["pt_hard_bin"]
     logger.debug(f"Extracted train number: {train_number}, pt hard bin: {pt_hard_bin}")
@@ -833,10 +837,10 @@ def calculate_embedding_skim(  # noqa: C901
 
     # Jets setup.
     logger.info(f"Skimming tree from file {input_filename}")
-    all_jets = new_methods.parquet_to_substructure_analysis(filename = input_filename, prefixes=list(prefixes.keys()))
-    #true_jets = all_jets["matched"]
-    #det_level_jets = all_jets["detLevel"]
-    #hybrid_jets = all_jets["data"]
+    all_jets = new_methods.parquet_to_substructure_analysis(filename=input_filename, prefixes=list(prefixes.keys()))
+    # true_jets = all_jets["matched"]
+    # det_level_jets = all_jets["detLevel"]
+    # hybrid_jets = all_jets["data"]
 
     # Do the calculations
     # Do not mask on the number of constituents. This would prevent tagged <-> untagged migrations in the response.
@@ -858,14 +862,14 @@ def calculate_embedding_skim(  # noqa: C901
     mask = all_jets["data"].jet_pt > 0
 
     # Mask the jets
-    masked_jets: Dict[
-        str, MaskedJets
-    ] = {}
+    masked_jets: Dict[str, MaskedJets] = {}
     for prefix_key, input_jets in all_jets.items():
         prefix = prefixes[prefix_key]
         masked_jets[prefix] = MaskedJets(
             *_select_and_retrieve_splittings(
-                input_jets, mask, iterative_splittings=iterative_splittings,
+                input_jets,
+                mask,
+                iterative_splittings=iterative_splittings,
             )
         )
 
@@ -882,7 +886,9 @@ def calculate_embedding_skim(  # noqa: C901
             # Add jet pt and general jet properties.
             # Jet kinematics
             grooming_results[f"{prefix}_jet_pt"] = input_jets.jets.jet_pt
-            grooming_results[f"{prefix}_jet_eta"], grooming_results[f"{prefix}_jet_phi"] = _calculate_jet_kinematics(input_jets.jets.jet_constituents)
+            grooming_results[f"{prefix}_jet_eta"], grooming_results[f"{prefix}_jet_phi"] = _calculate_jet_kinematics(
+                input_jets.jets.jet_constituents
+            )
             # Leading track
             leading_track_name = f"{prefix}_leading_track_pt"
             if prefix == "hybrid":
@@ -984,8 +990,12 @@ def calculate_embedding_skim(  # noqa: C901
             logger.debug("Done with det level subjet momentum fraction in hybrid jets")
 
             # Look for leading kt just because it's easier to understand conceptually.
-            hybrid_det_level_leading_matching = grooming_results[f"{func_name}_{prefixes['data']}_{prefixes['detLevel']}_matching_leading"]
-            hybrid_det_level_subleading_matching = grooming_results[f"{func_name}_{prefixes['data']}_{prefixes['detLevel']}_matching_subleading"]
+            hybrid_det_level_leading_matching = grooming_results[
+                f"{func_name}_{prefixes['data']}_{prefixes['detLevel']}_matching_leading"
+            ]
+            hybrid_det_level_subleading_matching = grooming_results[
+                f"{func_name}_{prefixes['data']}_{prefixes['detLevel']}_matching_subleading"
+            ]
             if (
                 draw_example_splittings
                 and func_name == "leading_kt"
@@ -1005,13 +1015,15 @@ def calculate_embedding_skim(  # noqa: C901
                     # Find the hybrid jet and splitting of interest.
                     # hybrid_jet = masked_hybrid_jets[mask_jets_of_interest][0]
                     # Take the index of the splitting of interest. We want the first jet, and then there must be one splitting index there.
-                    hybrid_jet_selected_splitting_index = calculations[prefixes["data"]].indices[mask_jets_of_interest][i][0]
+                    hybrid_jet_selected_splitting_index = calculations[prefixes["data"]].indices[mask_jets_of_interest][
+                        i
+                    ][0]
                     # Same for det level.
                     det_level_jet = masked_jets[prefixes["detLevel"]].jets[mask_jets_of_interest][i]
                     # Take the index of the splitting of interest. We want the first jet, and then there must be one splitting index there.
-                    det_level_jet_selected_splitting_index = calculations[prefixes["detLevel"]].indices[mask_jets_of_interest][
-                        i
-                    ][0]
+                    det_level_jet_selected_splitting_index = calculations[prefixes["detLevel"]].indices[
+                        mask_jets_of_interest
+                    ][i][0]
 
                     # Draw the splittings
                     draw_splitting.splittings_graph(
@@ -1056,7 +1068,7 @@ def calculate_data_skim(  # noqa: C901
     output_filename: Path,
     output_tree_name: str = "tree",
     create_friend_tree: bool = False,
-    scale_factors: Optional[Mapping[int, float]] = None
+    scale_factors: Optional[Mapping[int, float]] = None,
 ) -> Tuple[bool, str]:
     # Validation
     if scale_factors is None and collision_system == "pythia":
@@ -1067,7 +1079,7 @@ def calculate_data_skim(  # noqa: C901
 
     # Setup
     logger.info(f"Skimming tree from file {input_filename}")
-    all_jets = new_methods.parquet_to_substructure_analysis(filename = input_filename, prefixes=list(prefixes.keys()))
+    all_jets = new_methods.parquet_to_substructure_analysis(filename=input_filename, prefixes=list(prefixes.keys()))
 
     # Dataset wide masks
     # Select everything by default. We know that there must be at least one set of jets, so we're safe to select on 0.
@@ -1079,14 +1091,14 @@ def calculate_data_skim(  # noqa: C901
         # The jets object will contain the pt hard bin if it's available.
         mask = mask & (all_jets[0]["pt_hard"] >= 5.0)
 
-    masked_jets: Dict[
-        str, MaskedJets
-    ] = {}
+    masked_jets: Dict[str, MaskedJets] = {}
     for prefix_key, input_jets in all_jets.items():
         prefix = prefixes[prefix_key]
         masked_jets[prefix] = MaskedJets(
             *_select_and_retrieve_splittings(
-                input_jets, mask, iterative_splittings=iterative_splittings,
+                input_jets,
+                mask,
+                iterative_splittings=iterative_splittings,
             )
         )
 
@@ -1102,7 +1114,9 @@ def calculate_data_skim(  # noqa: C901
             # Add jet pt and general jet properties.
             # Jet kinematics
             grooming_results[f"{prefix}_jet_pt"] = input_jets.jets.jet_pt
-            grooming_results[f"{prefix}_jet_eta"], grooming_results[f"{prefix}_jet_phi"] = _calculate_jet_kinematics(input_jets.jets.jet_constituents)
+            grooming_results[f"{prefix}_jet_eta"], grooming_results[f"{prefix}_jet_phi"] = _calculate_jet_kinematics(
+                input_jets.jets.jet_constituents
+            )
             # Leading track
             # NOTE: Since this is for data, it doesn't really matter, but better to always do the right thing.
             leading_track_name = f"{prefix}_leading_track_pt"
@@ -1198,24 +1212,29 @@ def calculate_data_skim(  # noqa: C901
 if __name__ == "__main__":
     # An example for testing...
     from jet_substructure.base import helpers
+
     helpers.setup_logging()
     calculate_embedding_skim(
-        input_filename=Path("trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"),
+        input_filename=Path(
+            "trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"
+        ),
         iterative_splittings=True,
         prefixes={"data": "hybrid", "matched": "true", "detLevel": "det_level"},
         scale_factors={1: 16.0695},
         train_directory=Path("trains/embedPythia/5966/"),
         jet_R=0.4,
-        output_filename=Path("trains/embedPythia/5966/skim/test2/AnalysisResults.18q.repaired.00_iterative_splittings.root")
+        output_filename=Path(
+            "trains/embedPythia/5966/skim/test2/AnalysisResults.18q.repaired.00_iterative_splittings.root"
+        ),
     )
-    #collision_system = "PbPb"
-    #train_number = 5863
-    #calculate_data_skim(
+    # collision_system = "PbPb"
+    # train_number = 5863
+    # calculate_data_skim(
     #    input_filename=Path(f"trains/{collision_system}/{train_number}/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"),
     #    collision_system=collision_system,
     #    iterative_splittings=True,
     #    prefixes={"data": "data"},
     #    jet_R=0.4,
     #    output_filename=Path(f"trains/{collision_system}/{train_number}/skim/AnalysisResults.18q.repaired.00_iterative_splittings.root")
-    #)
+    # )
     # import IPython; IPython.start_ipython(user_ns=locals())

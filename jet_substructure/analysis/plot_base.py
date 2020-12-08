@@ -103,10 +103,26 @@ class TextConfig:
             self.alignment = f"{ud} {lr}"
 
         alignments = {
-            "upper right": dict(horizontalalignment="right", verticalalignment="top", multialignment="right",),
-            "upper left": dict(horizontalalignment="left", verticalalignment="top", multialignment="left",),
-            "lower right": dict(horizontalalignment="right", verticalalignment="bottom", multialignment="right",),
-            "lower left": dict(horizontalalignment="left", verticalalignment="bottom", multialignment="left",),
+            "upper right": dict(
+                horizontalalignment="right",
+                verticalalignment="top",
+                multialignment="right",
+            ),
+            "upper left": dict(
+                horizontalalignment="left",
+                verticalalignment="top",
+                multialignment="left",
+            ),
+            "lower right": dict(
+                horizontalalignment="right",
+                verticalalignment="bottom",
+                multialignment="right",
+            ),
+            "lower left": dict(
+                horizontalalignment="left",
+                verticalalignment="bottom",
+                multialignment="left",
+            ),
         }
         alignment_kwargs = alignments[self.alignment]
 
@@ -270,38 +286,46 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
     # Setup
     styles = {}
 
-    greens = sns.color_palette(f"Greens_d", 4)
-    purples = sns.color_palette(f"Purples_d", 3)
-    reds = sns.color_palette(f"Reds_d", 3)
-    greys = sns.color_palette(f"Greys_r", 5)
-    blues = sns.color_palette(f"Blues_r", 3)
-    oranges = sns.color_palette(f"Oranges_r", 3)
+    greens = sns.color_palette("Greens_d", 4)
+    purples = sns.color_palette("Purples_d", 3)
+    reds = sns.color_palette("Reds_d", 3)
+    # greys = sns.color_palette("Greys_r", 5)
+    blues = sns.color_palette("Blues_r", 3)
+    # oranges = sns.color_palette("Oranges_r", 3)
     for label in ["", "_compare"]:
         if label == "":
             # These are our main colors.
             # The methods are similar, but different, so we want to spread out the colors.
             # dynamical_grooming_colors = sns.color_palette(f"GnBu_d", 3)
-            dynamical_grooming_colors = sns.color_palette(f"Greens_d", 4)
-            leading_kt_colors = sns.color_palette(f"Purples_d", 3)
-            soft_drop_colors = sns.color_palette(f"Reds_d", 3)
+            dynamical_grooming_colors = sns.color_palette("Greens_d", 4)
+            leading_kt_colors = sns.color_palette("Purples_d", 3)
+            soft_drop_colors = sns.color_palette("Reds_d", 3)
         else:
             # These are our comparison colors. Similar in order and often shade, but distinct.
-            dynamical_grooming_colors = sns.color_palette(f"Greys_r", 5)
-            leading_kt_colors = sns.color_palette(f"Blues_r", 3)
-            soft_drop_colors = sns.color_palette(f"Oranges_r", 3)
+            dynamical_grooming_colors = sns.color_palette("Greys_r", 5)
+            leading_kt_colors = sns.color_palette("Blues_r", 3)
+            soft_drop_colors = sns.color_palette("Oranges_r", 3)
         markers = ["o", "d", "s"]
         grooming_styling = {
             f"dynamical_z{label}": GroomingMethodStyle(
                 color=dynamical_grooming_colors[0], marker=markers[0], fillstyle="full", label="$z$Drop", zorder=10
             ),
             f"dynamical_kt{label}": GroomingMethodStyle(
-                color=greens[1], marker=markers[0], fillstyle="full", label=r"$k_{\text{T}}$Drop", zorder=10,
+                color=greens[1],
+                marker=markers[0],
+                fillstyle="full",
+                label=r"$k_{\text{T}}$Drop",
+                zorder=10,
             ),
             f"dynamical_time{label}": GroomingMethodStyle(
                 color=reds[1], marker=markers[2], fillstyle="full", label=r"timeDrop", zorder=10
             ),
             f"leading_kt{label}": GroomingMethodStyle(
-                color=purples[1], marker=markers[1], fillstyle="full", label=r"Leading $k_{\text{T}}$", zorder=10,
+                color=purples[1],
+                marker=markers[1],
+                fillstyle="full",
+                label=r"Leading $k_{\text{T}}$",
+                zorder=10,
             ),
             f"leading_kt_z_cut_02{label}": GroomingMethodStyle(
                 color=blues[1] if not label else purples[1],

@@ -35,7 +35,7 @@ TMatrixD = Any
 
 
 def _np_array_converter(value: Any, dtype: np.dtype = np.float64) -> np.ndarray:
-    """ Convert the given value to a numpy array.
+    """Convert the given value to a numpy array.
 
     Normally, we would just use np.array directly as the converter function. However, mypy will complain if
     the converter is untyped. So we add (trivial) typing here.  See: https://github.com/python/mypy/issues/6172.
@@ -54,7 +54,7 @@ def _np_array_converter(value: Any, dtype: np.dtype = np.float64) -> np.ndarray:
 
 @attr.s
 class ParameterSettings:
-    """ Parameter settings
+    """Parameter settings
 
     Args:
         true_bins: True bins.
@@ -67,7 +67,7 @@ class ParameterSettings:
 
 @attr.s
 class SubstructureVariableSettings(ParameterSettings):
-    """ Settings specific to the substructure variable.
+    """Settings specific to the substructure variable.
 
     Supports z, Rg, and kt.
 
@@ -139,9 +139,13 @@ class Settings:
         base_filename = f"unfolding_{self.substructure_variable.name}_grooming_method_{self.grooming_method}"
         # Then add the binning information.
         # First, the substructure edges.
-        base_filename += f"_smeared_{self.substructure_variable.smeared_range.zero_padded_str(self.filename_padding_factor)}"
+        base_filename += (
+            f"_smeared_{self.substructure_variable.smeared_range.zero_padded_str(self.filename_padding_factor)}"
+        )
         # Then the untagged
-        base_filename += f"_untagged_{self.substructure_variable.untagged_bin.zero_padded_str(self.filename_padding_factor)}"
+        base_filename += (
+            f"_untagged_{self.substructure_variable.untagged_bin.zero_padded_str(self.filename_padding_factor)}"
+        )
         # Then the jet pt
         smeared_jet_pt = helpers.JetPtRange(min=self.jet_pt.smeared_bins[0], max=self.jet_pt.smeared_bins[-1])
         base_filename += f"_smeared_{smeared_jet_pt.zero_padded_str(self.filename_padding_factor)}"
@@ -165,7 +169,7 @@ def _pass_filenames_to_ROOT(filenames: Sequence[Path]) -> List[str]:
 
 
 def _array_to_ROOT(arr: np.ndarray, type_name: str = "double") -> Any:
-    """ Convert numpy array to std::vector via ROOT.
+    """Convert numpy array to std::vector via ROOT.
 
     Because it apparently can't handle conversions directly. Which is really dumb...
 
@@ -187,7 +191,7 @@ def _array_to_ROOT(arr: np.ndarray, type_name: str = "double") -> Any:
 
 
 def correlation_hist_substructure_var(cov: TMatrixD, name: str, title: str, na: int, nb: int, kbin: int) -> TH2D:
-    """ Correlation histogram for the substructure variable.
+    """Correlation histogram for the substructure variable.
 
     Varies from the pt by the indexing of the covariance matrix.
 
@@ -216,7 +220,7 @@ def correlation_hist_substructure_var(cov: TMatrixD, name: str, title: str, na: 
 
 
 def correlation_hist_pt(cov: TMatrixD, name: str, title: str, na: int, nb: int, kbin: int) -> TH2D:
-    """ Correlation histogram for the jet pt.
+    """Correlation histogram for the jet pt.
 
     Varies from the substructure variable by the indexing of the covariance matrix.
 
@@ -253,7 +257,7 @@ def unfolding_2D(
     max_iter: int = 20,
     n_iter_for_covariance: int = 8,
 ) -> Dict[str, TH2D]:
-    """ Perform unfolding in 2D.
+    """Perform unfolding in 2D.
 
     Args:
         response: Response matrix.
@@ -350,7 +354,7 @@ def _setup_unfolding() -> None:
     # This just assumes that this file is in the same directory as the unfolding.cxx file, which should
     # usually be a reasonable assumption.
     unfolding_cxx = Path(__file__).resolve().parent / "unfolding.cxx"
-    #ROOT.gInterpreter.ProcessLine(f"""#include "{str(unfolding_cxx)}" """)
+    # ROOT.gInterpreter.ProcessLine(f"""#include "{str(unfolding_cxx)}" """)
     ROOT.gInterpreter.ProcessLine(f""".L {str(unfolding_cxx)} """)
     # Nominally additional setup for MT. It's not really going to do us any good here, but it doesn't hurt anything.
     # NOTE: We do need to specify 1 to ensure that we don't use extra cores.
@@ -465,7 +469,10 @@ def _hists_to_map_for_ROOT(hists: Dict[str, TH2D]) -> Any:
 
 
 def run_unfolding(
-    settings: Settings, data_filenames: Sequence[Path], embedded_filenames: Sequence[Path], reweight_prior: bool = False,
+    settings: Settings,
+    data_filenames: Sequence[Path],
+    embedded_filenames: Sequence[Path],
+    reweight_prior: bool = False,
 ) -> bool:
     # Delayed import to avoid direct dependence.
     import ROOT
@@ -537,7 +544,9 @@ def run_unfolding(
 
     # Next, the trivial closure test where the input is the smeared hybrid spectra.
     output_hists = unfolding_2D(
-        response=responses.response, input_spectra=hists["h2_smeared"], true_spectra=hists["h2_true"],
+        response=responses.response,
+        input_spectra=hists["h2_smeared"],
+        true_spectra=hists["h2_true"],
     )
     # Write the output before we move onto the next case.
     _write_hists(
@@ -558,12 +567,12 @@ def run_unfolding(
     )
 
     # Try out ROOT based unfolding. Based on my tests, this doesn't matter...
-    #fOut = ROOT.TFile(str(settings.output_dir / "test_unfolding_cpp.root"), "RECREATE")
-    #ROOT.Unfold2D(responses.response, hists["h2_true"], hists["h2_raw"], ROOT.RooUnfold.ErrorTreatment.kCovariance, fOut, "", 20)
-    #for v in hists.values():
+    # fOut = ROOT.TFile(str(settings.output_dir / "test_unfolding_cpp.root"), "RECREATE")
+    # ROOT.Unfold2D(responses.response, hists["h2_true"], hists["h2_raw"], ROOT.RooUnfold.ErrorTreatment.kCovariance, fOut, "", 20)
+    # for v in hists.values():
     #    v.Write()
     ##fOut.Write()
-    #fOut.Close()
+    # fOut.Close()
 
     return True
 
@@ -603,9 +612,12 @@ def get_reweighted_ratio(
 
 
 def run_unfolding_closure_reweighting(
-    settings: Settings, embedded_filenames: Sequence[Path], closure_variation: str, fraction_for_response: float = 0.75,
+    settings: Settings,
+    embedded_filenames: Sequence[Path],
+    closure_variation: str,
+    fraction_for_response: float = 0.75,
 ) -> bool:
-    """ Run unfolding closure with reweighting.
+    """Run unfolding closure with reweighting.
 
     Note:
         Must run separately with and without pure matches because the response is different.
@@ -623,7 +635,6 @@ def run_unfolding_closure_reweighting(
     import ROOT
 
     # TODO: Need to chain creating the reweighting hists unless they already exists.
-
     # Setup
     _setup_unfolding()
     # Validate variations.
@@ -684,7 +695,9 @@ def run_unfolding_closure_reweighting(
     output_hists = {}
     output_hists.update(
         unfolding_2D(
-            response=responses.response, input_spectra=hists["h2_pseudo_data"], true_spectra=hists["h2_pseudo_true"],
+            response=responses.response,
+            input_spectra=hists["h2_pseudo_data"],
+            true_spectra=hists["h2_pseudo_true"],
         )
     )
 
@@ -985,7 +998,11 @@ def run_unfolding_rdf(
     )
 
     # Data
-    h2_raw = df_data.Histo2D(h2_raw_args, "data_substructure_variable", data_jet_pt_name,)
+    h2_raw = df_data.Histo2D(
+        h2_raw_args,
+        "data_substructure_variable",
+        data_jet_pt_name,
+    )
 
     logger.info("Starting calculation")
     logger.info(f"Entries: {h2_raw.GetEntries()}")
@@ -1120,15 +1137,15 @@ if __name__ == "__main__":
 
     logger.info("Running...")
     run_unfolding(
-       settings=default_settings,
-       # NOTE: TChain can only handle one "*" in the filename.
-       data_filenames=[Path("trains/PbPb/6359/skim/*.root")],
-       embedded_filenames=[
-           Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(6338, 6358)
-       ],
+        settings=default_settings,
+        # NOTE: TChain can only handle one "*" in the filename.
+        data_filenames=[Path("trains/PbPb/6359/skim/*.root")],
+        embedded_filenames=[
+            Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(6338, 6358)
+        ],
     )
 
-    #run_unfolding_closure_reweighting(
+    # run_unfolding_closure_reweighting(
     #    settings=setup("dynamical_kt"),
     #    # NOTE: TChain can only handle one "*" in the filename.
     #    embedded_filenames=[
@@ -1136,4 +1153,4 @@ if __name__ == "__main__":
     #    ],
     #    # closure_variation="reweight_pseudo_data",
     #    closure_variation="split_MC",
-    #)
+    # )

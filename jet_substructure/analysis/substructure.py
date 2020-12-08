@@ -12,6 +12,7 @@ import attr
 import awkward0 as ak
 import numpy as np
 
+
 # T_Input = TypeVar("T_Input")
 T_Array = Union[ak.JaggedArray, np.ndarray]
 T_Input = T_Array
@@ -33,7 +34,7 @@ def _calculate_dynamical_grooming(
     R: float,
     grooming_func: Callable[[T_Input, T_Input, T_Input, float], T_Input],
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """ Calculate dynamical grooming using the giving grooming function.
+    """Calculate dynamical grooming using the giving grooming function.
 
     Returns:
         Dynamical grooming value, index of value.
@@ -54,7 +55,7 @@ def calculate_kt_leading(kt: T_Input) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def calculate_soft_drop(z: T_Input, z_hard_cutoff: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """ Calculate Soft Drop.
+    """Calculate Soft Drop.
 
     Args:
         z: Shared momentum fraction of the splitting.
@@ -172,7 +173,7 @@ def calculate_substructure_variables(
     SubstructureResult,
     SubstructureResult,
 ]:
-    """ Calculate jet substructure variables.
+    """Calculate jet substructure variables.
 
     Note:
         The array keys of the stored data need to be renamed using `normalize_array_names(...)`.

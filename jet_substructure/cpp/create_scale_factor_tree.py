@@ -51,7 +51,7 @@ def scale_factor_tree(filename: Path) -> None:
     with uproot.recreate(output_filename) as output_file:
         output_file["tree"] = uproot.newtree(branches)
         # Write all of the calculations
-        output_file["tree"].extend({"scale_factor" : scale_factor * np.ones(n_entries)})
+        output_file["tree"].extend({"scale_factor": scale_factor * np.ones(n_entries)})
 
 
 if __name__ == "__main__":

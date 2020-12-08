@@ -23,7 +23,7 @@ T = TypeVar("T")
 
 
 class UprootArray(Collection[T]):
-    """ Effectively a protocol for the UprootArray type.
+    """Effectively a protocol for the UprootArray type.
 
     The main advantage is that it allows us to keep track of the types. I don't believe
     that they're closely checked, but if nothing else, they're useful as sanity checks
@@ -114,7 +114,7 @@ class UprootArray(Collection[T]):
         raise NotImplementedError("Just typing information.")
 
     def fillna(self, value: Any) -> UprootArray[T]:
-        """ Fill na values with the given values.
+        """Fill na values with the given values.
 
         Note:
             This is a bit of a white lie. The types in the array can be a Union[T, Type[value]],
@@ -149,7 +149,7 @@ def setup_logging(level: int = logging.DEBUG) -> None:
 
 
 def pretty_print_tree(d: Mapping[int, Any], indent: int = 0) -> None:
-    """ Convenience function for pretty printing the splitting tree.
+    """Convenience function for pretty printing the splitting tree.
 
     From: https://stackoverflow.com/a/3229493.
 
@@ -169,7 +169,7 @@ def pretty_print_tree(d: Mapping[int, Any], indent: int = 0) -> None:
 
 
 def convert_flat_to_tree(parent_label: int, relationships: Sequence[Tuple[int, int]]) -> Dict[int, Any]:
-    """ Convert the flat array to the tree.
+    """Convert the flat array to the tree.
 
     Slightly modified from: https://stackoverflow.com/a/43728268
 
@@ -186,7 +186,7 @@ def convert_flat_to_tree(parent_label: int, relationships: Sequence[Tuple[int, i
 
 
 def dict_product(input_dict: Dict[str, List[Any]]) -> Iterable[Dict[str, Any]]:
-    """ Like `itertools.product`, but with a dictionary containing lists.
+    """Like `itertools.product`, but with a dictionary containing lists.
 
     By way of example:
 
@@ -213,7 +213,7 @@ class RangeSelector:
     _display_name = r"p_{\text{T,ch jet}}"
 
     def mask_attribute(self, df: UprootArrays, attribute_name: str) -> UprootArray[bool]:
-        """ Create a mask to given attribute to the provided range.
+        """Create a mask to given attribute to the provided range.
 
         Args:
             df: Data to be used to define the mask. May be a pandas DataFrame or output from loading arrays
@@ -230,7 +230,7 @@ class RangeSelector:
 
     @classmethod
     def full_range_over_selections(cls: Type["RangeSelector"], selections: Sequence[RangeSelector]) -> "RangeSelector":
-        """ Extract the min and max range value over all of the selections.
+        """Extract the min and max range value over all of the selections.
 
         The DataFrames can be reduced to only contain these values.
 
@@ -243,7 +243,10 @@ class RangeSelector:
         Returns:
             Minimum and maximum values.
         """
-        return cls(min=min(selections, key=lambda v: v.min).min, max=max(selections, key=lambda v: v.max).max,)
+        return cls(
+            min=min(selections, key=lambda v: v.min).min,
+            max=max(selections, key=lambda v: v.max).max,
+        )
 
     def __str__(self) -> str:
         return f"{self._variable_name}_{self.min}_{self.max}"
@@ -304,7 +307,7 @@ def expand_wildcards_in_filenames(paths: Sequence[Path]) -> List[Path]:
 def _AliEmcalList_to_TList(
     existing_list: Any,
 ) -> Any:
-    """ Convert an `AliEmcalList` to `TList` so we don't have to deal with `AliEmcalList` later...
+    """Convert an `AliEmcalList` to `TList` so we don't have to deal with `AliEmcalList` later...
 
     Ideally, we could just cast this, but I don't see how to do that with PyROOT...
     For example, `reinterpret_cast` maintains the type of the original object.
@@ -335,7 +338,7 @@ def split_tree(  # noqa: C901
     chunk_size: float = 200e6,
     n_cores: int = 1,
 ) -> Dict[Path, List[Path]]:
-    """ Split tree into a given number of chunks.
+    """Split tree into a given number of chunks.
 
     It will also skip storing bad entries in the new files.
 
@@ -478,7 +481,7 @@ def split_tree(  # noqa: C901
 
 
 def split_tree_entry_point() -> None:
-    """ Entry point for splitting a tree into chunks.
+    """Entry point for splitting a tree into chunks.
 
     Args:
         None. It can be configured through command line arguments.
@@ -487,7 +490,7 @@ def split_tree_entry_point() -> None:
         None.
     """
     setup_logging()
-    parser = argparse.ArgumentParser(description=f"Split tree into chunks.")
+    parser = argparse.ArgumentParser(description="Split tree into chunks.")
 
     parser.add_argument("-f", "--filenames", required=True, nargs="+", default=[])
     parser.add_argument(
@@ -497,13 +500,7 @@ def split_tree_entry_point() -> None:
         type=str,
         help="Name of the tree to split",
     )
-    parser.add_argument(
-        "-c",
-        "--cores",
-        default=1,
-        type=int,
-        help="Number of cores to use."
-    )
+    parser.add_argument("-c", "--cores", default=1, type=int, help="Number of cores to use.")
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "-n", "--nChunks", default=-1, type=int, help="Number of chunks. Default: -1, which then uses the chunk size."
@@ -515,7 +512,11 @@ def split_tree_entry_point() -> None:
     args = parser.parse_args()
 
     output_filenames = split_tree(
-        filenames=args.filenames, tree_name=args.treeName, number_of_chunks=args.nChunks, chunk_size=args.chunkSize, n_cores=args.cores,
+        filenames=args.filenames,
+        tree_name=args.treeName,
+        number_of_chunks=args.nChunks,
+        chunk_size=args.chunkSize,
+        n_cores=args.cores,
     )
 
     import pprint
@@ -564,7 +565,7 @@ def merge_ROOT_files(dir: Path, n_merged_files: int = 5) -> Dict[Path, List[Path
 
 
 def merge_ROOT_files_entry_point() -> None:
-    """ Entry point for merging ROOT files into groups.
+    """Entry point for merging ROOT files into groups.
 
     Args:
         None. It can be configured through command line arguments.
@@ -573,7 +574,7 @@ def merge_ROOT_files_entry_point() -> None:
         None.
     """
     setup_logging()
-    parser = argparse.ArgumentParser(description=f"Merge files into groups.")
+    parser = argparse.ArgumentParser(description="Merge files into groups.")
 
     parser.add_argument(
         "-d", "--directory", required=True, type=Path, help="Directory containing the ROOT files to merge."

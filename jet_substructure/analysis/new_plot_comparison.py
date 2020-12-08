@@ -47,7 +47,7 @@ def plot_compare_grooming_methods_for_attribute(
     ax: Optional[matplotlib.axes.Axes] = None,
     plot_png: Optional[bool] = False,
 ) -> str:
-    """ Plot comparison between grooming methods for a given substructure variable (attribute) and given prefix.
+    """Plot comparison between grooming methods for a given substructure variable (attribute) and given prefix.
 
     It can be for a single or multiple grooming methods.
 
@@ -141,7 +141,7 @@ def plot_compare_grooming_methods_for_prefix(
     output_dir: Path,
     plot_png: bool = False,
 ) -> None:
-    """ Plot comparison between prefixes for a given substructure variable (attribute) and grooming method(s).
+    """Plot comparison between prefixes for a given substructure variable (attribute) and grooming method(s).
 
     It can be for a single or multiple grooming methods.
     """
@@ -150,7 +150,13 @@ def plot_compare_grooming_methods_for_prefix(
     logger.info(
         f"Plotting grooming method comparison for {attr_name}, {display_labels_vs}, grooming_methods: {grooming_methods}"
     )
-    fig, (ax, ax_ratio) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+    fig, (ax, ax_ratio) = plt.subplots(
+        2,
+        1,
+        figsize=(8, 6),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
 
     grooming_styles = pb.define_grooming_styles()
 

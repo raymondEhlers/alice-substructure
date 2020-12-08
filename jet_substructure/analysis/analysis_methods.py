@@ -53,7 +53,7 @@ class PowerLaw(pachyderm.fit.Fit):  # type: ignore
 
 
 def fit_kt_spectrum(kt_spectra: binned_data.BinnedData) -> PowerLaw:
-    """ Fit a given kt spectrum to a power law.
+    """Fit a given kt spectrum to a power law.
 
     Args:
         kt_spectrum: kt spectrum to be fit.

@@ -1004,7 +1004,7 @@ def setup_root_data_frame_closure(
 
 @python_app
 def _unfolding_standard(
-    settings: "unfolding_2D.Settings",
+    settings: "unfolding_2D.Settings",  # noqa: F821
     reweight_prior: bool,
     inputs=[],
     outputs=[],
@@ -1024,7 +1024,7 @@ def _unfolding_standard(
 
 @python_app
 def _unfolding_closure(
-    settings: "unfolding_2D.Settings",
+    settings: "unfolding_2D.Settings",  # noqa: F821
     closure_variation: str,
     inputs=[],
     outputs=[],
@@ -1056,10 +1056,10 @@ def setup_unfolding(
 
     PbPb_dataset_config = read_config(collision_system="PbPb")
     PbPb_train_directories = set([Path(filename).parent for filename in PbPb_dataset_config["files"]])
-    PbPb_prefixes = PbPb_dataset_config["prefixes"]
+    # PbPb_prefixes = PbPb_dataset_config["prefixes"]
     embedded_dataset_config = read_config(collision_system="embedPythia")
     embedded_train_directories = set([Path(filename).parent for filename in embedded_dataset_config["files"]])
-    embedded_prefixes = embedded_dataset_config["prefixes"]
+    # embedded_prefixes = embedded_dataset_config["prefixes"]
 
     # Detemrien filenames first since they don't depend on grooming methods
     data_files: List[File] = []

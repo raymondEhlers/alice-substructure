@@ -1465,12 +1465,10 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     # However, first we need to rebin
     tag = f"_{jet_pt_bin.histogram_str(label=prefix)}" if rdf_plots else ""
     bh_hist = hists[f"{grooming_method}_{prefix}_kt{tag}"]
-    #h = binned_data.BinnedData.from_existing_data(
+    # h = binned_data.BinnedData.from_existing_data(
     #    bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1 :: bh.rebin(2)]  # noqa: E203
-    #)
-    h = binned_data.BinnedData.from_existing_data(
-        bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1:15]  # noqa: E203
-    )
+    # )
+    h = binned_data.BinnedData.from_existing_data(bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1:15])  # noqa: E203
 
     # Plot
     # Normally, we transpose the data. However, we want the kt on the x axis and the pt on the y axis.

@@ -34,7 +34,7 @@ soft_drop_grooming_methods = all_grooming_methods[6:]
 def load_histograms(
     filename: str, collision_system: str, tag: str, base_path: Path, verbose: bool = False
 ) -> Dict[str, binned_data.BinnedData]:
-    """ Load histograms stored in a file.
+    """Load histograms stored in a file.
 
     Note:
         As of 10 September 2020, uproot4 has some bugs in reading histograms, so we read them with uproot3.
@@ -64,7 +64,7 @@ def load_histograms(
 
 
 def output_dir_f(output_dir: Path, identifier: str) -> Path:
-    """ Format an output_dir path with a given identifier.
+    """Format an output_dir path with a given identifier.
 
     Also ensures that the directory exists.
 
@@ -81,7 +81,7 @@ def output_dir_f(output_dir: Path, identifier: str) -> Path:
 
 
 def _image_to_base64(filename: Path) -> str:
-    """ Convert an image at the give path to base64.
+    """Convert an image at the give path to base64.
 
     By converting, we can embed it into an img tag, which means that we can move a file around without any issues.
 
@@ -96,7 +96,7 @@ def _image_to_base64(filename: Path) -> str:
 def display_images(
     rows: Sequence[Sequence[str]], fig_output_dir: Path, embed_with_base64: bool = False, render_display: bool = True
 ) -> Optional[str]:
-    """ Display stored images in a layout using HTML + CSS.
+    """Display stored images in a layout using HTML + CSS.
 
     For each row, the width is determined by the number of images, such that they their widths
     will sum to the full width. This can make images rather small, so we include a scaling transform
@@ -196,7 +196,7 @@ def display_images(
             full_html += html
 
     if render_display:
-        from IPython.display import display, HTML
+        from IPython.display import HTML, display
 
         display(HTML(full_html))
     else:
@@ -206,7 +206,7 @@ def display_images(
 
 
 def display_images_ipywidgets(rows: Sequence[Sequence[str]], fig_output_dir: Path, render_display: bool = True) -> Any:
-    """ Display images with ipywidgets (backup method).
+    """Display images with ipywidgets (backup method).
 
     This doesn't work nearly as well as the direct HTML based approach, but it's kept here for posterity.
     For one, it doesn't seem to render nicely when exporting notebooks. Plus, jupyter lab doesn't play
@@ -221,7 +221,7 @@ def display_images_ipywidgets(rows: Sequence[Sequence[str]], fig_output_dir: Pat
         The compiled HTML containing the image.
     """
     # Delay the import so we don't have to rely on a package that's only used as a backup method.
-    from ipywidgets import Image, HBox, VBox
+    from ipywidgets import HBox, Image, VBox
 
     layout = []
     for row in rows:

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Sequence, Tuple, Type
 
 import attr
+import numpy as np
 import uproot
 from pachyderm import binned_data, yaml
 
@@ -24,7 +25,7 @@ class ScaleFactor:
     n_trials: float = attr.ib(converter=float)
     n_entries: float = attr.ib(converter=float)
 
-    def value(self):
+    def value(self) -> float:
         """Value of the scale factor.
 
         NOTE:
@@ -57,14 +58,14 @@ class ScaleFactor:
         )
 
 
-def scale_factor_ROOT_wrapper(base_path: Path, train_number: int) -> Tuple[float, Any, Any]:
+def scale_factor_ROOT_wrapper(base_path: Path, train_number: int) -> Tuple[int, Any, Any]:
     # Setup
     filenames = data_manager._ensure_and_expand_paths([Path(str(base_path).format(train_number=train_number))])
 
     return scale_factor_ROOT(filenames)
 
 
-def scale_factor_ROOT(filenames: Sequence[Path]) -> Tuple[float, Any, Any]:
+def scale_factor_ROOT(filenames: Sequence[Path]) -> Tuple[int, Any, Any]:
     # Delay import to avoid direct dependence
     import ROOT
 
@@ -92,21 +93,23 @@ def scale_factor_ROOT(filenames: Sequence[Path]) -> Tuple[float, Any, Any]:
     return n_entries, cross_section, n_trials
 
 
-def scale_factor_uproot_wrapper(base_path: Path, train_number: int, run_despite_issues: bool = False) -> None:
+def scale_factor_uproot_wrapper(
+    base_path: Path, train_number: int, run_despite_issues: bool = False
+) -> Tuple[int, Any, Any]:
     # Setup
     filenames = data_manager._ensure_and_expand_paths([Path(str(base_path).format(train_number=train_number))])
 
     return scale_factor_uproot(filenames=filenames, run_despite_issues=run_despite_issues)
 
 
-def scale_factor_uproot(filenames: Sequence[Path], run_despite_issues: bool = False) -> None:
+def scale_factor_uproot(filenames: Sequence[Path], run_despite_issues: bool = False) -> Tuple[int, Any, Any]:
     # Validation
     if not run_despite_issues:
         raise RuntimeError("Pachyderm binned data doesn't add profile histograms correctly...")
 
     cross_section_hists = []
     n_trials_hists = []
-    n_entries = 0
+    n_entries: np.ndarray = []
     for filename in filenames:
         with uproot.open(filename) as input_file:
             # Retrieve the embedding helper to extract the cross section and ntrials.
@@ -127,7 +130,11 @@ def scale_factor_uproot(filenames: Sequence[Path], run_despite_issues: bool = Fa
 
 
 def scale_factor_from_hists(n_entries: int, cross_section: Any, n_trials: Any) -> float:
-    scale_factor = ScaleFactor.from_hists(cross_section=cross_section, n_trials=n_trials, n_entries=n_entries,)
+    scale_factor = ScaleFactor.from_hists(
+        cross_section=cross_section,
+        n_trials=n_trials,
+        n_entries=n_entries,
+    )
 
     return scale_factor.value()
 

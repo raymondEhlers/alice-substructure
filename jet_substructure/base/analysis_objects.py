@@ -60,12 +60,15 @@ class Identifier:
 
     @classmethod
     def from_existing(cls: Type[_T_Identifier], existing: _T_Identifier) -> _T_Identifier:
-        return cls(iterative_splittings=existing.iterative_splittings, jet_pt_bin=existing.jet_pt_bin,)
+        return cls(
+            iterative_splittings=existing.iterative_splittings,
+            jet_pt_bin=existing.jet_pt_bin,
+        )
 
 
 @attr.s(frozen=True)
 class MatchingHybridIdentifier(Identifier):
-    """ Identify hybrid cuts on the matching hists.
+    """Identify hybrid cuts on the matching hists.
 
     Note:
         We only use this class for plotting! Not for identify the hists during processing!
@@ -102,7 +105,11 @@ class MatchingHybridIdentifier(Identifier):
         hybrid_jet_pt_bin: helpers.RangeSelector,
         min_kt: float,
     ) -> "MatchingHybridIdentifier":
-        return cls(iterative_splittings=existing.iterative_splittings, jet_pt_bin=hybrid_jet_pt_bin, min_kt=min_kt,)
+        return cls(
+            iterative_splittings=existing.iterative_splittings,
+            jet_pt_bin=hybrid_jet_pt_bin,
+            min_kt=min_kt,
+        )
 
 
 @attr.s(frozen=True)
@@ -118,7 +125,10 @@ class AnalysisSettings:
 
     @classmethod
     def from_config(cls: Type["AnalysisSettings"], config: Mapping[str, Any], z_cutoff: float) -> "AnalysisSettings":
-        return cls(z_cutoff=z_cutoff, **cls._extract_values_from_dataset_config(config),)
+        return cls(
+            z_cutoff=z_cutoff,
+            **cls._extract_values_from_dataset_config(config),
+        )
 
 
 @attr.s(frozen=True)
@@ -216,7 +226,11 @@ class MatchingResult:
     failed: UprootArray[bool] = attr.ib()
 
     def __getitem__(self, mask: UprootArray[bool]) -> "MatchingResult":
-        return type(self)(properly=self.properly[mask], mistag=self.mistag[mask], failed=self.failed[mask],)
+        return type(self)(
+            properly=self.properly[mask],
+            mistag=self.mistag[mask],
+            failed=self.failed[mask],
+        )
 
 
 @attr.s
@@ -236,7 +250,7 @@ class FillHistogramInput:
 
     @property
     def n_jets(self) -> int:
-        """ Number of jets.
+        """Number of jets.
 
         Need to determine all jets which are accepted in the jet pt range.
         Otherwise, those which may fail (such as with a z_cutoff) may not get
@@ -539,7 +553,11 @@ class SubstructureToyHists(SubstructureHistsBase):
         )
 
     def fill(
-        self, data_inputs: FillHistogramInput, true_inputs: FillHistogramInput, jet_R: float, weight: float,
+        self,
+        data_inputs: FillHistogramInput,
+        true_inputs: FillHistogramInput,
+        jet_R: float,
+        weight: float,
     ) -> None:
         # Validation
         # Give a useful error message
@@ -1147,7 +1165,10 @@ def create_substructure_hists(iterative_splittings: bool, z_cutoff: float) -> Hi
         values_axis=bh.axis.Regular(50, 0, 50),
     )
     dynamical_kt = SubstructureHists.create_boost_histograms(
-        name="dynamical_kt", title="ktDrop", iterative_splittings=iterative_splittings, values_axis=kt_axis,
+        name="dynamical_kt",
+        title="ktDrop",
+        iterative_splittings=iterative_splittings,
+        values_axis=kt_axis,
     )
     dynamical_time = SubstructureHists.create_boost_histograms(
         name="dynamical_time",
@@ -1195,7 +1216,10 @@ def create_substructure_toy_hists(iterative_splittings: bool, z_cutoff: float) -
         values_axis=bh.axis.Regular(50, 0, 50),
     )
     dynamical_kt = SubstructureToyHists.create_boost_histograms(
-        name="dynamical_kt", title="ktDrop", iterative_splittings=iterative_splittings, values_axis=kt_axis,
+        name="dynamical_kt",
+        title="ktDrop",
+        iterative_splittings=iterative_splittings,
+        values_axis=kt_axis,
     )
     dynamical_time = SubstructureToyHists.create_boost_histograms(
         name="dynamical_time",
@@ -1344,23 +1368,29 @@ def create_substructure_response_hists_extended(
 
 
 def create_matching_hists(iterative_splittings: bool, z_cutoff: float) -> Hists[SubstructureMatchingSubjetHists]:
-    """ Matching subjets hists
-
-    """
+    """Matching subjets hists"""
     inclusive = SubstructureMatchingSubjetHists.create_boost_histograms(
-        name="inclusive_response", title="Inclusive", iterative_splittings=iterative_splittings,
+        name="inclusive_response",
+        title="Inclusive",
+        iterative_splittings=iterative_splittings,
     )
     dynamical_z = SubstructureMatchingSubjetHists.create_boost_histograms(
-        name="dynamical_z_response", title="zDrop", iterative_splittings=iterative_splittings,
+        name="dynamical_z_response",
+        title="zDrop",
+        iterative_splittings=iterative_splittings,
     )
     dynamical_kt = SubstructureMatchingSubjetHists.create_boost_histograms(
         name="dynamical_kt_response", title="ktDrop", iterative_splittings=iterative_splittings
     )
     dynamical_time = SubstructureMatchingSubjetHists.create_boost_histograms(
-        name="dynamical_time_response", title="timeDrop", iterative_splittings=iterative_splittings,
+        name="dynamical_time_response",
+        title="timeDrop",
+        iterative_splittings=iterative_splittings,
     )
     leading_kt = SubstructureMatchingSubjetHists.create_boost_histograms(
-        name="leading_kt_response", title=r"Leading $k_{\text{T}}$", iterative_splittings=iterative_splittings,
+        name="leading_kt_response",
+        title=r"Leading $k_{\text{T}}$",
+        iterative_splittings=iterative_splittings,
     )
     leading_kt_hard_cutoff = SubstructureMatchingSubjetHists.create_boost_histograms(
         name="leading_kt_hard_cutoff_response",

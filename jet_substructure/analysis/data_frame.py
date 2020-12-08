@@ -78,17 +78,17 @@ class SkimDataset:
         if self._path_list:
             input_path_list = self._path_list
         else:
-            #base_path = Path("trains") / self.collision_system / "{train_number}" / "skim"
+            # base_path = Path("trains") / self.collision_system / "{train_number}" / "skim"
             base_path = Path("trains") / self.collision_system / "{train_number}"
             if self.merged_skim:
                 base_path = base_path / "merged" / "*.root"
             else:
                 base_path = base_path / "AnalysisResults*.root"
-                #base_path = base_path / "*_iterative_splittings*.root"
+                # base_path = base_path / "*_iterative_splittings*.root"
             input_path_list = [
                 Path(str(base_path).format(train_number=train_number)) for train_number in self.train_numbers
             ]
-        #logger.debug(f"input_path_list: {input_path_list}")
+        # logger.debug(f"input_path_list: {input_path_list}")
         path_list = data_manager._ensure_and_expand_paths(
             input_path_list,
             # [
@@ -116,9 +116,7 @@ class SkimDataset:
 
 
 def _merge_hists(a: Dict[str, bh.Histogram], b: Dict[str, bh.Histogram]) -> Dict[str, bh.Histogram]:
-    """ Merge hists stored in a file.
-
-    """
+    """Merge hists stored in a file."""
     for k in b:
         a[k] += b[k]
     return a
@@ -300,29 +298,41 @@ def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Pat
         for hybrid_jet_pt_bin in [helpers.RangeSelector(40, 120), helpers.RangeSelector(20, 200)]:
             hists[
                 f"{grooming_method}_hybrid_det_level_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"
-            ] = bh.Histogram(bh.axis.Regular(25, 0, 250), storage=bh.storage.WeightedMean(),)
+            ] = bh.Histogram(
+                bh.axis.Regular(25, 0, 250),
+                storage=bh.storage.WeightedMean(),
+            )
             hists[f"{grooming_method}_hybrid_true_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"] = bh.Histogram(
-                bh.axis.Regular(25, 0, 250), storage=bh.storage.WeightedMean(),
+                bh.axis.Regular(25, 0, 250),
+                storage=bh.storage.WeightedMean(),
             )
             hists[f"{grooming_method}_det_true_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"] = bh.Histogram(
-                bh.axis.Regular(25, 0, 250), storage=bh.storage.WeightedMean(),
+                bh.axis.Regular(25, 0, 250),
+                storage=bh.storage.WeightedMean(),
             )
         # Residual so we can see the entire distribution.
         # We intentionally don't select the hybrid jet pt range here.
         hists[f"{grooming_method}_hybrid_det_level_jet_pt_residual_distribution"] = bh.Histogram(
-            bh.axis.Regular(15, 0, 150), bh.axis.Regular(150, -1.5, 1.5), storage=bh.storage.Weight(),
+            bh.axis.Regular(15, 0, 150),
+            bh.axis.Regular(150, -1.5, 1.5),
+            storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_hybrid_true_jet_pt_residual_distribution"] = bh.Histogram(
-            bh.axis.Regular(15, 0, 150), bh.axis.Regular(150, -1.5, 1.5), storage=bh.storage.Weight(),
+            bh.axis.Regular(15, 0, 150),
+            bh.axis.Regular(150, -1.5, 1.5),
+            storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_det_true_jet_pt_residual_distribution"] = bh.Histogram(
-            bh.axis.Regular(15, 0, 150), bh.axis.Regular(150, -1.5, 1.5), storage=bh.storage.Weight(),
+            bh.axis.Regular(15, 0, 150),
+            bh.axis.Regular(150, -1.5, 1.5),
+            storage=bh.storage.Weight(),
         )
 
         # Distance comparison by matching type
         for matching_type in _matching_name_to_axis_value:
             hists[f"{grooming_method}_hybrid_det_level_distance_matching_type_{matching_type}"] = bh.Histogram(
-                bh.axis.Regular(20, 0, 0.5), storage=bh.storage.Weight(),
+                bh.axis.Regular(20, 0, 0.5),
+                storage=bh.storage.Weight(),
             )
 
     progress_manager = enlighten.Manager()
@@ -539,7 +549,7 @@ def _fill_grooming_hists(
     prefix: str,
     suffix: Optional[str] = None,
 ) -> None:
-    """ Fill grooming hists using the df.
+    """Fill grooming hists using the df.
 
     This is in a separate function so the DataFrame can be masked.
 
@@ -602,20 +612,23 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
     branches = [f"*{prefix}*"]
     if dataset.collision_system in ["pythia", "embedPythia"]:
         # TODO: Extract properly and re-enable...
-        #branches.append("scale_factor")
+        # branches.append("scale_factor")
         pass
     if dataset.collision_system == "embedPythia":
         branches.append("det_level_leading_track_pt")
         branches.append("data_leading_track_pt")
-    #data_frames = uproot3.pandas.iterate(
+    # data_frames = uproot3.pandas.iterate(
     # Using entrysteps=float("inf") is imperative for uproot.pandas.iterate to get reasonable performance!
     # TODO: Make tree name configurable...
     data_frames = uproot3.tree.iterate(
         outputtype=pd.DataFrame,
-        #path=dataset.path_list, treepath="tree", namedecode="utf-8", branches=branches, reportpath=True,
-        #path=dataset.path_list, treepath="AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl",
-        path=dataset.path_list, treepath="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
-        namedecode="utf-8", branches=branches, reportpath=True, #entrysteps=float("inf"),
+        # path=dataset.path_list, treepath="tree", namedecode="utf-8", branches=branches, reportpath=True,
+        # path=dataset.path_list, treepath="AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl",
+        path=dataset.path_list,
+        treepath="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+        namedecode="utf-8",
+        branches=branches,
+        reportpath=True,  # entrysteps=float("inf"),
         entrysteps="500MB",
     )
     logger.debug(f"Path list: {dataset.path_list}")
@@ -623,18 +636,18 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
 
     # TODO: Define grooming methods better?
     grooming_methods = [
-        #"dynamical_z",
-        #"dynamical_kt",
-        #"dynamical_time",
-        #"leading_kt",
+        # "dynamical_z",
+        # "dynamical_kt",
+        # "dynamical_time",
+        # "leading_kt",
         "leading_kt_z_cut_02",
-        #"leading_kt_z_cut_04",
-        #"soft_drop_z_cut_02",
-        #"soft_drop_z_cut_04",
+        # "leading_kt_z_cut_04",
+        # "soft_drop_z_cut_02",
+        # "soft_drop_z_cut_04",
     ]
     direct_comparison_grooming_methods = [
-        #"leading_kt_z_cut_02_first_split",
-        #"leading_kt_z_cut_04_first_split",
+        # "leading_kt_z_cut_02_first_split",
+        # "leading_kt_z_cut_04_first_split",
     ]
 
     # Define hists.
@@ -643,51 +656,78 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
         # Standard
         jet_pt_axis = bh.axis.Regular(28, 0, 140)
         hists[f"{grooming_method}_{prefix}_kt"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(26, -1, 25), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(26, -1, 25),
+            storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_{prefix}_delta_R"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(21, -0.02, jet_R), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(21, -0.02, jet_R),
+            storage=bh.storage.Weight(),
         )
-        #hists[f"{grooming_method}_{prefix}_theta"] = bh.Histogram(
+        # hists[f"{grooming_method}_{prefix}_theta"] = bh.Histogram(
         #    jet_pt_axis, bh.axis.Regular(21, -0.05, 1.0), storage=bh.storage.Weight(),
-        #)
+        # )
         hists[f"{grooming_method}_{prefix}_z"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(21, -0.025, 0.5), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(21, -0.025, 0.5),
+            storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_{prefix}_n_to_split"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(10, -0.5, 9.5),
+            storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_{prefix}_n_groomed_to_split"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(10, -0.5, 9.5),
+            storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_{prefix}_n_passed_grooming"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(10, -0.5, 9.5),
+            storage=bh.storage.Weight(),
         )
         # Lund plane
         hists[f"{grooming_method}_{prefix}_lund_plane"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(100, 0, 5), bh.axis.Regular(100, -5.0, 5.0), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(100, 0, 5),
+            bh.axis.Regular(100, -5.0, 5.0),
+            storage=bh.storage.Weight(),
         )
         # High kt
         hists[f"{grooming_method}_{prefix}_kt_high_kt"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(26, -1, 25), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(26, -1, 25),
+            storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_{prefix}_delta_R_high_kt"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(21, -0.02, jet_R), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(21, -0.02, jet_R),
+            storage=bh.storage.Weight(),
         )
-        #hists[f"{grooming_method}_{prefix}_theta_high_kt"] = bh.Histogram(
+        # hists[f"{grooming_method}_{prefix}_theta_high_kt"] = bh.Histogram(
         #    jet_pt_axis, bh.axis.Regular(21, -0.05, 1.0), storage=bh.storage.Weight(),
-        #)
+        # )
         hists[f"{grooming_method}_{prefix}_z_high_kt"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(21, -0.025, 0.5), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(21, -0.025, 0.5),
+            storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_{prefix}_n_to_split_high_kt"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(10, -0.5, 9.5),
+            storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_{prefix}_n_groomed_to_split_high_kt"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(10, -0.5, 9.5),
+            storage=bh.storage.Weight(),
         )
         hists[f"{grooming_method}_{prefix}_n_passed_grooming_high_kt"] = bh.Histogram(
-            jet_pt_axis, bh.axis.Regular(10, -0.5, 9.5), storage=bh.storage.Weight(),
+            jet_pt_axis,
+            bh.axis.Regular(10, -0.5, 9.5),
+            storage=bh.storage.Weight(),
         )
 
     progress_manager = enlighten.Manager()
@@ -820,13 +860,13 @@ def merge_output(train_numbers: Sequence[int], output_filename: Path, output_pat
             for k, v in temp_hists.items():
                 hists[k] += v
         del temp_hists
-    #hists = functools.reduce(
+    # hists = functools.reduce(
     #    _merge_hists,
     #    (
     #        dill.load(gzip.GzipFile(f, "r"))
     #        for f in files
     #    ),
-    #)
+    # )
     pkl_filename = output_path / f"{filename}.pgz"
     logger.info(f"Saving hists to {pkl_filename}")
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
@@ -836,7 +876,7 @@ def merge_output(train_numbers: Sequence[int], output_filename: Path, output_pat
 
 
 def output_dir_f(output_dir: Path, identifier: str) -> Path:
-    """ Format an output_dir path with a given identifier.
+    """Format an output_dir path with a given identifier.
 
     Also ensures that the directory exists.
 
@@ -855,18 +895,18 @@ def output_dir_f(output_dir: Path, identifier: str) -> Path:
 def plot_all() -> None:
     # TODO: Consolidate
     grooming_methods = [
-        #"dynamical_z",
-        #"dynamical_kt",
-        #"dynamical_time",
-        #"leading_kt",
+        # "dynamical_z",
+        # "dynamical_kt",
+        # "dynamical_time",
+        # "leading_kt",
         "leading_kt_z_cut_02",
-        #"leading_kt_z_cut_04",
-        #"soft_drop_z_cut_02",
-        #"soft_drop_z_cut_04",
+        # "leading_kt_z_cut_04",
+        # "soft_drop_z_cut_02",
+        # "soft_drop_z_cut_04",
     ]
     direct_comparison_grooming_methods = [
-        #"leading_kt_z_cut_02_first_split",
-        #"leading_kt_z_cut_04_first_split",
+        # "leading_kt_z_cut_02_first_split",
+        # "leading_kt_z_cut_04_first_split",
     ]
 
     # NOTE: Intentionally skipping the f-string here. We want to format it later!
@@ -956,7 +996,9 @@ def run_plot(datasets: Mapping[str, SkimDataset], remerge: bool = False) -> None
 
 def define_embedding_datasets(
     output_identifier: str = "",
-    train_number: Optional[int] = None, train_numbers: Optional[Sequence[int]] = None, merged_skim: bool = False,
+    train_number: Optional[int] = None,
+    train_numbers: Optional[Sequence[int]] = None,
+    merged_skim: bool = False,
 ) -> Dict[str, SkimDataset]:
     if train_number is None and train_numbers is None:
         raise ValueError("Must pass either train number or train_numbers")
@@ -982,16 +1024,20 @@ def define_embedding_datasets(
     output_identifier_full = "embedPythia"
     if output_identifier:
         output_identifier_full = output_identifier_full + f"_{output_identifier}"
-    #for prefix in ["hybrid", "det_level", "true"]:
+    # for prefix in ["hybrid", "det_level", "true"]:
     for prefix in ["data", "det_level", "matched"]:
         datasets[f"embedPythia_{prefix}"] = SkimDataset(
-            collision_system="embedPythia", train_numbers=train_numbers, merged_skim=merged_skim, prefix=prefix, output_filename_identifier=output_identifier_full
+            collision_system="embedPythia",
+            train_numbers=train_numbers,
+            merged_skim=merged_skim,
+            prefix=prefix,
+            output_filename_identifier=output_identifier_full,
         )
     return datasets
 
 
 def process_embedding_skim_entry_point() -> None:
-    """ Entry point for processing the skim.
+    """Entry point for processing the skim.
 
     Args:
         None. It can be configured through command line arguments.
@@ -1000,12 +1046,14 @@ def process_embedding_skim_entry_point() -> None:
         None.
     """
     helpers.setup_logging()
-    parser = argparse.ArgumentParser(description=f"Processed the skimmed dataset.")
+    parser = argparse.ArgumentParser(description="Processed the skimmed dataset.")
     parser.add_argument("-t", "--trainNumber", required=True, type=int, help="Embedding train number to process.")
     parser.add_argument("-f", "--filename", required=True, type=str, help="Filename to process.")
     args = parser.parse_args()
 
-    embedding_datasets = define_embedding_datasets(train_number=args.trainNumber, output_identifier=Path(args.filename).with_suffix("").name)
+    embedding_datasets = define_embedding_datasets(
+        train_number=args.trainNumber, output_identifier=Path(args.filename).with_suffix("").name
+    )
     # This is a hack, but it's easy right now...
     for dataset in embedding_datasets.values():
         dataset._path_list = [Path(args.filename)]
@@ -1013,7 +1061,8 @@ def process_embedding_skim_entry_point() -> None:
     # Process
     # Response
     df_from_file_embedding(
-        dataset=embedding_datasets["embedPythia_response"], path_list_friends=[],
+        dataset=embedding_datasets["embedPythia_response"],
+        path_list_friends=[],
     )
     # Hybrid
     df_from_file_data(dataset=embedding_datasets["embedPythia_hybrid"])
@@ -1031,36 +1080,34 @@ def run() -> None:
             # TODO: improve this when time allows to accept single values....
             train_numbers=[5987],
             prefix="data",
-            path_list = [
-                Path("trains") / "PbPb" / "5987" / "AnalysisResults.*.root"
-            ]
+            path_list=[Path("trains") / "PbPb" / "5987" / "AnalysisResults.*.root"],
         ),
-        #"pythia_data": SkimDataset(
+        # "pythia_data": SkimDataset(
         #    collision_system="pythia",
         #    # TODO: improve this when time allows to accept single values....
         #    train_numbers=[2110],
         #    prefix="data",
-        #),
-        #"pythia_matched": SkimDataset(
+        # ),
+        # "pythia_matched": SkimDataset(
         #    collision_system="pythia",
         #    # TODO: improve this when time allows to accept single values....
         #    train_numbers=[2110],
         #    prefix="matched",
-        #),
+        # ),
     }
-    #datasets.update(define_embedding_datasets(train_numbers=list(range(5988, 6008))))
+    # datasets.update(define_embedding_datasets(train_numbers=list(range(5988, 6008))))
     datasets.update(define_embedding_datasets(train_numbers=list(range(6007, 6008))))
 
     if not plot_only:
-        #df_from_file_data(dataset=datasets["PbPb"],)
+        # df_from_file_data(dataset=datasets["PbPb"],)
         df_from_file_data(dataset=datasets["embedPythia_data"])
         # run_embed_pythia(run_response=True)
-        #df_from_file_data(dataset=datasets["embedPythia_hybrid"],)
-        #df_from_file_embedding(
+        # df_from_file_data(dataset=datasets["embedPythia_hybrid"],)
+        # df_from_file_embedding(
         #    dataset=datasets["embedPythia_response"], path_list_friends=[],
-        #)
-        #df_from_file_data(dataset=datasets["pythia_matched"],)
-        #df_from_file_data(dataset=datasets["pythia_data"],)
+        # )
+        # df_from_file_data(dataset=datasets["pythia_matched"],)
+        # df_from_file_data(dataset=datasets["pythia_data"],)
         # dask_df_from_file()
         # dask_df_from_delayed()
         # map_reduce_pandas_concat()

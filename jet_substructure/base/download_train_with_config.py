@@ -231,9 +231,11 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
 def entry_point() -> None:
     helpers.setup_logging(level=logging.INFO)
 
-    parser = argparse.ArgumentParser(description=f"Split tree into chunks.")
+    parser = argparse.ArgumentParser(description="Download LEGO train outputs.")
     parser.add_argument(
-        "--train", type=int, help="Single train to process, or first train to process.",
+        "--train",
+        type=int,
+        help="Single train to process, or first train to process.",
     )
     parser.add_argument(
         "--maxTrain",

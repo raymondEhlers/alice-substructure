@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 @attr.s
 class Calculation:
-    """ Similar to `FillHistogramInput`, but adds the splittings indices.
+    """Similar to `FillHistogramInput`, but adds the splittings indices.
 
     Note:
         The splitting indices are the overall indices of the input splittings within
@@ -104,9 +104,10 @@ class GroomingResultForTree:
 
 
 def _define_calculation_functions(
-    dataset: analysis_objects.Dataset, iterative_splittings: bool,
+    dataset: analysis_objects.Dataset,
+    iterative_splittings: bool,
 ) -> Dict[str, functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]]]:
-    """ Define the calculation functions of interest.
+    """Define the calculation functions of interest.
 
     Note:
         The type of the inclusive is different, but it takes and returns the same sets of arguments
@@ -125,7 +126,9 @@ def _define_calculation_functions(
         "dynamical_time": functools.partial(
             substructure_methods.JetSplittingArray.dynamical_time, R=dataset.settings.jet_R
         ),
-        "leading_kt": functools.partial(substructure_methods.JetSplittingArray.leading_kt,),
+        "leading_kt": functools.partial(
+            substructure_methods.JetSplittingArray.leading_kt,
+        ),
         "leading_kt_z_cut_02": functools.partial(substructure_methods.JetSplittingArray.leading_kt, z_cutoff=0.2),
         "leading_kt_z_cut_04": functools.partial(substructure_methods.JetSplittingArray.leading_kt, z_cutoff=0.4),
     }
@@ -144,9 +147,7 @@ def _define_calculation_functions(
 def _select_and_retrieve_splittings(
     jets: substructure_methods.SubstructureJetArray, mask: UprootArray[bool], iterative_splittings: bool
 ) -> Tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray, UprootArray[int]]:
-    """ Generalization of the function in analyze_tree to add the splitting index.
-
-    """
+    """Generalization of the function in analyze_tree to add the splitting index."""
     restricted_jets, restricted_splittings = analyze_tree._select_and_retrieve_splittings(
         jets, mask, iterative_splittings
     )
@@ -265,7 +266,7 @@ def prong_matching(
     grooming_method: str,
     match_using_distance: bool = True,
 ) -> Dict[str, np.ndarray]:
-    """ Performs prong matching for the provided collections.
+    """Performs prong matching for the provided collections.
 
     Note:
         0 is there were insufficient constituents to form a splitting, 1 is properly matched, 2 is mistagged
@@ -333,7 +334,7 @@ def calculate_and_skim_embedding(  # noqa: C901
     create_friend_tree: bool = False,
     draw_example_splittings: bool = False,
 ) -> bool:
-    """ Determine the response and prong matching for jets substructure techniques.
+    """Determine the response and prong matching for jets substructure techniques.
 
     Why combine them together? Because then we only have to open and process a tree once.
     At a future date (beyond the start of April 2020), it would be better to refactor them more separately,
@@ -599,7 +600,9 @@ def calculate_and_skim_data(
     ] = {}
     for prefix, input_jets in zip(prefixes, all_jets):
         masked_jets[prefix] = _select_and_retrieve_splittings(
-            input_jets, mask, iterative_splittings=iterative_splittings,
+            input_jets,
+            mask,
+            iterative_splittings=iterative_splittings,
         )
 
     # Results output
@@ -746,15 +749,22 @@ def run(
         iterative_splittings=iterative_splittings,
         **additional_kwargs_for_analysis,
     )
-    wrapper_multiprocessing = functools.partial(analyze_tree._wrap_multiprocessing, analysis_function=wrapper,)
+    wrapper_multiprocessing = functools.partial(
+        analyze_tree._wrap_multiprocessing,
+        analysis_function=wrapper,
+    )
     with progress_manager.counter(total=len(dm), desc="Skimming", unit="tree") as tree_counter:
         if number_of_cores > 1:
             with Pool(nodes=number_of_cores) as pool:
                 number_of_trees_processed = functools.reduce(
-                    operator.add, tree_counter(pool.imap(wrapper_multiprocessing, dm_iterator)),
+                    operator.add,
+                    tree_counter(pool.imap(wrapper_multiprocessing, dm_iterator)),
                 )
         else:
-            number_of_trees_processed = functools.reduce(operator.add, tree_counter(map(wrapper, dm_iterator)),)
+            number_of_trees_processed = functools.reduce(
+                operator.add,
+                tree_counter(map(wrapper, dm_iterator)),
+            )
 
     logger.info(f"Processed {number_of_trees_processed} out of {len(dm)} trees!")
 
@@ -763,7 +773,7 @@ def run(
 
 
 def parse_arguments() -> Tuple[str, List[Path], bool]:
-    parser = argparse.ArgumentParser(description=f"Skim provided files in a given dataset.")
+    parser = argparse.ArgumentParser(description="Skim provided files in a given dataset.")
 
     parser.add_argument("-d", "--datasetName", type=str)
     parser.add_argument("-f", "--filenames", nargs="+", default=[])

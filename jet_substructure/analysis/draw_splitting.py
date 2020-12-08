@@ -41,7 +41,7 @@ def splittings_graph(  # noqa: C901
     show_subjet_pt: bool = False,
     selected_splitting_index: int = -1,
 ) -> "networkx.DiGraph":
-    """ Draw a splitting graph for a given jet.
+    """Draw a splitting graph for a given jet.
 
     In the graph, inner nodes represent splittings, and lines represent subjets. Outer nodes (ie those with no
     nodes leaving them) represent particles. The iterative splitting nodes are shown in green, while the iterative

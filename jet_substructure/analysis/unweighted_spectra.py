@@ -138,7 +138,7 @@ def scaling_per_pt_hard_bin() -> None:
         yerr=merged_true_jet_pt.variances,
         marker=".",
         linestyle="",
-        label=fr"Merged",
+        label=r"Merged",
         color="black",
     )
 
@@ -155,7 +155,7 @@ def scaling_per_pt_hard_bin() -> None:
         yerr=merged_hybrid_jet_pt.variances,
         marker=".",
         linestyle="",
-        label=fr"Merged",
+        label=r"Merged",
         color="black",
     )
 

@@ -11,7 +11,6 @@ import typing
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence, Tuple, TypeVar, cast
 
-
 try:
     from typing import Final  # type: ignore
 except ImportError:
