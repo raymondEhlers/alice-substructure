@@ -1068,7 +1068,9 @@ def run_dynamical_grooming_embedding(
     hardest_kt.SetDetLevelJetsOn(True)
     hardest_kt.SetEnableSubjetMatching(True)
     hardest_kt.SetHardCutoff(0.2)
+    hardest_kt.SetGroomingMethod(ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kDynamicalCore)
     hardest_kt.Initialize()
+    print(hardest_kt.GroomingMethodName())
 
     # Setup L+L substructure task.
     ll_substructure = _run_add_task_macro(
