@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Mapping, Sequence, Tuple
+from typing import List, Mapping, Sequence, Tuple
 
 import attr
 import boost_histogram as bh
@@ -68,7 +68,8 @@ def _project_matching(bh_hist: bh.Histogram, axis_to_keep: int) -> binned_data.B
 
 def _project_matching_RDF(bh_hist: bh.Histogram, min_kt_hybrid: float) -> binned_data.BinnedData:
     res = bh_hist[
-        slice(None, None, bh.rebin(5)), slice(bh.loc(min_kt_hybrid) if min_kt_hybrid > 0 else None, None, bh.sum),
+        slice(None, None, bh.rebin(5)),
+        slice(bh.loc(min_kt_hybrid) if min_kt_hybrid > 0 else None, None, bh.sum),
     ]
 
     return binned_data.BinnedData.from_existing_data(res)
@@ -391,7 +392,10 @@ def _plot_subjet_matching_purity(  # noqa: C901
 
 
 def plot_prong_matching_purity(
-    hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path, plot_png: bool = False,
+    hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    output_dir: Path,
+    plot_png: bool = False,
 ) -> None:
     # Setup
     hybrid_jet_pt_bin = helpers.JetPtRange(min=40, max=120)
@@ -581,7 +585,10 @@ def _plot_residual_by_matching_type(
         selection_list = [slice(None), slice(None), slice(None)]
         if min_hybrid_kt:
             # Apply a hybrid kt cut.
-            selection_list[0] = slice(h.axes[0].find_bin(min_hybrid_kt), None,)
+            selection_list[0] = slice(
+                h.axes[0].find_bin(min_hybrid_kt),
+                None,
+            )
         # Must be a tuple to be used for indexing, but need a list for reassignment.
         selection = tuple(selection_list)
 
@@ -794,7 +801,7 @@ def _plot_jet_pt_residual_distribution(
     plot_config: PlotConfig,
     output_dir: Path,
 ) -> None:
-    """ Plot the full jet pt residual for a pt true selection.
+    """Plot the full jet pt residual for a pt true selection.
 
     Note:
         The pt true selections was applied when filling. This just plots the values.
@@ -973,7 +980,10 @@ def _plot_response_by_matching_type(
 
         # Plot
         mesh = ax.pcolormesh(
-            h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+            h.axes[0].bin_edges.T,
+            h.axes[1].bin_edges.T,
+            h.values.T,
+            norm=matplotlib.colors.LogNorm(**z_axis_range),
         )
         fig.colorbar(mesh, pad=0.02)
 
@@ -1218,7 +1228,13 @@ def _plot_kt_comparison(
     output_dir: Path,
 ) -> None:
     logger.info(f"Plotting kt comparison for {grooming_method} with hybrid {hybrid_jet_pt_bin}")
-    fig, (ax, ax_ratio) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+    fig, (ax, ax_ratio) = plt.subplots(
+        2,
+        1,
+        figsize=(8, 6),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
 
     # Data
     rebin_factor = 2
@@ -1435,10 +1451,12 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     hists: Mapping[str, bh.Histogram],
     grooming_method: str,
     prefix: str,
-    jet_pt_bin: helpers.RangeSelector,
+    jet_pt_bin: helpers.JetPtRange,
+    rdf_plots: bool,
     plot_config: PlotConfig,
     output_dir: Path,
-) -> None:
+    plot_png: bool = False,
+) -> Path:
     logger.debug(f"Plotting kt vs jet pt for {grooming_method}.")
 
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -1483,34 +1501,52 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     # Store and cleanup
     filename = f"{plot_config.name}_{jet_pt_bin}_iterative_splittings_{grooming_method}"
     fig.savefig(output_dir / f"{filename}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{filename}.png")
     plt.close(fig)
+    return Path(filename)
 
 
-def plot_kt_vs_jet_pt(hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path,) -> None:
-    jet_pt_bin = helpers.RangeSelector(min=40, max=120)
-    prefix = "data"
+def plot_kt_vs_jet_pt(
+    hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    prefix: str,
+    rdf_plots: bool,
+    output_dir: Path,
+    plot_png: bool,
+) -> List[Path]:
+    jet_pt_bin = helpers.JetPtRange(min=40, max=120)
 
+    filenames = []
     for grooming_method in grooming_methods:
         text = "Iterative splittings"
         text += ", " + " ".join(grooming_method.split("_")).capitalize()
-        _plot_kt_vs_jet_pt_raw_with_labels(
-            hists=hists,
-            grooming_method=grooming_method,
-            prefix=prefix,
-            jet_pt_bin=jet_pt_bin,
-            plot_config=PlotConfig(
-                name="kt_vs_jet_pt_raw",
-                panels=Panel(
-                    axes=[
-                        AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0, 25)),
-                        AxisConfig("y", label=r"$p_{\text{T}}\:(\text{GeV}/c)$", range=(40, 120)),
-                    ],
-                    text=TextConfig(x=0.98, y=0.02, text=text),
+        filenames.append(
+            _plot_kt_vs_jet_pt_raw_with_labels(
+                hists=hists,
+                grooming_method=grooming_method,
+                prefix=prefix,
+                jet_pt_bin=jet_pt_bin,
+                rdf_plots=rdf_plots,
+                plot_config=PlotConfig(
+                    name="kt_vs_jet_pt_raw",
+                    panels=Panel(
+                        axes=[
+                            AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0, 25)),
+                            AxisConfig("y", label=r"$p_{\text{T}}\:(\text{GeV}/c)$", range=(40, 120)),
+                        ],
+                        text=TextConfig(x=0.98, y=0.02, text=text),
+                    ),
+                    figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
                 ),
-                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
-            ),
-            output_dir=output_dir,
+                output_dir=output_dir,
+                plot_png=plot_png,
+            )
         )
+
+    return filenames
 
 
 def _plot_distance_comparison(
@@ -1607,7 +1643,10 @@ def _plot_leading_matched_subleading_unmatched_short_distance_response(
 
     # Plot
     mesh = ax.pcolormesh(
-        h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+        h.axes[0].bin_edges.T,
+        h.axes[1].bin_edges.T,
+        h.values.T,
+        norm=matplotlib.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -1780,9 +1819,7 @@ def compare_grooming_methods_for_substructure_prod(
     output_dir: Path,
     rdf_plots: bool = False,
 ) -> None:
-    """
-
-    """
+    """"""
     jet_pt_bin = helpers.RangeSelector(min=40, max=120)
 
     # TODO: Comprehensive ALICE labeling.
@@ -2034,7 +2071,13 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
     logger.info(
         f"Plotting grooming method comparison for {attr_name}, {display_labels_vs}, grooming_methods: {grooming_methods}"
     )
-    fig, (ax, ax_ratio) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
+    fig, (ax, ax_ratio) = plt.subplots(
+        2,
+        1,
+        figsize=(8, 6),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
     grooming_styling = define_grooming_styles()
 
     for grooming_method in grooming_methods:
@@ -2133,7 +2176,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
     rdf_plots: bool = False,
     plot_png: bool = False,
 ) -> None:
-    """ Compare grooming methods for PbPb vs embedded.
+    """Compare grooming methods for PbPb vs embedded.
 
     Note:
         The name says data vs embed production because that's what the spacing is tuned for.
@@ -2502,7 +2545,10 @@ def _plot_lund_plane(
 
     # Make the plot
     mesh = ax.pcolormesh(
-        h.axes[0].bin_edges.T, h.axes[1].bin_edges.T, h.values.T, norm=matplotlib.colors.LogNorm(**z_axis_range),
+        h.axes[0].bin_edges.T,
+        h.axes[1].bin_edges.T,
+        h.values.T,
+        norm=matplotlib.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -2515,7 +2561,11 @@ def _plot_lund_plane(
     plt.close(fig)
 
 
-def lund_plane(hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path,) -> None:
+def lund_plane(
+    hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    output_dir: Path,
+) -> None:
     true_jet_pt_bin = helpers.RangeSelector(min=60, max=80)
     for grooming_method in grooming_methods:
         text = ""

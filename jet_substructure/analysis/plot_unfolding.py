@@ -1271,6 +1271,61 @@ def plot_kt_unfolding(
             ),
             plot_png=plot_png,
         )
+        # Check a higher jet pt bin: 80-100
+        true_jet_pt_range = helpers.JetPtRange(80, 100)
+        text = f"${true_jet_pt_range.display_str(label='true')}$"
+        plot_unfolded(
+            unfolding_output=unfolding_output,
+            hist_true=unfolding_output.true_substructure(
+                unfolding_output.true_hist_name, true_jet_pt_range=true_jet_pt_range
+            ),
+            hist_n_iter_compare=unfolding_output.unfolded_substructure(
+                unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range
+            ),
+            unfolded_hists=[
+                unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
+                for n_iter in range(1, unfolding_output.max_n_iter)
+            ],
+            plot_config=pb.PlotConfig(
+                name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",  # noqa: F541
+                                log=True,
+                            )
+                        ],
+                        legend=pb.LegendConfig(location="lower left"),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"Ratio to iter {unfolding_output.n_iter_compare}",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to true",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            ),
+            plot_png=plot_png,
+        )
         # Unfolded jet pt
         true_substructure_variable_range = helpers.KtRange(-1, 100)
         text = f"${true_substructure_variable_range.display_str(label='true')}$"
@@ -1478,28 +1533,28 @@ def plot_kt_unfolding(
     )
 
     # Select the n_iter iteration
-    true_jet_pt_range = helpers.JetPtRange(60, 80)
-    text = f"${true_jet_pt_range.display_str(label='true')}$"
-    plot_select_iteration(
-        hists=unfolding_output.hists,
-        projection_func=_project_substructure_variable,
-        max_iter=unfolding_output.max_n_iter,
-        true_bin=true_jet_pt_range,
-        plot_config=pb.PlotConfig(
-            name=f"select_iteration_{unfolding_output.substructure_variable}_true_pt_60_80",
-            panels=pb.Panel(
-                axes=[
-                    pb.AxisConfig("x", label="Iteration"),
-                    pb.AxisConfig("y", label="Summed Error", range=(0, None)),
-                ],
-                legend=pb.LegendConfig(location="center right"),
-                text=pb.TextConfig(text, 0.03, 0.03),
+    for true_jet_pt_range in [helpers.JetPtRange(60, 80), helpers.JetPtRange(80, 100)]:
+        text = f"${true_jet_pt_range.display_str(label='true')}$"
+        plot_select_iteration(
+            hists=unfolding_output.hists,
+            projection_func=_project_substructure_variable,
+            max_iter=unfolding_output.max_n_iter,
+            true_bin=true_jet_pt_range,
+            plot_config=pb.PlotConfig(
+                name=f"select_iteration_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+                panels=pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label="Iteration"),
+                        pb.AxisConfig("y", label="Summed Error", range=(0, None)),
+                    ],
+                    legend=pb.LegendConfig(location="center right"),
+                    text=pb.TextConfig(text, 0.03, 0.03),
+                ),
             ),
-        ),
-        output_dir=unfolding_output.output_dir,
-        plot_png=plot_png,
-        reweighted_prior_output=reweighted_prior_output,
-    )
+            output_dir=unfolding_output.output_dir,
+            plot_png=plot_png,
+            reweighted_prior_output=reweighted_prior_output,
+        )
 
     # Efficiency
     plot_efficiency(
@@ -1509,6 +1564,7 @@ def plot_kt_unfolding(
             helpers.JetPtRange(40, 120),
             helpers.JetPtRange(40, 60),
             helpers.JetPtRange(60, 80),
+            helpers.JetPtRange(80, 100),
             helpers.JetPtRange(80, 120),
         ],
         true_bin_label="p",
