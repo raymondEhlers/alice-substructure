@@ -473,6 +473,8 @@ def run_unfolding(
     data_filenames: Sequence[Path],
     embedded_filenames: Sequence[Path],
     reweight_prior: bool = False,
+    reweight_data_dataset_name: str = "",
+    reweight_embedded_dataset_name: str = "",
 ) -> bool:
     # Delayed import to avoid direct dependence.
     import ROOT
@@ -486,10 +488,17 @@ def run_unfolding(
 
     h_reweighting_response_ratio = ROOT.nullptr
     if reweight_prior:
-        # TODO: Make thes configurable...
+        # Validation
+        if not reweight_data_dataset_name or not reweight_embedded_dataset_name:
+            raise ValueError(
+                f"Must pass data and embedded dataset names. Passed data: {reweight_data_dataset_name}, embedded: {reweight_embedded_dataset_name}"
+            )
+
         h_reweighting_response_ratio = get_reweighted_ratio(
-            embedded_dataset_name="LHC19f4_embedded_into_LHC18qr_5966_5985",
-            data_dataset_name="LHC18qr_5863",
+            # embedded_dataset_name="LHC19f4_embedded_into_LHC18qr_5966_5985",
+            # data_dataset_name="LHC18qr_5863",
+            embedded_dataset_name=reweight_embedded_dataset_name,
+            data_dataset_name=reweight_data_dataset_name,
             grooming_method=settings.grooming_method,
         )
 
@@ -616,6 +625,8 @@ def run_unfolding_closure_reweighting(
     embedded_filenames: Sequence[Path],
     closure_variation: str,
     fraction_for_response: float = 0.75,
+    data_dataset_name: Optional[str] = "",
+    embedded_dataset_name: Optional[str] = "",
 ) -> bool:
     """Run unfolding closure with reweighting.
 
@@ -656,10 +667,17 @@ def run_unfolding_closure_reweighting(
     # Load hists for reweighting and calculate ratio.
     h_reweighting_ratio = ROOT.nullptr
     if variation != ROOT.ClosureVariation_t.splitMC:
-        # TODO: Make thes configurable...
+        # Validation
+        if not data_dataset_name or not embedded_dataset_name:
+            raise ValueError(
+                f"Must pass data and embedded dataset names. Passed data: {data_dataset_name}, embedded: {embedded_dataset_name}"
+            )
+
         h_reweighting_ratio = get_reweighted_ratio(
-            embedded_dataset_name="LHC19f4_embedded_into_LHC18qr_5966_5985",
-            data_dataset_name="LHC18qr_5863",
+            # embedded_dataset_name="LHC19f4_embedded_into_LHC18qr_5966_5985",
+            # data_dataset_name="LHC18qr_5863",
+            embedded_dataset_name=embedded_dataset_name,
+            data_dataset_name=data_dataset_name,
             grooming_method=settings.grooming_method,
         )
 
