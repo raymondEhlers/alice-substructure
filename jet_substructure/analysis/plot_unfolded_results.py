@@ -16,7 +16,7 @@ import uproot3
 from pachyderm import binned_data
 
 import jet_substructure.analysis.plot_base as pb
-from jet_substructure.analysis.unfolding_base import AsymmetricErrors, ErrorInput, relative_error
+from jet_substructure.analysis.unfolding_base import AsymmetricErrors, ErrorInput, relative_error, select_hist_range
 from jet_substructure.base import helpers
 
 
@@ -27,28 +27,6 @@ logger = logging.getLogger(__name__)
 class Result:
     data: binned_data.BinnedData = attr.ib()
     pythia: binned_data.BinnedData = attr.ib()
-
-
-def select_hist_in_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelector) -> binned_data.BinnedData:
-    bin_center_mask = (hist.axes[0].bin_centers >= x_range.min) & (hist.axes[0].bin_centers <= x_range.max)
-    first_bin_edge = np.where(bin_center_mask)[0][0]
-    last_bin_edge = -1 * np.where(bin_center_mask[::-1])[0][0]
-
-    # Handle metadata
-    metadata = {}
-    for k, v in hist.metadata.items():
-        if isinstance(v, AsymmetricErrors):
-            metadata[k] = AsymmetricErrors(
-                low=v.low[bin_center_mask],
-                high=v.high[bin_center_mask],
-            )
-
-    return binned_data.BinnedData(
-        axes=[hist.axes[0].bin_edges[first_bin_edge:last_bin_edge]],
-        values=hist.values[bin_center_mask],
-        variances=hist.variances[bin_center_mask],
-        metadata=metadata,
-    )
 
 
 def get_unfolded_pp_data_leticia(grooming_method: str, x_range: helpers.RangeSelector) -> Result:
@@ -64,7 +42,7 @@ def get_unfolded_pp_data_leticia(grooming_method: str, x_range: helpers.RangeSel
     input_path = Path("output/pp/unfolding/leticia")
     f = uproot3.open(input_path / f"result_{grooming_method_map[grooming_method]}.root")
 
-    # This is the main data, giving the statistical uncertaintines.
+    # This is the main data, giving the statistical uncertainties.
     # For some reason, the name sometimes changes (apparently for the z_cut)
     hist_name = "shape_0" if "shape_0" in f else "shapeR"
     hist = f[hist_name]
@@ -77,11 +55,11 @@ def get_unfolded_pp_data_leticia(grooming_method: str, x_range: helpers.RangeSel
     data.metadata["y_systematic_errors"] = AsymmetricErrors(low=systematics.yerrorslow, high=systematics.yerrorshigh)
 
     # Only keep the data within the selected range.
-    data = select_hist_in_range(hist=data, x_range=x_range)
+    data = select_hist_range(hist=data, x_range=x_range)
 
-    # Next, get pythia (for conveience, we've just stored it in the same file. Later we can do better).
+    # Next, get pythia (for convenience, we've just stored it in the same file. Later we can do better).
     pythia = binned_data.BinnedData.from_existing_data(f["true1"])
-    pythia = select_hist_in_range(hist=pythia, x_range=x_range)
+    pythia = select_hist_range(hist=pythia, x_range=x_range)
 
     return Result(data=data, pythia=pythia)
 
