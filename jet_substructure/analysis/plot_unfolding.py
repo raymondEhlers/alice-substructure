@@ -42,12 +42,23 @@ def _efficiency_substructure_variable(
         Efficiency hist for the substructure variable.
     """
     # Assign them for convenience
-    bh_cut_efficiency = hists["true"].to_boost_histogram()
+    try:
+        bh_cut_efficiency = hists["true"].to_boost_histogram()
+    except KeyError:
+        logger.warning(
+            'Hist "true" was not found. Instead, trying to extract the efficiency directly from the projection.'
+        )
+        bh_cut_efficiency = None
+        cut = binned_data.BinnedData.from_existing_data(
+            hists[f"correff{int(true_jet_pt_range.min)}-{int(true_jet_pt_range.max)}"]
+        )
     bh_full_efficiency = hists["truef"].to_boost_histogram()
 
     # Select true pt range.
     selection = slice(bh.loc(true_jet_pt_range.min), bh.loc(true_jet_pt_range.max), bh.sum)
-    cut = binned_data.BinnedData.from_existing_data(bh_cut_efficiency[:, selection])
+    # Only project if necessary
+    if bh_cut_efficiency:
+        cut = binned_data.BinnedData.from_existing_data(bh_cut_efficiency[:, selection])
     full = binned_data.BinnedData.from_existing_data(bh_full_efficiency[:, selection])
 
     return cut / full
