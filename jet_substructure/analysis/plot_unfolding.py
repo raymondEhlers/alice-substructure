@@ -5,7 +5,7 @@
 
 import logging
 from pathlib import Path
-from typing import Callable, Mapping, MutableMapping, Optional, Sequence
+from typing import Callable, Dict, Mapping, MutableMapping, Optional, Sequence
 
 import attr
 import boost_histogram as bh
@@ -681,6 +681,308 @@ def plot_systematic(
         fig.savefig(output_dir_png / f"{figure_name}.png")
 
     plt.close(fig)
+
+
+def setup_unfolding_outputs(  # noqa: C901
+    substructure_variable: str,
+    grooming_method: str,
+    smeared_var_range: helpers.KtRange,
+    smeared_untagged_var: helpers.KtRange,
+    smeared_jet_pt_range: helpers.JetPtRange,
+    collision_system: str,
+    n_iter_compare: int,
+    base_suffix: str,
+    output_dir: Path,
+) -> Dict[str, UnfoldingOutput]:
+    # Setup the input files
+    unfolding_outputs = {}
+    unfolding_outputs["default"] = UnfoldingOutput(
+        substructure_variable=substructure_variable,
+        grooming_method=grooming_method,
+        smeared_var_range=smeared_var_range,
+        smeared_untagged_var=smeared_untagged_var,
+        smeared_jet_pt_range=smeared_jet_pt_range,
+        collision_system=collision_system,
+        base_dir=output_dir,
+        n_iter_compare=n_iter_compare,
+        pure_matches=False,
+        suffix=base_suffix,
+    )
+
+    # Setup the tag, adding the required underscore for separation.
+    if base_suffix:
+        base_suffix = f"{base_suffix}_"
+
+    try:
+        unfolding_outputs["tracking_efficiency"] = UnfoldingOutput(
+            substructure_variable=substructure_variable,
+            grooming_method=grooming_method,
+            smeared_var_range=smeared_var_range,
+            smeared_untagged_var=smeared_untagged_var,
+            smeared_jet_pt_range=smeared_jet_pt_range,
+            collision_system=collision_system,
+            base_dir=output_dir,
+            n_iter_compare=n_iter_compare,
+            pure_matches=False,
+            suffix=f"{base_suffix}tracking_eff",
+        )
+    except FileNotFoundError:
+        logger.debug("Skipping tracking efficiency because the output file doesn't exist.")
+
+    try:
+        unfolding_outputs["truncation_low"] = UnfoldingOutput(
+            substructure_variable=substructure_variable,
+            grooming_method=grooming_method,
+            smeared_var_range=smeared_var_range,
+            smeared_untagged_var=smeared_untagged_var,
+            smeared_jet_pt_range=helpers.JetPtRange(smeared_jet_pt_range.min - 5, smeared_jet_pt_range.max),
+            collision_system=collision_system,
+            base_dir=output_dir,
+            n_iter_compare=n_iter_compare,
+            pure_matches=False,
+            suffix=f"{base_suffix}truncation",
+        )
+        unfolding_outputs["truncation_high"] = UnfoldingOutput(
+            substructure_variable=substructure_variable,
+            grooming_method=grooming_method,
+            smeared_var_range=smeared_var_range,
+            smeared_untagged_var=smeared_untagged_var,
+            smeared_jet_pt_range=helpers.JetPtRange(smeared_jet_pt_range.min + 5, smeared_jet_pt_range.max),
+            collision_system=collision_system,
+            base_dir=output_dir,
+            n_iter_compare=n_iter_compare,
+            pure_matches=False,
+            suffix=f"{base_suffix}truncation",
+        )
+    except FileNotFoundError:
+        logger.debug("Skipping truncation because the output file doesn't exist.")
+
+    try:
+        unfolding_outputs["random_binning"] = UnfoldingOutput(
+            substructure_variable=substructure_variable,
+            grooming_method=grooming_method,
+            smeared_var_range=smeared_var_range,
+            smeared_untagged_var=smeared_untagged_var,
+            smeared_jet_pt_range=smeared_jet_pt_range,
+            collision_system=collision_system,
+            base_dir=output_dir,
+            n_iter_compare=n_iter_compare,
+            pure_matches=False,
+            suffix=f"{base_suffix}random_binning",
+        )
+    except FileNotFoundError:
+        logger.debug("Skipping random binning because the output file doesn't exist.")
+
+    try:
+        unfolding_outputs["untagged_bin"] = UnfoldingOutput(
+            substructure_variable=substructure_variable,
+            grooming_method=grooming_method,
+            smeared_var_range=smeared_var_range,
+            # NOTE: We set 20 externally (in the unfolding configuration in parsl). But it should work fine
+            #       because it encompasses all possible ranges seen so far.
+            smeared_untagged_var=helpers.KtRange(smeared_var_range.max, 20),
+            smeared_jet_pt_range=smeared_jet_pt_range,
+            collision_system=collision_system,
+            base_dir=output_dir,
+            n_iter_compare=n_iter_compare,
+            pure_matches=False,
+            suffix=base_suffix,
+        )
+    except FileNotFoundError:
+        logger.debug("Skipping untagged bin location because the output file doesn't exist.")
+
+    try:
+        unfolding_outputs["reweight_prior"] = UnfoldingOutput(
+            substructure_variable=substructure_variable,
+            grooming_method=grooming_method,
+            smeared_var_range=smeared_var_range,
+            smeared_untagged_var=smeared_untagged_var,
+            smeared_jet_pt_range=smeared_jet_pt_range,
+            collision_system=collision_system,
+            base_dir=output_dir,
+            n_iter_compare=n_iter_compare,
+            pure_matches=False,
+            suffix=f"{base_suffix}reweight_prior",
+        )
+    except FileNotFoundError:
+        logger.debug("Skipping reweighted prior because the output file doesn't exist.")
+
+    for background_setting in ["Rmax06", "Rmax005"]:
+        try:
+            unfolding_outputs[background_setting] = UnfoldingOutput(
+                substructure_variable=substructure_variable,
+                grooming_method=grooming_method,
+                smeared_var_range=smeared_var_range,
+                smeared_untagged_var=smeared_untagged_var,
+                smeared_jet_pt_range=smeared_jet_pt_range,
+                collision_system=collision_system,
+                base_dir=output_dir,
+                n_iter_compare=n_iter_compare,
+                pure_matches=False,
+                suffix=f"{base_suffix}{background_setting}",
+            )
+        except FileNotFoundError:
+            logger.debug(f"Skipping background setting {background_setting} because the output file doesn't exist.")
+
+    return unfolding_outputs
+
+
+def unfolded_substructure_results(
+    unfolding_outputs: Mapping[str, UnfoldingOutput], true_jet_pt_range: helpers.JetPtRange
+) -> Dict[str, SingleResult]:
+    """Convert unfolded results into individual unfolded substructure results (selecting a particular iteration).
+
+    This is useful for working with substructure systematics.
+
+    Note:
+        We always select the n iter from the default unfolded result.
+
+    Args:
+        unfolding_output: All unfolded outputs.
+        true_jet_pt_range: True jet pt range for the substructure result.
+    Returns:
+        Unfolded substructure results.
+    """
+    unfolded = {}
+    for k, v in unfolding_outputs.items():
+        unfolded[k] = SingleResult(
+            # NOTE: We want to match the iter of the default case.
+            data=v.unfolded_substructure(
+                n_iter=unfolding_outputs["default"].n_iter_compare,
+                true_jet_pt_range=true_jet_pt_range,
+            ),
+            n_iter=unfolding_outputs["default"].n_iter_compare,
+            ranges=[true_jet_pt_range],
+        )
+    return unfolded
+
+
+def calculate_systematics(  # noqa: C901
+    unfolded: Mapping[str, SingleResult],
+    unfolding_outputs: Mapping[str, UnfoldingOutput],
+    true_jet_pt_range: helpers.JetPtRange,
+) -> SingleResult:
+    # Setup
+    unfolded["default"].data.metadata["y_systematic"] = {}
+
+    # Tracking efficiency
+    try:
+        tracking_efficiency_sym = np.abs(unfolded["tracking_efficiency"].data.values - unfolded["default"].data.values)
+        unfolded["default"].data.metadata["y_systematic"]["tracking_efficiency"] = unfolding_base.AsymmetricErrors(
+            tracking_efficiency_sym, tracking_efficiency_sym
+        )
+    except KeyError as e:
+        logger.debug(f"Skipping tracking efficiency because of {e}")
+
+    # Truncation
+    try:
+        unfolded["default"].data.metadata["y_systematic"]["truncation"] = unfolding_base.AsymmetricErrors(
+            np.abs(unfolded["truncation_low"].data.values - unfolded["default"].data.values),
+            np.abs(unfolded["truncation_high"].data.values - unfolded["default"].data.values),
+        )
+    except KeyError as e:
+        logger.debug(f"Skipping truncation because of {e}")
+
+    # Regularization
+    # +/- 1 iteration
+    unfolded["default"].data.metadata["y_systematic"]["regularization"] = unfolding_base.AsymmetricErrors(
+        np.abs(
+            unfolded["default"].data.values
+            - unfolding_outputs["default"]
+            .unfolded_substructure(
+                n_iter=unfolding_outputs["default"].n_iter_compare - 1, true_jet_pt_range=true_jet_pt_range
+            )
+            .values
+        ),
+        np.abs(
+            unfolded["default"].data.values
+            - unfolding_outputs["default"]
+            .unfolded_substructure(
+                n_iter=unfolding_outputs["default"].n_iter_compare + 1, true_jet_pt_range=true_jet_pt_range
+            )
+            .values
+        ),
+    )
+
+    # Random binning
+    try:
+        random_binning_sym = np.abs(unfolded["random_binning"].data.values - unfolded["default"].data.values)
+        unfolded["default"].data.metadata["y_systematic"]["random_binning"] = unfolding_base.AsymmetricErrors(
+            random_binning_sym, random_binning_sym
+        )
+    except KeyError as e:
+        logger.debug(f"Skipping random binning because of {e}")
+
+    # Untagged bin location
+    try:
+        untagged_bin_sym = np.abs(unfolded["untagged_bin"].data.values - unfolded["default"].data.values)
+        unfolded["default"].data.metadata["y_systematic"]["untagged_bin"] = unfolding_base.AsymmetricErrors(
+            untagged_bin_sym, untagged_bin_sym
+        )
+    except KeyError as e:
+        logger.debug(f"Skipping untagged bin location because of {e}")
+
+    # Reweight prior
+    try:
+        reweight_prior_sym = np.abs(unfolded["reweight_prior"].data.values - unfolded["default"].data.values)
+        unfolded["default"].data.metadata["y_systematic"]["reweight_prior"] = unfolding_base.AsymmetricErrors(
+            reweight_prior_sym, reweight_prior_sym
+        )
+    except KeyError as e:
+        logger.debug(f"Skipping reweighting prior because of {e}")
+
+    # Background subtraction systematics.
+    for background_setting in ["Rmax06", "Rmax005"]:
+        try:
+            background_systematic = np.abs(unfolded[background_setting].data.values - unfolded["default"].data.values)
+            unfolded["default"].data.metadata["y_systematic"][background_setting] = unfolding_base.AsymmetricErrors(
+                background_systematic,
+                background_systematic,
+            )
+        except KeyError as e:
+            logger.debug(f"Skipping background systematic {background_setting} because of {e}")
+
+    # Cross check to make sure that I haven't copied and pasted incorrectly.
+    assert not any(
+        [
+            np.allclose(a.low, b.low)
+            for k_a, a in unfolded["default"].data.metadata["y_systematic"].items()
+            for k_b, b in unfolded["default"].data.metadata["y_systematic"].items()
+            if k_a != k_b
+        ]
+    )
+    assert not any(
+        [
+            np.allclose(a.high, b.high)
+            for k_a, a in unfolded["default"].data.metadata["y_systematic"].items()
+            for k_b, b in unfolded["default"].data.metadata["y_systematic"].items()
+            if k_a != k_b
+        ]
+    )
+
+    # Sum in quadrature
+    # We protect against including quadrature in case we already calculated the systematics.
+    unfolded["default"].data.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
+        low=np.sqrt(
+            np.sum(
+                [v.low ** 2 for k, v in unfolded["default"].data.metadata["y_systematic"].items() if k != "quadrature"],
+                axis=0,
+            )
+        ),
+        high=np.sqrt(
+            np.sum(
+                [
+                    v.high ** 2
+                    for k, v in unfolded["default"].data.metadata["y_systematic"].items()
+                    if k != "quadrature"
+                ],
+                axis=0,
+            )
+        ),
+    )
+
+    # We could already retrieve this from the input, but return it for convenience.
+    return unfolded["default"]
 
 
 def plot_unfolded(
