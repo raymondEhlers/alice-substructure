@@ -1,4 +1,12 @@
+""" Unfolding results base functionality.
+
+.. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
+"""
+
+from __future__ import annotations
+
 from functools import reduce
+from typing import Any, Optional, Type, cast
 
 import attr
 import numpy as np
@@ -7,10 +15,87 @@ from pachyderm import binned_data
 from jet_substructure.base import helpers
 
 
-@attr.s
+@attr.s(eq=False)
 class AsymmetricErrors:
     low: np.ndarray = attr.ib()
     high: np.ndarray = attr.ib()
+
+    def __eq__(self, other: Any) -> bool:
+        if other.__class__ is not self.__class__:
+            return NotImplemented
+        return cast(bool, np.allclose(self.low, other.low) and np.allclose(self.high, other.high))
+
+    @classmethod
+    def calculate_errors(
+        cls: Type[AsymmetricErrors], errors_one: np.ndarray, errors_two: Optional[np.ndarray] = None
+    ) -> AsymmetricErrors:
+        """Calculate asymmetric errors from given errors.
+
+        Note:
+            This returns positive, absolute errors in each direction.
+
+        Args:
+            errors_one: First error array. Doesn't matter if it's the upper or lower value.
+            errors_two: Second error array. Doesn't matter if it's the upper or lower value.
+                Default: None, in which case the first passed errors are duplicated. This duplication
+                is used for single valued asymmetric errors.
+        Returns:
+            Asymmetric errors calculated based on the given errors. See the function for the
+                precise algorithm.
+        """
+        # Validation
+        # This allows us to calculate single value asymmetric errors.
+        # This is equivalent to just pass the same error values twice, but this
+        # is a cleaner interface.
+        if errors_two is None:
+            errors_two = np.array(errors_one, copy=True)
+
+        # Determine when the errors are positive.
+        # True if positive, false if negative
+        positive_one = np.sign(errors_one) == 1
+        positive_two = np.sign(errors_two) == 1
+        # Calculate once for convenience.
+        errors_one_abs = np.abs(errors_one)
+        errors_two_abs = np.abs(errors_two)
+
+        # Output arrays
+        low = np.zeros_like(errors_one)
+        high = np.zeros_like(errors_one)
+
+        # First, handle when they have the same sign.
+        # For this case, we take the maximum of either error, and assign that asymmetrically to the side of the sign
+        # positive -> high
+        # negative -> low
+        same_sign = positive_one == positive_two
+        # Both positive.
+        mask = same_sign & positive_one
+        # Don't need to set low because it's already zero for these points.
+        high[mask] = np.maximum(errors_one_abs, errors_two_abs)[mask]
+        # Both negative.
+        mask = same_sign & ~positive_one
+        # Don't need to set high because it's already zero for these points.
+        low[mask] = np.maximum(errors_one_abs, errors_two_abs)[mask]
+
+        # Next, handle opposite signs.
+        # For this case, we assign the errors based on the sign.
+        # positive -> high
+        # negative -> low
+        opposite_sign = positive_one != positive_two
+        # one positive, two negative
+        mask = opposite_sign & positive_one
+        low[mask] = errors_two_abs[mask]
+        high[mask] = errors_one_abs[mask]
+        # one negative, two positive
+        mask = opposite_sign & positive_two
+        low[mask] = errors_one_abs[mask]
+        high[mask] = errors_two_abs[mask]
+
+        # Cross check. We almost certainly will never have 0 in both bins.
+        low_is_zero = low == 0
+        high_is_zero = high == 0
+        assert not np.any(low_is_zero & high_is_zero)
+
+        return cls(low=low, high=high)
 
 
 @attr.s
