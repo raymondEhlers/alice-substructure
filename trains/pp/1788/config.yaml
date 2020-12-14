@@ -1,0 +1,9 @@
+---
+train: "Jets_EMC_pp"
+trainNumber: 1788
+production: "LHC17p"
+alienOutputDir:
+    FAST: "/alice/cern.ch/user/a/alitrain/PWGJE/Jets_EMC_pp/1788_20200217-1924_child_1/merge"
+    woSDD: "/alice/cern.ch/user/a/alitrain/PWGJE/Jets_EMC_pp/1788_20200217-1924_child_2/merge"
+status: |
+    "First pass at jet splittings on pp data with recursive splittings recorded."

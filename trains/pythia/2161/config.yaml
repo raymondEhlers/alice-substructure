@@ -1,0 +1,12 @@
+---
+train: "Jets_EMC_pp_MC"
+trainNumber: 2161
+production: "LHC18b8"
+aliphysics_tag: "vAN-20200421_ROOT6-1"
+run_by_run: true
+alienOutputDir:
+    woSDD: "/alice/cern.ch/user/a/alitrain/PWGJE/Jets_EMC_pp_MC/2161_20200422-2020_child_2/merge"
+    FAST: "/alice/cern.ch/user/a/alitrain/PWGJE/Jets_EMC_pp_MC/2161_20200422-2020_child_3/merge"
+status: |
+    "Tracking efficiency systematic for R=0.4 jet splittings with pythia. Requires run-by-run output to get"
+    " the pt hard scaling correct. Use Markus' script to download!"
