@@ -389,14 +389,14 @@ def plot_relative_individual_systematics(
         )
 
     # For comparison, add the statistical too
-    hep.histplot(
-        H=unfolded.data.errors / unfolded.data.values,
-        bins=unfolded.data.axes[0].bin_edges,
+    ax.errorbar(
+        unfolded.data.bin_centers,
+        np.zeros(len(unfolded.data.bin_centers)),
+        yerr=unfolded.data.errors / unfolded.data.values,
         # color=style.color,
-        label="Statistical (for comparison)",
-        # marker="o",
-        # linestyle="",
-        alpha=0.8,
+        marker="o",
+        linestyle="",
+        # alpha=0.8,
     )
 
     # Label and layout
@@ -866,6 +866,7 @@ def calculate_systematics(  # noqa: C901
     unfolded["default"].data.metadata["y_systematic"] = {}
 
     # Tracking efficiency
+    # This is treated as a symmetric uncertainty.
     try:
         tracking_efficiency_sym = np.abs(unfolded["tracking_efficiency"].data.values - unfolded["default"].data.values)
         unfolded["default"].data.metadata["y_systematic"]["tracking_efficiency"] = unfolding_base.AsymmetricErrors(
