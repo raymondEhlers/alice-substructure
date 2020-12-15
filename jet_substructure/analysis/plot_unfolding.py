@@ -685,7 +685,19 @@ def setup_unfolding_outputs(  # noqa: C901
     n_iter_compare: int,
     base_suffix: str,
     output_dir: Path,
+    truncation_shift: float = 5,
+    displaced_untagged_above_range: bool = True,
+    displaced_extremum: Optional[float] = None,
 ) -> Dict[str, UnfoldingOutput]:
+    # Validation
+    # Keep the truncation positive so we know how we've shifted.
+    if truncation_shift < 0:
+        truncation_shift = np.abs(truncation_shift)
+    if displaced_extremum is None:
+        # NOTE: We set 20 externally (in the unfolding configuration in parsl). But it should work fine
+        #       because it encompasses all possible PbPb ranges used so far.
+        displaced_extremum = 20
+
     # Setup the input files
     unfolding_outputs = {}
     unfolding_outputs["default"] = UnfoldingOutput(
@@ -716,7 +728,7 @@ def setup_unfolding_outputs(  # noqa: C901
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
             pure_matches=False,
-            suffix=f"{base_suffix}tracking_eff",
+            suffix=f"{base_suffix}tracking_efficiency",
         )
     except FileNotFoundError:
         logger.debug("Skipping tracking efficiency because the output file doesn't exist.")
@@ -727,7 +739,9 @@ def setup_unfolding_outputs(  # noqa: C901
             grooming_method=grooming_method,
             smeared_var_range=smeared_var_range,
             smeared_untagged_var=smeared_untagged_var,
-            smeared_jet_pt_range=helpers.JetPtRange(smeared_jet_pt_range.min - 5, smeared_jet_pt_range.max),
+            smeared_jet_pt_range=helpers.JetPtRange(
+                smeared_jet_pt_range.min - truncation_shift, smeared_jet_pt_range.max
+            ),
             collision_system=collision_system,
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
@@ -739,7 +753,9 @@ def setup_unfolding_outputs(  # noqa: C901
             grooming_method=grooming_method,
             smeared_var_range=smeared_var_range,
             smeared_untagged_var=smeared_untagged_var,
-            smeared_jet_pt_range=helpers.JetPtRange(smeared_jet_pt_range.min + 5, smeared_jet_pt_range.max),
+            smeared_jet_pt_range=helpers.JetPtRange(
+                smeared_jet_pt_range.min + truncation_shift, smeared_jet_pt_range.max
+            ),
             collision_system=collision_system,
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
@@ -766,19 +782,23 @@ def setup_unfolding_outputs(  # noqa: C901
         logger.debug("Skipping random binning because the output file doesn't exist.")
 
     try:
+        if displaced_untagged_above_range:
+            displaced_untagged_var = helpers.KtRange(smeared_var_range.max, displaced_extremum)
+        else:
+            displaced_untagged_var = helpers.KtRange(displaced_extremum, smeared_var_range.min)
+
         unfolding_outputs["untagged_bin"] = UnfoldingOutput(
             substructure_variable=substructure_variable,
             grooming_method=grooming_method,
             smeared_var_range=smeared_var_range,
-            # NOTE: We set 20 externally (in the unfolding configuration in parsl). But it should work fine
-            #       because it encompasses all possible ranges seen so far.
-            smeared_untagged_var=helpers.KtRange(smeared_var_range.max, 20),
+            smeared_untagged_var=displaced_untagged_var,
             smeared_jet_pt_range=smeared_jet_pt_range,
             collision_system=collision_system,
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
             pure_matches=False,
-            suffix=base_suffix,
+            # Drop the last "_", which isn't needed here.
+            suffix=base_suffix[:-1],
         )
     except FileNotFoundError:
         logger.debug("Skipping untagged bin location because the output file doesn't exist.")
