@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
 import seaborn as sns
-import uproot3
+import uproot
 from pachyderm import binned_data
 
 from jet_substructure.analysis import plot_base as pb
@@ -232,24 +232,16 @@ class UnfoldingOutput:
 
         # Initialize the file if the histograms aren't specified.
         if not self.hists:
-            f = uproot3.open(self.input_filename)
-            for k in f.keys():
-                hist_key = k.decode("utf-8")
-                hist_key = hist_key[: hist_key.find(";")]
-                self.hists[hist_key] = binned_data.BinnedData.from_existing_data(f[k])
+            f = uproot.open(self.input_filename)
+            for k in f.keys(cycle=False):
+                self.hists[k] = binned_data.BinnedData.from_existing_data(f[k])
 
     @property
     def identifier(self) -> str:
         name = f"{self.substructure_variable}_grooming_method_{self.grooming_method}"
         name += f"_smeared_{self.smeared_var_range}"
-        # TEMP until fixed in the unfolding code...
         name += f"_untagged_{self.smeared_untagged_var}"
-        # name += f"_untagged_{self.smeared_untagged_var.min}_{self.smeared_untagged_var.max}"
-        # TEMP until fixed in the unfolding code...
         name += f"_smeared_{self.smeared_jet_pt_range}"
-        # name += f"_smeared_jet_pt_{self.smeared_jet_pt_range.min}_{self.smeared_jet_pt_range.max}"
-        # if self.smeared_input:
-        #    name += "_hybrid_as_input"
         if self.pure_matches:
             name += "_pure_matches"
         if self.suffix:

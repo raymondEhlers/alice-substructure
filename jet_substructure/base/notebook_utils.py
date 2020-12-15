@@ -9,7 +9,7 @@ import math
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 
-import uproot3
+import uproot
 from pachyderm import binned_data
 
 
@@ -36,9 +36,6 @@ def load_histograms(
 ) -> Dict[str, binned_data.BinnedData]:
     """Load histograms stored in a file.
 
-    Note:
-        As of 10 September 2020, uproot4 has some bugs in reading histograms, so we read them with uproot3.
-
     Args:
         filename: Name of the file to open.
         collision_system: Name of the collision system.
@@ -51,14 +48,11 @@ def load_histograms(
     """
     input_filename = base_path / collision_system / tag / filename
     hists = {}
-    with uproot3.open(input_filename) as f:
-        for k in f.keys():
-            # Remove the cycle from the name. We don't care.
-            temp_k = k.decode("utf-8")
-            temp_k = temp_k[: temp_k.find(";")]
+    with uproot.open(input_filename) as f:
+        for k in f.keys(cycle=False):
             if verbose:
-                logger.debug(f"Retrieving hist {temp_k}")
-            hists[temp_k] = binned_data.BinnedData.from_existing_data(f[temp_k])
+                logger.debug(f"Retrieving hist {k}")
+            hists[k] = binned_data.BinnedData.from_existing_data(f[k])
 
     return hists
 
