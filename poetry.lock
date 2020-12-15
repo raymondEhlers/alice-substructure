@@ -1684,7 +1684,7 @@ python-versions = "*"
 
 [[package]]
 name = "uproot"
-version = "4.0.0"
+version = "4.0.1rc1"
 description = "ROOT I/O in pure Python and NumPy."
 category = "main"
 optional = false
@@ -1694,8 +1694,8 @@ python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 numpy = "*"
 
 [package.extras]
-all = ["pytest", "flake8", "flake8-print", "scikit-hep-testdata", "lz4", "xxhash", "pandas", "awkward (>=1.0.0rc1)", "boost-histogram", "hist"]
-dev = ["pandas", "awkward (>=1.0.0rc1)", "boost-histogram", "hist"]
+all = ["pytest", "flake8", "flake8-print", "scikit-hep-testdata", "lz4", "xxhash", "pandas", "awkward (>=1.0.0)", "boost-histogram", "hist"]
+dev = ["pandas", "awkward (>=1.0.0)", "boost-histogram", "hist"]
 test = ["pytest", "flake8", "flake8-print", "scikit-hep-testdata", "lz4", "xxhash"]
 
 [[package]]
@@ -1803,7 +1803,7 @@ testing = ["pytest (>=3.5,<3.7.3 || >3.7.3)", "pytest-checkdocs (>=1.2.3)", "pyt
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "ef06352f772b96143f56a70b765d1afcf9aa5e683a16aac848bf4e96a261fa35"
+content-hash = "903f0193b2d92454d02ec14c0ac1ce72ae4bf68a1800476729546365065b690c"
 
 [metadata.files]
 ansicon = [
@@ -2989,8 +2989,8 @@ typing-extensions = [
     {file = "typing_extensions-3.7.4.3.tar.gz", hash = "sha256:99d4073b617d30288f569d3f13d2bd7548c3a7e4c8de87db09a9d29bb3a4a60c"},
 ]
 uproot = [
-    {file = "uproot-4.0.0-py2.py3-none-any.whl", hash = "sha256:f45a708bb18d54e765903c961796c829138367de8ef300fa9bc20978dc1010a5"},
-    {file = "uproot-4.0.0.tar.gz", hash = "sha256:afe977e1b123676e121f65512816b9f4612469fec1a73aa6f6cd0e41e33d5920"},
+    {file = "uproot-4.0.1rc1-py2.py3-none-any.whl", hash = "sha256:c193da529906e3cec734fcd0409027b4f69b6e47f205fee2688163a4d8f705bc"},
+    {file = "uproot-4.0.1rc1.tar.gz", hash = "sha256:706949f8f84bc944b6a4fcd5f2dd5d03111e399ba6f77bff68ad5b3394e5d0ff"},
 ]
 uproot3 = [
     {file = "uproot3-3.14.2-py3-none-any.whl", hash = "sha256:ed4156a8528548cd36dc4ca69f2566c03b9922422be9631abc4fa31c3c77ce93"},
