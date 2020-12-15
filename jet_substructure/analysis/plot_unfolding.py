@@ -1355,8 +1355,8 @@ def plot_efficiency(
 
 
 def plot_select_iteration(
-    hists: Mapping[str, binned_data.BinnedData],
-    projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
+    unfolding_output: UnfoldingOutput,
+    projection_func: Callable[[UnfoldingOutput, int, helpers.RangeSelector], binned_data.BinnedData],
     max_iter: int,
     true_bin: helpers.RangeSelector,
     plot_config: pb.PlotConfig,
@@ -1394,37 +1394,51 @@ def plot_select_iteration(
 
     for i, iter in enumerate(range(2, max_iter - 2)):
         # Current iteration
-        hist_name = f"bayesian_unfolded_iter_{iter}"
-        current_iter_hist = projection_func(hists[hist_name], true_bin)
+        current_iter_hist = projection_func(unfolding_output, iter, true_bin)
         # Previous iter hist
-        hist_name = f"bayesian_unfolded_iter_{iter-1}"
-        previous_iter_hist = projection_func(hists[hist_name], true_bin)
+        previous_iter_hist = projection_func(unfolding_output, iter - 1, true_bin)
         # Iter + 2 hist
-        hist_name = f"bayesian_unfolded_iter_{iter+2}"
-        forward_iter_hist = projection_func(hists[hist_name], true_bin)
+        forward_iter_hist = projection_func(unfolding_output, iter + 2, true_bin)
 
-        # hist = _normalize_hist(hist)
         # Calculate and store regularization error
         regularization_value = np.sum(
             (
-                np.maximum(
-                    np.abs(previous_iter_hist.values - current_iter_hist.values),
-                    np.abs(forward_iter_hist.values - current_iter_hist.values),
+                np.divide(
+                    np.maximum(
+                        np.abs(previous_iter_hist.values - current_iter_hist.values),
+                        np.abs(forward_iter_hist.values - current_iter_hist.values),
+                    ),
+                    # TEMP: Try excluding the untagged bin.
+                    # / current_iter_hist.values)[1:]
+                    current_iter_hist.values,
+                    out=np.zeros_like(current_iter_hist.values),
+                    where=current_iter_hist.values != 0,
                 )
-                # TEMP: Try excluding the untagged bin.
-                # / current_iter_hist.values)[1:]
-                / current_iter_hist.values
             )
         )
         hist_reg.values[i] = regularization_value
         # Calculate and store stat error
-        stat_value = np.sum(current_iter_hist.errors / current_iter_hist.values)
+        stat_value = np.sum(
+            np.divide(
+                current_iter_hist.errors,
+                current_iter_hist.values,
+                out=np.zeros_like(current_iter_hist.values),
+                where=current_iter_hist.values != 0,
+            )
+        )
         hist_stat.values[i] = stat_value
         # If prior is provided, calculate.
         prior_value = 0
         if reweighted_prior_output:
-            prior = reweighted_prior_output.unfolded_substructure(n_iter=iter, true_jet_pt_range=true_bin)  # type: ignore
-            prior_value = np.sum(np.abs(current_iter_hist.values - prior.values) / current_iter_hist.values)
+            prior = projection_func(reweighted_prior_output, iter, true_bin)
+            prior_value = np.sum(
+                np.divide(
+                    np.abs(current_iter_hist.values - prior.values),
+                    current_iter_hist.values,
+                    out=np.zeros_like(current_iter_hist.values),
+                    where=current_iter_hist.values != 0,
+                )
+            )
             hist_prior.values[i] = prior_value
 
         # Total
@@ -1862,8 +1876,8 @@ def plot_kt_unfolding(
     for true_jet_pt_range in [helpers.JetPtRange(60, 80), helpers.JetPtRange(80, 100)]:
         text = f"${true_jet_pt_range.display_str(label='true')}$"
         plot_select_iteration(
-            hists=unfolding_output.hists,
-            projection_func=_project_substructure_variable,
+            unfolding_output=unfolding_output,
+            projection_func=UnfoldingOutput.unfolded_substructure,
             max_iter=unfolding_output.max_n_iter,
             true_bin=true_jet_pt_range,
             plot_config=pb.PlotConfig(
@@ -2635,8 +2649,8 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
     jet_pt_for_text = helpers.JetPtRange(60, 80)
     text = f"${jet_pt_for_text.display_str(label='true')}$"
     plot_select_iteration(
-        hists=unfolding_output.hists,
-        projection_func=_project_substructure_variable,
+        unfolding_output=unfolding_output,
+        projection_func=UnfoldingOutput.unfolded_substructure,
         max_iter=unfolding_output.max_n_iter,
         true_bin=helpers.JetPtRange(60, 80),
         plot_config=pb.PlotConfig(
