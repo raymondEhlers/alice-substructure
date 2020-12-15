@@ -807,7 +807,7 @@ def setup_unfolding_outputs(  # noqa: C901
     except FileNotFoundError:
         logger.debug("Skipping reweighted prior because the output file doesn't exist.")
 
-    for background_setting in ["Rmax06", "Rmax005"]:
+    for background_setting in ["Rmax060", "Rmax005"]:
         try:
             unfolding_outputs[background_setting] = UnfoldingOutput(
                 substructure_variable=substructure_variable,
