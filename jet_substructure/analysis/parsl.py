@@ -150,7 +150,7 @@ def setup_parsl_587(
                     cores_per_node=jobs_per_node,
                     # Ensures that the jobs are spread out. Also means that we need to be careful
                     # when others are running to avoid running out of memory.
-                    exclusive=True,
+                    # exclusive=True,
                     # Format: HH:MM:SS
                     walltime="02:00:00",
                     # walltime="00:21:00",
@@ -766,6 +766,7 @@ def setup_root_data_frame(
     logger.info(f"N cores per job: {math.floor(8 / jobs_per_node)}")
     results = []
     cross_check_task = dataset_config.get("cross_check_task", False)
+    logger.info(f"Cross check task: {cross_check_task}")
     for grooming_method in [
         "leading_kt",
         # "leading_kt_z_cut_02",
@@ -792,7 +793,7 @@ def setup_root_data_frame(
                 grooming_method=grooming_method,
                 jet_R=dataset_config["jet_R"],
                 n_cores=math.floor(8 / jobs_per_node),
-                cross_check_task=dataset_config.get("cross_check_task", False),
+                cross_check_task=cross_check_task,
                 inputs=input_files,
                 outputs=[parsl_output_file],
             )
@@ -1006,6 +1007,8 @@ def setup_root_data_frame_closure(
 def _unfolding_standard(
     settings: "unfolding_2D.Settings",  # noqa: F821
     reweight_prior: bool,
+    reweight_data_dataset_name: str,
+    reweight_embedded_dataset_name: str,
     inputs=[],
     outputs=[],
 ) -> AppFuture:
@@ -1015,10 +1018,12 @@ def _unfolding_standard(
 
     return unfolding_2D.run_unfolding(
         settings=settings,
+        reweight_prior=reweight_prior,
+        reweight_data_dataset_name=reweight_data_dataset_name,
+        reweight_embedded_dataset_name=reweight_embedded_dataset_name,
         # 0 are the data filenames, 1 are the embedded filenames
         data_filenames=[Path(f.filepath) for f in inputs[0]],
         embedded_filenames=[Path(f.filepath) for f in inputs[1]],
-        reweight_prior=reweight_prior,
     )
 
 
@@ -1026,6 +1031,8 @@ def _unfolding_standard(
 def _unfolding_closure(
     settings: "unfolding_2D.Settings",  # noqa: F821
     closure_variation: str,
+    data_dataset_name: str,
+    embedded_dataset_name: str,
     inputs=[],
     outputs=[],
 ) -> AppFuture:
@@ -1038,6 +1045,8 @@ def _unfolding_closure(
         # 0 are the data filenames, 1 are the embedded filenames
         embedded_filenames=[Path(f.filepath) for f in inputs[1]],
         closure_variation=closure_variation,
+        data_dataset_name=data_dataset_name,
+        embedded_dataset_name=embedded_dataset_name,
     )
 
 
@@ -1087,16 +1096,16 @@ def setup_unfolding(
         _default_settings = unfolding_2D.Settings(
             grooming_method=grooming_method,
             jet_pt=unfolding_2D.ParameterSettings(
-                true_bins=np.array([0, 30, 40, 60, 80, 100, 120, 160], dtype=np.float64),
-                smeared_bins=np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64),
+                true_bins=np.array([0, 40, 60, 80, 100, 120, 160], dtype=np.float64),
+                smeared_bins=np.array([40, 50, 60, 80, 100, 120], dtype=np.float64),
             ),
             substructure_variable=unfolding_2D.SubstructureVariableSettings.from_binning(
                 true_bins=np.array(
                     # NOTE: (-0.05, 0) is the untagged bin.
-                    [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],
+                    [-0.05, 0, 2, 3, 4, 8, 100],
                     dtype=np.float64,
                 ),
-                smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64),
+                smeared_bins=np.array([1, 2, 3, 4, 8], dtype=np.float64),
                 name="kt",
                 variable_name="kt",
                 untagged_bin_below_range=True,
@@ -1106,10 +1115,20 @@ def setup_unfolding(
             use_pure_matches=False,
         )
         settings[_default_settings.output_tag] = _default_settings
+        # TODO: Make these settings more formal and selectable.
         # NOTE: Generate 5 random edges of 5% (+/-, so 10% total) with:
         #       np.random.random_sample(5) / 10 + 0.95
         #       it can then be multiplied with the inner binning.
-        #       Used: smeared_bins=np.array([1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15], dtype=np.float64),
+        #       Semi-central:
+        #       Standard binning:
+        #           true_bins=np.array([-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],, dtype=np.float64)
+        #           smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64)
+        #       Random binning: smeared_bins=np.array([1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15], dtype=np.float64),
+        #       Central:
+        #       Standard binning:
+        #           true_bins=np.array([-0.05, 0, 2, 3, 4, 8, 100], dtype=np.float64)
+        #           smeared_bins=np.array([1, 2, 3, 4, 8], dtype=np.float64),
+        #       Random binning: smeared_bins=np.array([1, 2, 3.02, 4.13, 8], dtype=np.float64)
 
         if run_closures:
             # And then add the variations.
@@ -1147,9 +1166,11 @@ def setup_unfolding(
             results.append(
                 _unfolding_standard(
                     settings=s,
+                    reweight_prior=reweight_prior,
+                    reweight_data_dataset_name=PbPb_dataset_config["name"],
+                    reweight_embedded_dataset_name=embedded_dataset_config["name"],
                     inputs=input_files,
                     outputs=[parsl_output_file],
-                    reweight_prior=reweight_prior,
                 )
             )
 
@@ -1168,6 +1189,8 @@ def setup_unfolding(
                         _unfolding_closure(
                             settings=s,
                             closure_variation=closure_variation,
+                            data_dataset_name=PbPb_dataset_config["name"],
+                            embedded_dataset_name=embedded_dataset_config["name"],
                             inputs=input_files,
                             outputs=[parsl_output_file],
                         )
@@ -1180,11 +1203,11 @@ if __name__ == "__main__":  # noqa: C901
     # Settings
     collision_system = "PbPb"
     jobs_to_execute = [
-        "root_data_frame",
+        "unfolding",
     ]
     entries_per_job = int(1e5)
     nodes_to_allocate = 1
-    jobs_per_node = 1
+    jobs_per_node = 5
 
     # Basic setup for jobs
     _possible_jobs = [
@@ -1294,15 +1317,15 @@ if __name__ == "__main__":  # noqa: C901
                 "leading_kt",
                 # "leading_kt_z_cut_02",
                 # "leading_kt_z_cut_04",
-                "dynamical_z",
-                "dynamical_kt",
-                "dynamical_time",
+                # "dynamical_z",
+                # "dynamical_kt",
+                # "dynamical_time",
                 # "soft_drop_z_cut_02",
                 # "soft_drop_z_cut_04",
             ],
             run_closures=False,
-            reweight_prior=False,
-            tag="",
+            reweight_prior=True,
+            tag="central_reweight_prior",
         )
 
     logger.info(f"About to ask for result. len: {len(results)}")
