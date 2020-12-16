@@ -219,6 +219,7 @@ class UnfoldingOutput:
     smeared_input: bool = attr.ib(default=False)
     pure_matches: bool = attr.ib(default=False)
     suffix: str = attr.ib(default="")
+    label: str = attr.ib(default="")
     n_iter_compare: int = attr.ib(default=4)
     raw_hist_name: str = attr.ib(default="raw")
     smeared_hist_name: str = attr.ib(default="smeared")
@@ -242,10 +243,13 @@ class UnfoldingOutput:
         name += f"_smeared_{self.smeared_var_range}"
         name += f"_untagged_{self.smeared_untagged_var}"
         name += f"_smeared_{self.smeared_jet_pt_range}"
-        if self.pure_matches:
-            name += "_pure_matches"
         if self.suffix:
             name += f"_{self.suffix}"
+        # Put other possible options after the tag so we can sort by tag if it exists.
+        if self.pure_matches:
+            name += "_pure_matches"
+        if self.label:
+            name += f"_{self.label}"
         return name
 
     @property
@@ -675,6 +679,118 @@ def plot_systematic(
     plt.close(fig)
 
 
+def setup_unfolding_closures(
+    substructure_variable: str,
+    grooming_method: str,
+    smeared_var_range: helpers.KtRange,
+    smeared_untagged_var: helpers.KtRange,
+    smeared_jet_pt_range: helpers.JetPtRange,
+    collision_system: str,
+    n_iter_compare: int,
+    suffix: str,
+    output_dir: Path,
+    pure_matches: bool = False,
+) -> Dict[str, UnfoldingOutput]:
+    # Setup the input files
+    unfolding_outputs = {}
+    unfolding_outputs["default"] = UnfoldingOutput(
+        substructure_variable=substructure_variable,
+        grooming_method=grooming_method,
+        smeared_var_range=smeared_var_range,
+        smeared_untagged_var=smeared_untagged_var,
+        smeared_jet_pt_range=smeared_jet_pt_range,
+        collision_system=collision_system,
+        base_dir=output_dir,
+        n_iter_compare=n_iter_compare,
+        pure_matches=pure_matches,
+        suffix=suffix,
+    )
+
+    # These should always exist.
+    unfolding_outputs["trivial_closure"] = UnfoldingOutput(
+        substructure_variable=substructure_variable,
+        grooming_method=grooming_method,
+        smeared_var_range=smeared_var_range,
+        smeared_untagged_var=smeared_untagged_var,
+        smeared_jet_pt_range=smeared_jet_pt_range,
+        collision_system=collision_system,
+        base_dir=output_dir,
+        n_iter_compare=n_iter_compare,
+        pure_matches=pure_matches,
+        smeared_input=True,
+        suffix=suffix,
+        label="closure_trivial_hybrid_smeared_as_input",
+    )
+
+    unfolding_outputs["closure_later_iter"] = UnfoldingOutput(
+        substructure_variable=substructure_variable,
+        grooming_method=grooming_method,
+        smeared_var_range=smeared_var_range,
+        smeared_untagged_var=smeared_untagged_var,
+        smeared_jet_pt_range=smeared_jet_pt_range,
+        collision_system=collision_system,
+        base_dir=output_dir,
+        n_iter_compare=n_iter_compare,
+        pure_matches=pure_matches,
+        suffix=suffix,
+        label="closure_5_iter_5",
+    )
+
+    try:
+        unfolding_outputs["split_MC"] = UnfoldingOutput(
+            substructure_variable=substructure_variable,
+            grooming_method=grooming_method,
+            smeared_var_range=smeared_var_range,
+            smeared_untagged_var=smeared_untagged_var,
+            smeared_jet_pt_range=smeared_jet_pt_range,
+            collision_system=collision_system,
+            base_dir=output_dir,
+            n_iter_compare=n_iter_compare,
+            pure_matches=pure_matches,
+            smeared_input=True,
+            suffix=suffix,
+            label="closure_split_MC",
+        )
+    except FileNotFoundError:
+        logger.debug("Skipping split MC because the output file doesn't exist.")
+
+    try:
+        unfolding_outputs["reweight_pseudo_data"] = UnfoldingOutput(
+            substructure_variable=substructure_variable,
+            grooming_method=grooming_method,
+            smeared_var_range=smeared_var_range,
+            smeared_untagged_var=smeared_untagged_var,
+            smeared_jet_pt_range=smeared_jet_pt_range,
+            collision_system=collision_system,
+            base_dir=output_dir,
+            n_iter_compare=n_iter_compare,
+            pure_matches=pure_matches,
+            suffix=suffix,
+            label="closure_reweight_pseudo_data",
+        )
+    except FileNotFoundError:
+        logger.debug("Skipping reweighted pseudo data because the output file doesn't exist.")
+
+    try:
+        unfolding_outputs["reweight_response"] = UnfoldingOutput(
+            substructure_variable=substructure_variable,
+            grooming_method=grooming_method,
+            smeared_var_range=smeared_var_range,
+            smeared_untagged_var=smeared_untagged_var,
+            smeared_jet_pt_range=smeared_jet_pt_range,
+            collision_system=collision_system,
+            base_dir=output_dir,
+            n_iter_compare=n_iter_compare,
+            pure_matches=pure_matches,
+            suffix=suffix,
+            label="closure_reweight_response",
+        )
+    except FileNotFoundError:
+        logger.debug("Skipping reweighted response because the output file doesn't exist.")
+
+    return unfolding_outputs
+
+
 def setup_unfolding_outputs(  # noqa: C901
     substructure_variable: str,
     grooming_method: str,
@@ -683,7 +799,7 @@ def setup_unfolding_outputs(  # noqa: C901
     smeared_jet_pt_range: helpers.JetPtRange,
     collision_system: str,
     n_iter_compare: int,
-    base_suffix: str,
+    suffix: str,
     output_dir: Path,
     truncation_shift: float = 5,
     displaced_untagged_above_range: bool = True,
@@ -710,12 +826,8 @@ def setup_unfolding_outputs(  # noqa: C901
         base_dir=output_dir,
         n_iter_compare=n_iter_compare,
         pure_matches=False,
-        suffix=base_suffix,
+        suffix=suffix,
     )
-
-    # Setup the tag, adding the required underscore for separation.
-    if base_suffix:
-        base_suffix = f"{base_suffix}_"
 
     try:
         unfolding_outputs["tracking_efficiency"] = UnfoldingOutput(
@@ -728,7 +840,8 @@ def setup_unfolding_outputs(  # noqa: C901
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
             pure_matches=False,
-            suffix=f"{base_suffix}tracking_efficiency",
+            suffix=suffix,
+            label="tracking_efficiency",
         )
     except FileNotFoundError:
         logger.debug("Skipping tracking efficiency because the output file doesn't exist.")
@@ -746,7 +859,8 @@ def setup_unfolding_outputs(  # noqa: C901
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
             pure_matches=False,
-            suffix=f"{base_suffix}truncation",
+            suffix=suffix,
+            label="truncation",
         )
         unfolding_outputs["truncation_high"] = UnfoldingOutput(
             substructure_variable=substructure_variable,
@@ -760,7 +874,8 @@ def setup_unfolding_outputs(  # noqa: C901
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
             pure_matches=False,
-            suffix=f"{base_suffix}truncation",
+            suffix=suffix,
+            label="truncation",
         )
     except FileNotFoundError:
         logger.debug("Skipping truncation because the output file doesn't exist.")
@@ -776,7 +891,8 @@ def setup_unfolding_outputs(  # noqa: C901
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
             pure_matches=False,
-            suffix=f"{base_suffix}random_binning",
+            suffix=suffix,
+            label="random_binning",
         )
     except FileNotFoundError:
         logger.debug("Skipping random binning because the output file doesn't exist.")
@@ -797,8 +913,7 @@ def setup_unfolding_outputs(  # noqa: C901
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
             pure_matches=False,
-            # Drop the last "_", which isn't needed here.
-            suffix=base_suffix[:-1],
+            suffix=suffix,
         )
     except FileNotFoundError:
         logger.debug("Skipping untagged bin location because the output file doesn't exist.")
@@ -814,7 +929,8 @@ def setup_unfolding_outputs(  # noqa: C901
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
             pure_matches=False,
-            suffix=f"{base_suffix}reweight_prior",
+            suffix=suffix,
+            label="reweight_prior",
         )
     except FileNotFoundError:
         logger.debug("Skipping reweighted prior because the output file doesn't exist.")
@@ -831,7 +947,8 @@ def setup_unfolding_outputs(  # noqa: C901
                 base_dir=output_dir,
                 n_iter_compare=n_iter_compare,
                 pure_matches=False,
-                suffix=f"{base_suffix}{background_setting}",
+                suffix=suffix,
+                label=f"{background_setting}",
             )
         except FileNotFoundError:
             logger.debug(f"Skipping background setting {background_setting} because the output file doesn't exist.")
@@ -1877,7 +1994,7 @@ def plot_kt_unfolding(
         text = f"${true_jet_pt_range.display_str(label='true')}$"
         plot_select_iteration(
             unfolding_output=unfolding_output,
-            projection_func=UnfoldingOutput.unfolded_substructure,
+            projection_func=UnfoldingOutput.unfolded_substructure,  # type: ignore
             max_iter=unfolding_output.max_n_iter,
             true_bin=true_jet_pt_range,
             plot_config=pb.PlotConfig(
@@ -2650,7 +2767,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
     text = f"${jet_pt_for_text.display_str(label='true')}$"
     plot_select_iteration(
         unfolding_output=unfolding_output,
-        projection_func=UnfoldingOutput.unfolded_substructure,
+        projection_func=UnfoldingOutput.unfolded_substructure,  # type: ignore
         max_iter=unfolding_output.max_n_iter,
         true_bin=helpers.JetPtRange(60, 80),
         plot_config=pb.PlotConfig(
