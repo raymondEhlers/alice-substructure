@@ -1,0 +1,11 @@
+---
+train: "Jets_EMC_pp"
+number: 1998
+dataset: "LHC17p"
+aliphysics_tag: "vAN-20201214_ROOT6-1"
+alien_output_info:
+    child_1:
+        name: "LHC17p"
+        stage_to_download: "merged"
+status: |
+    "Recorded all recursive splittings in pp for R=0.2. Nominal settings."
