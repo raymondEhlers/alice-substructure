@@ -5,7 +5,10 @@ dataset: "LHC17p"
 aliphysics_tag: "vAN-20201214_ROOT6-1"
 alien_output_info:
     child_1:
-        name: "LHC17p"
+        name: "FAST"
+        stage_to_download: "merged"
+    child_2:
+        name: "woSDD"
         stage_to_download: "merged"
 status: |
     "Recorded all recursive splittings in pp for R=0.2. Nominal settings."
