@@ -3,9 +3,10 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+import itertools
 import logging
 from pathlib import Path
-from typing import Callable, Dict, Mapping, MutableMapping, Optional, Sequence
+from typing import Callable, Dict, Iterable, Mapping, MutableMapping, Optional, Sequence
 
 import attr
 import boost_histogram as bh
@@ -265,6 +266,17 @@ class UnfoldingOutput:
                     n = max(n, int(hist_name.split("_")[-1]) + 1)
             self._max_n_iter: int = n
         return self._max_n_iter
+
+    def n_iter_range_to_plot(self) -> Iterable[int]:
+        """Generate the n_iter range to plot.
+
+        This lets us cut down on the iterations to plot when it would be too much to view comfortably.
+        First, we return the first n, and then take every second from there.
+        """
+        change_to_sparse = 8
+        if self.max_n_iter > change_to_sparse:
+            return itertools.chain(range(1, change_to_sparse + 1), range(change_to_sparse + 1, self.max_n_iter, 2))
+        return range(1, self.max_n_iter)
 
     @property
     def input_filename(self) -> Path:
@@ -1119,7 +1131,7 @@ def plot_unfolded(
     unfolding_output: UnfoldingOutput,
     hist_true: binned_data.BinnedData,
     hist_n_iter_compare: binned_data.BinnedData,
-    unfolded_hists: Sequence[binned_data.BinnedData],
+    unfolded_hists: Mapping[int, binned_data.BinnedData],
     plot_config: pb.PlotConfig,
     plot_png: bool = False,
 ) -> None:
@@ -1135,7 +1147,7 @@ def plot_unfolded(
     )
     ax_upper, ax_ratio_iter, ax_ratio_true = axes
 
-    for i, hist in enumerate(unfolded_hists, start=1):
+    for i, hist in unfolded_hists.items():
         ax_upper.errorbar(
             hist.axes[0].bin_centers,
             hist.values,
@@ -1242,7 +1254,7 @@ def plot_refolded(
     unfolding_output: UnfoldingOutput,
     hist_raw: binned_data.BinnedData,
     hist_smeared: binned_data.BinnedData,
-    refolded_hists: Sequence[binned_data.BinnedData],
+    refolded_hists: Mapping[int, binned_data.BinnedData],
     plot_config: pb.PlotConfig,
     plot_png: bool = False,
 ) -> None:
@@ -1285,7 +1297,7 @@ def plot_refolded(
     )
 
     ratio_denominator = hist_smeared if unfolding_output.smeared_input else hist_raw
-    for i, hist in enumerate(refolded_hists, start=1):
+    for i, hist in refolded_hists.items():
         ax_upper.errorbar(
             hist.axes[0].bin_centers,
             hist.values,
@@ -1629,10 +1641,10 @@ def plot_kt_unfolding(
             hist_n_iter_compare=unfolding_output.unfolded_substructure(
                 unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range
             ),
-            unfolded_hists=[
-                unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
-                for n_iter in range(1, unfolding_output.max_n_iter)
-            ],
+            unfolded_hists={
+                n_iter: unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+            },
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
                 panels=[
@@ -1643,9 +1655,10 @@ def plot_kt_unfolding(
                                 "y",
                                 label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",  # noqa: F541
                                 log=True,
+                                range=(8e-4, None),
                             )
                         ],
-                        legend=pb.LegendConfig(location="lower left"),
+                        legend=pb.LegendConfig(location="lower left", ncol=2),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
@@ -1684,10 +1697,10 @@ def plot_kt_unfolding(
             hist_n_iter_compare=unfolding_output.unfolded_substructure(
                 unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range
             ),
-            unfolded_hists=[
-                unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
-                for n_iter in range(1, unfolding_output.max_n_iter)
-            ],
+            unfolded_hists={
+                n_iter: unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+            },
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
                 panels=[
@@ -1698,9 +1711,10 @@ def plot_kt_unfolding(
                                 "y",
                                 label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",  # noqa: F541
                                 log=True,
+                                range=(1e-4, None),
                             )
                         ],
-                        legend=pb.LegendConfig(location="lower left"),
+                        legend=pb.LegendConfig(location="lower left", ncol=2),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
@@ -1739,10 +1753,10 @@ def plot_kt_unfolding(
             hist_n_iter_compare=unfolding_output.unfolded_substructure(
                 unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range
             ),
-            unfolded_hists=[
-                unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
-                for n_iter in range(1, unfolding_output.max_n_iter)
-            ],
+            unfolded_hists={
+                n_iter: unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+            },
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
                 panels=[
@@ -1753,9 +1767,10 @@ def plot_kt_unfolding(
                                 "y",
                                 label=fr"$\text{{d}}N/\text{{d}}k_{{\text{{T}}}}\:(\text{{GeV}}/c)^{{-1}}$",  # noqa: F541
                                 log=True,
+                                range=(1e-3, None),
                             )
                         ],
-                        legend=pb.LegendConfig(location="lower left"),
+                        legend=pb.LegendConfig(location="lower left", ncol=2),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
@@ -1794,12 +1809,12 @@ def plot_kt_unfolding(
             hist_n_iter_compare=unfolding_output.unfolded_jet_pt(
                 unfolding_output.n_iter_compare, true_substructure_variable_range=true_substructure_variable_range
             ),
-            unfolded_hists=[
-                unfolding_output.unfolded_jet_pt(
+            unfolded_hists={
+                n_iter: unfolding_output.unfolded_jet_pt(
                     n_iter=n_iter, true_substructure_variable_range=true_substructure_variable_range
                 )
-                for n_iter in range(1, unfolding_output.max_n_iter)
-            ],
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+            },
             plot_config=pb.PlotConfig(
                 name="unfolded_pt",
                 panels=[
@@ -1808,7 +1823,7 @@ def plot_kt_unfolding(
                         axes=[
                             pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
                         ],
-                        legend=pb.LegendConfig(location="lower left"),
+                        legend=pb.LegendConfig(location="lower left", ncol=2),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
@@ -1847,12 +1862,12 @@ def plot_kt_unfolding(
             hist_smeared=unfolding_output.smeared_substructure(
                 hist_name=unfolding_output.smeared_hist_name, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range
             ),
-            refolded_hists=[
-                unfolding_output.refolded_substructure(
+            refolded_hists={
+                n_iter: unfolding_output.refolded_substructure(
                     n_iter=n_iter, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range
                 )
-                for n_iter in range(1, unfolding_output.max_n_iter)
-            ],
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+            },
             plot_config=pb.PlotConfig(
                 name=f"refolded_{unfolding_output.substructure_variable}",
                 panels=[
@@ -1861,7 +1876,7 @@ def plot_kt_unfolding(
                         axes=[
                             pb.AxisConfig("y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
                         ],
-                        legend=pb.LegendConfig(location="lower left"),
+                        legend=pb.LegendConfig(location="lower left", ncol=2, anchor=(0.15, 0.025)),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
@@ -1893,12 +1908,12 @@ def plot_kt_unfolding(
                 hist_name=unfolding_output.smeared_hist_name,
                 smeared_substructure_variable_range=unfolding_output.smeared_var_range,
             ),
-            refolded_hists=[
-                unfolding_output.refolded_jet_pt(
+            refolded_hists={
+                n_iter: unfolding_output.refolded_jet_pt(
                     n_iter=n_iter, smeared_substructure_variable_range=unfolding_output.smeared_var_range
                 )
-                for n_iter in range(1, unfolding_output.max_n_iter)
-            ],
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+            },
             plot_config=pb.PlotConfig(
                 name="refolded_pt",
                 panels=[
@@ -1907,7 +1922,7 @@ def plot_kt_unfolding(
                         axes=[
                             pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
                         ],
-                        legend=pb.LegendConfig(location="lower left"),
+                        legend=pb.LegendConfig(location="upper right", ncol=2, anchor=(0.975, 0.90)),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
@@ -2506,10 +2521,10 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
             hist_n_iter_compare=unfolding_output.unfolded_substructure(
                 unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range
             ),
-            unfolded_hists=[
-                unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
-                for n_iter in range(1, unfolding_output.max_n_iter)
-            ],
+            unfolded_hists={
+                n_iter: unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+            },
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{unfolding_output.substructure_variable}_true_pt_60_80",
                 panels=[
@@ -2560,10 +2575,10 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
             hist_n_iter_compare=unfolding_output.unfolded_substructure(
                 unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range
             ),
-            unfolded_hists=[
-                unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
-                for n_iter in range(1, unfolding_output.max_n_iter)
-            ],
+            unfolded_hists={
+                n_iter: unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+            },
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{unfolding_output.substructure_variable}_true_pt_40_120",
                 panels=[
@@ -2613,12 +2628,12 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
             hist_n_iter_compare=unfolding_output.unfolded_jet_pt(
                 unfolding_output.n_iter_compare, true_substructure_variable_range=true_substructure_variable_range
             ),
-            unfolded_hists=[
-                unfolding_output.unfolded_jet_pt(
+            unfolded_hists={
+                n_iter: unfolding_output.unfolded_jet_pt(
                     n_iter=n_iter, true_substructure_variable_range=true_substructure_variable_range
                 )
-                for n_iter in range(1, unfolding_output.max_n_iter)
-            ],
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+            },
             plot_config=pb.PlotConfig(
                 name="unfolded_pt",
                 panels=[
@@ -2664,19 +2679,19 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
             hist_smeared=unfolding_output.smeared_substructure(
                 hist_name=unfolding_output.smeared_hist_name, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range
             ),
-            refolded_hists=[
-                unfolding_output.refolded_substructure(
+            refolded_hists={
+                n_iter: unfolding_output.refolded_substructure(
                     n_iter=n_iter, smeared_jet_pt_range=unfolding_output.smeared_jet_pt_range
                 )
-                for n_iter in range(1, unfolding_output.max_n_iter)
-            ],
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+            },
             plot_config=pb.PlotConfig(
                 name=f"refolded_{unfolding_output.substructure_variable}",
                 panels=[
                     # Main panel
                     pb.Panel(
                         axes=[pb.AxisConfig("y", label=r"$\text{d}N/\text{d}\Delta R$", log=True)],
-                        legend=pb.LegendConfig(location="lower left"),
+                        legend=pb.LegendConfig(location="lower center", ncol=2),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
@@ -2707,12 +2722,12 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                 hist_name=unfolding_output.smeared_hist_name,
                 smeared_substructure_variable_range=unfolding_output.smeared_var_range,
             ),
-            refolded_hists=[
-                unfolding_output.refolded_jet_pt(
+            refolded_hists={
+                n_iter: unfolding_output.refolded_jet_pt(
                     n_iter=n_iter, smeared_substructure_variable_range=unfolding_output.smeared_var_range
                 )
-                for n_iter in range(1, unfolding_output.max_n_iter)
-            ],
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+            },
             plot_config=pb.PlotConfig(
                 name="refolded_pt",
                 panels=[
@@ -2721,7 +2736,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                         axes=[
                             pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
                         ],
-                        legend=pb.LegendConfig(location="lower left"),
+                        legend=pb.LegendConfig(location="upper right", ncol=2, anchor=(0.975, 0.90)),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
