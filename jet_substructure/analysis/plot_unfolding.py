@@ -6,7 +6,7 @@
 import itertools
 import logging
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Mapping, MutableMapping, Optional, Sequence
+from typing import Callable, Dict, Iterable, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 import attr
 import boost_histogram as bh
@@ -398,12 +398,13 @@ def plot_relative_individual_systematics(
 
     # For comparison, add the statistical too
     ax.errorbar(
-        unfolded.data.bin_centers,
-        np.zeros(len(unfolded.data.bin_centers)),
+        unfolded.data.axes[0].bin_centers,
+        np.zeros(len(unfolded.data.axes[0].bin_centers)),
         yerr=unfolded.data.errors / unfolded.data.values,
         # color=style.color,
         marker="o",
         linestyle="",
+        label="Statistical",
         # alpha=0.8,
     )
 
@@ -498,7 +499,7 @@ def _plot_compare_kt_with_systematics(
         )
 
         # Ratio + statistical error bars from unfolding
-        ratio = reference[grooming_method] / h
+        ratio = h / reference[grooming_method]
         ax_ratio.errorbar(
             ratio.axes[0].bin_centers,
             ratio.values,
@@ -549,20 +550,22 @@ def plot_PbPb_systematics(
     hists: Mapping[str, SingleResult],
     reference: Mapping[str, binned_data.BinnedData],
     grooming_methods: Sequence[str],
-    centrality: str,
+    event_activity: str,
     output_dir: Path,
+    kt_range: Tuple[float, float] = (1.5, 15),
+    jet_R: str = "R04",
 ) -> None:
     """Plot PbPb unfolded results with systematics."""
     jet_pt_bin = hists[grooming_methods[0]].ranges[0]
-    centrality_map = {
+    event_activity_map = {
         "central": r"0-10\%",
         "semi_central": r"30-50\%",
     }
 
     text = pb.label_to_display_string["ALICE"]["work_in_progress"]
-    text += "\n" + pb.label_to_display_string["collision_system"]["PbPb"] + f", {centrality_map[centrality]}"
+    text += "\n" + pb.label_to_display_string["collision_system"]["PbPb"] + f", {event_activity_map[event_activity]}"
     text += "\n" + pb.label_to_display_string["jets"]["general"]
-    text += "\n" + pb.label_to_display_string["jets"]["R04"]
+    text += "\n" + pb.label_to_display_string["jets"][jet_R]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     _plot_compare_kt_with_systematics(
         hists=hists,
@@ -570,7 +573,7 @@ def plot_PbPb_systematics(
         set_zero_to_nan=False,
         reference=reference,
         plot_config=pb.PlotConfig(
-            name=f"unfolded_kt_systematics_{centrality}",
+            name=f"unfolded_kt_systematics_{event_activity}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -582,16 +585,16 @@ def plot_PbPb_systematics(
                             range=(1e-3, 0.5),
                         ),
                     ],
-                    text=pb.TextConfig(x=0.97, y=0.97, text=text),
-                    legend=pb.LegendConfig(location="lower left", font_size=14),
+                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
+                    legend=pb.LegendConfig(location="lower left", font_size=22),
                 ),
                 # Ratio
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(1.5, 15)),
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=kt_range),
                         pb.AxisConfig(
                             "y",
-                            label=r"$\frac{\text{PYTHIA}}{\text{data}}$",
+                            label=r"$\frac{\text{data}}{\text{PYTHIA}}$",
                             range=(0.65, 1.35),
                         ),
                     ]
@@ -601,94 +604,6 @@ def plot_PbPb_systematics(
         ),
         output_dir=output_dir,
     )
-
-
-def plot_systematic(
-    unfolded: SingleResult,
-    plot_config: pb.PlotConfig,
-    output_dir: Path,
-    plot_png: bool = False,
-) -> None:
-    """Plot systematic
-
-    Initial version to play around with.
-    """
-    # Setup
-    logger.debug("Plotting systematic.")
-    fig, ax = plt.subplots(figsize=(10, 8))
-    # fig, axes = plt.subplots(3, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [3, 1]}, sharex=True,)
-    # ax_upper, ax_ratio_iter, ax_ratio_true = axes
-
-    ax.errorbar(
-        unfolded.data.axes[0].bin_centers,
-        unfolded.data.values,
-        yerr=unfolded.data.errors,
-        xerr=unfolded.data.axes[0].bin_widths / 2,
-        # color=style.color,
-        marker="o",
-        linestyle="",
-    )
-    # Systematic
-    pachyderm.plot.error_boxes(
-        ax=ax,
-        x_data=unfolded.data.axes[0].bin_centers,
-        y_data=unfolded.data.values,
-        x_errors=unfolded.data.axes[0].bin_widths / 2,
-        y_errors=np.array(
-            [
-                unfolded.data.metadata["y_systematic"]["quadrature"].low,
-                unfolded.data.metadata["y_systematic"]["quadrature"].high,
-            ]
-        ),
-        # y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
-        # color=style.color,
-        # color=p[0].get_color(),
-        linewidth=0,
-        color="red",
-    )
-
-    # This isn't really right, but it's a first pass. Let's see...
-    # Rmax06
-    # pachyderm.plot.error_boxes(
-    #    ax=ax,
-    #    x_data=unfolded.data.axes[0].bin_centers,
-    #    y_data=unfolded.data.values,
-    #    x_errors=unfolded.data.axes[0].bin_widths / 2,
-    #    y_errors=unfolded.data.metadata["y_systematic_Rmax06"],
-    #    #y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
-    #    #color=style.color,
-    #    #color=p[0].get_color(),
-    #    linewidth=0,
-    #    label="RMax06",
-    #    color="red",
-    # )
-    ## Tracking efficiency
-    # pachyderm.plot.error_boxes(
-    #    ax=ax,
-    #    x_data=unfolded.data.axes[0].bin_centers,
-    #    y_data=unfolded.data.values,
-    #    x_errors=unfolded.data.axes[0].bin_widths / 2,
-    #    y_errors=unfolded.data.metadata["y_systematic_tracking_efficiency"],
-    #    #y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
-    #    #color=style.color,
-    #    #color=p[0].get_color(),
-    #    linewidth=0,
-    #    label="Tracking Eff.",
-    #    color="green",
-    # )
-
-    # Label and layout
-    plot_config.apply(fig=fig, ax=ax)
-
-    figure_name = f"{plot_config.name}"
-    logger.info(f"Writing plot to {output_dir / figure_name}.pdf")
-    fig.savefig(output_dir / f"{figure_name}.pdf")
-    if plot_png:
-        output_dir_png = output_dir / "png"
-        output_dir_png.mkdir(parents=True, exist_ok=True)
-        fig.savefig(output_dir_png / f"{figure_name}.png")
-
-    plt.close(fig)
 
 
 def setup_unfolding_closures(
@@ -1074,15 +989,23 @@ def calculate_systematics(  # noqa: C901
         logger.debug(f"Skipping reweighting prior because of {e}")
 
     # Background subtraction systematics.
-    for background_setting in ["Rmax06", "Rmax005"]:
+    background_systematics = {}
+    for background_setting in ["Rmax060", "Rmax005"]:
         try:
-            background_systematic = np.abs(unfolded[background_setting].data.values - unfolded["default"].data.values)
-            unfolded["default"].data.metadata["y_systematic"][background_setting] = unfolding_base.AsymmetricErrors(
-                background_systematic,
-                background_systematic,
+            background_systematics[background_setting] = np.abs(
+                unfolded[background_setting].data.values - unfolded["default"].data.values
             )
         except KeyError as e:
-            logger.debug(f"Skipping background systematic {background_setting} because of {e}")
+            logger.debug(f"Skipping background systematic {background_setting} because of {e!r}")
+
+    if len(background_systematics) > 0:
+        first_background_sub = next(iter(background_systematics.values()))
+        unfolded["default"].data.metadata["y_systematic"]["background_sub"] = unfolding_base.AsymmetricErrors(
+            background_systematics.get("RMax005", first_background_sub),
+            background_systematics.get("RMax060", first_background_sub),
+        )
+    else:
+        logger.debug("Skipping background subtraction systematic because no values are available")
 
     # Cross check to make sure that I haven't copied and pasted incorrectly.
     assert not any(
@@ -1628,6 +1551,7 @@ def plot_select_iteration(
 def plot_kt_unfolding(
     unfolding_output: UnfoldingOutput, plot_png: bool = False, reweighted_prior_output: Optional[UnfoldingOutput] = None
 ) -> Path:
+    logger.info(f"Plotting {unfolding_output.identifier}")
     # with sns.color_palette("GnBu_d", n_colors=11):
     with sns.color_palette("Paired", n_colors=unfolding_output.max_n_iter):
         # Main unfolded plot.
