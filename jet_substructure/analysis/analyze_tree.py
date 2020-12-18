@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
 
 import attr
-import awkward0 as ak
+import awkward0 as ak0
 import enlighten
 import IPython
 import numpy as np
@@ -542,10 +542,10 @@ def _get_leading_and_subleading_subjets(
     unsorted_subjet_pt = subjets_unsorted.constituents.four_vectors().sum().pt
     subjets_pt_comparison = 1 - (unsorted_subjet_pt[:, 0] > unsorted_subjet_pt[:, 1])
     # For each subjet_pt_comparison, we want to take the index of the leading subjet and use that to extract the leading subjet.
-    leading_indices = ak.JaggedArray.fromoffsets(range(len(subjets_pt_comparison) + 1), subjets_pt_comparison)
+    leading_indices = ak0.JaggedArray.fromoffsets(range(len(subjets_pt_comparison) + 1), subjets_pt_comparison)
     subjets_leading = subjets_unsorted[leading_indices].flatten()
     # Same idea for the subleading subjet (which is necessarily 1 - subjets_pt_comparison because there are only two subjets.
-    subleading_indices = ak.JaggedArray.fromoffsets(range(len(subjets_pt_comparison) + 1), 1 - subjets_pt_comparison)
+    subleading_indices = ak0.JaggedArray.fromoffsets(range(len(subjets_pt_comparison) + 1), 1 - subjets_pt_comparison)
     subjets_subleading = subjets_unsorted[subleading_indices].flatten()
 
     return subjets_leading, subjets_subleading

@@ -17,7 +17,7 @@ import awkward as ak
 import IPython
 import numba as nb
 import numpy as np
-import uproot as uproot3
+import uproot3
 from pachyderm import yaml
 
 from jet_substructure.analysis import analyze_tree
