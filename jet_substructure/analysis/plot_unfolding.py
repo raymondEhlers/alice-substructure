@@ -74,7 +74,7 @@ def _project_substructure_variable(
         input_hist: Hist to be projected.
         jet_pt_range: True jet pt range over which we will integrate.
     Returns:
-        The input hist projected onto the the substructure variable axis.
+        The input hist projected onto the substructure variable axis.
     """
     # For convenience
     bh_hist = input_hist.to_boost_histogram()
@@ -388,18 +388,36 @@ def plot_relative_individual_systematics(
     fig, ax = plt.subplots(figsize=(10, 7.5))
 
     for name, systematic in unfolded.data.metadata["y_systematic"].items():
-        hep.histplot(
-            H=np.maximum(systematic.low, systematic.high) / unfolded.data.values,
+        # Upper values
+        extra_args = {}
+        if name == "quadrature":
+            extra_args = {
+                "color": "black",
+                "linewidth": 2,
+            }
+        p = hep.histplot(
+            H=np.ones_like(unfolded.data.values) + (systematic.high / unfolded.data.values),
             bins=unfolded.data.axes[0].bin_edges,
-            # color=style.color,
             label=name.replace("_", " "),
             alpha=0.8,
+            **extra_args,
+        )
+        # Lower values
+        # Need to drop this - otherwise it will conflict with existing arguments.
+        if name == "quadrature":
+            extra_args.pop("color")
+        hep.histplot(
+            H=np.ones_like(unfolded.data.values) - (systematic.low / unfolded.data.values),
+            bins=unfolded.data.axes[0].bin_edges,
+            color=p[0].step.get_color(),
+            alpha=0.8,
+            **extra_args,
         )
 
     # For comparison, add the statistical too
     ax.errorbar(
         unfolded.data.axes[0].bin_centers,
-        np.zeros(len(unfolded.data.axes[0].bin_centers)),
+        np.ones_like(unfolded.data.axes[0].bin_centers),
         yerr=unfolded.data.errors / unfolded.data.values,
         # color=style.color,
         marker="o",
@@ -420,6 +438,139 @@ def plot_relative_individual_systematics(
         fig.savefig(output_dir_png / f"{figure_name}.png")
 
     plt.close(fig)
+
+
+def _plot_simple_kt_with_systematics(
+    hists: Mapping[str, SingleResult],
+    grooming_methods: Sequence[str],
+    set_zero_to_nan: bool,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+) -> None:
+    """Plot PbPb with systematics for a set of grooming methods."""
+    logger.info("Plotting grooming method comparison for kt with systematics")
+
+    # fig, ax = plt.subplots(figsize=(9, 10))
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+
+    grooming_styling = pb.define_grooming_styles()
+
+    for grooming_method in grooming_methods:
+        # Setup
+        style = grooming_styling[grooming_method]
+
+        # Axes: jet_pt, attr_name
+        h = hists[grooming_method].data
+
+        # Set 0s to NaN (for example, in z_g where have a good portion of the range cut off).
+        if set_zero_to_nan:
+            h.errors[h.values == 0] = np.nan
+            h.values[h.values == 0] = np.nan
+
+        # Plot options
+        kwargs = {
+            "markerfacecolor": "white" if style.fillstyle == "none" else style.color,
+            "alpha": 1 if style.fillstyle == "none" else 0.8,
+        }
+        if style.fillstyle != "none":
+            kwargs["markeredgewidth"] = 0
+
+        # Main data points
+        ax.errorbar(
+            h.axes[0].bin_centers,
+            h.values,
+            yerr=h.errors,
+            xerr=h.axes[0].bin_widths / 2,
+            color=style.color,
+            marker=style.marker,
+            fillstyle=style.fillstyle,
+            linestyle="",
+            label=style.label,
+            zorder=style.zorder,
+            **kwargs,
+        )
+
+        # Systematic uncertainty
+        pachyderm.plot.error_boxes(
+            ax=ax,
+            x_data=h.axes[0].bin_centers,
+            y_data=h.values,
+            x_errors=h.axes[0].bin_widths / 2,
+            y_errors=np.array(
+                [
+                    h.metadata["y_systematic"]["quadrature"].low,
+                    h.metadata["y_systematic"]["quadrature"].high,
+                ]
+            ),
+            # y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+            # color=style.color,
+            # color=p[0].get_color(),
+            color=style.color,
+            linewidth=0,
+        )
+
+    # Labeling and presentation
+    plot_config.apply(fig=fig, ax=ax)
+    # A few additional tweaks.
+    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
+    # ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=0.2))
+
+    filename = f"{plot_config.name}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def plot_PbPb_systematics_simple(
+    hists: Mapping[str, SingleResult],
+    grooming_methods: Sequence[str],
+    event_activity: str,
+    output_dir: Path,
+    kt_range: Tuple[float, float] = (1.5, 15),
+    jet_R: str = "R04",
+) -> None:
+    """Plot PbPb unfolded results with systematics."""
+    jet_pt_bin = hists[grooming_methods[0]].ranges[0]
+    event_activity_map = {
+        "central": r"0-10\%",
+        "semi_central": r"30-50\%",
+    }
+
+    text = pb.label_to_display_string["ALICE"]["work_in_progress"]
+    if event_activity != "pp":
+        text += (
+            "\n" + pb.label_to_display_string["collision_system"]["PbPb"] + f", {event_activity_map[event_activity]}"
+        )
+    else:
+        text += "\n" + pb.label_to_display_string["collision_system"]["pp_5TeV"]
+    text += "\n" + pb.label_to_display_string["jets"]["general"]
+    text += "\n" + pb.label_to_display_string["jets"][jet_R]
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    _plot_simple_kt_with_systematics(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        set_zero_to_nan=False,
+        plot_config=pb.PlotConfig(
+            name=f"unfolded_kt_systematics_simple_{event_activity}",
+            panels=[
+                # Main panel
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=kt_range),
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                            log=True,
+                            range=(7e-3, 1),
+                        ),
+                    ],
+                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
+                    legend=pb.LegendConfig(location="lower left", font_size=22),
+                ),
+            ],
+            figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.06)),
+        ),
+        output_dir=output_dir,
+    )
 
 
 def _plot_compare_kt_with_systematics(
@@ -563,7 +714,12 @@ def plot_PbPb_systematics(
     }
 
     text = pb.label_to_display_string["ALICE"]["work_in_progress"]
-    text += "\n" + pb.label_to_display_string["collision_system"]["PbPb"] + f", {event_activity_map[event_activity]}"
+    if event_activity != "pp":
+        text += (
+            "\n" + pb.label_to_display_string["collision_system"]["PbPb"] + f", {event_activity_map[event_activity]}"
+        )
+    else:
+        text += "\n" + pb.label_to_display_string["collision_system"]["pp_5TeV"]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
@@ -582,7 +738,7 @@ def plot_PbPb_systematics(
                             "y",
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
-                            range=(1e-3, 0.5),
+                            range=(1e-3, 0.3),
                         ),
                     ],
                     text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
@@ -595,7 +751,7 @@ def plot_PbPb_systematics(
                         pb.AxisConfig(
                             "y",
                             label=r"$\frac{\text{data}}{\text{PYTHIA}}$",
-                            range=(0.65, 1.35),
+                            range=(0.55, 1.45),
                         ),
                     ]
                 ),
@@ -755,6 +911,7 @@ def setup_unfolding_outputs(  # noqa: C901
         pure_matches=False,
         suffix=suffix,
     )
+    print(f"default: {unfolding_outputs['default'].identifier}")
 
     try:
         unfolding_outputs["tracking_efficiency"] = UnfoldingOutput(
@@ -842,6 +999,7 @@ def setup_unfolding_outputs(  # noqa: C901
             pure_matches=False,
             suffix=suffix,
         )
+        print(f"untagged_bin: {unfolding_outputs['untagged_bin'].identifier}")
     except FileNotFoundError:
         logger.debug("Skipping untagged bin location because the output file doesn't exist.")
 
@@ -917,13 +1075,22 @@ def calculate_systematics(  # noqa: C901
     unfolded: Mapping[str, SingleResult],
     unfolding_outputs: Mapping[str, UnfoldingOutput],
     true_jet_pt_range: helpers.JetPtRange,
+    truncation_iter: Optional[helpers.RangeSelector] = None,
 ) -> SingleResult:
+    # Validation
+    if truncation_iter is None:
+        truncation_iter = helpers.RangeSelector(1, 1)
+    if truncation_iter.min < 0:
+        truncation_iter = helpers.RangeSelector(-1 * truncation_iter.min, truncation_iter.max)
     # Setup
     unfolded["default"].data.metadata["y_systematic"] = {}
 
     # Tracking efficiency
     # This is treated as a symmetric uncertainty.
+    # However, we store it as asymmetric errors objects for consistency with everything else.
     try:
+        # NOTE: Unlike the others, we take the abs and set the values here directly because
+        #       we want them to be symmetric.
         tracking_efficiency_sym = np.abs(unfolded["tracking_efficiency"].data.values - unfolded["default"].data.values)
         unfolded["default"].data.metadata["y_systematic"]["tracking_efficiency"] = unfolding_base.AsymmetricErrors(
             tracking_efficiency_sym, tracking_efficiency_sym
@@ -931,59 +1098,65 @@ def calculate_systematics(  # noqa: C901
     except KeyError as e:
         logger.debug(f"Skipping tracking efficiency because of {e}")
 
+    # Everything else is treated asymmetrically, potentially one-sided.
     # Truncation
     try:
-        unfolded["default"].data.metadata["y_systematic"]["truncation"] = unfolding_base.AsymmetricErrors(
-            np.abs(unfolded["truncation_low"].data.values - unfolded["default"].data.values),
-            np.abs(unfolded["truncation_high"].data.values - unfolded["default"].data.values),
+        unfolded["default"].data.metadata["y_systematic"][
+            "truncation"
+        ] = unfolding_base.AsymmetricErrors.calculate_errors(
+            unfolded["truncation_low"].data.values - unfolded["default"].data.values,
+            unfolded["truncation_high"].data.values - unfolded["default"].data.values,
         )
     except KeyError as e:
         logger.debug(f"Skipping truncation because of {e}")
 
     # Regularization
-    # +/- 1 iteration
-    unfolded["default"].data.metadata["y_systematic"]["regularization"] = unfolding_base.AsymmetricErrors(
-        np.abs(
-            unfolded["default"].data.values
-            - unfolding_outputs["default"]
-            .unfolded_substructure(
-                n_iter=unfolding_outputs["default"].n_iter_compare - 1, true_jet_pt_range=true_jet_pt_range
-            )
-            .values
-        ),
-        np.abs(
-            unfolded["default"].data.values
-            - unfolding_outputs["default"]
-            .unfolded_substructure(
-                n_iter=unfolding_outputs["default"].n_iter_compare + 1, true_jet_pt_range=true_jet_pt_range
-            )
-            .values
-        ),
+    # +/- iterations
+    unfolded["default"].data.metadata["y_systematic"][
+        "regularization"
+    ] = unfolding_base.AsymmetricErrors.calculate_errors(
+        unfolded["default"].data.values
+        - unfolding_outputs["default"]
+        .unfolded_substructure(
+            n_iter=unfolding_outputs["default"].n_iter_compare - truncation_iter.min,  # type: ignore
+            true_jet_pt_range=true_jet_pt_range,
+        )
+        .values,
+        unfolded["default"].data.values
+        - unfolding_outputs["default"]
+        .unfolded_substructure(
+            n_iter=unfolding_outputs["default"].n_iter_compare + truncation_iter.max,  # type: ignore
+            true_jet_pt_range=true_jet_pt_range,
+        )
+        .values,
     )
 
     # Random binning
     try:
-        random_binning_sym = np.abs(unfolded["random_binning"].data.values - unfolded["default"].data.values)
-        unfolded["default"].data.metadata["y_systematic"]["random_binning"] = unfolding_base.AsymmetricErrors(
-            random_binning_sym, random_binning_sym
+        unfolded["default"].data.metadata["y_systematic"][
+            "random_binning"
+        ] = unfolding_base.AsymmetricErrors.calculate_errors(
+            unfolded["random_binning"].data.values - unfolded["default"].data.values
         )
     except KeyError as e:
         logger.debug(f"Skipping random binning because of {e}")
 
     # Untagged bin location
     try:
-        untagged_bin_sym = np.abs(unfolded["untagged_bin"].data.values - unfolded["default"].data.values)
-        unfolded["default"].data.metadata["y_systematic"]["untagged_bin"] = unfolding_base.AsymmetricErrors(
-            untagged_bin_sym, untagged_bin_sym
+        unfolded["default"].data.metadata["y_systematic"][
+            "untagged_bin"
+        ] = unfolding_base.AsymmetricErrors.calculate_errors(
+            unfolded["untagged_bin"].data.values - unfolded["default"].data.values
         )
     except KeyError as e:
         logger.debug(f"Skipping untagged bin location because of {e}")
 
     # Reweight prior
     try:
-        reweight_prior_sym = np.abs(unfolded["reweight_prior"].data.values - unfolded["default"].data.values)
-        unfolded["default"].data.metadata["y_systematic"]["reweight_prior"] = unfolding_base.AsymmetricErrors(
-            reweight_prior_sym, reweight_prior_sym
+        unfolded["default"].data.metadata["y_systematic"][
+            "reweight_prior"
+        ] = unfolding_base.AsymmetricErrors.calculate_errors(
+            unfolded["reweight_prior"].data.values - unfolded["default"].data.values
         )
     except KeyError as e:
         logger.debug(f"Skipping reweighting prior because of {e}")
@@ -992,7 +1165,7 @@ def calculate_systematics(  # noqa: C901
     background_systematics = {}
     for background_setting in ["Rmax060", "Rmax005"]:
         try:
-            background_systematics[background_setting] = np.abs(
+            background_systematics[background_setting] = (
                 unfolded[background_setting].data.values - unfolded["default"].data.values
             )
         except KeyError as e:
@@ -1000,7 +1173,9 @@ def calculate_systematics(  # noqa: C901
 
     if len(background_systematics) > 0:
         first_background_sub = next(iter(background_systematics.values()))
-        unfolded["default"].data.metadata["y_systematic"]["background_sub"] = unfolding_base.AsymmetricErrors(
+        unfolded["default"].data.metadata["y_systematic"][
+            "background_sub"
+        ] = unfolding_base.AsymmetricErrors.calculate_errors(
             background_systematics.get("RMax005", first_background_sub),
             background_systematics.get("RMax060", first_background_sub),
         )
@@ -1597,7 +1772,8 @@ def plot_kt_unfolding(
                     ),
                     pb.Panel(
                         axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
+                            # pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
+                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 8)),
                             pb.AxisConfig(
                                 "y",
                                 label="Ratio to true",

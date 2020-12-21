@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import logging
 from functools import reduce
 from typing import Any, Optional, Type, cast
 
@@ -13,6 +14,9 @@ import numpy as np
 from pachyderm import binned_data
 
 from jet_substructure.base import helpers
+
+
+logger = logging.getLogger(__name__)
 
 
 @attr.s(eq=False)
@@ -47,8 +51,10 @@ class AsymmetricErrors:
         # This allows us to calculate single value asymmetric errors.
         # This is equivalent to just pass the same error values twice, but this
         # is a cleaner interface.
+        one_sided = False
         if errors_two is None:
             errors_two = np.array(errors_one, copy=True)
+            one_sided = True
 
         # Determine when the errors are positive.
         # True if positive, false if negative
@@ -90,10 +96,17 @@ class AsymmetricErrors:
         low[mask] = errors_one_abs[mask]
         high[mask] = errors_two_abs[mask]
 
-        # Cross check. We almost certainly will never have 0 in both bins.
+        # Cross checks. We almost certainly will never have 0 in both bins.
         low_is_zero = low == 0
         high_is_zero = high == 0
-        assert not np.any(low_is_zero & high_is_zero)
+        if np.any(low_is_zero & high_is_zero):
+            logger.warning("Errors are identically zero for this calculation! Check this carefully!")
+        # If it's one sided, then we always should have only one non-zero error.
+        if one_sided:
+            # not required because assert needs to be False for the assertion to fail.
+            assert not np.any(
+                ~low_is_zero & ~high_is_zero
+            ), f"One sided errors should only have one non-zero value. low: {low}, high: {high}, test: {~low_is_zero & ~high_is_zero}"
 
         return cls(low=low, high=high)
 
