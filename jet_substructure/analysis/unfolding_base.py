@@ -139,11 +139,21 @@ def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelect
     # Handle metadata
     metadata = {}
     for k, v in hist.metadata.items():
-        if isinstance(v, AsymmetricErrors):
-            metadata[k] = AsymmetricErrors(
-                low=v.low[bin_center_mask],
-                high=v.high[bin_center_mask],
-            )
+        if k == "y_systematic":
+            y_systematic = {}
+            for k_sys, v_sys in v.items():
+                if isinstance(v_sys, AsymmetricErrors):
+                    y_systematic[k_sys] = AsymmetricErrors(
+                        low=v_sys.low[bin_center_mask],
+                        high=v_sys.high[bin_center_mask],
+                    )
+            metadata["y_systematic"] = y_systematic
+        else:
+            if isinstance(v, AsymmetricErrors):
+                y_systematic[k] = AsymmetricErrors(
+                    low=v.low[bin_center_mask],
+                    high=v.high[bin_center_mask],
+                )
 
     return binned_data.BinnedData(
         axes=[hist.axes[0].bin_edges[first_bin_edge:last_bin_edge]],

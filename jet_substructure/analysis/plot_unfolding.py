@@ -440,6 +440,136 @@ def plot_relative_individual_systematics(
     plt.close(fig)
 
 
+def _plot_pp_PbPb_comparison(
+    hists: Mapping[str, SingleResult],
+    grooming_method: str,
+    set_zero_to_nan: bool,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+) -> None:
+    """Plot PbPb with systematics compared to pp with systematics for a set of grooming methods.
+
+    As of Dec 2020, pass on the ratio because the binning doesn't align.
+    """
+    logger.info("Plotting grooming method comparison for kt with systematics")
+
+    # fig, ax = plt.subplots(figsize=(9, 10))
+    # Size is specified to make it convenient to compare against Hard Probes plots.
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    # Collision system is a bit misleading because it's really just a high label, but good enough for a quick look.
+    for (collision_system, hist), color in zip(hists.items(), ["blue", "red"]):
+        # Axes: jet_pt, attr_name
+        h = hist.data
+
+        # NOTE: Careful, this is hard coded! It's good enough for a hack...
+        if collision_system == "pp":
+            h = unfolding_base.select_hist_range(h, helpers.KtRange(0.5, 8))
+        elif collision_system == "semi_central":
+            h = unfolding_base.select_hist_range(h, helpers.KtRange(2, 15))
+        elif collision_system == "central":
+            h = unfolding_base.select_hist_range(h, helpers.KtRange(2, 8))
+        else:
+            logger.error("Collision system not recognized!")
+
+        # Set 0s to NaN (for example, in z_g where have a good portion of the range cut off).
+        if set_zero_to_nan:
+            h.errors[h.values == 0] = np.nan
+            h.values[h.values == 0] = np.nan
+
+        # Main data points
+        ax.errorbar(
+            h.axes[0].bin_centers,
+            h.values,
+            yerr=h.errors,
+            xerr=h.axes[0].bin_widths / 2,
+            color=color,
+            linestyle="",
+            label=collision_system.replace("_", " "),
+        )
+
+        # Systematic uncertainty
+        pachyderm.plot.error_boxes(
+            ax=ax,
+            x_data=h.axes[0].bin_centers,
+            y_data=h.values,
+            x_errors=h.axes[0].bin_widths / 2,
+            y_errors=np.array(
+                [
+                    h.metadata["y_systematic"]["quadrature"].low,
+                    h.metadata["y_systematic"]["quadrature"].high,
+                ]
+            ),
+            # y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+            # color=style.color,
+            # color=p[0].get_color(),
+            color=color,
+            linewidth=0,
+        )
+
+    # Labeling and presentation
+    plot_config.apply(fig=fig, ax=ax)
+    # A few additional tweaks.
+    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
+    # ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=0.2))
+
+    filename = f"{plot_config.name}_{grooming_method}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def plot_pp_PbPb_comparison(
+    hists: Mapping[str, SingleResult],
+    grooming_method: str,
+    event_activity: str,
+    output_dir: Path,
+    kt_range: Tuple[float, float] = (1.5, 15),
+    jet_R: str = "R04",
+) -> None:
+    """Plot PbPb unfolded results with systematics."""
+    jet_pt_bin = next(iter(hists.values())).ranges[0]
+    event_activity_map = {
+        "central": r"0-10\%",
+        "semi_central": r"30-50\%",
+    }
+    grooming_styling = pb.define_grooming_styles()
+    style = grooming_styling[grooming_method]
+
+    text = pb.label_to_display_string["ALICE"]["work_in_progress"]
+    text += "\n" + pb.label_to_display_string["collision_system"]["PbPb"] + f", {event_activity_map[event_activity]}"
+    text += "\n" + pb.label_to_display_string["collision_system"]["pp_5TeV_NN"]
+    text += "\n" + pb.label_to_display_string["jets"]["general"]
+    text += "\n" + pb.label_to_display_string["jets"][jet_R]
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    text += "\n" + fr"{style.label}"
+    _plot_pp_PbPb_comparison(
+        hists=hists,
+        grooming_method=grooming_method,
+        set_zero_to_nan=False,
+        plot_config=pb.PlotConfig(
+            name=f"unfolded_kt_PbPb_comparison_{event_activity}",
+            panels=[
+                # Main panel
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=kt_range),
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                            log=True,
+                            range=(1e-3, 1),
+                        ),
+                    ],
+                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
+                    legend=pb.LegendConfig(location="lower left", font_size=22),
+                ),
+            ],
+            figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.08)),
+        ),
+        output_dir=output_dir,
+    )
+
+
 def _plot_simple_kt_with_systematics(
     hists: Mapping[str, SingleResult],
     grooming_methods: Sequence[str],
@@ -451,6 +581,7 @@ def _plot_simple_kt_with_systematics(
     logger.info("Plotting grooming method comparison for kt with systematics")
 
     # fig, ax = plt.subplots(figsize=(9, 10))
+    # Size is specified to make it convenient to compare against Hard Probes plots.
     fig, ax = plt.subplots(figsize=(8, 4.5))
 
     grooming_styling = pb.define_grooming_styles()
