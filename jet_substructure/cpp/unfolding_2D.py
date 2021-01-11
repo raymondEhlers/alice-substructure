@@ -660,7 +660,7 @@ def run_unfolding_closure_reweighting(
     hists = _default_hists(settings=settings)
     # Add pseudo-data and pseudo-true. They're equivalent to raw and true, so they can just be cloned.
     hists["h2_pseudo_data"] = hists["h2_raw"].Clone("h2_pseudo_data")
-    hists["h2_pseudo_true"] = hists["h2_true"].Clone("h2_pseudo_data")
+    hists["h2_pseudo_true"] = hists["h2_true"].Clone("h2_pseudo_true")
 
     hists_map_for_root = _hists_to_map_for_ROOT(hists=hists)
 
