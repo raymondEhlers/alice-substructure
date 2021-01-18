@@ -173,29 +173,6 @@ def _select_and_retrieve_splittings(
     return restricted_jets, restricted_splittings, restricted_splittings_indices
 
 
-# @nb.jit
-# def reproduce(
-#    selected_splittings: new_methods.JetSplittingArray,
-# ) -> np.ndarray:
-#    output = np.zeros(len(selected_splittings), np.int16)
-#
-#    i = 0
-#    for selected_splitting in selected_splittings:
-#        if i > 28:
-#            return
-#        print("======== i =", i)
-#        parent_indices = selected_splitting.parent_index
-#        print("parent_indices", parent_indices)
-#        j = 0
-#        for p in parent_indices:
-#            print(j, ":", p)
-#            j += 1
-#        i += 1
-#        output[i] = 1
-#
-#    return output
-
-
 @nb.njit  # noqa: C901
 def calculate_splitting_number(  # noqa: C901
     all_splittings: new_methods.JetSplittingArray,
@@ -249,66 +226,7 @@ def calculate_splitting_number(  # noqa: C901
             if debug:
                 print("output[i]", output[i])
 
-        # i += 1
-
     return output
-
-
-def calculate_splitting_number_old(
-    all_splittings: new_methods.JetSplittingArray,
-    selected_splittings: new_methods.JetSplittingArray,
-    restricted_splittings_indices: UprootArray[int],
-    debug: bool = False,
-) -> np.ndarray:
-    # logger.debug("Calculating splitting number")
-    # Setup
-    # We need the parent index of all of the splittings and of those which we have selected.
-    # The restricted splittings aren't enough on their own because they may not contain all of
-    # the necessary splitting history to reconstruct the splitting.
-    all_splittings_parent_index = all_splittings.parent_index
-    parent_index = selected_splittings.parent_index
-    counts = all_splittings_parent_index * 0
-
-    return counts
-
-    IPython.embed()
-
-    # First, increment all which have a selected splitting, meaning that if the splitting is at
-    # the origin, it is the considered the 1st splitting (so we're reserving 0 for the untagged).
-    counts[ak.num(selected_splittings) > 0] = counts[ak.num(selected_splittings) > 0] + 1
-
-    # The general procedure is that we will mask as true all parent_index != -1
-    # If those pass all of the cuts (including that it is in the restricted splittings)
-    # then we increment the count. Once a parent index gets to -1, then we stop selecting it
-    # in our mask, so it stops being updated.
-    # NOTE: In general, we don't want to iterative with these type of arrays, but it's
-    #       unavoidable here. And I don't think it should loop more than 30-40 times in the
-    #       worst case (and often much less).
-    while True:
-        # First, we need to determine if we're done. If so, all parent_index values will be -1.
-        mask = parent_index != -1
-        # Need two all() calls because the mask is jagged (with dim one of the jagged axis).
-        if (mask != True).all().all():  # noqa: E712
-            break
-        # Need to repeat the parent_index to be the same shape as the restricted splittings so we can
-        # check if any are equal. If any are equal, then that splitting is in the restricted group.
-        # NOTE: We fill padded values with -2 because that can't possibly be a splitting index.
-        parent_repeated_to_be_same_shape = (
-            restricted_splittings_indices.ones_like() * parent_index.pad(1).fillna(-2).flatten()
-        )
-        accept_mask = (parent_repeated_to_be_same_shape == restricted_splittings_indices).any()
-
-        if debug:
-            IPython.start_ipython(user_ns=locals())
-        # In the case that the parent_index of our splitting is in the selected splittings,
-        # and it hasn't gotten to the origin, we can finally increment our count.
-        # NOTE: Need to pad, fill, and flatten to match the shape of the accept_mask (which is just an ndarray mask)
-        counts[ak.flatten(ak.fill_none(ak.pad_none(mask, 1), False)) & accept_mask] += 1
-        # We retrieve the parents, and then assign them for those which are not yet at the origin.
-        parent_index[mask] = all_splittings_parent_index[parent_index][mask]
-
-    # logger.debug("Finished splitting number calculation")
-    return counts
 
 
 @nb.njit
@@ -706,75 +624,6 @@ def generator_subjet_momentum_fraction_in_measured_jet_numba_wrapper(
         grooming_results[
             f"{grooming_method}_{generator_like_jets_label}_{label}_subjet_momentum_fraction_in_{measured_like_jets_label}_jet"
         ] = momentum_fraction
-
-    return grooming_results
-
-
-def prong_matching(
-    measured_like_jets_calculation: Calculation,
-    measured_like_jets_label: str,
-    generator_like_jets_calculation: Calculation,
-    generator_like_jets_label: str,
-    grooming_method: str,
-    match_using_distance: bool = True,
-) -> Dict[str, np.ndarray]:
-    """Performs prong matching for the provided collections.
-
-    Note:
-        0 is there were insufficient constituents to form a splitting, 1 is properly matched, 2 is mistagged
-        (leading -> subleading or subleading -> leading), 3 is untagged (failed).
-
-    Args:
-        measured_like_jets_calculation: Grooming calculation for measured-like jets (hybrid for hybrid-det level matching).
-        measured_like_jets_label: Label for measured jets (hybrid for hybrid-det level matching).
-        generator_like_jets_calculation: Grooming calculation for generator-like jets (det level for hybrid-det level matching).
-        generator_like_jets_label: Label for generator jets (det_level for hybrid-det level matching).
-        grooming_method: Name of the grooming method.
-        match_using_distance: If True, match using distance. Otherwise, match using the stored label.
-    Returns:
-        Matching and subleading matching values.
-    """
-    # We can only perform matching if there are selected splittings.
-    # Need to mask for calculations which have no indices (ie didn't find any that met criteria.
-    mask = (generator_like_jets_calculation.indices.counts != 0) & (measured_like_jets_calculation.indices.counts != 0)
-    try:
-        masked_generator_like_jets_calculation = generator_like_jets_calculation[mask]
-        masked_measured_like_jets_calculation = measured_like_jets_calculation[mask]
-    except IndexError as e:
-        logger.warning(e)
-        IPython.start_ipython(user_ns=locals())
-
-    # Matching
-    grooming_results = {}
-    logger.info(f"Performing {measured_like_jets_label}-{generator_like_jets_label} matching for {grooming_method}")
-    leading_matching, subleading_matching = analyze_tree.determine_matched_jets(
-        hybrid_inputs=analysis_objects.FillHistogramInput(
-            jets=masked_measured_like_jets_calculation.input_jets,
-            splittings=masked_measured_like_jets_calculation.input_splittings,
-            values=masked_measured_like_jets_calculation.values,
-            indices=masked_measured_like_jets_calculation.indices,
-        ),
-        matched_inputs=analysis_objects.FillHistogramInput(
-            jets=masked_generator_like_jets_calculation.input_jets,
-            splittings=masked_generator_like_jets_calculation.input_splittings,
-            values=masked_generator_like_jets_calculation.values,
-            indices=masked_generator_like_jets_calculation.indices,
-        ),
-        match_using_distance=match_using_distance,
-    )
-    # Store leading, subleading matches
-    for label, matching in [("leading", leading_matching), ("subleading", subleading_matching)]:
-        # We'll store the output in an array, and then store that in the overall output with a mask
-        # We need the additional mask because we can't perform matching for every jet (single particle jets, etc).
-        output = np.zeros(len(generator_like_jets_calculation.input_jets), dtype=np.int)
-        matching_output = np.zeros(len(matching.properly), dtype=np.int)
-        matching_output[matching.properly] = 1
-        matching_output[matching.mistag] = 2
-        matching_output[matching.failed] = 3
-        output[mask] = matching_output
-        grooming_results[
-            f"{grooming_method}_{measured_like_jets_label}_{generator_like_jets_label}_matching_{label}"
-        ] = output
 
     return grooming_results
 
