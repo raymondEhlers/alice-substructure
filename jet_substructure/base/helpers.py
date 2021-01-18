@@ -10,7 +10,21 @@ import itertools
 import logging
 import typing
 from pathlib import Path
-from typing import Any, Collection, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union
+from typing import (
+    Any,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    NoReturn,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import attr
 import numpy as np
@@ -20,6 +34,19 @@ logger = logging.getLogger(__name__)
 
 # Typing helpers
 T = TypeVar("T")
+
+
+def assert_never(value: NoReturn) -> NoReturn:
+    """Typing helper to check that all values have been exhausted.
+
+    Can be used for checking Enum and Literals.
+
+    From: https://hakibenita.com/python-mypy-exhaustive-checking
+
+    Args:
+        value: Value to check for exhaustiveness.
+    """
+    assert False, f"Unhandled value: {value} ({type(value).__name__})"
 
 
 class UprootArray(Collection[T]):
