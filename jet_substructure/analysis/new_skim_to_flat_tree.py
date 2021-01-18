@@ -9,19 +9,24 @@ from __future__ import annotations
 
 import functools
 import logging
+import warnings
 from pathlib import Path
-from typing import Dict, Iterable, Mapping, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 
 import attr
 import awkward as ak
-import IPython
 import numba as nb
 import numpy as np
-import uproot3
+
+
+# We know already - nothing to be done...
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    import uproot3
+
 from pachyderm import yaml
 
-from jet_substructure.analysis import analyze_tree
-from jet_substructure.base import analysis_objects, new_methods
+from jet_substructure.base import new_methods
 from jet_substructure.base.helpers import UprootArray
 
 
@@ -180,8 +185,9 @@ def calculate_splitting_number(  # noqa: C901
     restricted_splittings_indices: UprootArray[int],
     debug: bool = False,
 ) -> np.ndarray:
-    # TODO: Optimize the data sizes...
-    output = np.zeros(len(selected_splittings), np.int8)
+    # NOTE: I would like to use uint8 here, but it's not implemented in uproot3's writing.
+    #       However, int8 gives us enough range, so it's fine to use it instead.
+    output = np.zeros(len(selected_splittings), dtype=np.int8)
 
     for i, (selected_splitting, restricted_splitting_indices, available_splittings_parents) in enumerate(
         zip(selected_splittings, restricted_splittings_indices, all_splittings.parent_index)
@@ -230,7 +236,15 @@ def calculate_splitting_number(  # noqa: C901
 
 
 @nb.njit
-def _find_contributing_subjets(input_jet, groomed_index: int):
+def _find_contributing_subjets(input_jet: ak.Array, groomed_index: int) -> List[ak.Array]:
+    """Find subjets which contribute to a given grooming index.
+
+    Args:
+        input_jet: Inputs jets.
+        groomed_index: Selected grooming index (ie. splitting).
+    Returns:
+        Subjets contributing to the splitting.
+    """
     # subjets = []
     # for sj in input_jet.subjets:
     #    if sj.parent_splitting_index == groomed_index:
@@ -293,7 +307,7 @@ def _subjet_shared_momentum(
 
 
 @nb.njit
-def subjet_pt(subjet, jet):
+def subjet_pt(subjet, jet) -> float:
     px = 0
     py = 0
     # pt = 0
@@ -339,8 +353,8 @@ def determine_matched_jets_numba(
     match_using_distance: bool,
 ) -> Tuple[np.ndarray, np.ndarray]:
     n_jets = len(measured_like_jets)
-    leading_matching = np.ones(n_jets, dtype=np.int16) * -1
-    subleading_matching = np.ones(n_jets, dtype=np.int16) * -1
+    leading_matching = np.full(n_jets, -1, dtype=np.int8)
+    subleading_matching = np.full(n_jets, -1, dtype=np.int8)
 
     for (
         i,
@@ -460,8 +474,6 @@ def prong_matching_numba_wrapper(
     Returns:
         Matching and subleading matching values.
     """
-    ...
-
     # Matching
     grooming_results = {}
     logger.debug(f"Performing {measured_like_jets_label}-{generator_like_jets_label} matching for {grooming_method}")
@@ -476,19 +488,6 @@ def prong_matching_numba_wrapper(
         measured_like_groomed_indices=measured_like_jets_calculation.indices,
         match_using_distance=match_using_distance,
     )
-    # Store leading, subleading matches
-    # for label, matching in [("leading", leading_matching), ("subleading", subleading_matching)]:
-    #    # We'll store the output in an array, and then store that in the overall output with a mask
-    #    # We need the additional mask because we can't perform matching for every jet (single particle jets, etc).
-    #    output = np.zeros(ak.num(generator_like_jets_calculation.input_jets), dtype=np.int)
-    #    matching_output = np.zeros(len(matching.properly), dtype=np.int)
-    #    matching_output[matching.properly] = 1
-    #    matching_output[matching.mistag] = 2
-    #    matching_output[matching.failed] = 3
-    #    output[mask] = matching_output
-    #    grooming_results[
-    #        f"{grooming_method}_{measured_like_jets_label}_{generator_like_jets_label}_matching_{label}"
-    #    ] = output
 
     for label, matching in [("leading", leading_matching), ("subleading", subleading_matching)]:
         grooming_results[
@@ -504,7 +503,7 @@ def _subjet_momentum_fraction_in_jet(
     generator_like_jet,
     measured_like_jet,
     match_using_distance: bool = False,
-):
+) -> float:
     """Calculate subjet momentum fraction contained within another jet.
 
     Unfortunately, we can't blindly use the `_subjet_shared_momentum` function because
@@ -628,13 +627,16 @@ def generator_subjet_momentum_fraction_in_measured_jet_numba_wrapper(
     return grooming_results
 
 
-def _calculate_jet_kinematics(constituents: new_methods.JetConstituentArray) -> Tuple[ak.Array, ak.Array]:
+def _calculate_jet_kinematics(
+    constituents: new_methods.JetConstituentArray, float_type: Optional[np.dtype] = None
+) -> Tuple[ak.Array, ak.Array]:
     """Calculate jet kinematics.
 
     Since `vector` isn't yet available, we perform the four vector calculations by hand.
 
     Args:
         constituents: Jet constituents.
+        float_type: Float to be used for conversion. Default: None. This uses the ak default.
     Returns:
         eta, phi
     """
@@ -646,20 +648,25 @@ def _calculate_jet_kinematics(constituents: new_methods.JetConstituentArray) -> 
     # Formulas just from inverting the above.
     eta = np.arcsinh(pz / np.sqrt(px ** 2 + py ** 2))
     phi = np.arctan2(py, px)
-    return eta, phi
+    if float_type is None:
+        return eta, phi
+    else:
+        return ak.values_astype(eta, float_type), ak.values_astype(phi, float_type)
 
 
 def calculate_embedding_skim(  # noqa: C901
     input_filename: Path,
     iterative_splittings: bool,
     prefixes: Mapping[str, str],
-    scale_factors: Sequence[float],
+    scale_factors: Mapping[int, float],
     train_directory: Path,
     jet_R: float,
     output_filename: Path,
     output_tree_name: str = "tree",
     create_friend_tree: bool = False,
     draw_example_splittings: bool = False,
+    write_feather: bool = False,
+    write_parquet: bool = False,
 ) -> Tuple[bool, str]:
     """Determine the response and prong matching for jets substructure techniques.
 
@@ -675,6 +682,9 @@ def calculate_embedding_skim(  # noqa: C901
     if output_filename.exists():
         return True, "already exists"
 
+    # Output consistent types.
+    float_type = np.float32
+    to_float = functools.partial(ak.values_astype, to=np.float32)
     # Setup
     # Use the train configuration to extract the train number and pt hard bin, which are used to get the scale factor.
     y = yaml.yaml()
@@ -730,24 +740,27 @@ def calculate_embedding_skim(  # noqa: C901
         output_filename = Path(str(output_filename.with_suffix("")) + "_friend.root")
         # As the skim is re-run, values are generally transitioned to the standard tree the next time it's generated.
     else:
-        grooming_results["scale_factor"] = (masked_jets[prefixes["matched"]].jets.jet_pt[mask] * 0) + scale_factor
+        grooming_results["scale_factor"] = to_float(
+            (masked_jets[prefixes["matched"]].jets.jet_pt[mask] * 0) + scale_factor
+        )
 
         for prefix, input_jets in masked_jets.items():
             # Add jet pt and general jet properties.
             # Jet kinematics
-            grooming_results[f"{prefix}_jet_pt"] = input_jets.jets.jet_pt
+            grooming_results[f"{prefix}_jet_pt"] = to_float(input_jets.jets.jet_pt)
             grooming_results[f"{prefix}_jet_eta"], grooming_results[f"{prefix}_jet_phi"] = _calculate_jet_kinematics(
-                input_jets.jets.jet_constituents
+                input_jets.jets.jet_constituents,
+                float_type=float_type,
             )
             # Leading track
             leading_track_name = f"{prefix}_leading_track_pt"
             if prefix == "hybrid":
                 # First, store the unsubstracted (which we use for the double counting cut) as the normal leading track pt.
-                if "data_leading_track_pt" in ak.fields(input_jets.jets):
-                    grooming_results[leading_track_name] = input_jets.jets["data_leading_track_pt"]
+                if "leading_track_pt" in ak.fields(input_jets.jets):
+                    grooming_results[leading_track_name] = to_float(input_jets.jets["data_leading_track_pt"])
                 # Then update the name for the substracted constituents in data.
                 leading_track_name = f"{prefix}_leading_track_pt_sub"
-            grooming_results[leading_track_name] = ak.max(input_jets.jets.jet_constituents.pt, axis=1)
+            grooming_results[leading_track_name] = to_float(ak.max(input_jets.jets.jet_constituents.pt, axis=1))
 
         # Perform our calculations.
         functions = _define_calculation_functions(jet_R=jet_R, iterative_splittings=iterative_splittings)
@@ -787,16 +800,22 @@ def calculate_embedding_skim(  # noqa: C901
                 # We pad with the UNFILLED_VALUE constant to account for any calculations that don't find a splitting.
                 grooming_result = GroomingResultForTree(
                     grooming_method=func_name,
-                    delta_R=ak.flatten(
-                        ak.fill_none(ak.pad_none(groomed_splittings.delta_R, 1), new_methods.UNFILLED_VALUE)
+                    delta_R=to_float(
+                        ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.delta_R, 1), new_methods.UNFILLED_VALUE))
                     ),
-                    z=ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.z, 1), new_methods.UNFILLED_VALUE)),
-                    kt=ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.kt, 1), new_methods.UNFILLED_VALUE)),
+                    z=to_float(
+                        ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.z, 1), new_methods.UNFILLED_VALUE))
+                    ),
+                    kt=to_float(
+                        ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.kt, 1), new_methods.UNFILLED_VALUE))
+                    ),
                     # All of the numbers are already flattened. 0 means untagged.
                     n_to_split=n_to_split,
                     n_groomed_to_split=n_groomed_to_split,
                     # Number of splittings which pass the grooming condition. For SoftDrop, this is n_sd.
-                    n_passed_grooming=ak.num(calculation.possible_indices, axis=1),
+                    # NOTE: I would like to use uint8 here, but it's not implemented in uproot3's writing.
+                    #       However, int8 gives us enough range, so it's fine to use it instead.
+                    n_passed_grooming=ak.values_astype(ak.num(calculation.possible_indices, axis=1), np.int8),
                 )
                 grooming_results.update(grooming_result.asdict(prefix=prefix))
 
@@ -856,7 +875,7 @@ def calculate_embedding_skim(  # noqa: C901
                 # Find a sufficiently interesting jet (ie high enough pt)
                 mask_jets_of_interest = (
                     (hybrid_det_level_leading_matching.properly & hybrid_det_level_subleading_matching.failed)
-                    & (masked_jets[prefixes["data"]].jet_pt > 80)
+                    & (masked_jets[prefixes["data"]].jets.jet_pt > 80)
                     & (calculations[prefixes["detLevel"]].splittings.kt > 10).flatten()
                 )
 
@@ -893,17 +912,28 @@ def calculate_embedding_skim(  # noqa: C901
 
             logger.debug(f"Completed {func_name}")
 
-    # Convert to numpy since we want to write to an output tree.
-    grooming_results_np = {k: ak.to_numpy(v) for k, v in grooming_results.items()}
     # For extra safety
     output_filename.parent.mkdir(parents=True, exist_ok=True)
-    # Write with uproot
+    # First, convert to numpy since we want to write to an output tree.
+    grooming_results_np = {k: np.asarray(v) for k, v in grooming_results.items()}
     branches = {k: v.dtype for k, v in grooming_results_np.items()}
     logger.info(f"Writing embedding skim to {output_filename}")
+    # Write with uproot
     with uproot3.recreate(output_filename) as output_file:
         output_file[output_tree_name] = uproot3.newtree(branches)
         # Write all of the calculations
         output_file[output_tree_name].extend(grooming_results_np)
+
+    # Some alternative formats for other analysis techniques.
+    if write_parquet:
+        logger.info("Writing parquet...")
+        ak.to_parquet(grooming_results, output_filename.with_suffix(".parquet"), compression="zstd")
+    if write_feather:
+        logger.info("Writing feather...")
+        import pyarrow.feather
+
+        pa_table = ak.to_arrow_table(grooming_results)
+        pyarrow.feather.write_feather(pa_table, output_filename.with_suffix(".feather"), compression="zstd")
 
     logger.info(f"Finished processing tree from file {input_filename}")
     return True, "processed"
@@ -919,6 +949,8 @@ def calculate_data_skim(  # noqa: C901
     output_tree_name: str = "tree",
     create_friend_tree: bool = False,
     scale_factors: Optional[Mapping[int, float]] = None,
+    write_feather: bool = False,
+    write_parquet: bool = False,
 ) -> Tuple[bool, str]:
     # Validation
     if scale_factors is None and collision_system == "pythia":
@@ -928,6 +960,10 @@ def calculate_data_skim(  # noqa: C901
         return True, "already exists"
 
     # Setup
+    # Output consistent types.
+    float_type = np.float32
+    to_float = functools.partial(ak.values_astype, to=np.float32)
+    # Jets setup
     logger.info(f"Skimming tree from file {input_filename}")
     all_jets = new_methods.parquet_to_substructure_analysis(filename=input_filename, prefixes=list(prefixes.keys()))
 
@@ -963,9 +999,10 @@ def calculate_data_skim(  # noqa: C901
         for prefix, input_jets in masked_jets.items():
             # Add jet pt and general jet properties.
             # Jet kinematics
-            grooming_results[f"{prefix}_jet_pt"] = input_jets.jets.jet_pt
+            grooming_results[f"{prefix}_jet_pt"] = to_float(input_jets.jets.jet_pt)
             grooming_results[f"{prefix}_jet_eta"], grooming_results[f"{prefix}_jet_phi"] = _calculate_jet_kinematics(
-                input_jets.jets.jet_constituents
+                input_jets.jets.jet_constituents,
+                float_type=float_type,
             )
             # Leading track
             # NOTE: Since this is for data, it doesn't really matter, but better to always do the right thing.
@@ -973,11 +1010,11 @@ def calculate_data_skim(  # noqa: C901
             # NOTE: We would include embedPythia here, but we don't run the embedding through this function, so we can ignore it.
             if prefix == "data" and collision_system == "PbPb":
                 # First, store the unsubstracted (which we use for the double counting cut).
-                if "data_leading_track_pt" in ak.fields(input_jets.jets):
-                    grooming_results[leading_track_name] = input_jets.jets["data_leading_track_pt"]
+                if "leading_track_pt" in ak.fields(input_jets.jets):
+                    grooming_results[leading_track_name] = to_float(input_jets.jets["data_leading_track_pt"])
                 # Then update the name for the substracted constituents in data.
                 leading_track_name = f"{prefix}_leading_track_pt_sub"
-            grooming_results[leading_track_name] = ak.max(input_jets.jets.jet_constituents.pt, axis=1)
+            grooming_results[leading_track_name] = to_float(ak.max(input_jets.jets.jet_constituents.pt, axis=1))
 
             # Perform our calculations.
             functions = _define_calculation_functions(jet_R=jet_R, iterative_splittings=iterative_splittings)
@@ -1012,16 +1049,22 @@ def calculate_data_skim(  # noqa: C901
                 # We pad with the UNFILLED_VALUE constant to account for any calculations that don't find a splitting.
                 grooming_result = GroomingResultForTree(
                     grooming_method=func_name,
-                    delta_R=ak.flatten(
-                        ak.fill_none(ak.pad_none(groomed_splittings.delta_R, 1), new_methods.UNFILLED_VALUE)
+                    delta_R=to_float(
+                        ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.delta_R, 1), new_methods.UNFILLED_VALUE))
                     ),
-                    z=ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.z, 1), new_methods.UNFILLED_VALUE)),
-                    kt=ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.kt, 1), new_methods.UNFILLED_VALUE)),
+                    z=to_float(
+                        ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.z, 1), new_methods.UNFILLED_VALUE))
+                    ),
+                    kt=to_float(
+                        ak.flatten(ak.fill_none(ak.pad_none(groomed_splittings.kt, 1), new_methods.UNFILLED_VALUE))
+                    ),
                     # All of the numbers are already flattened. 0 means untagged.
                     n_to_split=n_to_split,
                     n_groomed_to_split=n_groomed_to_split,
                     # Number of splittings which pass the grooming condition. For SoftDrop, this is n_sd.
-                    n_passed_grooming=ak.num(calculation.possible_indices, axis=1),
+                    # NOTE: I would like to use uint8 here, but it's not implemented in uproot3's writing.
+                    #       However, int8 gives us enough range, so it's fine to use it instead.
+                    n_passed_grooming=ak.values_astype(ak.num(calculation.possible_indices, axis=1), np.int8),
                 )
                 grooming_results.update(grooming_result.asdict(prefix=prefix))
 
@@ -1033,27 +1076,39 @@ def calculate_data_skim(  # noqa: C901
 
             # We need a prefix. Any is fine, so this is included with all sets of jets.
             a_prefix = next(iter(masked_jets.values()))
-            pt_hard_bins = masked_jets[a_prefix]["pt_hard_bin"]
+            pt_hard_bins = np.array(masked_jets[a_prefix]["pt_hard_bin"], dtype=np.uint8)
             logger.debug(f"Pt hard bins contained in the file: {np.unique(pt_hard_bins)}")
             grooming_results.update(
                 {
                     "scale_factor": np.array([scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
                     "pt_hard_bin": pt_hard_bins,
-                    "pt_hard": masked_jets[a_prefix]["pt_hard"],
+                    "pt_hard": to_float(masked_jets[a_prefix]["pt_hard"]),
                 }
             )
 
-    # Convert to numpy since we want to write to an output tree.
-    grooming_results_np = {k: ak.to_numpy(v) for k, v in grooming_results.items()}
     # For extra safety
     output_filename.parent.mkdir(parents=True, exist_ok=True)
-    # Write with uproot
+    # First, convert to numpy since we want to write to an output tree.
+    grooming_results_np = {k: np.asarray(v) for k, v in grooming_results.items()}
     branches = {k: v.dtype for k, v in grooming_results_np.items()}
     logger.info(f"Writing data skim to {output_filename}")
+    # Write with uproot
     with uproot3.recreate(output_filename) as output_file:
         output_file[output_tree_name] = uproot3.newtree(branches)
         # Write all of the calculations
         output_file[output_tree_name].extend(grooming_results_np)
+
+    # Some alternative formats for other analysis techniques.
+    if write_parquet:
+        logger.info("Writing parquet...")
+        ak.to_parquet(grooming_results, output_filename.with_suffix(".parquet"), compression="zstd")
+    if write_feather:
+        logger.info("Writing feather...")
+        import pyarrow.feather
+
+        pa_table = ak.to_arrow_table(grooming_results)
+        pyarrow.feather.write_feather(pa_table, output_filename.with_suffix(".lz4.feather"), compression="lz4")
+        pyarrow.feather.write_feather(pa_table, output_filename.with_suffix(".zstd.feather"), compression="zstd")
 
     logger.info(f"Finished processing tree from file {input_filename}")
     return True, "processed"
@@ -1064,7 +1119,7 @@ if __name__ == "__main__":
     from jet_substructure.base import helpers
 
     helpers.setup_logging()
-    calculate_embedding_skim(
+    res = calculate_embedding_skim(
         input_filename=Path(
             "trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"
         ),
@@ -1074,17 +1129,22 @@ if __name__ == "__main__":
         train_directory=Path("trains/embedPythia/5966/"),
         jet_R=0.4,
         output_filename=Path(
-            "trains/embedPythia/5966/skim/test2/AnalysisResults.18q.repaired.00_iterative_splittings.root"
+            "trains/embedPythia/5966/skim/test3/AnalysisResults.18q.repaired.00_iterative_splittings.root"
         ),
+        write_parquet=True,
+        write_feather=True,
     )
     # collision_system = "PbPb"
     # train_number = 5863
-    # calculate_data_skim(
-    #    input_filename=Path(f"trains/{collision_system}/{train_number}/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"),
-    #    collision_system=collision_system,
-    #    iterative_splittings=True,
-    #    prefixes={"data": "data"},
-    #    jet_R=0.4,
-    #    output_filename=Path(f"trains/{collision_system}/{train_number}/skim/AnalysisResults.18q.repaired.00_iterative_splittings.root")
+    # res = calculate_data_skim(
+    #     input_filename=Path(f"trains/{collision_system}/{train_number}/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"),
+    #     collision_system=collision_system,
+    #     iterative_splittings=True,
+    #     prefixes={"data": "data"},
+    #     jet_R=0.4,
+    #     output_filename=Path(f"trains/{collision_system}/{train_number}/skim/test/AnalysisResults.18q.repaired.00_iterative_splittings.root"),
+    #     write_parquet=True,
+    #     write_feather=True,
     # )
+    logger.info(res)
     # import IPython; IPython.start_ipython(user_ns=locals())

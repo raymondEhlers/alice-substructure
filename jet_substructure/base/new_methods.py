@@ -615,6 +615,7 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
     # We use some very different value to make it clear if something ever goes wrong.
     # NOTE: It's important to do this before constructing our substructure array. Otherwise it will
     #       mess up the awkward1 behaviors.
+    # TODO: We can remove this once we repeat the conversion from ROOT -> parquet
     fill_none_value = -9999
     arrays = ak.fill_none(arrays, fill_none_value)
 
