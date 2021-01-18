@@ -1,0 +1,32 @@
+---
+train: "Jets_EMC_PbPb"
+number: 6460
+dataset: "LHC18{q,r}"
+aliphysics_tag: "vAN-20201202_ROOT6-1"
+embedded_dataset: "LHC19f4"
+pt_hard_bin: 5
+alien_output_info:
+    child_1:
+        name: "LHC18r"
+        stage_to_download: "merged"
+    child_2:
+        name: "LHC18q"
+        stage_to_download: "manual"
+        manual:
+            295831: "merged"
+            295854: "merged"
+            295943: "merged"
+            296194: "merged"
+            296196: "merged"
+            296241: "merged"
+            296244: "merged"
+            296246: "merged"
+            296377: "merged"
+            296419: "merged"
+            296433: "single_run_manual"
+            296549: "merged"
+            296550: "merged"
+            296551: "merged"
+status: |
+    "Substructure embedding central dynamical core iterative splittings. Double counting cut applied (with fix),"
+    " Rmax=0.25 nominal."
