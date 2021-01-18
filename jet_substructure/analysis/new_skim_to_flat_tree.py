@@ -1107,8 +1107,7 @@ def calculate_data_skim(  # noqa: C901
         import pyarrow.feather
 
         pa_table = ak.to_arrow_table(grooming_results)
-        pyarrow.feather.write_feather(pa_table, output_filename.with_suffix(".lz4.feather"), compression="lz4")
-        pyarrow.feather.write_feather(pa_table, output_filename.with_suffix(".zstd.feather"), compression="zstd")
+        pyarrow.feather.write_feather(pa_table, output_filename.with_suffix(".feather"), compression="zstd")
 
     logger.info(f"Finished processing tree from file {input_filename}")
     return True, "processed"
