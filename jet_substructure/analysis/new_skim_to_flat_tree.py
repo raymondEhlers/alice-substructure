@@ -127,9 +127,10 @@ def _define_calculation_functions(
         jet_R: Jet resolution parameter.
         iterative_splittings: Whether calculating iterative splittings or not.
     Returns:
-        dynamical_z, dynamical_kt, dynamical_time, leading_kt, leading_kt z>0.2, leading_kt z>0.4, SD z>0.2, SD z>0.4
+        dynamical_core, dynamical_z, dynamical_kt, dynamical_time, leading_kt, leading_kt z>0.2, leading_kt z>0.4, SD z>0.2, SD z>0.4
     """
     functions = {
+        "dynamical_core": functools.partial(new_methods.JetSplittingArray.dynamical_core, R=jet_R),
         "dynamical_z": functools.partial(new_methods.JetSplittingArray.dynamical_z, R=jet_R),
         "dynamical_kt": functools.partial(new_methods.JetSplittingArray.dynamical_kt, R=jet_R),
         "dynamical_time": functools.partial(new_methods.JetSplittingArray.dynamical_time, R=jet_R),
@@ -195,7 +196,7 @@ def _select_and_retrieve_splittings(
 #    return output
 
 
-@nb.njit
+@nb.njit  # noqa: C901
 def calculate_splitting_number(  # noqa: C901
     all_splittings: new_methods.JetSplittingArray,
     selected_splittings: new_methods.JetSplittingArray,

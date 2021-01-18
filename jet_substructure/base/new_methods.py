@@ -11,6 +11,7 @@ import typing
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence, Tuple, TypeVar, cast
 
+
 try:
     from typing import Final  # type: ignore
 except ImportError:
@@ -62,6 +63,19 @@ def _dynamical_hardness_measure(delta_R, z, parent_pt, R, a):  # type: ignore
     """
     return z * (1 - z) * parent_pt * (delta_R / R) ** a
 
+
+dynamical_core = functools.partial(_dynamical_hardness_measure, a=0.5)
+dynamical_core.__doc__ = """
+Calculates dynamical core (a = 0.5).
+
+Args:
+    delta_R: Splitting delta R.
+    z: Splitting z.
+    parent_pt: Pt of the parent of the splitting.
+    R: Jet resolution parameter.
+Returns:
+    The hardness of the splitting according to the measure.
+"""
 
 dynamical_z = functools.partial(_dynamical_hardness_measure, a=0.1)
 dynamical_z.__doc__ = """
@@ -302,6 +316,18 @@ class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
         # parent_pt = subleading / z = kt / sin(delta_R) / z
         return cast(float, self.kt / np.sin(self.delta_R) / self.z)
 
+    def dynamical_core(self, R: float) -> float:
+        """Dynamical core of the splitting.
+
+        See the definition for further information.
+
+        Args:
+            R: Jet resolution parameter.
+        Returns:
+            Dynamical core of the splitting.
+        """
+        return dynamical_core(self.delta_R, self.z, self.parent_pt, R)  # type: ignore
+
     def dynamical_z(self, R: float) -> float:
         """Dynamical z of the splitting.
 
@@ -356,6 +382,17 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
             The splittings which are part of the iterative splitting chain.
         """
         return cast(SubjetArray, self[subjets.iterative_splitting_index])
+
+    def dynamical_core(self, R: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
+        """Dynamical core of the jet splittings.
+
+        Args:
+            R: Jet resolution parameter.
+        Returns:
+            Leading dynamical core values, leading dynamical core indices, indices of all splittings.
+        """
+        values, indices = find_leading(dynamical_core(self.delta_R, self.z, self.parent_pt, R))
+        return values, indices, ak.Array(self.z.layout.localindex())
 
     def dynamical_z(self, R: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
         """Dynamical z of the jet splittings.
