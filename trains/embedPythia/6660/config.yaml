@@ -1,0 +1,17 @@
+---
+train: "Jets_EMC_PbPb"
+number: 6660
+dataset: "LHC18{q,r}"
+aliphysics_tag: "v5-09-57-01_ROOT6-1"
+embedded_dataset: "LHC20g4"
+pt_hard_bin: 11
+alien_output_info:
+    child_1:
+        name: "LHC18q"
+        stage_to_download: "Stage_5"
+    child_2:
+        name: "LHC18r"
+        stage_to_download: "Stage_5"
+status: |
+    "Substructure embedding semi-central, record all splittings. Double counting cut applied (with fix),"
+    " updated to pass 3, Rmax=0.25 nominal."
