@@ -12,4 +12,4 @@ alien_output_dir:
         stage_to_download: "run_by_run"
 status: |
     "Tracking efficiency systematic for R=0.2 jet splittings with pythia. Requires run-by-run output to get"
-    " the pt hard scaling correct."
+    " the pt hard scaling correct. Use Markus' or my script to download!"

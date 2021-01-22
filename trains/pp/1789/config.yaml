@@ -1,9 +1,14 @@
 ---
 train: "Jets_EMC_pp"
-trainNumber: 1789
-production: "LHC17q"
-alienOutputDir:
-    FAST: "/alice/cern.ch/user/a/alitrain/PWGJE/Jets_EMC_pp/1789_20200217-2113_child_1/merge"
-    woSDD: "/alice/cern.ch/user/a/alitrain/PWGJE/Jets_EMC_pp/1789_20200217-2113_child_2/merge"
+number: 1789
+dataset: "LHC17q"
+aliphysics_tag: "vAN-20200217_ROOT6-1"
+alien_output_info:
+    child_1:
+        name: "FAST"
+        stage_to_download: "merged"
+    child_2:
+        name: "woSDD"
+        stage_to_download: "merged"
 status: |
     "First pass at R=0.4 jet splittings on pp data with recursive splittings recorded."
