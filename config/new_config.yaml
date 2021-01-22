@@ -36,6 +36,66 @@ _scale_factors_LHC19f4_embedded_into_LHC18qr: &scale_factors
     20: 2.0978e-06
 
 available_datasets:
+    # pp
+    LHC17pq_pp_R04_1998_1999: &LHC17pq_pp_R04
+        # NOTE: 22 January 2021: This dataset uses the jagged constituent indices from early versions
+        #       of the substructure task. Although this maps nicely onto indexed arrays in awkward,
+        #       it's probably not worth the effort right now. Instead, I'll just re-run this train.
+        # NOTE: Repairing this dataset requires an older version of AliPhysics. If it has the current
+        #       version with the updated tree layout, it will corrupt rewriting the file. I suppose
+        #       the issue is that it reads with the proper class version, but then tries to update
+        #       the most recent version (which doesn't work, because there is no procedure for conversion).
+        #       I suspect this issue would be more obvious, except that we reused the fConstituentIndices
+        #       name in the tree, so it blindly tries to write one type of branch as another type.
+        #       However, we must use AliPhysics because otherwise it doesn't understand AliEmcalList...
+        #       So this is a catch 22! :-(
+        #
+        #       Fortunately, since the output is small and doesn't appear to have any corruption issues
+        #       in the tree, we can symlink the original files as the "repaired" files and call it a day.
+        name: "LHC17pq_pp_R04_1788_1789"
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_RawTree_Data_NoSub_Incl"
+        # A map for the stored data branch prefix to uniform ones that we'll use in the analysis.
+        input_prefixes:
+            data: "data"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches:
+            - "{prefix}.fJetPt"
+            - "{prefix}.fJetConstituents.fPt"
+            - "{prefix}.fJetConstituents.fEta"
+            - "{prefix}.fJetConstituents.fPhi"
+            # Older production...
+            - "{prefix}.fJetConstituents.fGlobalIndex"
+            - "{prefix}.fJetSplittings.fKt"
+            - "{prefix}.fJetSplittings.fDeltaR"
+            - "{prefix}.fJetSplittings.fZ"
+            - "{prefix}.fJetSplittings.fParentIndex"
+            - "{prefix}.fSubjets.fPartOfIterativeSplitting"
+            - "{prefix}.fSubjets.fSplittingNodeIndex"
+            - "{prefix}.fSubjets.fConstituentIndices"
+            # Older production...
+            - "{prefix}.fSubjets.fConstituentJaggedIndices"
+        jet_R: 0.4
+        files:
+            - "trains/pp/1788/AnalysisResults.*.repaired.root"
+            - "trains/pp/1789/AnalysisResults.*.repaired.root"
+    LHC17pq_pp_R02_1998_1999: &LHC17pq_pp_R02
+        name: "LHC17pq_pp_R02_1998_1999"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR020_tracks_pT0150_E_scheme_RawTree_Data_NoSub_Incl"
+        # A map for the stored data branch prefix to uniform ones that we'll use in the analysis.
+        input_prefixes:
+            data: "data"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        files:
+            - "trains/pp/1998/AnalysisResults.*.repaired.root"
+            - "trains/pp/1999/AnalysisResults.*.repaired.root"
+    # Pb-Pb
     LHC18qr_semi_central_5863: &LHC18qr_semi_central
         name: "LHC18qr_semi_central_5863"
         # yamllint disable-line rule:line-length
@@ -348,3 +408,5 @@ execution:
         dataset: *LHC19f4_embedded_into_LHC18qr_central
     PbPb:
         dataset: *LHC18qr_central
+    pp:
+        dataset: *LHC17pq_pp_R04
