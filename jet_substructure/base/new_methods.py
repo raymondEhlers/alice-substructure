@@ -9,7 +9,7 @@ import functools
 import logging
 import typing
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Tuple, TypeVar, cast
+from typing import Any, Dict, List, Optional, Sequence, Tuple, TypeVar, cast
 
 
 try:
@@ -515,7 +515,7 @@ def _convert_tree_to_parquet(
         tree.show()
 
     # Determine branches.
-    all_branches = []
+    all_branches: List[str] = []
     all_branches.extend(branches)
     for prefix in prefixes:
         all_branches.extend([b.format(prefix=prefix) for b in prefix_branches])
@@ -604,10 +604,10 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
     #       as of August 2020.
     arrays = ak.from_parquet(filename)
 
-    # All arrow data is nullable, so the data types that we stored in the parquet file are not quite
-    # identical to those that we put in: all types loaded from the file are now nullable (denoted by
-    # the "?" in awkward1). As of August 2020, awkward1 seems to treat nullable data differently in
-    # many cases (I suspect bugs, but I'm not sure).
+    # As of August 2020, there was an issue with loading data from parquet: All arrow data is nullable, so
+    # the data types that we stored in the parquet file are not quite identical to those that we put in:
+    # all types loaded from the file are now nullable (denoted by the "?" in awkward1). As of August 2020,
+    # awkward1 seems to treat nullable data differently in many cases (I suspect bugs, but I'm not sure).
     # However, since we're not storing nulled data - at most, they have empty arrays, which don't count
     # as nullable - we can work around this issue by filling None with a throwaway value, which removes
     # the nullability.
@@ -615,9 +615,19 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
     # We use some very different value to make it clear if something ever goes wrong.
     # NOTE: It's important to do this before constructing our substructure array. Otherwise it will
     #       mess up the awkward1 behaviors.
-    # TODO: We can remove this once we repeat the conversion from ROOT -> parquet
-    fill_none_value = -9999
-    arrays = ak.fill_none(arrays, fill_none_value)
+    #
+    # Update January 2021: awkward now preserves nullability when writing. Which is to say, if data is
+    #       not null before writing, then it won't be after reading. To take advantage of this, we would
+    #       have to redo the conversion from root to parquet, but that won't happen immediately. Therefore,
+    #       we check for nullable arrays (denoted by "?" in the awkward type), and if we find it, we
+    #       apply our hack. If not, then we can skip it. Eventually, once everything is reconverted,
+    #       then this can be removed.
+    # NOTE: This check probably isn't the most robust. I imagine we can actually iterate through the
+    #       array and check for nullability on each type. But this check is quick and easy, so we'll
+    #       stick with it.
+    if "?" in str(arrays.type):
+        fill_none_value = -9999
+        arrays = ak.fill_none(arrays, fill_none_value)
 
     columns = {}
     if "ptHard" in ak.fields(arrays):
@@ -719,7 +729,7 @@ if __name__ == "__main__":
     convert_tree_to_parquet(
         filename=Path("trains/embedPythia/5966/AnalysisResults.18r.repaired.root"),
         tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
-        prefixes={"matched": "true", "detLevel": "det_level", "data": "hybrid"},
+        prefixes=list({"matched": "true", "detLevel": "det_level", "data": "hybrid"}.keys()),
         branches=[],
         prefix_branches=[
             "{prefix}.fJetPt",
