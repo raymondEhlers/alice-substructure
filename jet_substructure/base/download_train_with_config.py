@@ -135,7 +135,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                         )
                     # NOTE: This is somewhat LHC18{q,r} specific
                     # Example: /alice/data/2018/LHC18r/000296934/pass1/PWGJE/Jets_EMC_PbPb/5902_20200515-1910_child_1
-                    manual_dir = (
+                    manual_dir: Path = (
                         Path("/alice/data/2018/")
                         / f"LHC{child_label}"
                         / f"000{run_number}"
@@ -162,8 +162,8 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                     else:
                         logger.info(f"Processing manual single run {run_number} for child {child_label}")
                         # Didn't even get to a stage of the merging. Take whatever is there...
-                        directories_with_output_files = alice_utils.list_alien_dir(manual_dir)
-                        directories_with_output_files = [manual_dir / d for d in directories_with_output_files]
+                        _directories_with_output_files = alice_utils.list_alien_dir(manual_dir)
+                        directories_with_output_files = [manual_dir / d for d in _directories_with_output_files]
                         _additional_label = str(run_number)
                         for d in directories_with_output_files:
                             # Use having a suffix as a proxy for a file, and without a suffix as a directory.
