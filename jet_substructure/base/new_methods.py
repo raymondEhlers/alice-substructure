@@ -264,7 +264,7 @@ class JetSplittingCommon:
     parent_index: int
 
     @property
-    def parent_pt(self) -> UprootArray[float]:
+    def parent_pt(self) -> ArrayOrScalar[float]:
         """Pt of the (parent) subjets which lead to the splittings.
 
         The pt can be calculated from the splitting properties via:
@@ -301,7 +301,7 @@ class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
     parent_index: int
 
     @property
-    def parent_pt(self) -> ArrayOrScalar[float]:
+    def parent_pt(self) -> float:
         """Pt of the (parent) subjet which lead to the splitting.
 
         The pt can be calculated from the splitting properties via:
