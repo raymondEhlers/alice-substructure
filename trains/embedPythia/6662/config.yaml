@@ -2,6 +2,8 @@
 train: "Jets_EMC_PbPb"
 number: 6662
 dataset: "LHC18{q,r}"
+pass: 3
+AOD: 242
 aliphysics_tag: "v5-09-57-01_ROOT6-1"
 embedded_dataset: "LHC20g4"
 pt_hard_bin: 13

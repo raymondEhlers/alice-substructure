@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Dict, Sequence
 
+import pachyderm.alice.download as alice_dl
 import pachyderm.alice.utils as alice_utils
 from pachyderm import yaml
 
@@ -21,6 +22,19 @@ logger = logging.getLogger(__name__)
 
 
 _possible_merging_stages = ["merged", "manual", "single_run_manual", "Stage_1", "Stage_2", "Stage_5"]
+
+
+def year_from_datatset(dataset: str) -> int:
+    """Extract the year from the dataset.
+
+    Args:
+        dataset: Dataset (period) name.
+    Returns:
+        Year of the given dataset.
+    """
+    if not dataset.startswith("LHC"):
+        raise ValueError(f"Invalid dataset name: {dataset}")
+    return int(dataset[3:5]) + 2000
 
 
 def add_files_from_xml_file(
@@ -127,19 +141,34 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                 output[str(alien_dir / "AnalysisResults.root")] = str(local_file)
             elif stage_to_download == "manual":
                 manual_config = child_info["manual"]
+                logger.warning("This is still LHC18 specific. Careful!")
                 for run_number, manual_stage_to_download in manual_config.items():
                     # Validation
                     if manual_stage_to_download not in _possible_merging_stages:
                         raise ValueError(
                             f"Invalid last successful merging stage. Provided: {manual_stage_to_download}. Possible values: {_possible_merging_stages}"
                         )
-                    # NOTE: This is somewhat LHC18{q,r} specific
+                    # NOTE: This is LHC18{q,r} specific
                     # Example: /alice/data/2018/LHC18r/000296934/pass1/PWGJE/Jets_EMC_PbPb/5902_20200515-1910_child_1
+                    # We default to pass1 because we didn't specify this in the past.
+                    pass_default = 1
+
+                    # Dataset agnostic
+                    # Determining pass and AOD shouldn't be super specific to LHC18{q,r}
+                    pass_value = Path(f"pass{config.get('pass', pass_default)}")
+                    aod_value = config.get("AOD", None)
+                    if aod_value:
+                        pass_value /= aod_value
+                    dataset_name = f"LHC{child_label}"
+                    data_or_sim_str = alice_dl.does_period_contain_data(dataset_name)
+                    run_prefix = "000" if data_or_sim_str == "data" else ""
+
+                    # Back to (somewhat) LHC18{q,r} specific.
                     manual_dir: Path = (
-                        Path("/alice/data/2018/")
-                        / f"LHC{child_label}"
-                        / f"000{run_number}"
-                        / "pass1"
+                        Path(f"/alice/data/{year_from_datatset(dataset_name)}/")
+                        / dataset_name
+                        / f"{run_prefix}{run_number}"
+                        / pass_value
                         / PWG
                         / train_name
                         / likely_child_directory
