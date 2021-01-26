@@ -141,7 +141,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                 output[str(alien_dir / "AnalysisResults.root")] = str(local_file)
             elif stage_to_download == "manual":
                 manual_config = child_info["manual"]
-                logger.warning("This is still LHC18 specific. Careful!")
+                logger.warning("Relying on LHC18qr specific info. Careful!")
                 for run_number, manual_stage_to_download in manual_config.items():
                     # Validation
                     if manual_stage_to_download not in _possible_merging_stages:
@@ -158,14 +158,15 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                     pass_value = Path(f"pass{config.get('pass', pass_default)}")
                     aod_value = config.get("AOD", None)
                     if aod_value:
-                        pass_value /= aod_value
+                        pass_value /= f"AOD{aod_value}"
                     dataset_name = f"LHC{child_label}"
-                    data_or_sim_str = alice_dl.does_period_contain_data(dataset_name)
-                    run_prefix = "000" if data_or_sim_str == "data" else ""
+                    is_data = alice_dl.does_period_contain_data(dataset_name)
+                    run_prefix = "000" if is_data else ""
+                    data_or_sim_str = "data" if is_data else "sim"
 
                     # Back to (somewhat) LHC18{q,r} specific.
                     manual_dir: Path = (
-                        Path(f"/alice/data/{year_from_datatset(dataset_name)}/")
+                        Path(f"/alice/{data_or_sim_str}/{year_from_datatset(dataset_name)}/")
                         / dataset_name
                         / f"{run_prefix}{run_number}"
                         / pass_value
