@@ -1,0 +1,15 @@
+---
+train: "Jets_EMC_pp"
+number: 2040
+dataset: "LHC17q"
+pass: 1
+aliphysics_tag: "vAN-20210126_ROOT6-1"
+alien_output_info:
+    child_1:
+        name: "FAST"
+        stage_to_download: "merged"
+    child_2:
+        name: "woSDD"
+        stage_to_download: "merged"
+status: |
+    "Recorded all recursive splittings in pp for R=0.4. Nominal settings."
