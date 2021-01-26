@@ -54,20 +54,33 @@ def read_config(collision_system: str, config_path: Path = Path("config/new_conf
 
 
 def read_extracted_scale_factors(
-    collision_system: str, dataset_name: str
-) -> Dict[int, skim_analysis_objects.ScaleFactor]:
+    collision_system: str,
+    dataset_name: str,
+    normalize_scale_factors: bool = True,
+) -> Dict[int, float]:
     """Read extracted scale factors.
 
     Args:
         collision_system: Name of the collision system.
         dataset_name: Name of the dataset.
+        normalize_scale_factors: If True, normalize the scale factors based on the number of accepted events.
+
+    Returns:
+        Normalized scaled factors
     """
     p = Path(f"trains/{collision_system}/{dataset_name}_scale_factors.yaml")
     y = yaml.yaml(classes_to_register=[skim_analysis_objects.ScaleFactor])
     with open(p, "r") as f:
         scale_factors: Dict[int, skim_analysis_objects.ScaleFactor] = y.load(f)
 
-    return scale_factors
+    # Normalize scale factors based on the number of entries.
+    average_number_of_events = sum([v.n_accepted_events for v in scale_factors.values()]) / len(scale_factors)
+    normalized_scale_factors = {
+        pt_hard_bin: v.value() / (v.n_accepted_events / average_number_of_events)
+        for pt_hard_bin, v in scale_factors.items()
+    }
+
+    return normalized_scale_factors
 
 
 def setup_parsl_587(
@@ -463,10 +476,10 @@ def _extract_scale_factors_for_embedding(
     from pathlib import Path
 
     from jet_substructure.base import skim_analysis_objects
-    from jet_substructure.cpp import extract_scale_factors
+    from jet_substructure.cpp import scale_factors
 
     res = skim_analysis_objects.ScaleFactor.from_hists(
-        *extract_scale_factors.scale_factor_ROOT(filenames=[Path(i.filepath) for i in inputs])
+        *scale_factors.scale_factor_ROOT(filenames=[Path(i.filepath) for i in inputs])
     )
     return res
 
@@ -530,7 +543,7 @@ def _calculate_embedding_skim(
     dataset_config: Dict[str, Any],
     train_directory: Path,
     iterative_splittings: bool,
-    scale_factors: Mapping[int, skim_analysis_objects.ScaleFactor],
+    scale_factors: Mapping[int, float],
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
     stdout: Optional[str] = None,
@@ -640,7 +653,7 @@ def _calculate_data_skim(
     collision_system: str,
     dataset_config: Dict[str, Any],
     iterative_splittings: bool,
-    scale_factors: Mapping[int, skim_analysis_objects.ScaleFactor],
+    scale_factors: Mapping[int, float],
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> AppFuture:
