@@ -9,7 +9,7 @@ import functools
 import logging
 import typing
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, TypeVar, cast
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, TypeVar, cast
 
 
 try:
@@ -588,13 +588,14 @@ def convert_tree_to_parquet(
     return result, output_filename
 
 
-def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) -> Dict[str, ak.Array]:
+def parquet_to_substructure_analysis(filename: Path, prefixes: Mapping[str, str]) -> Dict[str, ak.Array]:
     """Convert an existing parquet file to arrays for substructure analysis.
 
     Args:
         filename: Filename of the parquet file.
         prefixes: Prefixes of the branches to be loaded from the parquet file. The template branches
             are already specified - these are just to fill them in. Each prefix will create a substructure array.
+            We map from the desired prefixes to those which are used in storing the data.
     Returns:
         One substructure array per prefix, along with a few individual columns if available in the input data
             (related to pt hard info).
@@ -640,27 +641,31 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
     additional_columns = {}
     # Add unsubstracted leading track pt for data if it was stored.
     # We'll need to handle this later in the skim.
+    # NOTE: This always has prefix "data" if it's included!
     if "data_leading_track_pt" in ak.fields(arrays):
-        additional_columns["data"] = {
+        prefix_for_leading_track = "hybrid" if "hybrid" in list(prefixes.values()) else "data"
+        additional_columns[prefix_for_leading_track] = {
             "leading_track_pt": arrays["data_leading_track_pt"],
         }
 
     # We use a ton of gymnastics here because I'm not confident about memory ownership here and I want to
     # avoid copies as much as possible!
+    # NOTE: Here, we translate from whatever the prefix was stored under (where we just blindly copied it),
+    #       to standardized prefixes.
     return {
         **columns,
         **{
-            prefix: ak.zip(
+            output_prefix: ak.zip(
                 {
-                    "jet_pt": arrays[f"{prefix}.fJetPt"],
+                    "jet_pt": arrays[f"{input_prefix}.fJetPt"],
                     "jet_constituents": ak.zip(
                         {
-                            "pt": arrays[f"{prefix}.fJetConstituents.fPt"],
-                            "eta": arrays[f"{prefix}.fJetConstituents.fEta"],
-                            "phi": arrays[f"{prefix}.fJetConstituents.fPhi"],
-                            "id": arrays[f"{prefix}.fJetConstituents.fID"]
-                            if f"{prefix}.fJetConstituents.fID" in ak.fields(arrays)
-                            else arrays[f"{prefix}.fJetConstituents.fGlobalIndex"],
+                            "pt": arrays[f"{input_prefix}.fJetConstituents.fPt"],
+                            "eta": arrays[f"{input_prefix}.fJetConstituents.fEta"],
+                            "phi": arrays[f"{input_prefix}.fJetConstituents.fPhi"],
+                            "id": arrays[f"{input_prefix}.fJetConstituents.fID"]
+                            if f"{input_prefix}.fJetConstituents.fID" in ak.fields(arrays)
+                            else arrays[f"{input_prefix}.fJetConstituents.fGlobalIndex"],
                         },
                         with_name="JetConstituent",
                         # We want to apply the behavior for each jet, and then for each constituent
@@ -669,10 +674,10 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
                     ),
                     "jet_splittings": ak.zip(
                         {
-                            "kt": arrays[f"{prefix}.fJetSplittings.fKt"],
-                            "delta_R": arrays[f"{prefix}.fJetSplittings.fDeltaR"],
-                            "z": arrays[f"{prefix}.fJetSplittings.fZ"],
-                            "parent_index": arrays[f"{prefix}.fJetSplittings.fParentIndex"],
+                            "kt": arrays[f"{input_prefix}.fJetSplittings.fKt"],
+                            "delta_R": arrays[f"{input_prefix}.fJetSplittings.fDeltaR"],
+                            "z": arrays[f"{input_prefix}.fJetSplittings.fZ"],
+                            "parent_index": arrays[f"{input_prefix}.fJetSplittings.fParentIndex"],
                         },
                         with_name="JetSplitting",
                         # We want to apply the behavior for each jet, and then for each splitting
@@ -681,22 +686,22 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Sequence[str]) ->
                     ),
                     "subjets": ak.zip(
                         {
-                            "part_of_iterative_splitting": arrays[f"{prefix}.fSubjets.fPartOfIterativeSplitting"],
-                            "parent_splitting_index": arrays[f"{prefix}.fSubjets.fSplittingNodeIndex"],
-                            "constituent_indices": arrays[f"{prefix}.fSubjets.fConstituentIndices"],
+                            "part_of_iterative_splitting": arrays[f"{input_prefix}.fSubjets.fPartOfIterativeSplitting"],
+                            "parent_splitting_index": arrays[f"{input_prefix}.fSubjets.fSplittingNodeIndex"],
+                            "constituent_indices": arrays[f"{input_prefix}.fSubjets.fConstituentIndices"],
                         },
                         with_name="Subjet",
                         # We want to apply the behavior for each jet, and then for each subjet
                         # in the jet, so we use a depth limit of 2.
                         depth_limit=2,
                     ),
-                    **additional_columns.get(prefix, {}),
+                    **additional_columns.get(output_prefix, {}),
                 },
                 # The structure of the jet pt and the other values is inherently different, so
                 # we only put them together on the jet level with a depth limit of 1.
                 depth_limit=1,
             )
-            for prefix in prefixes
+            for output_prefix, input_prefix in prefixes.items()
         },
     }
 
@@ -729,7 +734,7 @@ if __name__ == "__main__":
     convert_tree_to_parquet(
         filename=Path("trains/embedPythia/5966/AnalysisResults.18r.repaired.root"),
         tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
-        prefixes=list({"matched": "true", "detLevel": "det_level", "data": "hybrid"}.keys()),
+        prefixes=list({"hybrid": "data", "true": "matched", "det_level": "detLevel"}.keys()),
         branches=[],
         prefix_branches=[
             "{prefix}.fJetPt",
