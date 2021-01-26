@@ -12,7 +12,7 @@ import numpy as np
 import uproot
 from pachyderm import binned_data, yaml
 
-from jet_substructure.base import data_manager, helpers
+from jet_substructure.base import helpers
 
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ class ScaleFactor:
 
 def scale_factor_ROOT_wrapper(base_path: Path, train_number: int) -> Tuple[int, Any, Any]:
     # Setup
-    filenames = data_manager._ensure_and_expand_paths([Path(str(base_path).format(train_number=train_number))])
+    filenames = helpers.ensure_and_expand_paths([Path(str(base_path).format(train_number=train_number))])
 
     return scale_factor_ROOT(filenames)
 
@@ -97,7 +97,7 @@ def scale_factor_uproot_wrapper(
     base_path: Path, train_number: int, run_despite_issues: bool = False
 ) -> Tuple[int, Any, Any]:
     # Setup
-    filenames = data_manager._ensure_and_expand_paths([Path(str(base_path).format(train_number=train_number))])
+    filenames = helpers.ensure_and_expand_paths([Path(str(base_path).format(train_number=train_number))])
 
     return scale_factor_uproot(filenames=filenames, run_despite_issues=run_despite_issues)
 

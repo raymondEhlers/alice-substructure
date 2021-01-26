@@ -10,7 +10,7 @@ import numpy as np
 import uproot
 from pachyderm import binned_data
 
-from jet_substructure.base import data_manager, helpers
+from jet_substructure.base import helpers
 
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     helpers.setup_logging()
 
     base_path = Path("trains/embedPythia/{train_number}/AnalysisResults.*.root")
-    filenames = data_manager._ensure_and_expand_paths(
+    filenames = helpers.ensure_and_expand_paths(
         [Path(str(base_path).format(train_number=train_number)) for train_number in range(5988, 6008)]
     )
     for filename in filenames:

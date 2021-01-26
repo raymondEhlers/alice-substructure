@@ -331,6 +331,10 @@ def expand_wildcards_in_filenames(paths: Sequence[Path]) -> List[Path]:
     return return_paths
 
 
+def ensure_and_expand_paths(paths: Sequence[Union[str, Path]]) -> List[Path]:
+    return expand_wildcards_in_filenames([Path(p) for p in paths])
+
+
 def _AliEmcalList_to_TList(
     existing_list: Any,
 ) -> Any:

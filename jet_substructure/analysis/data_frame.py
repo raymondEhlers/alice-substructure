@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 import uproot3
 
-from jet_substructure.base import analysis_objects, data_manager, helpers, skim_analysis_objects
+from jet_substructure.base import analysis_objects, helpers, skim_analysis_objects
 
 
 logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ class SkimDataset:
                 Path(str(base_path).format(train_number=train_number)) for train_number in self.train_numbers
             ]
         # logger.debug(f"input_path_list: {input_path_list}")
-        path_list = data_manager._ensure_and_expand_paths(
+        path_list = helpers.ensure_and_expand_paths(
             input_path_list,
             # [
             #    #Path("trains/embedPythia/5903/skim/merged/*.root")
@@ -146,7 +146,7 @@ def dask_df_from_delayed() -> None:
         tree = uproot3.open(file)[treepath]
         return tree.pandas.df(branches=branches)
 
-    path_list = data_manager._ensure_and_expand_paths(
+    path_list = helpers.ensure_and_expand_paths(
         [
             Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings.root"),
             Path("trains/embedPythia/55*/skim/*_iterative_splittings.root"),
@@ -645,7 +645,7 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
         # "soft_drop_z_cut_02",
         # "soft_drop_z_cut_04",
     ]
-    direct_comparison_grooming_methods = [
+    direct_comparison_grooming_methods: List[str] = [
         # "leading_kt_z_cut_02_first_split",
         # "leading_kt_z_cut_04_first_split",
     ]
@@ -786,14 +786,14 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
 
 # def run_embed_pythia(run_response: bool = True) -> None:
 #    collision_system = "embedPythia"
-#    path_list = data_manager._ensure_and_expand_paths(
+#    path_list = helpers.ensure_and_expand_paths(
 #        [
 #            Path("trains/embedPythia/588*/skim/*_iterative_splittings.root"),
 #            Path("trains/embedPythia/589*/skim/*_iterative_splittings.root"),
 #            Path("trains/embedPythia/590*/skim/*_iterative_splittings.root"),
 #        ]
 #    )
-#    path_list_friends = data_manager._ensure_and_expand_paths(
+#    path_list_friends = helpers.ensure_and_expand_paths(
 #        [
 #            #Path("temp_cache/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
 #            #Path("trains/embedPythia/55*/skim/*_iterative_splittings_friend.root"),
@@ -802,7 +802,7 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
 #    if run_response:
 #        for train_number in range(5903, 5904):
 #            logger.info(f"Processing train number {train_number}")
-#            path_list = data_manager._ensure_and_expand_paths(
+#            path_list = helpers.ensure_and_expand_paths(
 #                [
 #                    #Path("trains/embedPythia/5903/skim/merged/*.root")
 #                    Path("trains/embedPythia/5903/skim/merged/AnalysisResults.merged.01.root")
@@ -820,7 +820,7 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
 #
 #    for train_number in range(5904, 5904):
 #        logger.info(f"Processing train number {train_number}")
-#        path_list = data_manager._ensure_and_expand_paths(
+#        path_list = helpers.ensure_and_expand_paths(
 #            [
 #                Path(f"trains/embedPythia/{train_number}/skim/*_iterative_splittings.root"),
 #            ]
@@ -851,12 +851,12 @@ def merge_output(train_numbers: Sequence[int], output_filename: Path, output_pat
     logger.info(f"filename: {filename}")
     logger.info(f"files: {files}")
     first_filename = files[0]
-    with gzip.GzipFile(first_filename, "r") as f:
-        hists = dill.load(f)
+    with gzip.GzipFile(first_filename, "r") as f_gz:
+        hists = dill.load(f_gz)
     for f in files[1:3]:
         logger.debug(f"Handling file {f}")
-        with gzip.GzipFile(first_filename, "r") as f:
-            temp_hists = dill.load(f)
+        with gzip.GzipFile(f, "r") as f_gz:
+            temp_hists = dill.load(f_gz)
             for k, v in temp_hists.items():
                 hists[k] += v
         del temp_hists
@@ -904,7 +904,7 @@ def plot_all() -> None:
         # "soft_drop_z_cut_02",
         # "soft_drop_z_cut_04",
     ]
-    direct_comparison_grooming_methods = [
+    direct_comparison_grooming_methods: List[str] = [
         # "leading_kt_z_cut_02_first_split",
         # "leading_kt_z_cut_04_first_split",
     ]

@@ -31,14 +31,15 @@ import h5py
 import uproot3
 from typing_extensions import Literal
 
-from jet_substructure.base.helpers import UprootArray, UprootArrays, expand_wildcards_in_filenames
+from jet_substructure.base.helpers import (
+    UprootArray,
+    UprootArrays,
+    ensure_and_expand_paths,
+    expand_wildcards_in_filenames,
+)
 
 
 logger = logging.getLogger(__name__)
-
-
-def _ensure_and_expand_paths(paths: Sequence[Union[str, Path]]) -> List[Path]:
-    return expand_wildcards_in_filenames([Path(p) for p in paths])
 
 
 def _ensure_and_expand_hdf5_paths(paths: Sequence[Union[str, Path]]) -> List[Path]:
@@ -247,7 +248,7 @@ class HDF5TreeWrapper(TreeMixin, MutableMapping[str, UprootArray[Any]]):
 
 @attr.s
 class UprootTreeIterator:
-    _filenames: Sequence[Path] = attr.ib(converter=_ensure_and_expand_paths)
+    _filenames: Sequence[Path] = attr.ib(converter=ensure_and_expand_paths)
     _tree_name: str = attr.ib()
     _cache: MutableMapping[str, UprootArray[Any]] = attr.ib(factory=partial(uproot3.ThreadSafeArrayCache, "1 GB"))
     _key_cache: MutableMapping[str, UprootArray[Any]] = attr.ib(factory=partial(uproot3.ThreadSafeArrayCache, "100 MB"))
@@ -366,7 +367,7 @@ class Tree(MutableMapping[str, UprootArray[Any]]):
 
 @attr.s
 class IterateTrees:
-    _filenames: Sequence[Path] = attr.ib(converter=_ensure_and_expand_paths)
+    _filenames: Sequence[Path] = attr.ib(converter=ensure_and_expand_paths)
     tree_name: str = attr.ib()
     branches: FrozenSet[str] = attr.ib(converter=frozenset)
     _current_tree: Optional[Tree] = attr.ib(default=None)
