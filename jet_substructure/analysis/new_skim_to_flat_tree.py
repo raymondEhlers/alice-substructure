@@ -26,7 +26,7 @@ with warnings.catch_warnings():
 
 from pachyderm import yaml
 
-from jet_substructure.base import new_methods
+from jet_substructure.base import new_methods, skim_analysis_objects
 from jet_substructure.base.helpers import UprootArray
 
 
@@ -658,7 +658,7 @@ def calculate_embedding_skim(  # noqa: C901
     input_filename: Path,
     iterative_splittings: bool,
     prefixes: Mapping[str, str],
-    scale_factors: Mapping[int, float],
+    scale_factors: Mapping[int, skim_analysis_objects.ScaleFactor],
     train_directory: Path,
     jet_R: float,
     output_filename: Path,
@@ -694,7 +694,7 @@ def calculate_embedding_skim(  # noqa: C901
     train_number = train_config["number"]
     pt_hard_bin = train_config["pt_hard_bin"]
     logger.debug(f"Extracted train number: {train_number}, pt hard bin: {pt_hard_bin}")
-    scale_factor = scale_factors[pt_hard_bin]
+    scale_factor = scale_factors[pt_hard_bin].value()
 
     # Jets setup.
     logger.info(f"Skimming tree from file {input_filename}")
@@ -940,7 +940,7 @@ def calculate_data_skim(  # noqa: C901
     output_filename: Path,
     output_tree_name: str = "tree",
     create_friend_tree: bool = False,
-    scale_factors: Optional[Mapping[int, float]] = None,
+    scale_factors: Optional[Mapping[int, skim_analysis_objects.ScaleFactor]] = None,
     write_feather: bool = False,
     write_parquet: bool = False,
 ) -> Tuple[bool, str]:
@@ -1069,7 +1069,7 @@ def calculate_data_skim(  # noqa: C901
             logger.debug(f"Pt hard bins contained in the file: {np.unique(pt_hard_bins)}")
             grooming_results.update(
                 {
-                    "scale_factor": np.array([scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
+                    "scale_factor": np.array([scale_factors[b].value() for b in pt_hard_bins], dtype=np.float32),
                     "pt_hard_bin": pt_hard_bins,
                     "pt_hard": to_float(all_jets["pt_hard"]),
                 }

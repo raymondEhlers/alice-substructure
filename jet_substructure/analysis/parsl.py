@@ -27,7 +27,7 @@ from parsl.executors import HighThroughputExecutor
 from parsl.monitoring.monitoring import MonitoringHub
 from parsl.providers import SlurmProvider
 
-from jet_substructure.base import helpers
+from jet_substructure.base import helpers, skim_analysis_objects
 
 
 logger = logging.getLogger(__name__)
@@ -51,6 +51,23 @@ def read_config(collision_system: str, config_path: Path = Path("config/new_conf
     config: Dict[str, Any] = full_config["execution"][collision_system]["dataset"]
 
     return config
+
+
+def read_extracted_scale_factors(
+    collision_system: str, dataset_name: str
+) -> Dict[int, skim_analysis_objects.ScaleFactor]:
+    """Read extracted scale factors.
+
+    Args:
+        collision_system: Name of the collision system.
+        dataset_name: Name of the dataset.
+    """
+    p = Path(f"trains/{collision_system}/{dataset_name}_scale_factors.yaml")
+    y = yaml.yaml(classes_to_register=[skim_analysis_objects.ScaleFactor])
+    with open(p, "r") as f:
+        scale_factors: Dict[int, skim_analysis_objects.ScaleFactor] = y.load(f)
+
+    return scale_factors
 
 
 def setup_parsl_587(
@@ -445,9 +462,10 @@ def _extract_scale_factors_for_embedding(
 ) -> AppFuture:
     from pathlib import Path
 
+    from jet_substructure.base import skim_analysis_objects
     from jet_substructure.cpp import extract_scale_factors
 
-    res = extract_scale_factors.ScaleFactor.from_hists(
+    res = skim_analysis_objects.ScaleFactor.from_hists(
         *extract_scale_factors.scale_factor_ROOT(filenames=[Path(i.filepath) for i in inputs])
     )
     return res
@@ -460,10 +478,9 @@ def setup_extract_scale_factors_for_embedding(
     """Extract scale factors from embedding hists.
 
     Note:
-        This is surprisingly fast, at least for the Rmax=0.6 case.
+        This is surprisingly fast, at least for the Rmax=0.6 case where I tried this
+        as an example.
     """
-    from jet_substructure.cpp import extract_scale_factors
-
     # Setup
     scale_factors = {}
     dataset_config = read_config(collision_system=collision_system)
@@ -502,7 +519,7 @@ def setup_extract_scale_factors_for_embedding(
     logger.info(results)
 
     # Write them to YAML for later.
-    y = yaml.yaml(classes_to_register=[extract_scale_factors.ScaleFactor])
+    y = yaml.yaml(classes_to_register=[skim_analysis_objects.ScaleFactor])
     output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}_scale_factors.yaml")
     with open(output_filename, "w") as f:
         y.dump(results, f)
@@ -513,6 +530,7 @@ def _calculate_embedding_skim(
     dataset_config: Dict[str, Any],
     train_directory: Path,
     iterative_splittings: bool,
+    scale_factors: Mapping[int, skim_analysis_objects.ScaleFactor],
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
     stdout: Optional[str] = None,
@@ -529,7 +547,7 @@ def _calculate_embedding_skim(
             input_filename=Path(inputs[0].filepath),
             iterative_splittings=iterative_splittings,
             prefixes=dataset_config["prefixes"],
-            scale_factors=dataset_config["scale_factors"],
+            scale_factors=scale_factors,
             train_directory=train_directory,
             jet_R=dataset_config["jet_R"],
             output_filename=Path(outputs[0].filepath),
@@ -571,6 +589,7 @@ def setup_calculate_embedding_skim(
     results = []
     dataset_config = read_config(collision_system=collision_system)
     train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
+    scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
 
     # If input files aren't passed, then we need to determine them ourselves.
     if input_files is None:
@@ -605,6 +624,7 @@ def setup_calculate_embedding_skim(
                 dataset_config=dataset_config,
                 iterative_splittings=iterative_splittings,
                 train_directory=train_directory,
+                scale_factors=scale_factors,
                 inputs=[parsl_input_file],
                 outputs=[parsl_output_file],
                 # stdout=parsl.AUTO_LOGNAME,
@@ -620,6 +640,7 @@ def _calculate_data_skim(
     collision_system: str,
     dataset_config: Dict[str, Any],
     iterative_splittings: bool,
+    scale_factors: Mapping[int, skim_analysis_objects.ScaleFactor],
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> AppFuture:
@@ -637,7 +658,7 @@ def _calculate_data_skim(
             prefixes=dataset_config["prefixes"],
             jet_R=dataset_config["jet_R"],
             output_filename=Path(outputs[0].filepath),
-            scale_factors=dataset_config.get("scale_factors", None),
+            scale_factors=scale_factors,
         )
     except Exception as e:
         # Skip any problems for now
@@ -676,6 +697,12 @@ def setup_calculate_data_skim(
     results = []
     dataset_config = read_config(collision_system=collision_system)
     train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
+    # Only meaningful for pythia.
+    scale_factors = {}
+    if collision_system == "pythia":
+        scale_factors = read_extracted_scale_factors(
+            collision_system=collision_system, dataset_name=dataset_config["name"]
+        )
 
     # If input files aren't passed, then we need to determine them ourselves.
     if input_files is None:
@@ -710,6 +737,7 @@ def setup_calculate_data_skim(
                 dataset_config=dataset_config,
                 collision_system=collision_system,
                 iterative_splittings=iterative_splittings,
+                scale_factors=scale_factors,
                 inputs=[parsl_input_file],
                 outputs=[parsl_output_file],
                 # stdout=parsl.AUTO_LOGNAME,
