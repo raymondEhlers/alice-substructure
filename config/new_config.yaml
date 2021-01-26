@@ -368,6 +368,8 @@ available_datasets:
     LHC19f4_embedded_into_LHC18qr_central_6338_6357: &LHC19f4_embedded_into_LHC18qr_central
         name: "LHC19f4_embedded_into_LHC18qr_central_6338_6357"
         cross_check_task: true
+        grooming_methods:
+            - "leading_kt"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
         # Map for the uniform prefix name to the analysis task prefix.

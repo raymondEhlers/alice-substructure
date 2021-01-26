@@ -10,7 +10,7 @@ import logging
 import math
 import random
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import parsl
@@ -48,7 +48,7 @@ def read_config(collision_system: str, config_path: Path = Path("config/new_conf
     with open(config_path, "r") as f:
         full_config = y.load(f)
 
-    config = full_config["execution"][collision_system]["dataset"]
+    config: Dict[str, Any] = full_config["execution"][collision_system]["dataset"]
 
     return config
 
@@ -180,8 +180,10 @@ def setup_parsl_587(
     return b587_executor
 
 
-@python_app
-def _repair_root_files(tree_name: str, n_cores: int, inputs=[], outputs=[]) -> AppFuture:
+@python_app  # type: ignore
+def _repair_root_files(
+    tree_name: str, n_cores: int, inputs: Sequence[File] = [], outputs: Sequence[File] = []
+) -> AppFuture:
     """ Repair ROOT files app. """
     from pathlib import Path
 
@@ -225,7 +227,12 @@ def setup_repair_root_files(
     if selected_train_numbers:
         filenames = [f for f in filenames if int(f.parent.name) in selected_train_numbers]
     # Filter out already repaired files
-    filenames = [f for f in filenames if "repaired" not in str(f.name)]
+    # Specifically, we usually specify the repaired files in the config, but that's
+    # not meaningful here. So we remove the "repaired" from the name, and then take those files.
+    # NOTE: It's important that we take a set because if the dir already has both, we don't
+    #       want to try to add files twice.
+    # NOTE: This is susceptible to issues if "repaired." is in the path, but I think that's unlikely.
+    filenames = sorted(set([Path(str(f).replace("repaired.", "")) for f in filenames]))
     # logger.info(f"Repairing filenames: {filenames}")
 
     for filename in filenames:
@@ -285,7 +292,7 @@ def _number_of_entries_per_file(
         Mapping between file and number of entries in the file.
     """
     # Validation
-    filenames = helpers.expand_wildcards_in_filenames(input_filenames)
+    filenames = helpers.expand_wildcards_in_filenames([Path(f) for f in input_filenames])
 
     # Setup
     y = yaml.yaml()
@@ -335,7 +342,7 @@ def _distribute_entries_to_jobs(
                 end = number_of_entries
                 continue_iterating = False
             # Store the start and stop for convenience.
-            splits.append([start, end])
+            splits.append((start, end))
             # Move up to the next iteration.
             start = end
 
@@ -344,17 +351,17 @@ def _distribute_entries_to_jobs(
     return job_info
 
 
-@python_app
+@python_app  # type: ignore
 def _convert_to_parquet(
     tree_name: str,
     prefixes: Sequence[str],
     branches: Sequence[str],
     prefix_branches: Sequence[str],
     event_range: Optional[Tuple[Optional[int], Optional[int]]] = None,
-    inputs=[],
-    outputs=[],
-    stdout=None,
-):
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+    stdout: Optional[str] = None,
+) -> AppFuture:
     """ Convert to parquet app. """
     from pathlib import Path
 
@@ -416,7 +423,7 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
             results.append(
                 _convert_to_parquet(
                     tree_name=dataset_config["tree_name"],
-                    prefixes=list(dataset_config["prefixes"].values()),
+                    prefixes=list(dataset_config["prefix"].values()),
                     branches=dataset_config["branches"],
                     prefix_branches=dataset_config["prefix_branches"],
                     event_range=event_range,
@@ -429,8 +436,13 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
     return results
 
 
-@python_app
-def _extract_scale_factors_for_embedding(inputs=[], outputs=[], stdout=None, stderr=None) -> AppFuture:
+@python_app  # type: ignore
+def _extract_scale_factors_for_embedding(
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+    stdout: Optional[str] = None,
+    stderr: Optional[str] = None,
+) -> AppFuture:
     from pathlib import Path
 
     from jet_substructure.cpp import extract_scale_factors
@@ -496,15 +508,15 @@ def setup_extract_scale_factors_for_embedding(
         y.dump(results, f)
 
 
-@python_app
+@python_app  # type: ignore
 def _calculate_embedding_skim(
     dataset_config: Dict[str, Any],
     train_directory: Path,
     iterative_splittings: bool,
-    inputs=[],
-    outputs=[],
-    stdout=None,
-    stderr=None,
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+    stdout: Optional[str] = None,
+    stderr: Optional[str] = None,
 ) -> AppFuture:
     """ Calculate embedding skim app. """
     import traceback
@@ -525,7 +537,8 @@ def _calculate_embedding_skim(
     except Exception as e:
         # Skip any problems for now
         logger.warning(e)
-        res = traceback.format_exc()
+        # Match the expected format if the calculation succeeded
+        res = (False, traceback.format_exc())
 
     logger.debug(outputs)
     return res
@@ -602,9 +615,13 @@ def setup_calculate_embedding_skim(
     return results
 
 
-@python_app()
+@python_app  # type: ignore
 def _calculate_data_skim(
-    collision_system: str, dataset_config: Dict[str, Any], iterative_splittings: bool, inputs=[], outputs=[]
+    collision_system: str,
+    dataset_config: Dict[str, Any],
+    iterative_splittings: bool,
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
 ) -> AppFuture:
     """ Calculate data skim app. """
     import traceback
@@ -625,7 +642,8 @@ def _calculate_data_skim(
     except Exception as e:
         # Skip any problems for now
         logger.warning(e)
-        res = traceback.format_exc()
+        # Match the expected format if the calculation succeeded
+        res = (False, traceback.format_exc())
 
     logger.debug(outputs)
     return res
@@ -702,7 +720,7 @@ def setup_calculate_data_skim(
     return results
 
 
-@python_app
+@python_app  # type: ignore
 def _root_data_frame(
     collision_system: str,
     tree_name: str,
@@ -711,8 +729,8 @@ def _root_data_frame(
     jet_R: float,
     n_cores: int,
     cross_check_task: bool,
-    inputs: Optional[Sequence[File]] = [],
-    outputs: Optional[Sequence[File]] = [],
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
 ) -> AppFuture:
     """ ROOT data frame app. """
     from pathlib import Path
@@ -738,8 +756,9 @@ def _root_data_frame(
 def setup_root_data_frame(
     collision_system: str,
     jobs_per_node: int,
+    default_grooming_methods: Sequence[str],
     selected_train_numbers: Optional[Sequence[int]] = None,
-    input_files: Optional[Sequence[DataFuture]] = None,
+    input_files: Optional[MutableSequence[DataFuture]] = None,
 ) -> List[AppFuture]:
     # Setup
     output_dir = Path("output") / collision_system / "RDF"
@@ -767,17 +786,11 @@ def setup_root_data_frame(
     results = []
     cross_check_task = dataset_config.get("cross_check_task", False)
     logger.info(f"Cross check task: {cross_check_task}")
-    for grooming_method in [
-        "leading_kt",
-        # "leading_kt_z_cut_02",
-        # "leading_kt_z_cut_04",
-        # "dynamical_core",
-        # "dynamical_z",
-        # "dynamical_kt",
-        # "dynamical_time",
-        # "soft_drop_z_cut_02",
-        # "soft_drop_z_cut_04",
-    ]:
+    if cross_check_task:
+        grooming_methods = dataset_config["grooming_methods"]
+    else:
+        grooming_methods = list(default_grooming_methods)
+    for grooming_method in grooming_methods:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
         # Note: It randomizes in place.
@@ -803,7 +816,7 @@ def setup_root_data_frame(
     return results
 
 
-@python_app
+@python_app  # type: ignore
 def _root_data_frame_response(
     collision_system: str,
     tree_name: str,
@@ -812,8 +825,8 @@ def _root_data_frame_response(
     jet_R: float,
     n_cores: int,
     cross_check_task: bool,
-    inputs: Optional[Sequence[File]] = [],
-    outputs: Optional[Sequence[File]] = [],
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
 ) -> AppFuture:
     """ ROOT data frame response app. """
     from pathlib import Path
@@ -839,8 +852,9 @@ def _root_data_frame_response(
 def setup_root_data_frame_response(
     collision_system: str,
     jobs_per_node: int,
+    default_grooming_methods: Sequence[str],
     selected_train_numbers: Optional[Sequence[int]] = None,
-    input_files: Optional[Sequence[DataFuture]] = None,
+    input_files: Optional[MutableSequence[DataFuture]] = None,
 ) -> List[AppFuture]:
     # Setup
     output_dir = Path("output") / collision_system / "RDF"
@@ -867,17 +881,11 @@ def setup_root_data_frame_response(
     logger.info(f"N cores per job: {math.floor(8 / jobs_per_node)}")
     results = []
     cross_check_task = dataset_config.get("cross_check_task", False)
-    for grooming_method in [
-        "leading_kt",
-        # "leading_kt_z_cut_02",
-        # "leading_kt_z_cut_04",
-        # "dynamical_core",
-        # "dynamical_z",
-        # "dynamical_kt",
-        # "dynamical_time",
-        # "soft_drop_z_cut_02",
-        # "soft_drop_z_cut_04",
-    ]:
+    if cross_check_task:
+        grooming_methods = dataset_config["grooming_methods"]
+    else:
+        grooming_methods = default_grooming_methods
+    for grooming_method in grooming_methods:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
         # Note: It randomizes in place.
@@ -904,7 +912,7 @@ def setup_root_data_frame_response(
     return results
 
 
-@python_app
+@python_app  # type: ignore
 def _root_data_frame_closure(
     collision_system: str,
     tree_name: str,
@@ -913,10 +921,10 @@ def _root_data_frame_closure(
     jet_R: float,
     n_cores: int,
     cross_check_task: bool,
-    inputs: Optional[Sequence[File]] = [],
-    outputs: Optional[Sequence[File]] = [],
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
 ) -> AppFuture:
-    """ ROOT data frame clsoure app. """
+    """ ROOT data frame closure app. """
     from pathlib import Path
 
     from jet_substructure.cpp import data_frame
@@ -940,8 +948,9 @@ def _root_data_frame_closure(
 def setup_root_data_frame_closure(
     collision_system: str,
     jobs_per_node: int,
+    default_grooming_methods: Sequence[str],
     selected_train_numbers: Optional[Sequence[int]] = None,
-    input_files: Optional[Sequence[DataFuture]] = None,
+    input_files: Optional[MutableSequence[DataFuture]] = None,
 ) -> List[AppFuture]:
     # Setup
     output_dir = Path("output") / collision_system / "RDF"
@@ -969,17 +978,11 @@ def setup_root_data_frame_closure(
     logger.info(f"N cores per job: {math.floor(8 / jobs_per_node)}")
     results = []
     cross_check_task = dataset_config.get("cross_check_task", False)
-    for grooming_method in [
-        "leading_kt",
-        # "leading_kt_z_cut_02",
-        # "leading_kt_z_cut_04",
-        # "dynamical_core",
-        # "dynamical_z",
-        # "dynamical_kt",
-        # "dynamical_time",
-        # "soft_drop_z_cut_02",
-        # "soft_drop_z_cut_04",
-    ]:
+    if cross_check_task:
+        grooming_methods = dataset_config["grooming_methods"]
+    else:
+        grooming_methods = default_grooming_methods
+    for grooming_method in grooming_methods:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
         # Note: It randomizes in place.
@@ -1006,14 +1009,14 @@ def setup_root_data_frame_closure(
     return results
 
 
-@python_app
+@python_app  # type: ignore
 def _unfolding_standard(
     settings: "unfolding_2D.Settings",  # noqa: F821
     reweight_prior: bool,
     reweight_data_dataset_name: str,
     reweight_embedded_dataset_name: str,
-    inputs=[],
-    outputs=[],
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
 ) -> AppFuture:
     from pathlib import Path
 
@@ -1030,14 +1033,14 @@ def _unfolding_standard(
     )
 
 
-@python_app
+@python_app  # type: ignore
 def _unfolding_closure(
     settings: "unfolding_2D.Settings",  # noqa: F821
     closure_variation: str,
     data_dataset_name: str,
     embedded_dataset_name: str,
-    inputs=[],
-    outputs=[],
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
 ) -> AppFuture:
     from pathlib import Path
 
@@ -1204,13 +1207,25 @@ def setup_unfolding(
 
 if __name__ == "__main__":  # noqa: C901
     # Settings
-    collision_system = "PbPb"
+    collision_system = "pp"
     jobs_to_execute = [
-        "unfolding",
+        "convert_to_parquet",
     ]
-    entries_per_job = int(1e5)
+    entries_per_job = int(2e5)
     nodes_to_allocate = 1
-    jobs_per_node = 5
+    jobs_per_node = 6
+    # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
+    grooming_methods = [
+        "leading_kt",
+        "leading_kt_z_cut_02",
+        "leading_kt_z_cut_04",
+        "dynamical_core",
+        "dynamical_z",
+        "dynamical_kt",
+        "dynamical_time",
+        "soft_drop_z_cut_02",
+        "soft_drop_z_cut_04",
+    ]
 
     # Basic setup for jobs
     _possible_jobs = [
@@ -1270,6 +1285,7 @@ if __name__ == "__main__":  # noqa: C901
             entries_per_job=entries_per_job,
         )
     if "extract_scale_factors_for_embedding" in jobs_to_execute:
+        # NOTE: These are exected directly because they're needed for the next steps.
         setup_extract_scale_factors_for_embedding(
             collision_system=collision_system,
             # selected_train_numbers=list(range(6316, 6318)),
@@ -1291,6 +1307,7 @@ if __name__ == "__main__":  # noqa: C901
         results = setup_root_data_frame(
             collision_system=collision_system,
             jobs_per_node=jobs_per_node,
+            default_grooming_methods=grooming_methods,
             # selected_train_numbers=list(range(5977, 5978)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
@@ -1298,6 +1315,7 @@ if __name__ == "__main__":  # noqa: C901
         results = setup_root_data_frame_response(
             collision_system=collision_system,
             jobs_per_node=jobs_per_node,
+            default_grooming_methods=grooming_methods,
             # selected_train_numbers=list(range(6338, 6339)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
@@ -1309,6 +1327,7 @@ if __name__ == "__main__":  # noqa: C901
                 setup_root_data_frame_closure(
                     collision_system=_collision_system,
                     jobs_per_node=jobs_per_node,
+                    default_grooming_methods=grooming_methods,
                     # selected_train_numbers=list(range(5977, 5978)),
                     input_files=[r.outputs[0] for r in results] if results else None,
                 )
@@ -1316,17 +1335,7 @@ if __name__ == "__main__":  # noqa: C901
         results.extend(temp_results)
     if "unfolding" in jobs_to_execute:
         results = setup_unfolding(
-            grooming_methods=[
-                "leading_kt",
-                # "leading_kt_z_cut_02",
-                # "leading_kt_z_cut_04",
-                # "dynamical_core",
-                # "dynamical_z",
-                # "dynamical_kt",
-                # "dynamical_time",
-                # "soft_drop_z_cut_02",
-                # "soft_drop_z_cut_04",
-            ],
+            grooming_methods=grooming_methods,
             run_closures=False,
             reweight_prior=True,
             tag="central_reweight_prior",
