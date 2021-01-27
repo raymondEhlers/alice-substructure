@@ -32,7 +32,7 @@ class MatchingIndex:
         return f"{self.measured_like_prefix}_{self.generator_like_prefix}"
 
 
-def cross_check_task_renames(grooming_method: str, input_branches: Sequence[str]) -> Dict[str, str]:
+def cross_check_task_branch_name_shim(grooming_method: str, input_branches: Sequence[str]) -> Dict[str, str]:
     # Validation
     input_branches = list(input_branches)
 
@@ -457,7 +457,9 @@ def run_create_closure_ratio(
 
     if cross_check_task:
         # Add the aliases. This has to be done after the df is defined because apparently they don't carry over.
-        renames = cross_check_task_renames(grooming_method=grooming_method, input_branches=df_original.GetColumnNames())
+        renames = cross_check_task_branch_name_shim(
+            grooming_method=grooming_method, input_branches=df_original.GetColumnNames()
+        )
         for k, v in renames.items():
             df_original = df_original.Alias(k, v)
 
@@ -577,7 +579,9 @@ def run_response(  # noqa: C901
 
     if cross_check_task:
         # Add the aliases. This has to be done after the df is defined because apparently they don't carry over.
-        renames = cross_check_task_renames(grooming_method=grooming_method, input_branches=df_original.GetColumnNames())
+        renames = cross_check_task_branch_name_shim(
+            grooming_method=grooming_method, input_branches=df_original.GetColumnNames()
+        )
         for k, v in renames.items():
             df_original = df_original.Alias(k, v)
 
@@ -906,7 +910,6 @@ def run(  # noqa: C901
     main_tree = ROOT.TChain(tree_name)
     for filename in input_filenames:
         main_tree.Add(str(filename))
-    # if collision_system == "embedPythia":
     if cross_check_task:
         friend_tree = ROOT.TChain("tree")
         for filename in input_filenames:
@@ -919,7 +922,9 @@ def run(  # noqa: C901
 
     if cross_check_task:
         # Add the aliases. This has to be done after the df is defined because apparently they don't carry over.
-        renames = cross_check_task_renames(grooming_method=grooming_method, input_branches=df_original.GetColumnNames())
+        renames = cross_check_task_branch_name_shim(
+            grooming_method=grooming_method, input_branches=df_original.GetColumnNames()
+        )
         for k, v in renames.items():
             df_original = df_original.Alias(k, v)
 
