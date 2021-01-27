@@ -5,12 +5,14 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+from __future__ import annotations
+
 import copy
 import logging
 import math
 import random
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import parsl
@@ -28,6 +30,10 @@ from parsl.monitoring.monitoring import MonitoringHub
 from parsl.providers import SlurmProvider
 
 from jet_substructure.base import helpers, skim_analysis_objects
+
+
+if TYPE_CHECKING:
+    from jet_substructure.cpp import unfolding_2D
 
 
 logger = logging.getLogger(__name__)
@@ -536,6 +542,81 @@ def setup_extract_scale_factors_for_embedding(
     output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}_scale_factors.yaml")
     with open(output_filename, "w") as f:
         y.dump(results, f)
+
+
+@python_app  # type: ignore
+def _write_cross_check_task_scale_factor_trees(
+    scale_factor: float,
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+    stdout: Optional[str] = None,
+    stderr: Optional[str] = None,
+) -> AppFuture:
+    from pathlib import Path
+
+    from jet_substructure.cpp import scale_factors
+
+    res = scale_factors.create_scale_factor_tree_for_cross_check_task_output(
+        filename=Path(inputs[0].filepath),
+        scale_factor=scale_factor,
+    )
+    return res
+
+
+def setup_write_cross_check_task_scale_factor_trees(
+    collision_system: str,
+    selected_train_numbers: Optional[Sequence[int]] = None,
+) -> None:
+    # Setup
+    dataset_config = read_config(collision_system=collision_system)
+    cross_check_task = dataset_config.get("cross_check_task", False)
+    if not cross_check_task:
+        logger.info(
+            f"Dataset {dataset_config['name']} is not a cross check task, so skipping writing the scale factor tree."
+        )
+        return
+
+    logger.info("Determining input files.")
+    input_files_per_pt_hard_bin = {}
+    for filename_base in dataset_config["files"]:
+        filename_base = Path(filename_base)
+
+        # Grab the pt hard bin to use as the key.
+        y = yaml.yaml()
+        with open(filename_base.parent / "config.yaml", "r") as f:
+            train_config = y.load(f)
+        train_number = train_config["number"]
+        pt_hard_bin = train_config["pt_hard_bin"]
+
+        # Validation for the train_number
+        assert train_number == int(filename_base.parent.name)
+        if selected_train_numbers and train_number not in selected_train_numbers:
+            logger.debug(f"Skipping train number {train_number}")
+            continue
+
+        # Expand the filenames
+        input_files_per_pt_hard_bin[pt_hard_bin] = helpers.expand_wildcards_in_filenames([filename_base])
+
+    # If we're writing the tree, we need the scale factors.
+    scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
+
+    results = {}
+    for pt_hard_bin, input_files in input_files_per_pt_hard_bin.items():
+        for input_file in input_files:
+            # Flatten the results so we don't have to do so later.
+            results[f"{pt_hard_bin}_{input_file}"] = _write_cross_check_task_scale_factor_trees(
+                inptus=[File(str(input_file))],
+                scale_factor=scale_factors[pt_hard_bin],
+            )
+
+    # Again, exceptionally, collect the results here so we can record the result.
+    # We don't pass on the dependency because we don't want to deal with the dependencies.
+    # NOTE: They could be handled by depending on the YAML file with the scale factors,
+    #       but it's not worth the effort at the moment (Jan 2021).
+    logger.info(f"About to ask for result of writing scale factor trees. len: {len(results)}")
+    # Wait for all apps to complete, and store the results.
+    final_results = {k: v.result() for k, v in results.items()}
+    logger.info(final_results)
 
 
 @python_app  # type: ignore
@@ -1117,7 +1198,7 @@ def setup_unfolding(
     embedded_train_directories = set([Path(filename).parent for filename in embedded_dataset_config["files"]])
     # embedded_prefixes = embedded_dataset_config["prefixes"]
 
-    # Detemrien filenames first since they don't depend on grooming methods
+    # Determine filenames first since they don't depend on grooming methods
     data_files: List[File] = []
     embedded_files: List[File] = []
     for label, train_directories, files in [
@@ -1326,8 +1407,12 @@ if __name__ == "__main__":  # noqa: C901
             entries_per_job=entries_per_job,
         )
     if "extract_scale_factors_for_embedding" in jobs_to_execute:
-        # NOTE: These are exected directly because they're needed for the next steps.
+        # NOTE: These are executed directly because they're needed for the next steps.
         setup_extract_scale_factors_for_embedding(
+            collision_system=collision_system,
+            # selected_train_numbers=list(range(6316, 6318)),
+        )
+        setup_write_cross_check_task_scale_factor_trees(
             collision_system=collision_system,
             # selected_train_numbers=list(range(6316, 6318)),
         )

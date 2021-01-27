@@ -4,12 +4,19 @@
 """
 
 import logging
+import warnings
 from pathlib import Path
 from typing import Any, Sequence, Tuple
 
 import numpy as np
 import uproot
 from pachyderm import binned_data, yaml
+
+
+# We know already - nothing to be done...
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    import uproot3
 
 from jet_substructure.base import helpers, skim_analysis_objects
 
@@ -78,6 +85,34 @@ def scale_factor_uproot(filenames: Sequence[Path], run_despite_issues: bool = Fa
     if not run_despite_issues:
         raise RuntimeError("Pachyderm binned data doesn't add profile histograms correctly...")
 
+    # NOTE: This code is from a previous piece of code to extract scale factors. This may only work
+    #       for uproot3. For now, it's not worth looking into, but I keep this around for posterity
+    #       in case it is useful later.
+    if False:
+        # To make this code appear valid, this line is just a hack and should be ignored when looking
+        # at the code as a reference.
+        filename = filenames[0]
+
+        # Setup
+        input_file = uproot3.open(filename)
+
+        # Retrieve the embedding helper to extract the cross section and ntrials.
+        embedding_hists = input_file["AliAnalysisTaskEmcalEmbeddingHelper_histos"]
+        h_cross_section_uproot = [h for h in embedding_hists if hasattr(h, "name") and h.name == b"fHistXsection"][0]
+        h_cross_section = binned_data.BinnedData.from_existing_data(h_cross_section_uproot)
+        h_n_trials = binned_data.BinnedData.from_existing_data(
+            [h for h in embedding_hists if hasattr(h, "name") and h.name == b"fHistTrials"][0]
+        )
+        # Find the first non-zero values bin.
+        # argmax will return the index of the first instance of True.
+        pt_hard_bin = (h_cross_section.values != 0).argmax(axis=0)
+
+        # The cross section is a profile hist, but we just read the raw values with uproot + binned_data. Consequently, the values
+        # aren't scaled down by the number of entries in that bin (as already performed by ROOT), so we just take the
+        # cross section / n_trials
+        scale_factor = h_cross_section.values[pt_hard_bin] / h_n_trials.values[pt_hard_bin]
+        logger.debug(f"Scale factor: {scale_factor}")
+
     cross_section_hists = []
     n_trials_hists = []
     n_entries: np.ndarray = []
@@ -112,8 +147,9 @@ def scale_factor_uproot(filenames: Sequence[Path], run_despite_issues: bool = Fa
     )
 
 
-def create_scale_factor_tree_for_embedded_output(
-    filename: Path, scale_factor: skim_analysis_objects.ScaleFactor
+def create_scale_factor_tree_for_cross_check_task_output(
+    filename: Path,
+    scale_factor: float,
 ) -> bool:
     """Create scale factor for a single embedded output."""
     # Get number of entries in the tree to determine
@@ -123,14 +159,19 @@ def create_scale_factor_tree_for_embedded_output(
         n_entries = f[tree_name].num_entries
         logger.debug(f"n entries: {n_entries}")
 
-    output_filename = filename.parent / "scale_factor" / filename.name
+    # We want the scale_factor directory to be in the main train directory.
+    base_dir = filename.parent
+    if base_dir.name == "skim":
+        # If we're in the skim dir, we need to move up one more level.
+        base_dir = base_dir.parent
+    output_filename = base_dir / "scale_factor" / filename.name
     output_filename.parent.mkdir(exist_ok=True, parents=True)
     logger.info(f"Writing scale_factor to {output_filename}")
     branches = {"scale_factor": np.float32}
-    with uproot.recreate(output_filename) as output_file:
-        output_file["tree"] = uproot.newtree(branches)
+    with uproot3.recreate(output_filename) as output_file:
+        output_file["tree"] = uproot3.newtree(branches)
         # Write all of the calculations
-        output_file["tree"].extend({"scale_factor": np.full(n_entries, scale_factor.value(), dtype=np.float32)})
+        output_file["tree"].extend({"scale_factor": np.full(n_entries, scale_factor, dtype=np.float32)})
 
     return True
 
