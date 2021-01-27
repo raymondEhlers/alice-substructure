@@ -6,7 +6,7 @@
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, Sequence, Tuple
+from typing import Any, Mapping, Sequence, Tuple
 
 import numpy as np
 import uproot
@@ -172,6 +172,46 @@ def create_scale_factor_tree_for_cross_check_task_output(
         output_file["tree"] = uproot3.newtree(branches)
         # Write all of the calculations
         output_file["tree"].extend({"scale_factor": np.full(n_entries, scale_factor, dtype=np.float32)})
+
+    return True
+
+
+def embedded_pt_hard_spectra(
+    filenames: Mapping[int, Sequence[Path]], scale_factors: Mapping[int, float], output_filename: Path
+) -> bool:
+    """Extract and save embedding pt hard spectra.
+
+    This functionaliy is exceptional because we only have the histograms, not the tree.
+
+    Note:
+        I write to yaml using binned_data because I'm not sure errors, etc would be handled properly
+        when writing the hist with uproot3.
+
+    Args:
+        filenames: Filenames as a function of pt hard bin.
+        scale_factors: Pt hard scale factors.
+        output_filename: Where the spectra should be saved (in yaml).
+    Returns:
+        True if successful.
+    """
+    pt_hard_spectra = []
+    for pt_hard_bin, pt_hard_filenames in filenames.items():
+        single_bin_pt_hard_spectra = []
+        for filename in filenames:
+            with uproot.open(filename) as f:
+                embedding_hists = f["AliAnalysisTaskEmcalEmbeddingHelper_histos"]
+                single_bin_pt_hard_spectra.append(
+                    [h for h in embedding_hists if h.has_member("fName") and h.member("fName") == "fHistPtHard"][0]
+                )
+        h_temp = sum(single_bin_pt_hard_spectra)
+        pt_hard_spectra.append(h_temp * scale_factors[pt_hard_bin])
+
+    final_spectra = sum(pt_hard_spectra)
+
+    output_filename.parent.mkdir(exist_ok=True, parents=True)
+    y = yaml.yaml(modules_to_register=[binned_data])
+    with open(output_filename, "w") as f_out:
+        y.dump([final_spectra], f_out)
 
     return True
 

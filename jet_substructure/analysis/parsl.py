@@ -74,19 +74,21 @@ def read_extracted_scale_factors(
     Returns:
         Normalized scaled factors
     """
-    p = Path(f"trains/{collision_system}/{dataset_name}_scale_factors.yaml")
+    p = Path(f"trains/{collision_system}/{dataset_name}/scale_factors.yaml")
     y = yaml.yaml(classes_to_register=[skim_analysis_objects.ScaleFactor])
     with open(p, "r") as f:
         scale_factors: Dict[int, skim_analysis_objects.ScaleFactor] = y.load(f)
 
     # Normalize scale factors based on the number of entries.
-    average_number_of_events = sum([v.n_accepted_events for v in scale_factors.values()]) / len(scale_factors)
-    normalized_scale_factors = {
-        pt_hard_bin: v.value() / (v.n_accepted_events / average_number_of_events)
-        for pt_hard_bin, v in scale_factors.items()
-    }
-
-    return normalized_scale_factors
+    if normalize_scale_factors:
+        average_number_of_events = sum([v.n_accepted_events for v in scale_factors.values()]) / len(scale_factors)
+        normalized_scale_factors = {
+            pt_hard_bin: v.value() / (v.n_accepted_events / average_number_of_events)
+            for pt_hard_bin, v in scale_factors.items()
+        }
+        return normalized_scale_factors
+    else:
+        return {pt_hard_bin: v.value() for pt_hard_bin, v in scale_factors.items()}
 
 
 def setup_parsl_587(
@@ -472,6 +474,33 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
     return results
 
 
+def _determine_input_files_per_pt_hard_bin(
+    dataset_config: Mapping[str, Any],
+    selected_train_numbers: Optional[Sequence[int]] = None,
+) -> Dict[int, List[Path]]:
+    input_files_per_pt_hard_bin = {}
+    for filename_base in dataset_config["files"]:
+        filename_base = Path(filename_base)
+
+        # Grab the pt hard bin to use as the key.
+        y = yaml.yaml()
+        with open(filename_base.parent / "config.yaml", "r") as f:
+            train_config = y.load(f)
+        train_number = train_config["number"]
+        pt_hard_bin = train_config["pt_hard_bin"]
+
+        # Validation for the train_number
+        assert train_number == int(filename_base.parent.name)
+        if selected_train_numbers and train_number not in selected_train_numbers:
+            logger.debug(f"Skipping train number {train_number}")
+            continue
+
+        # Expand the filenames
+        input_files_per_pt_hard_bin[pt_hard_bin] = helpers.expand_wildcards_in_filenames([filename_base])
+
+    return input_files_per_pt_hard_bin
+
+
 @python_app  # type: ignore
 def _extract_scale_factors_for_embedding(
     inputs: Sequence[File] = [],
@@ -505,25 +534,9 @@ def setup_extract_scale_factors_for_embedding(
     dataset_config = read_config(collision_system=collision_system)
 
     logger.info("Determining input files.")
-    input_files_per_pt_hard_bin = {}
-    for filename_base in dataset_config["files"]:
-        filename_base = Path(filename_base)
-
-        # Grab the pt hard bin to use as the key.
-        y = yaml.yaml()
-        with open(filename_base.parent / "config.yaml", "r") as f:
-            train_config = y.load(f)
-        train_number = train_config["number"]
-        pt_hard_bin = train_config["pt_hard_bin"]
-
-        # Validation for the train_number
-        assert train_number == int(filename_base.parent.name)
-        if selected_train_numbers and train_number not in selected_train_numbers:
-            logger.debug(f"Skipping train number {train_number}")
-            continue
-
-        # Expand the filenames
-        input_files_per_pt_hard_bin[pt_hard_bin] = helpers.expand_wildcards_in_filenames([filename_base])
+    input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
+        dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
+    )
 
     for pt_hard_bin, input_files in input_files_per_pt_hard_bin.items():
         logger.debug(f"pt_hard_bin: {pt_hard_bin}, filenames: {input_files}")
@@ -539,7 +552,7 @@ def setup_extract_scale_factors_for_embedding(
 
     # Write them to YAML for later.
     y = yaml.yaml(classes_to_register=[skim_analysis_objects.ScaleFactor])
-    output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}_scale_factors.yaml")
+    output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/scale_factors.yaml")
     with open(output_filename, "w") as f:
         y.dump(results, f)
 
@@ -577,25 +590,9 @@ def setup_write_cross_check_task_scale_factor_trees(
         return
 
     logger.info("Determining input files.")
-    input_files_per_pt_hard_bin = {}
-    for filename_base in dataset_config["files"]:
-        filename_base = Path(filename_base)
-
-        # Grab the pt hard bin to use as the key.
-        y = yaml.yaml()
-        with open(filename_base.parent / "config.yaml", "r") as f:
-            train_config = y.load(f)
-        train_number = train_config["number"]
-        pt_hard_bin = train_config["pt_hard_bin"]
-
-        # Validation for the train_number
-        assert train_number == int(filename_base.parent.name)
-        if selected_train_numbers and train_number not in selected_train_numbers:
-            logger.debug(f"Skipping train number {train_number}")
-            continue
-
-        # Expand the filenames
-        input_files_per_pt_hard_bin[pt_hard_bin] = helpers.expand_wildcards_in_filenames([filename_base])
+    input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
+        dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
+    )
 
     # If we're writing the tree, we need the scale factors.
     scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
@@ -608,6 +605,80 @@ def setup_write_cross_check_task_scale_factor_trees(
                 inptus=[File(str(input_file))],
                 scale_factor=scale_factors[pt_hard_bin],
             )
+
+    # Again, exceptionally, collect the results here so we can record the result.
+    # We don't pass on the dependency because we don't want to deal with the dependencies.
+    # NOTE: They could be handled by depending on the YAML file with the scale factors,
+    #       but it's not worth the effort at the moment (Jan 2021).
+    logger.info(f"About to ask for result of writing scale factor trees. len: {len(results)}")
+    # Wait for all apps to complete, and store the results.
+    final_results = {k: v.result() for k, v in results.items()}
+    logger.info(final_results)
+
+
+@python_app  # type: ignore
+def _extract_embedding_pt_hard_spectra(
+    scale_factors: Mapping[int, float],
+    offsets: Mapping[int, int],
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+    stdout: Optional[str] = None,
+    stderr: Optional[str] = None,
+) -> AppFuture:
+    from pathlib import Path
+
+    from jet_substructure.cpp import scale_factors as sf
+
+    # Convert back from parsl inputs
+    offsets_values = list(offsets.values())
+    filenames = {
+        pt_hard_bin: [
+            Path(f.filepath) for f in inputs[sum(offsets_values[:i]) : sum(offsets_values[: i + 1])]  # noqa: E203
+        ]
+        for i, pt_hard_bin in enumerate(offsets)
+    }
+    # filenames = {
+    #    pt_hard_bin: {Path(f.filepath) for pt_hard_bin, f in enumerate(inputs, start=1)}
+    # }
+
+    res = sf.embedded_pt_hard_spectra(
+        filenames=filenames,
+        scale_factors=scale_factors,
+        output_filename=Path(outputs[0].filepath),
+    )
+    return res
+
+
+def setup_extract_embedding_pt_hard_spectra(
+    collision_system: str,
+    selected_train_numbers: Optional[Sequence[int]] = None,
+) -> None:
+    # Setup
+    dataset_config = read_config(collision_system=collision_system)
+
+    # Input files
+    logger.info("Determining input files.")
+    input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
+        dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
+    )
+    scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
+
+    # Convert inputs to Parsl files.
+    # Needs to be a list, so flatten them, and then unflatten in the App.
+    parsl_files = []
+    offsets = {}
+    for pt_hard_bin, list_of_files in input_files_per_pt_hard_bin.items():
+        converted_filenames = [File(str(f)) for f in list_of_files]
+        offsets[pt_hard_bin] = len(converted_filenames)
+        parsl_files.extend(converted_filenames)
+
+    output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/pt_hard_spectra.yaml")
+    results = _extract_embedding_pt_hard_spectra(
+        scale_factors=scale_factors,
+        offsets=offsets,
+        inputs=parsl_files,
+        outputs=[File(str(output_filename))],
+    )
 
     # Again, exceptionally, collect the results here so we can record the result.
     # We don't pass on the dependency because we don't want to deal with the dependencies.
@@ -1413,6 +1484,10 @@ if __name__ == "__main__":  # noqa: C901
             # selected_train_numbers=list(range(6316, 6318)),
         )
         setup_write_cross_check_task_scale_factor_trees(
+            collision_system=collision_system,
+            # selected_train_numbers=list(range(6316, 6318)),
+        )
+        setup_extract_embedding_pt_hard_spectra(
             collision_system=collision_system,
             # selected_train_numbers=list(range(6316, 6318)),
         )
