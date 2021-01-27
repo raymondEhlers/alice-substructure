@@ -1061,15 +1061,20 @@ def calculate_data_skim(  # noqa: C901
 
         # Add scale factors when appropriate (ie for pythia)
         if collision_system == "pythia":
+            # Help out mypy...
+            assert scale_factors is not None
+            # Validation. We make a copy to ensure that we don't modify the input.
+            output_scale_factors = dict(scale_factors)
+
             # There is apparently a pt hard > 1000 in this dataset! This ends up with an entry in bin 21, which is weird.
             # So we copy the scale factor for pt hard bin 20 to 21 to cover it. It should be more or less correct.
-            scale_factors[21] = scale_factors[20]
+            output_scale_factors[21] = output_scale_factors[20]
 
             pt_hard_bins = np.array(all_jets["pt_hard_bin"], dtype=np.uint8)
             logger.debug(f"Pt hard bins contained in the file: {np.unique(pt_hard_bins)}")
             grooming_results.update(
                 {
-                    "scale_factor": np.array([scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
+                    "scale_factor": np.array([output_scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
                     "pt_hard_bin": pt_hard_bins,
                     "pt_hard": to_float(all_jets["pt_hard"]),
                 }
