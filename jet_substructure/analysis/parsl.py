@@ -260,18 +260,24 @@ def setup_repair_root_files(
     results = []
     dataset_config = read_config(collision_system=collision_system)
     tree_name = dataset_config["tree_name"]
-    filenames = helpers.expand_wildcards_in_filenames(dataset_config["files"])
+    filenames = dataset_config["files"]
     logger.info(f"Repairing files from dataset {dataset_config['name']}")
-    if selected_train_numbers:
-        filenames = [f for f in filenames if int(f.parent.name) in selected_train_numbers]
     # Filter out already repaired files
     # Specifically, we usually specify the repaired files in the config, but that's
     # not meaningful here. So we remove the "repaired" from the name, and then take those files.
+    # NOTE: This is susceptible to issues if "repaired." is in the path, but I think that's unlikely.
+    filenames = sorted([Path(str(f).replace("repaired.", "")) for f in filenames])
+    # Once we've intially filtered out the repaired filenames, we need to expand them
+    filenames = helpers.expand_wildcards_in_filenames(filenames)
+    # After the wildcard expansions, we need to do another filter for possible repaired filenames.
     # NOTE: It's important that we take a set because if the dir already has both, we don't
     #       want to try to add files twice.
     # NOTE: This is susceptible to issues if "repaired." is in the path, but I think that's unlikely.
     filenames = sorted(set([Path(str(f).replace("repaired.", "")) for f in filenames]))
-    # logger.info(f"Repairing filenames: {filenames}")
+    # And then filter by selected trains if necessary
+    if selected_train_numbers:
+        filenames = [f for f in filenames if int(f.parent.name) in selected_train_numbers]
+    logger.debug(f"Repairing filenames: {filenames}")
 
     for filename in filenames:
         # Setup file IO
