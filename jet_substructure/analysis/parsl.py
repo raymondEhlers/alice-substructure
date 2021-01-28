@@ -772,15 +772,18 @@ def setup_calculate_embedding_skim(
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
                 logger.debug(f"Skipping train number {train_directory.name}")
                 continue
-            logger.info(f"Processing {train_directory.name}")
+            logger.info(f"Processing train number {train_directory.name}")
 
             # Then iterate over the directories.
             for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
-                input_files.append((train_directory, File(str(filename))))
+                input_files.append(File(str(filename)))
 
     # Create the Apps.
-    for train_directory, parsl_input_file in input_files:
+    for parsl_input_file in input_files:
         # Setup
+        # The input_file is in trains/collision_system/train_number/parquet/events_per_job_{entries_per_job}/filename.parquet
+        # So to get the train directory, we need to take the parent 3 times.
+        train_directory = Path(parsl_input_file.filepath).parent.parent.parent
         iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
         # Setup file I/O
         output_dir = train_directory / "skim"
@@ -889,11 +892,14 @@ def setup_calculate_data_skim(
 
             # Then iterate over the directories.
             for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
-                input_files.append((train_directory, File(str(filename))))
+                input_files.append(File(str(filename)))
 
     # Create the Apps.
-    for train_directory, parsl_input_file in input_files:
+    for parsl_input_file in input_files:
         # Setup
+        # The input_file is in trains/collision_system/train_number/parquet/events_per_job_{entries_per_job}/filename.parquet
+        # So to get the train directory, we need to take the parent 3 times.
+        train_directory = Path(parsl_input_file.filepath).parent.parent.parent
         iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
         # Setup file I/O
         output_dir = train_directory / "skim"
@@ -1499,33 +1505,41 @@ if __name__ == "__main__":  # noqa: C901
             # selected_train_numbers=list(range(6316, 6318)),
         )
     if "calculate_embedding_skim" in jobs_to_execute:
-        results = setup_calculate_embedding_skim(
-            collision_system=collision_system,
-            entries_per_job=entries_per_job,
-            # selected_train_numbers=list(range(5966, 5967)),
-            input_files=[r.outputs[0] for r in results] if results else None,
+        results.extend(
+            setup_calculate_embedding_skim(
+                collision_system=collision_system,
+                entries_per_job=entries_per_job,
+                # selected_train_numbers=list(range(5966, 5967)),
+                input_files=[r.outputs[0] for r in results] if results else None,
+            )
         )
     if "calculate_data_skim" in jobs_to_execute:
-        results = setup_calculate_data_skim(
-            collision_system=collision_system,
-            entries_per_job=entries_per_job,
-            input_files=[r.outputs[0] for r in results] if results else None,
+        results.extend(
+            setup_calculate_data_skim(
+                collision_system=collision_system,
+                entries_per_job=entries_per_job,
+                input_files=[r.outputs[0] for r in results] if results else None,
+            )
         )
     if "root_data_frame" in jobs_to_execute:
-        results = setup_root_data_frame(
-            collision_system=collision_system,
-            jobs_per_node=jobs_per_node,
-            default_grooming_methods=grooming_methods,
-            # selected_train_numbers=list(range(5977, 5978)),
-            input_files=[r.outputs[0] for r in results] if results else None,
+        results.extend(
+            setup_root_data_frame(
+                collision_system=collision_system,
+                jobs_per_node=jobs_per_node,
+                default_grooming_methods=grooming_methods,
+                # selected_train_numbers=list(range(5977, 5978)),
+                input_files=[r.outputs[0] for r in results] if results else None,
+            )
         )
     if "root_data_frame_response" in jobs_to_execute:
-        results = setup_root_data_frame_response(
-            collision_system=collision_system,
-            jobs_per_node=jobs_per_node,
-            default_grooming_methods=grooming_methods,
-            # selected_train_numbers=list(range(6338, 6339)),
-            input_files=[r.outputs[0] for r in results] if results else None,
+        results.append(
+            setup_root_data_frame_response(
+                collision_system=collision_system,
+                jobs_per_node=jobs_per_node,
+                default_grooming_methods=grooming_methods,
+                # selected_train_numbers=list(range(6338, 6339)),
+                input_files=[r.outputs[0] for r in results] if results else None,
+            )
         )
     if "root_data_frame_closure" in jobs_to_execute:
         # We'll always want both, so let's just do both.
