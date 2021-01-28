@@ -37,6 +37,7 @@ _scale_factors_LHC19f4_embedded_into_LHC18qr: &scale_factors
 
 available_datasets:
     # pp
+    # pp R = 0.4
     LHC17pq_pp_R04_1998_1999:
         # NOTE: 22 January 2021: This dataset uses the jagged constituent indices from early versions
         #       of the substructure task. Although this maps nicely onto indexed arrays in awkward,
@@ -98,6 +99,7 @@ available_datasets:
         files:
             - "trains/pp/2039/AnalysisResults.*.repaired.root"
             - "trains/pp/2040/AnalysisResults.*.repaired.root"
+    # pp R = 0.2
     LHC17pq_pp_R02_1998_1999: &LHC17pq_pp_R02
         name: "LHC17pq_pp_R02_1998_1999"
         # yamllint disable-line rule:line-length
@@ -114,6 +116,7 @@ available_datasets:
             - "trains/pp/1998/AnalysisResults.*.repaired.root"
             - "trains/pp/1999/AnalysisResults.*.repaired.root"
     # pythia
+    # pythia R = 0.4
     LHC18b8_pythia_R04_2110: &LHC18b8_pythia_R04
         name: "LHC18b8_pythia_R04_2110"
         # yamllint disable-line rule:line-length
@@ -152,6 +155,7 @@ available_datasets:
             - "trains/pythia/2161/AnalysisResults.FAST.*.repaired.root"
             - "trains/pythia/2161/AnalysisResults.woSDD.*.repaired.root"
             - "trains/pythia/2161/AnalysisResults.woSDD.*.chunk*.root"
+    # pythia R = 0.2
     LHC18b8_pythia_R02_2461: &LHC18b8_pythia_R02
         name: "LHC18b8_pythia_R02_2461"
         # yamllint disable-line rule:line-length
