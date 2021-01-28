@@ -314,7 +314,7 @@ def _number_of_entries_per_file(
     input_filenames: Sequence[Union[Path, str]],
     tree_name: str,
     collision_system: str,
-    identifier: str,
+    dataset_name: str,
     recreate: bool = False,
 ) -> Dict[Path, int]:
     """Determine number of entries per file.
@@ -323,7 +323,7 @@ def _number_of_entries_per_file(
         input_filenames: Filenames to use in the number of entries determination.
         tree_name: Name of the tree.
         collision_system: Collision system.
-        identifier: Identifier for the dataset. Used to cache the number of entries per file.
+        dataset_name: Identifier for the dataset. Used to cache the number of entries per file.
         recreate: Force recreation of the number of entries per file for a dataset, skipping
             over the cache. Default: False.
     Returns:
@@ -334,7 +334,8 @@ def _number_of_entries_per_file(
 
     # Setup
     y = yaml.yaml()
-    number_of_entries_file = Path(f"trains/{collision_system}/{identifier}.yaml")
+    number_of_entries_file = Path(f"trains/{collision_system}/{dataset_name}/entries_per_file.yaml")
+    number_of_entries_file.parent.mkdir(parents=True, exist_ok=True)
 
     # We need the number of entries per file to be able to split up the jobs properly later.
     # If it doesn't exist, create it.
@@ -435,7 +436,7 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
         input_filenames=dataset_config["files"],
         tree_name=dataset_config["tree_name"],
         collision_system=collision_system,
-        identifier=dataset_config["name"],
+        dataset_name=dataset_config["name"],
         # recreate=True,
     )
     job_ranges = _distribute_entries_to_jobs(
