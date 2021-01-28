@@ -113,6 +113,77 @@ available_datasets:
         files:
             - "trains/pp/1998/AnalysisResults.*.repaired.root"
             - "trains/pp/1999/AnalysisResults.*.repaired.root"
+    # pythia
+    LHC18b8_pythia_R04_2110: &LHC18b8_pythia_R04
+        name: "LHC18b8_pythia_R04_2110"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+            "true": "matched"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.4
+        files:
+            # NOTE: These probably need to be redownloaded and repaired because they
+            #       followed an older standard...
+            - "trains/pythia/2110/AnalysisResults.FAST.*.repaired.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.*.repaired.root"
+            - "trains/pythia/2110/AnalysisResults.woSDD.*.chunk*.root"
+    LHC18b8_pythia_R04_tracking_efficiency_2161:
+        name: "LHC18b8_pythia_R04_tracking_efficiency_2161"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+            "true": "matched"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.4
+        files:
+            # NOTE: These probably need to be redownloaded and repaired because they
+            #       followed an older standard...
+            - "trains/pythia/2161/AnalysisResults.FAST.*.repaired.root"
+            - "trains/pythia/2161/AnalysisResults.woSDD.*.repaired.root"
+            - "trains/pythia/2161/AnalysisResults.woSDD.*.chunk*.root"
+    LHC18b8_pythia_R02_2461: &LHC18b8_pythia_R02
+        name: "LHC18b8_pythia_R02_2461"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR020_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+            "true": "matched"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        files:
+            - "trains/pythia/2461/AnalysisResults.FAST.*.repaired.root"
+            - "trains/pythia/2461/AnalysisResults.cent_woSDD.*.repaired.root"
+    LHC18b8_pythia_R02_tracking_efficiency_2462:
+        name: "LHC18b8_pythia_R02_tracking_efficiency_2462"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR020_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+            "true": "matched"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        files:
+            - "trains/pythia/2461/AnalysisResults.FAST.*.repaired.root"
+            - "trains/pythia/2461/AnalysisResults.cent_woSDD.*.repaired.root"
     # Pb-Pb
     LHC18qr_semi_central_5863: &LHC18qr_semi_central
         name: "LHC18qr_semi_central_5863"
