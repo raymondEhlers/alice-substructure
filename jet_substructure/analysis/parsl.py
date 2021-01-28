@@ -154,11 +154,11 @@ def setup_parsl_587(
 
     machines_to_exclude = [
         # pc051 and pc075 have two OSDs, so they will always be short of memory. Better to avoid until we have more memory.
-        "pc051",
-        "pc075",
+        # "pc051",
+        # "pc075",
         # pc147 is an mds server, and somehow load on it seems to cause problems in the ceph quorum. So we skip for now,
         # by may be able to include later...
-        "pc147",
+        # "pc147",
     ]
     if use_root:
         # pc059 to avoid causing problems on the login node when using 8 cores for root data frame.
