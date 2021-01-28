@@ -468,7 +468,7 @@ def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1
             results.append(
                 _convert_to_parquet(
                     tree_name=dataset_config["tree_name"],
-                    prefixes=list(dataset_config["prefix"].values()),
+                    prefixes=list(dataset_config["prefixes"].values()),
                     branches=dataset_config["branches"],
                     prefix_branches=dataset_config["prefix_branches"],
                     event_range=event_range,
