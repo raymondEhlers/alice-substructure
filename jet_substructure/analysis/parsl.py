@@ -397,6 +397,88 @@ def _distribute_entries_to_jobs(
 
 
 @python_app  # type: ignore
+def _number_of_entries_per_file_app(
+    tree_name: str,
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+) -> AppFuture:
+    from pathlib import Path
+
+    import uproot
+
+    filename = Path(inputs[0].filepath)
+    with uproot.open(filename) as f:
+        logger.debug(filename)
+        number_of_entries = f[tree_name].num_entries
+
+    return number_of_entries
+
+
+@python_app  # type: ignore
+def _write_number_of_entries_per_file_cache(
+    number_of_entries_per_file: Dict[str, AppFuture],
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+) -> AppFuture:
+    """Write the number of entries per file to a cache.
+
+    Note:
+        Since the values that are inputs to this function are already evaluated,
+        this doesn't actually need to be an app. We could just write the values.
+        However, since it's already an app, we just leave it.
+
+    """
+    from pathlib import Path
+
+    from pachyderm import yaml
+
+    # Setup
+    output_filename = Path(outputs[0].filepath)
+    output_filename.parent.mkdir(parents=True, exist_ok=True)
+    y = yaml.yaml()
+
+    # And then actually write the cache.
+    with open(output_filename, "w") as f:
+        # Explicit iteration because we need to ask for results.
+        # y.dump({k: v for k, v in number_of_entries_per_file.items()}, f)
+        # y.dump({k: v.result() for k, v in number_of_entries_per_file.items()}, f)
+        y.dump(number_of_entries_per_file, f)
+
+    return True
+
+
+@python_app  # type: ignore
+def _entries_to_ranges_for_jobs(
+    number_of_entries: int,
+    entries_per_job: int,
+) -> AppFuture:
+    """Determine the event range for a job given a total number of entries.
+
+    Args:
+        number_of_entries: Number of entries in the file.
+        entries_per_job: Number of entries to process in a single job.
+
+    Returns:
+        List of (start entry, end entry) values.
+    """
+    splits = []
+    start = 0
+    continue_iterating = True
+    while continue_iterating:
+        end = start + entries_per_job
+        # Ensure that we never ask for more entries than are in the file.
+        if start + entries_per_job > number_of_entries:
+            end = number_of_entries
+            continue_iterating = False
+        # Store the start and stop for convenience.
+        splits.append((start, end))
+        # Move up to the next iteration.
+        start = end
+
+    return splits
+
+
+@python_app  # type: ignore
 def _convert_to_parquet(
     tree_name: str,
     prefixes: Sequence[str],
@@ -425,60 +507,166 @@ def _convert_to_parquet(
     return res
 
 
-def setup_convert_to_parquet(collision_system: str, entries_per_job: int = int(1e5)) -> List[AppFuture]:
+def setup_convert_to_parquet(
+    collision_system: str,
+    entries_per_job: int,
+    dataset_config: Dict[str, Any],
+    input_files: Optional[MutableSequence[DataFuture]] = None,
+) -> Tuple[List[AppFuture], List[AppFuture]]:
     """Setup convert_to_parquet app for execution with parsl.
 
     Args:
+        collision_system: Name of collision system.
         events_per_job: Number of events to process in each job.
+        dataset_confing: Dataset configuration.
+        input_files: Input files from the previous job once which this task depends.
     Returns:
         List of `AppFuture` created when defining the jobs.
     """
     # Setup
     results = []
-    dataset_config = read_config(collision_system=collision_system)
+    number_of_entries_per_file_results = {}
+    job_ranges_results = []
+    parquet_results = []
 
-    # Based on the number of events desired per job, split the files into jobs with those number of events.
-    number_of_entries_per_file = _number_of_entries_per_file(
-        input_filenames=dataset_config["files"],
-        tree_name=dataset_config["tree_name"],
-        collision_system=collision_system,
-        dataset_name=dataset_config["name"],
-        # recreate=True,
-    )
-    job_ranges = _distribute_entries_to_jobs(
-        number_of_entries_per_file=number_of_entries_per_file, entries_per_job=entries_per_job
-    )
-    # logger.debug(job_ranges)
-    # Sanity check.
-    logger.debug(f"Total entries: {sum([len(l) for l in job_ranges.values()])}")
+    # Determine filenames
+    if input_files is None:
+        input_filenames = helpers.expand_wildcards_in_filenames([Path(f) for f in dataset_config["files"]])
+        input_files = [File(str(filename)) for filename in input_filenames]
 
-    # Iterate over the file and event ranges, setting up an app for each entry.
-    for i_file, (filename, event_ranges) in enumerate(job_ranges.items()):
-        for i, event_range in enumerate(event_ranges):
+    # Attempt to load the nubmer of entries per file cache
+    number_of_entries_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/entries_per_file.yaml")
+    number_of_entries_per_file = {}
+    if number_of_entries_filename.exists():
+        logger.info("Loading cache")
+        # Now we know that it exists, we can grab it.
+        y = yaml.yaml()
+        with open(number_of_entries_filename, "r") as f:
+            res = y.load(f)
+            # number_of_entries_per_file = {Path(k): v for k, v in res.items()}
+            number_of_entries_per_file = {k: v for k, v in res.items()}
+
+    logger.info(f"Input files: {input_files}")
+    logger.info(f"number_of_entries_per_file: {number_of_entries_per_file}")
+    for input_file in input_files:
+        if not number_of_entries_per_file:
+            number_of_entries_per_file_result = _number_of_entries_per_file_app(
+                tree_name=dataset_config["tree_name"],
+                inputs=[input_file],
+            )
+            # Store the output in our overall results.
+            results.append(number_of_entries_per_file_result)
+            # Store this output so we can cache this result.
+            number_of_entries_per_file_results[str(input_file.filepath)] = number_of_entries_per_file_result
+        else:
+            # Utilize the cache.
+            number_of_entries_per_file_result = number_of_entries_per_file[input_file.filepath]
+
+        job_ranges_result = _entries_to_ranges_for_jobs(
+            number_of_entries=number_of_entries_per_file_result,
+            entries_per_job=entries_per_job,
+        )
+        # Store the output in our overall results.
+        results.append(job_ranges_result)
+        # And then store just the job ranges results
+        job_ranges_results.append((input_file, job_ranges_result))
+
+    logger.info(f"Partially done results: {results}")
+    logger.info(f"job_range_results: {job_ranges_results}")
+
+    for input_file, job_range_result in job_ranges_results:
+        # TODO: We have to evaluate to determine the job ranges (?)
+        # for job_range in job_ranges_result.result():
+        # for i, event_range in enumerate(job_ranges_result.result()):
+        temp_result = job_ranges_result.result()
+        logger.info(f"job_ranges_result: {temp_result}")
+        for i, event_range in enumerate(temp_result):
             # Setup file IO
-            parsl_input_file = File(str(filename))
-            output_filename = Path(parsl_input_file.filepath)
+            output_filename = Path(input_file.filepath)
             # Path becomes ../parquet/events_per_job_.../filename.00.parquet
             output_filename = (
                 output_filename.parent / "parquet" / f"events_per_job_{entries_per_job}" / output_filename.name
             )
             output_filename = output_filename.with_suffix(f".{i:02}.parquet")
-            parsl_output_file = File(str(output_filename))
+            output_file = File(str(output_filename))
 
-            results.append(
+            parquet_results.append(
                 _convert_to_parquet(
                     tree_name=dataset_config["tree_name"],
                     prefixes=list(dataset_config["prefixes"].values()),
                     branches=dataset_config["branches"],
                     prefix_branches=dataset_config["prefix_branches"],
                     event_range=event_range,
-                    inputs=[parsl_input_file],
-                    outputs=[parsl_output_file],
-                    stdout=f"{i_file}_{i}.log",
+                    inputs=[input_file],
+                    outputs=[output_file],
+                    # stdout=f"{i_file}_{i}.log",
                 )
             )
+    # Store with the rest of the results
+    results.extend(parquet_results)
 
-    return results
+    logger.info(f"Almost done: {results}")
+    logger.info(f"number_of_entries_per_file_results: {number_of_entries_per_file_results}")
+
+    # Write cache if needed.
+    if number_of_entries_per_file_results:
+        results.append(
+            _write_number_of_entries_per_file_cache(
+                # Apparently we need to request the result here to avoid some pickling issues.
+                # Best guess: The results have already been evaluted while determining the range,
+                # so at this point, it's not a future anymore (ie. it was a future, but now it's a
+                # "present"). So we just retrieve the value again.
+                number_of_entries_per_file={k: v.result() for k, v in number_of_entries_per_file_results.items()},
+                # number_of_entries_per_file=number_of_entries_per_file_results,
+                outputs=[File(str(number_of_entries_filename))],
+            )
+        )
+
+    if False:
+        # Based on the number of events desired per job, split the files into jobs with those number of events.
+        # NOTE: The input root files _must_ be repaired first because we need to access the repaired files
+        #       here outside of an app (ie. it can't be executed lazily).
+        number_of_entries_per_file = _number_of_entries_per_file(
+            input_filenames=dataset_config["files"],
+            tree_name=dataset_config["tree_name"],
+            collision_system=collision_system,
+            dataset_name=dataset_config["name"],
+            # recreate=True,
+        )
+        job_ranges = _distribute_entries_to_jobs(
+            number_of_entries_per_file=number_of_entries_per_file, entries_per_job=entries_per_job
+        )
+        # logger.debug(job_ranges)
+        # Sanity check.
+        logger.debug(f"Total entries: {sum([len(l) for l in job_ranges.values()])}")
+
+        # Iterate over the file and event ranges, setting up an app for each entry.
+        for i_file, (filename, event_ranges) in enumerate(job_ranges.items()):
+            for i, event_range in enumerate(event_ranges):
+                # Setup file IO
+                parsl_input_file = File(str(filename))
+                output_filename = Path(parsl_input_file.filepath)
+                # Path becomes ../parquet/events_per_job_.../filename.00.parquet
+                output_filename = (
+                    output_filename.parent / "parquet" / f"events_per_job_{entries_per_job}" / output_filename.name
+                )
+                output_filename = output_filename.with_suffix(f".{i:02}.parquet")
+                parsl_output_file = File(str(output_filename))
+
+                results.append(
+                    _convert_to_parquet(
+                        tree_name=dataset_config["tree_name"],
+                        prefixes=list(dataset_config["prefixes"].values()),
+                        branches=dataset_config["branches"],
+                        prefix_branches=dataset_config["prefix_branches"],
+                        event_range=event_range,
+                        inputs=[parsl_input_file],
+                        outputs=[parsl_output_file],
+                        stdout=f"{i_file}_{i}.log",
+                    )
+                )
+
+    return results, parquet_results
 
 
 def _determine_input_files_per_pt_hard_bin(
@@ -974,9 +1162,9 @@ def setup_root_data_frame(
     prefixes = dataset_config["prefixes"]
 
     # If input files aren't passed, then we need to determine them ourselves.
+    determined_input_files = []
     if input_files is None:
         logger.info("Determining input files independently.")
-        input_files = []
         for train_directory in sorted(train_directories):
             # Select train numbers.
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
@@ -986,8 +1174,9 @@ def setup_root_data_frame(
 
             # Then iterate over the directories.
             for filename in Path(f"{train_directory}/skim/").glob("*.root"):
-                input_files.append(File(str(filename)))
+                determined_input_files.append(File(str(filename)))
 
+    # logger.info(f"Input files (len: {len(input_files)}: {input_files}")
     logger.info(f"N cores per job: {math.floor(8 / jobs_per_node)}")
     results = []
     cross_check_task = dataset_config.get("cross_check_task", False)
@@ -996,11 +1185,12 @@ def setup_root_data_frame(
         grooming_methods = dataset_config["grooming_methods"]
     else:
         grooming_methods = list(default_grooming_methods)
+
     for grooming_method in grooming_methods:
         # Setup file IO
         # Randomize the input list so we don't always hit the same files at the same time.
         # Note: It randomizes in place.
-        random.shuffle(input_files)
+        # random.shuffle(input_files)
         output_file = (
             output_dir / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.values())}.root"
         )
@@ -1014,7 +1204,7 @@ def setup_root_data_frame(
                 jet_R=dataset_config["jet_R"],
                 n_cores=math.floor(8 / jobs_per_node),
                 cross_check_task=cross_check_task,
-                inputs=input_files,
+                inputs=[r.outputs[0] for r in input_files] if input_files else determined_input_files,
                 outputs=[parsl_output_file],
             )
         )
@@ -1413,13 +1603,16 @@ def setup_unfolding(
 
 if __name__ == "__main__":  # noqa: C901
     # Settings
-    collision_system = "pp"
+    collision_system = "PbPb"
     jobs_to_execute = [
-        "convert_to_parquet",
+        # "repair_root_files",
+        # "convert_to_parquet",
+        "calculate_data_skim",
+        "root_data_frame",
     ]
-    entries_per_job = int(2e5)
-    nodes_to_allocate = 1
+    nodes_to_allocate = 2
     jobs_per_node = 6
+    entries_per_job = int(2e5)
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
     grooming_methods = [
         "leading_kt",
@@ -1477,7 +1670,11 @@ if __name__ == "__main__":  # noqa: C901
     # Quiet down parsl
     logging.getLogger("parsl").setLevel(logging.WARNING)
 
+    # Helpers
+    dataset_config = read_config(collision_system=collision_system)
+
     results = []
+    all_results = []
     logger.info(f"Jobs to execute: {jobs_to_execute}")
     if "repair_root_files" in jobs_to_execute:
         results = setup_repair_root_files(
@@ -1485,12 +1682,18 @@ if __name__ == "__main__":  # noqa: C901
             jobs_per_node=jobs_per_node,
             # selected_train_numbers=list(range(6296, 6297)),
         )
+        all_results.extend(results)
     if "convert_to_parquet" in jobs_to_execute:
-        results = setup_convert_to_parquet(
+        # Redefine results so we can use that in the next step.
+        _all_results, results = setup_convert_to_parquet(
             collision_system=collision_system,
             entries_per_job=entries_per_job,
+            dataset_config=dataset_config,
+            input_files=[r.outputs[0] for r in results] if results else None,
         )
+        all_results.extend(_all_results)
     if "extract_scale_factors_for_embedding" in jobs_to_execute:
+        # TODO: These should be possible to integrate, just as was done for the convert_to_parquet
         # NOTE: These are executed directly because they're needed for the next steps.
         setup_extract_scale_factors_for_embedding(
             collision_system=collision_system,
@@ -1505,42 +1708,40 @@ if __name__ == "__main__":  # noqa: C901
             # selected_train_numbers=list(range(6316, 6318)),
         )
     if "calculate_embedding_skim" in jobs_to_execute:
-        results.extend(
-            setup_calculate_embedding_skim(
-                collision_system=collision_system,
-                entries_per_job=entries_per_job,
-                # selected_train_numbers=list(range(5966, 5967)),
-                input_files=[r.outputs[0] for r in results] if results else None,
-            )
+        results = setup_calculate_embedding_skim(
+            collision_system=collision_system,
+            entries_per_job=entries_per_job,
+            # selected_train_numbers=list(range(5966, 5967)),
+            input_files=[r.outputs[0] for r in results] if results else None,
         )
+        all_results.extend(results)
     if "calculate_data_skim" in jobs_to_execute:
-        results.extend(
-            setup_calculate_data_skim(
-                collision_system=collision_system,
-                entries_per_job=entries_per_job,
-                input_files=[r.outputs[0] for r in results] if results else None,
-            )
+        results = setup_calculate_data_skim(
+            collision_system=collision_system,
+            entries_per_job=entries_per_job,
+            input_files=[r.outputs[0] for r in results] if results else None,
         )
+        # all_results.extend(results)
     if "root_data_frame" in jobs_to_execute:
-        results.extend(
-            setup_root_data_frame(
-                collision_system=collision_system,
-                jobs_per_node=jobs_per_node,
-                default_grooming_methods=grooming_methods,
-                # selected_train_numbers=list(range(5977, 5978)),
-                input_files=[r.outputs[0] for r in results] if results else None,
-            )
+        results = setup_root_data_frame(
+            collision_system=collision_system,
+            jobs_per_node=jobs_per_node,
+            default_grooming_methods=grooming_methods,
+            # selected_train_numbers=list(range(5977, 5978)),
+            # TODO: Maybe this counts as calling??
+            # input_files=[r.outputs[0] for r in results] if results else None,
+            input_files=results if results else None,
         )
+        all_results.extend(results)
     if "root_data_frame_response" in jobs_to_execute:
-        results.append(
-            setup_root_data_frame_response(
-                collision_system=collision_system,
-                jobs_per_node=jobs_per_node,
-                default_grooming_methods=grooming_methods,
-                # selected_train_numbers=list(range(6338, 6339)),
-                input_files=[r.outputs[0] for r in results] if results else None,
-            )
+        results = setup_root_data_frame_response(
+            collision_system=collision_system,
+            jobs_per_node=jobs_per_node,
+            default_grooming_methods=grooming_methods,
+            # selected_train_numbers=list(range(6338, 6339)),
+            input_files=[r.outputs[0] for r in results] if results else None,
         )
+        all_results.extend(results)
     if "root_data_frame_closure" in jobs_to_execute:
         # We'll always want both, so let's just do both.
         temp_results = []
@@ -1563,12 +1764,14 @@ if __name__ == "__main__":  # noqa: C901
             tag="central_reweight_prior",
         )
 
-    logger.info(f"About to ask for result. len: {len(results)}")
+    logger.info(f"About to ask for result. len: {len(all_results)}")
+    # import IPython; IPython.embed()
     # Wait on results
     # print each job status, initially all are running
     # print ("Job Status: {}".format([r.done() for r in results]))
     # Wait for all apps to complete
     res = [r.result() for r in results]
+    # res = [r.result() for r in all_results]
     logger.info(res)
 
     logger.info("Done")
