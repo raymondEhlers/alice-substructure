@@ -260,16 +260,16 @@ def setup_repair_root_files(
     # Setup
     logger.info(f"Repairing files from dataset {dataset_config['name']}")
     tree_name = dataset_config["tree_name"]
-    # Determine filesnames. This is a bit involved.
+    # Determine filenames. This is a bit involved.
     filenames = dataset_config["files"]
     # Filter out already repaired files
     # Specifically, we usually specify the repaired files in the config, but that's
     # not meaningful here. So we remove the "repaired" from the name, and then take those files.
     # NOTE: This is susceptible to issues if "repaired." is in the path, but I think that's unlikely.
     filenames = sorted([Path(str(f).replace("repaired.", "")) for f in filenames])
-    # Once we've intially filtered out the repaired filenames, we need to expand them
+    # Once we've initially filtered out the repaired filenames, we need to expand them
     filenames = helpers.expand_wildcards_in_filenames(filenames)
-    # After the wildcard expansions, we need to do another filter for possible repaired filenames.
+    # After the wild card expansions, we need to do another filter for possible repaired filenames.
     # NOTE: It's important that we take a set because if the dir already has both, we don't
     #       want to try to add files twice.
     # NOTE: This is susceptible to issues if "repaired." is in the path, but I think that's unlikely.
@@ -648,7 +648,7 @@ def setup_convert_to_parquet(
 def _determine_input_files_per_pt_hard_bin(
     dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> Dict[int, List[Path]]:
+) -> Dict[int, List[File]]:
     input_files_per_pt_hard_bin = {}
     for filename_base in dataset_config["files"]:
         filename_base = Path(filename_base)
@@ -667,7 +667,9 @@ def _determine_input_files_per_pt_hard_bin(
             continue
 
         # Expand the filenames
-        input_files_per_pt_hard_bin[pt_hard_bin] = helpers.expand_wildcards_in_filenames([filename_base])
+        input_files_per_pt_hard_bin[pt_hard_bin] = [
+            File(f) for f in helpers.expand_wildcards_in_filenames([filename_base])
+        ]
 
     return input_files_per_pt_hard_bin
 
@@ -682,19 +684,18 @@ def _extract_scale_factors_for_embedding(
     from pathlib import Path
 
     from jet_substructure.base import skim_analysis_objects
-    from jet_substructure.cpp import scale_factors
+    from jet_substructure.cpp import scale_factors as sf
 
     res = skim_analysis_objects.ScaleFactor.from_hists(
-        *scale_factors.scale_factor_ROOT(filenames=[Path(i.filepath) for i in inputs])
+        *sf.scale_factor_ROOT(filenames=[Path(i.filepath) for i in inputs])
     )
     return res
 
 
 def setup_extract_scale_factors_for_embedding(
-    collision_system: str,
     dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> None:
+) -> Dict[int, AppFuture]:
     """Extract scale factors from embedding hists.
 
     Note:
@@ -704,7 +705,7 @@ def setup_extract_scale_factors_for_embedding(
     # Setup
     scale_factors = {}
 
-    logger.info("Determining input files.")
+    logger.info("Determining input files for extracting scale factors.")
     input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
         dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
     )
@@ -715,17 +716,27 @@ def setup_extract_scale_factors_for_embedding(
             inputs=[File(str(fname)) for fname in input_files]
         )
 
-    # Exceptionally, collect the results here so we can record the result.
-    logger.info(f"About to ask for result. len: {len(scale_factors)}")
-    # Wait for all apps to complete, and store the results.
-    results = {k: v.result() for k, v in scale_factors.items()}
-    logger.info(results)
+    return scale_factors
+
+
+@python_app  # type: ignore
+def _write_scale_factors_to_yaml(
+    scale_factors: Mapping[int, skim_analysis_objects.ScaleFactor],
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+) -> AppFuture:
+    from pathlib import Path
+
+    from pachyderm import yaml
+
+    from jet_substructure.base import skim_analysis_objects
 
     # Write them to YAML for later.
     y = yaml.yaml(classes_to_register=[skim_analysis_objects.ScaleFactor])
-    output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/scale_factors.yaml")
-    with open(output_filename, "w") as f:
-        y.dump(results, f)
+    with open(Path(outputs[0].filepath), "w") as f:
+        y.dump(scale_factors, f)
+
+    return True
 
 
 @python_app  # type: ignore
@@ -738,53 +749,58 @@ def _write_cross_check_task_scale_factor_trees(
 ) -> AppFuture:
     from pathlib import Path
 
-    from jet_substructure.cpp import scale_factors
+    from jet_substructure.cpp import scale_factors as sf
 
-    res = scale_factors.create_scale_factor_tree_for_cross_check_task_output(
+    res = sf.create_scale_factor_tree_for_cross_check_task_output(
         filename=Path(inputs[0].filepath),
         scale_factor=scale_factor,
     )
     return res
 
 
-def setup_write_cross_check_task_scale_factor_trees(
+def setup_write_scale_factors(
     collision_system: str,
     dataset_config: Mapping[str, Any],
+    scale_factors: Mapping[int, skim_analysis_objects.ScaleFactor],
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> None:
+) -> Tuple[AppFuture, List[AppFuture]]:
+    """Write scale factors to YAML and to trees if necessary."""
+    # First, we write to YAML.
+    # We want to do this regardless of potentially writing the scale factor trees.
+    logger.info("Writing scale factors to YAML.")
+    output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/scale_factors.yaml")
+    parsl_output_file = File(str(output_filename))
+    yaml_result = _write_scale_factors_to_yaml(
+        scale_factors=scale_factors,
+        outputs=[parsl_output_file],
+    )
+
     # Setup
     cross_check_task = dataset_config.get("cross_check_task", False)
     if not cross_check_task:
         logger.info(
             f"Dataset {dataset_config['name']} is not a cross check task, so skipping writing the scale factor tree."
         )
-        return
+        return yaml_result, []
 
-    logger.info("Determining input files.")
+    logger.info("Determining input files for writing scale factor trees.")
     input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
         dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
     )
 
-    # If we're writing the tree, we need the scale factors.
-    scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
-
-    results = {}
+    tree_results = []
     for pt_hard_bin, input_files in input_files_per_pt_hard_bin.items():
         for input_file in input_files:
             # Flatten the results so we don't have to do so later.
-            results[f"{pt_hard_bin}_{input_file}"] = _write_cross_check_task_scale_factor_trees(
-                inptus=[File(str(input_file))],
-                scale_factor=scale_factors[pt_hard_bin],
+            # tree_results[f"{pt_hard_bin}_{input_file}"] = _write_cross_check_task_scale_factor_trees(
+            tree_results.append(
+                _write_cross_check_task_scale_factor_trees(
+                    scale_factor=scale_factors[pt_hard_bin],
+                    inputs=[File(str(input_file)), yaml_result.outputs[0]],
+                )
             )
 
-    # Again, exceptionally, collect the results here so we can record the result.
-    # We don't pass on the dependency because we don't want to deal with the dependencies.
-    # NOTE: They could be handled by depending on the YAML file with the scale factors,
-    #       but it's not worth the effort at the moment (Jan 2021).
-    logger.info(f"About to ask for result of writing scale factor trees. len: {len(results)}")
-    # Wait for all apps to complete, and store the results.
-    final_results = {k: v.result() for k, v in results.items()}
-    logger.info(final_results)
+    return yaml_result, tree_results
 
 
 @python_app  # type: ignore
@@ -823,14 +839,15 @@ def _extract_embedding_pt_hard_spectra(
 def setup_extract_embedding_pt_hard_spectra(
     collision_system: str,
     dataset_config: Mapping[str, Any],
+    scale_factors: Mapping[int, skim_analysis_objects.ScaleFactor],
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> None:
+) -> AppFuture:
     # Input files
     logger.info("Determining input files.")
     input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
         dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
     )
-    scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
+    # scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
 
     # Convert inputs to Parsl files.
     # Needs to be a list, so flatten them, and then unflatten in the App.
@@ -849,14 +866,7 @@ def setup_extract_embedding_pt_hard_spectra(
         outputs=[File(str(output_filename))],
     )
 
-    # Again, exceptionally, collect the results here so we can record the result.
-    # We don't pass on the dependency because we don't want to deal with the dependencies.
-    # NOTE: They could be handled by depending on the YAML file with the scale factors,
-    #       but it's not worth the effort at the moment (Jan 2021).
-    logger.info(f"About to ask for result of writing scale factor trees. len: {len(results)}")
-    # Wait for all apps to complete, and store the results.
-    final_results = {k: v.result() for k, v in results.items()}
-    logger.info(final_results)
+    return results
 
 
 @python_app  # type: ignore
@@ -1610,23 +1620,31 @@ if __name__ == "__main__":  # noqa: C901
         )
         all_results.extend(_all_results)
     if "extract_scale_factors_for_embedding" in jobs_to_execute:
-        # TODO: These should be possible to integrate, just as was done for the convert_to_parquet
-        # NOTE: These are executed directly because they're needed for the next steps.
-        setup_extract_scale_factors_for_embedding(
-            collision_system=collision_system,
+        # NOTE: We don't take any input_results because we're super dependent on knowing the
+        #       pt hard bins. We would have to reorganize the outputs heavily, so it's
+        #       in fact easier for us to determine them independently. Note also that we
+        #       we could only take the outputs from repair_root_files because we need to
+        #       go back to the original repaired root files.
+        scale_factors = setup_extract_scale_factors_for_embedding(
             dataset_config=dataset_config,
             # selected_train_numbers=list(range(6316, 6318)),
         )
-        setup_write_cross_check_task_scale_factor_trees(
+        all_results.extend(scale_factors)
+        yaml_result, tree_results = setup_write_scale_factors(
             collision_system=collision_system,
             dataset_config=dataset_config,
+            scale_factors=scale_factors,
             # selected_train_numbers=list(range(6316, 6318)),
         )
-        setup_extract_embedding_pt_hard_spectra(
+        all_results.extend(yaml_result)
+        all_results.extend(tree_results)
+        results = setup_extract_embedding_pt_hard_spectra(
             collision_system=collision_system,
             dataset_config=dataset_config,
+            scale_factors=scale_factors,
             # selected_train_numbers=list(range(6316, 6318)),
         )
+        all_results.extend(results)
     if "calculate_embedding_skim" in jobs_to_execute:
         results = setup_calculate_embedding_skim(
             collision_system=collision_system,
@@ -1697,8 +1715,8 @@ if __name__ == "__main__":  # noqa: C901
     # print each job status, initially all are running
     # print ("Job Status: {}".format([r.done() for r in results]))
     # Wait for all apps to complete
-    res = [r.result() for r in results]
-    # res = [r.result() for r in all_results]
+    # res = [r.result() for r in results]
+    res = [r.result() for r in all_results]
     logger.info(res)
 
     logger.info("Done")
