@@ -240,6 +240,7 @@ def _repair_root_files(
 def setup_repair_root_files(
     collision_system: str,
     jobs_per_node: int,
+    dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> List[AppFuture]:
     """Repair ROOT files.
@@ -259,7 +260,6 @@ def setup_repair_root_files(
 
     # Setup
     results = []
-    dataset_config = read_config(collision_system=collision_system)
     tree_name = dataset_config["tree_name"]
     filenames = dataset_config["files"]
     logger.info(f"Repairing files from dataset {dataset_config['name']}")
@@ -511,7 +511,7 @@ def _convert_to_parquet(
 def setup_convert_to_parquet(
     collision_system: str,
     entries_per_job: int,
-    dataset_config: Dict[str, Any],
+    dataset_config: Mapping[str, Any],
     input_files: Optional[MutableSequence[DataFuture]] = None,
 ) -> Tuple[List[AppFuture], List[AppFuture]]:
     """Setup convert_to_parquet app for execution with parsl.
@@ -717,6 +717,7 @@ def _extract_scale_factors_for_embedding(
 
 def setup_extract_scale_factors_for_embedding(
     collision_system: str,
+    dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> None:
     """Extract scale factors from embedding hists.
@@ -727,7 +728,6 @@ def setup_extract_scale_factors_for_embedding(
     """
     # Setup
     scale_factors = {}
-    dataset_config = read_config(collision_system=collision_system)
 
     logger.info("Determining input files.")
     input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
@@ -774,10 +774,10 @@ def _write_cross_check_task_scale_factor_trees(
 
 def setup_write_cross_check_task_scale_factor_trees(
     collision_system: str,
+    dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> None:
     # Setup
-    dataset_config = read_config(collision_system=collision_system)
     cross_check_task = dataset_config.get("cross_check_task", False)
     if not cross_check_task:
         logger.info(
@@ -847,11 +847,9 @@ def _extract_embedding_pt_hard_spectra(
 
 def setup_extract_embedding_pt_hard_spectra(
     collision_system: str,
+    dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> None:
-    # Setup
-    dataset_config = read_config(collision_system=collision_system)
-
     # Input files
     logger.info("Determining input files.")
     input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
@@ -888,7 +886,7 @@ def setup_extract_embedding_pt_hard_spectra(
 
 @python_app  # type: ignore
 def _calculate_embedding_skim(
-    dataset_config: Dict[str, Any],
+    dataset_config: Mapping[str, Any],
     train_directory: Path,
     iterative_splittings: bool,
     scale_factors: Mapping[int, float],
@@ -926,7 +924,7 @@ def _calculate_embedding_skim(
 def setup_calculate_embedding_skim(
     collision_system: str,
     entries_per_job: int,
-    dataset_config: Dict[str, Any],
+    dataset_config: Mapping[str, Any],
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[DataFuture]] = None,
@@ -1005,7 +1003,7 @@ def setup_calculate_embedding_skim(
 @python_app  # type: ignore
 def _calculate_data_skim(
     collision_system: str,
-    dataset_config: Dict[str, Any],
+    dataset_config: Mapping[str, Any],
     iterative_splittings: bool,
     scale_factors: Mapping[int, float],
     inputs: Sequence[File] = [],
@@ -1040,7 +1038,7 @@ def _calculate_data_skim(
 def setup_calculate_data_skim(
     collision_system: str,
     entries_per_job: int,
-    dataset_config: Dict[str, Any],
+    dataset_config: Mapping[str, Any],
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[DataFuture]] = None,
@@ -1255,7 +1253,7 @@ def setup_root_data_frame(
     processing_mode: str,
     collision_system: str,
     jobs_per_node: int,
-    dataset_config: Dict[str, Any],
+    dataset_config: Mapping[str, Any],
     default_grooming_methods: Sequence[str],
     cores_per_node: int = 8,
     selected_train_numbers: Optional[Sequence[int]] = None,
@@ -1617,6 +1615,7 @@ if __name__ == "__main__":  # noqa: C901
         results = setup_repair_root_files(
             collision_system=collision_system,
             jobs_per_node=jobs_per_node,
+            dataset_config=dataset_config,
             # selected_train_numbers=list(range(6296, 6297)),
         )
         all_results.extend(results)
@@ -1634,14 +1633,17 @@ if __name__ == "__main__":  # noqa: C901
         # NOTE: These are executed directly because they're needed for the next steps.
         setup_extract_scale_factors_for_embedding(
             collision_system=collision_system,
+            dataset_config=dataset_config,
             # selected_train_numbers=list(range(6316, 6318)),
         )
         setup_write_cross_check_task_scale_factor_trees(
             collision_system=collision_system,
+            dataset_config=dataset_config,
             # selected_train_numbers=list(range(6316, 6318)),
         )
         setup_extract_embedding_pt_hard_spectra(
             collision_system=collision_system,
+            dataset_config=dataset_config,
             # selected_train_numbers=list(range(6316, 6318)),
         )
     if "calculate_embedding_skim" in jobs_to_execute:
