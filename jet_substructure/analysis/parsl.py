@@ -522,7 +522,7 @@ def setup_convert_to_parquet(
     Args:
         collision_system: Name of collision system.
         entries_per_job: Number of events to process in each job.
-        dataset_confing: Dataset configuration.
+        dataset_config: Dataset configuration.
         input_results: AppFuture from a previous step.
     Returns:
         List of `AppFuture` created when defining the jobs.
@@ -537,7 +537,7 @@ def setup_convert_to_parquet(
     else:
         input_files = [r.outputs[0] for r in input_results]
 
-    # Attempt to load the nubmer of entries per file cache
+    # Attempt to load the number of entries per file cache
     number_of_entries_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/entries_per_file.yaml")
     number_of_entries_per_file = {}
     if number_of_entries_filename.exists():
@@ -555,7 +555,7 @@ def setup_convert_to_parquet(
     # Keeping track of individual job futures.
     job_ranges_results = []
     # NOTE: This will be a proxy for if we have to run jobs to determine the number of
-    #       entries per file. If there are entries in this dict, then we need to caluclate.
+    #       entries per file. If there are entries in this dict, then we need to calculate.
     #       If not, we're using the cache.
     number_of_entries_per_file_results = {}
     for input_file in input_files:
@@ -591,11 +591,13 @@ def setup_convert_to_parquet(
     for input_file, job_range_result in job_ranges_results:
         # We need the outputs from the job ranges, so we have to evaluate the jobs now.
         # This leads to kind of an awkward hanging if we need to wait to calculate the
-        # the number of entries per file, but there's nothing else to be done.
+        # number of entries per file, but there's nothing else to be done.
         # NOTE: We evaluate in this order instead of trying to evaluate all number of entries
         #       per file because this allows each the processing of each job to be independent.
-        # TODO: We have to evaluate to determine the job ranges (?)
-        logger.info(f"job_ranges_result: {job_ranges_result.result()}")
+        # NOTE: Unfortunately, this breaks the dependency chain from job ranges to convert_to_parquet
+        #       in the DAG display. However, it seems to internally calculate the dependencies
+        #       correctly, so it's fine.
+        # logger.info(f"job_ranges_result: {job_ranges_result.result()}")
         for i, event_range in enumerate(job_ranges_result.result()):
             # Setup file IO
             output_filename = Path(input_file.filepath)
@@ -620,8 +622,8 @@ def setup_convert_to_parquet(
     # Store with the rest of the results
     results.extend(parquet_results)
 
-    logger.info(f"Almost done: {results}")
-    logger.info(f"number_of_entries_per_file_results: {number_of_entries_per_file_results}")
+    # logger.info(f"Almost done: {results}")
+    # logger.info(f"number_of_entries_per_file_results: {number_of_entries_per_file_results}")
 
     # Write cache if needed.
     # NOTE: This won't show up the dependency tree because we've already asked for the results...
@@ -629,10 +631,11 @@ def setup_convert_to_parquet(
         logger.info("Writing the number of entries per file cache.")
         results.append(
             _write_number_of_entries_per_file_cache(
-                # Apparently we need to request the result here to avoid some pickling issues.
-                # Best guess: The results have already been evaluted while determining the range,
-                # so at this point, it's not a future anymore (ie. it was a future, but now it's a
-                # "present"). So we just retrieve the value again.
+                # It really, really seems like we should just be able to pass the results here,
+                # but for some reason, it crashes with `TypeError: can't pickle _thread.RLock objects`.
+                # It's super unclear, because even a simplified example seems to fail. But this
+                # works, and since it's already been calculated, we don't really lose any time with
+                # this approach. However, it's frustrating that it doesn't work as expected...
                 number_of_entries_per_file={k: v.result() for k, v in number_of_entries_per_file_results.items()},
                 # number_of_entries_per_file=number_of_entries_per_file_results,
                 outputs=[File(str(number_of_entries_filename))],
