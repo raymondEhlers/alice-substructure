@@ -572,14 +572,14 @@ def setup_convert_to_parquet(
             # Utilize the cache.
             number_of_entries_per_file_result = number_of_entries_per_file[input_file.filepath]
 
-        job_ranges_result = _entries_to_ranges_for_jobs(
+        _job_ranges_result = _entries_to_ranges_for_jobs(
             number_of_entries=number_of_entries_per_file_result,
             entries_per_job=entries_per_job,
         )
         # Store the output in our overall results.
-        results.append(job_ranges_result)
+        results.append(_job_ranges_result)
         # And then store just the job ranges results
-        job_ranges_results.append((input_file, job_ranges_result))
+        job_ranges_results.append((input_file, _job_ranges_result))
 
     # logger.info(f"Partially done results: {results}")
     # logger.info(f"job_range_results: {job_ranges_results}")
@@ -588,7 +588,7 @@ def setup_convert_to_parquet(
         logger.warning("This is going to hang for a while during the job range calculations...")
 
     parquet_results = []
-    for input_file, job_range_result in job_ranges_results:
+    for input_file, job_ranges_result in job_ranges_results:
         # We need the outputs from the job ranges, so we have to evaluate the jobs now.
         # This leads to kind of an awkward hanging if we need to wait to calculate the
         # number of entries per file, but there's nothing else to be done.

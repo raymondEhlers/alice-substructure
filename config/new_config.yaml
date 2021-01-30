@@ -192,7 +192,7 @@ available_datasets:
     #
     # Pb-Pb
     # Semi-central data R = 0.4 for pass1 AOD
-    LHC18qr_semi_central_R04_5863: &LHC18qr_semi_central_R04
+    LHC18qr_semi_central_R04_5863:
         name: "LHC18qr_semi_central_R04_5863"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
@@ -207,7 +207,7 @@ available_datasets:
         files:
             - "trains/PbPb/5863/AnalysisResults.*.repaired.root"
     # Rmax = 0.6 systematic.
-    LHC18qr_semi_central_R04_Rmax060: &LHC18qr_semi_central_R04_Rmax060
+    LHC18qr_semi_central_R04_Rmax060:
         name: "LHC18qr_semi_central_R04_Rmax060_5862"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
@@ -250,7 +250,7 @@ available_datasets:
         files:
             - "trains/PbPb/5537/AnalysisResults.*.root"
     # Semi-central data R = 0.4 for pass3 AOD
-    LHC18qr_semi_central_R04_6672:
+    LHC18qr_semi_central_R04_6672: &LHC18qr_semi_central_R04
         name: "LHC18qr_semi_central_R04_6672"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
@@ -265,7 +265,7 @@ available_datasets:
         files:
             - "trains/PbPb/6672/AnalysisResults.*.repaired.root"
     # Rmax = 0.7 systmeatic. NOTE: This is different than the pass1 AOD value
-    LHC18qr_semi_central_R04_Rmax070_6673:
+    LHC18qr_semi_central_R04_Rmax070_6673: &LHC18qr_semi_central_R04_Rmax070
         name: "LHC18qr_semi_central_R04_Rmax070_6673"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
@@ -281,7 +281,7 @@ available_datasets:
             - "trains/PbPb/6673/AnalysisResults.*.repaired.root"
     # Embedded pythia
     # LHC19f4 embedded into LHC18qr semi-central R = 0.4 for pass1 AOD
-    LHC19f4_embedded_into_LHC18qr_semi_central_R04_5966_5985: &LHC18qr_semi_central_R04_embedded
+    LHC19f4_embedded_into_LHC18qr_semi_central_R04_5966_5985:
         name: "LHC19f4_embedded_into_LHC18qr_semi_central_R04_5966_5985"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -289,7 +289,7 @@ available_datasets:
         prefixes:
             hybrid: "data"
             "true": "matched"
-            det_level: "detLeveL"
+            det_level: "detLevel"
         # Branches which don't contain a prefix
         branches: []
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
@@ -317,7 +317,7 @@ available_datasets:
             - "trains/embedPythia/5984/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/5985/AnalysisResults.*.repaired.root"
     # Systematics: Rmax = 0.6
-    LHC19f4_embedded_into_LHC18qr_semi_central_R04_Rmax060_6316_6335: &LHC18qr_semi_central_R04_embedded_Rmax060
+    LHC19f4_embedded_into_LHC18qr_semi_central_R04_Rmax060_6316_6335:
         name: "LHC19f4_embedded_into_LHC18qr_semi_central_R04_Rmax060_6316_6335"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -325,7 +325,7 @@ available_datasets:
         prefixes:
             hybrid: "data"
             "true": "matched"
-            det_level: "detLeveL"
+            det_level: "detLevel"
         # Branches which don't contain a prefix
         branches: []
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
@@ -366,7 +366,7 @@ available_datasets:
         prefixes:
             hybrid: "data"
             "true": "matched"
-            det_level: "detLeveL"
+            det_level: "detLevel"
         # Branches which don't contain a prefix
         branches: []
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
@@ -404,7 +404,7 @@ available_datasets:
         prefixes:
             hybrid: "data"
             "true": "matched"
-            det_level: "detLeveL"
+            det_level: "detLevel"
         # Branches which don't contain a prefix
         branches: []
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
@@ -440,7 +440,7 @@ available_datasets:
         prefixes:
             hybrid: "data"
             "true": "matched"
-            det_level: "detLeveL"
+            det_level: "detLevel"
         # Branches which don't contain a prefix
         branches: []
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
@@ -482,7 +482,7 @@ available_datasets:
             - "trains/embedPythia/5799/AnalysisResults.*.repaired.root"
     #
     # LHC20g4 embedded into LHC18qr semi-central R = 0.4 for pass3 AOD
-    LHC20g4_embedded_into_LHC18qr_semi_central_R04_6650_6668_6671:
+    LHC20g4_embedded_into_LHC18qr_semi_central_R04_6650_6668_6671: &LHC18qr_semi_central_R04_embedded
         name: "LHC20g4_embedded_into_LHC18qr_semi_central_R04_6650_6668_6671"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -490,7 +490,7 @@ available_datasets:
         prefixes:
             hybrid: "data"
             "true": "matched"
-            det_level: "detLeveL"
+            det_level: "detLevel"
         # Branches which don't contain a prefix
         branches: []
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
@@ -519,7 +519,7 @@ available_datasets:
             # A grid problem tanked 6669, so we had to replace it with 6671
             - "trains/embedPythia/6671/AnalysisResults.*.repaired.root"
     # Systematic: Rmax = 0.7
-    LHC20g4_embedded_into_LHC18qr_semi_central_R04_Rmax070_6630_6649:
+    LHC20g4_embedded_into_LHC18qr_semi_central_R04_Rmax070_6630_6649: &LHC18qr_semi_central_R04_embedded_Rmax070
         name: "LHC20g4_embedded_into_LHC18qr_semi_central_R04_Rmax070_6630_6649"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -527,7 +527,7 @@ available_datasets:
         prefixes:
             hybrid: "data"
             "true": "matched"
-            det_level: "detLeveL"
+            det_level: "detLevel"
         # Branches which don't contain a prefix
         branches: []
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
@@ -583,7 +583,7 @@ available_datasets:
         prefixes:
             hybrid: "data"
             "true": "matched"
-            det_level: "detLeveL"
+            det_level: "detLevel"
         # Branches which don't contain a prefix
         branches: []
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
@@ -616,9 +616,9 @@ available_datasets:
 
 execution:
     PbPb:
-        dataset: *LHC18qr_central_R02
+        dataset: *LHC18qr_semi_central_R04_Rmax070
     embedPythia:
-        dataset: *LHC18qr_central_R02_embedded
+        dataset: *LHC18qr_semi_central_R04_embedded_Rmax070
     pp:
         dataset: *LHC17pq_pp_R02
     pythia:
