@@ -929,7 +929,7 @@ def setup_calculate_embedding_skim(
     dataset_config: Dict[str, Any],
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
-    input_files: Optional[Sequence[DataFuture]] = None,
+    input_results: Optional[MutableSequence[DataFuture]] = None,
 ) -> List[AppFuture]:
     """Setup to calculate embedding skim.
 
@@ -952,9 +952,9 @@ def setup_calculate_embedding_skim(
     scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
 
     # If input files aren't passed, then we need to determine them ourselves.
-    if input_files is None:
+    input_files = []
+    if input_results is None:
         logger.info("Determining input files independently.")
-        input_files = []
         # First, determine the train directories so we can skip over some of them if requested.
         train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
         for train_directory in sorted(train_directories):
@@ -967,6 +967,8 @@ def setup_calculate_embedding_skim(
             # Then iterate over the directories.
             for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
                 input_files.append(File(str(filename)))
+    else:
+        input_files = [r.outputs[0] for r in input_results]
 
     # Create the Apps.
     for parsl_input_file in input_files:
@@ -1041,7 +1043,7 @@ def setup_calculate_data_skim(
     dataset_config: Dict[str, Any],
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
-    input_files: Optional[Sequence[DataFuture]] = None,
+    input_results: Optional[MutableSequence[DataFuture]] = None,
 ) -> List[AppFuture]:
     """Setup to calculate data skim.
 
@@ -1069,9 +1071,9 @@ def setup_calculate_data_skim(
         )
 
     # If input files aren't passed, then we need to determine them ourselves.
-    if input_files is None:
+    input_files = []
+    if input_results is None:
         logger.info("Determining input files independently.")
-        input_files = []
         # First, determine the train directories so we can skip over some of them if requested.
         train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
         for train_directory in sorted(train_directories):
@@ -1084,6 +1086,8 @@ def setup_calculate_data_skim(
             # Then iterate over the directories.
             for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
                 input_files.append(File(str(filename)))
+    else:
+        input_files = [r.outputs[0] for r in input_results]
 
     # Create the Apps.
     for parsl_input_file in input_files:
@@ -1539,7 +1543,7 @@ if __name__ == "__main__":  # noqa: C901
     collision_system = "PbPb"
     jobs_to_execute = [
         # "repair_root_files",
-        # "convert_to_parquet",
+        "convert_to_parquet",
         "calculate_data_skim",
         "root_data_frame",
     ]
@@ -1646,7 +1650,7 @@ if __name__ == "__main__":  # noqa: C901
             entries_per_job=entries_per_job,
             dataset_config=dataset_config,
             # selected_train_numbers=list(range(5966, 5967)),
-            input_files=[r.outputs[0] for r in results] if results else None,
+            input_results=results if results else None,
         )
         all_results.extend(results)
     if "calculate_data_skim" in jobs_to_execute:
@@ -1655,9 +1659,9 @@ if __name__ == "__main__":  # noqa: C901
             entries_per_job=entries_per_job,
             dataset_config=dataset_config,
             # selected_train_numbers=list(range(5977, 5978)),
-            input_files=[r.outputs[0] for r in results] if results else None,
+            input_results=results if results else None,
         )
-        # all_results.extend(results)
+        all_results.extend(results)
     if "root_data_frame" in jobs_to_execute:
         results = setup_root_data_frame(
             processing_mode="standard",
