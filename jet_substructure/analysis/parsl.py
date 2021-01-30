@@ -21,7 +21,6 @@ import uproot
 from pachyderm import yaml
 from parsl.addresses import address_by_hostname
 from parsl.app.app import python_app
-from parsl.app.futures import DataFuture
 from parsl.channels import LocalChannel
 from parsl.config import Config
 from parsl.data_provider.files import File
@@ -238,8 +237,7 @@ def _repair_root_files(
 
 
 def setup_repair_root_files(
-    collision_system: str,
-    jobs_per_node: int,
+    n_cores_per_job: int,
     dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> List[AppFuture]:
@@ -248,7 +246,8 @@ def setup_repair_root_files(
     Settings will be taken out of the configuration file.
 
     Args:
-        collision_system: Collision system.
+        n_cores_per_job: Number of cores to use per job.
+        dataset_config: Dataset configuration.
         selected_train_numbers: Use only a selection of train numbers. Default: None. All train numbers are
             taken from the config.
     Returns:
@@ -259,10 +258,10 @@ def setup_repair_root_files(
         selected_train_numbers = []
 
     # Setup
-    results = []
-    tree_name = dataset_config["tree_name"]
-    filenames = dataset_config["files"]
     logger.info(f"Repairing files from dataset {dataset_config['name']}")
+    tree_name = dataset_config["tree_name"]
+    # Determine filesnames. This is a bit involved.
+    filenames = dataset_config["files"]
     # Filter out already repaired files
     # Specifically, we usually specify the repaired files in the config, but that's
     # not meaningful here. So we remove the "repaired" from the name, and then take those files.
@@ -280,6 +279,7 @@ def setup_repair_root_files(
         filenames = [f for f in filenames if int(f.parent.name) in selected_train_numbers]
     logger.debug(f"Repairing filenames: {filenames}")
 
+    results = []
     for filename in filenames:
         # Setup file IO
         parsl_input_file = File(str(filename))
@@ -289,7 +289,7 @@ def setup_repair_root_files(
         results.append(
             _repair_root_files(
                 tree_name=tree_name,
-                n_cores=math.floor(8 / jobs_per_node),
+                n_cores=n_cores_per_job,
                 inputs=[parsl_input_file],
                 outputs=[parsl_output_file],
             )
@@ -488,7 +488,6 @@ def _convert_to_parquet(
     event_range: Optional[Tuple[Optional[int], Optional[int]]] = None,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
-    stdout: Optional[str] = None,
 ) -> AppFuture:
     """ Convert to parquet app. """
     from pathlib import Path
@@ -512,34 +511,37 @@ def setup_convert_to_parquet(
     collision_system: str,
     entries_per_job: int,
     dataset_config: Mapping[str, Any],
-    input_files: Optional[MutableSequence[DataFuture]] = None,
+    input_results: Optional[MutableSequence[AppFuture]] = None,
 ) -> Tuple[List[AppFuture], List[AppFuture]]:
     """Setup convert_to_parquet app for execution with parsl.
 
+    This is a bit more involved than many of the other tasks because it requires some
+    intermediate information to fully process. Consequently, it consists of a number
+    of apps.
+
     Args:
         collision_system: Name of collision system.
-        events_per_job: Number of events to process in each job.
+        entries_per_job: Number of events to process in each job.
         dataset_confing: Dataset configuration.
-        input_files: Input files from the previous job once which this task depends.
+        input_results: AppFuture from a previous step.
     Returns:
         List of `AppFuture` created when defining the jobs.
     """
     # Setup
     results = []
-    number_of_entries_per_file_results = {}
-    job_ranges_results = []
-    parquet_results = []
 
     # Determine filenames
-    if input_files is None:
+    if input_results is None:
         input_filenames = helpers.expand_wildcards_in_filenames([Path(f) for f in dataset_config["files"]])
         input_files = [File(str(filename)) for filename in input_filenames]
+    else:
+        input_files = [r.outputs[0] for r in input_results]
 
     # Attempt to load the nubmer of entries per file cache
     number_of_entries_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/entries_per_file.yaml")
     number_of_entries_per_file = {}
     if number_of_entries_filename.exists():
-        logger.info("Loading cache")
+        logger.info("Loading number of entries per file cache")
         # Now we know that it exists, we can grab it.
         y = yaml.yaml()
         with open(number_of_entries_filename, "r") as f:
@@ -547,8 +549,15 @@ def setup_convert_to_parquet(
             # number_of_entries_per_file = {Path(k): v for k, v in res.items()}
             number_of_entries_per_file = {k: v for k, v in res.items()}
 
-    logger.info(f"Input files: {input_files}")
-    logger.info(f"number_of_entries_per_file: {number_of_entries_per_file}")
+    # logger.info(f"Input files: {input_files}")
+    # logger.info(f"number_of_entries_per_file: {number_of_entries_per_file}")
+
+    # Keeping track of individual job futures.
+    job_ranges_results = []
+    # NOTE: This will be a proxy for if we have to run jobs to determine the number of
+    #       entries per file. If there are entries in this dict, then we need to caluclate.
+    #       If not, we're using the cache.
+    number_of_entries_per_file_results = {}
     for input_file in input_files:
         if not number_of_entries_per_file:
             number_of_entries_per_file_result = _number_of_entries_per_file_app(
@@ -572,16 +581,22 @@ def setup_convert_to_parquet(
         # And then store just the job ranges results
         job_ranges_results.append((input_file, job_ranges_result))
 
-    logger.info(f"Partially done results: {results}")
-    logger.info(f"job_range_results: {job_ranges_results}")
+    # logger.info(f"Partially done results: {results}")
+    # logger.info(f"job_range_results: {job_ranges_results}")
+    logger.info("About to determine job ranges for conversion to parquet.")
+    if number_of_entries_per_file_results:
+        logger.warning("This is going to hang for a while during the job range calculations...")
 
+    parquet_results = []
     for input_file, job_range_result in job_ranges_results:
+        # We need the outputs from the job ranges, so we have to evaluate the jobs now.
+        # This leads to kind of an awkward hanging if we need to wait to calculate the
+        # the number of entries per file, but there's nothing else to be done.
+        # NOTE: We evaluate in this order instead of trying to evaluate all number of entries
+        #       per file because this allows each the processing of each job to be independent.
         # TODO: We have to evaluate to determine the job ranges (?)
-        # for job_range in job_ranges_result.result():
-        # for i, event_range in enumerate(job_ranges_result.result()):
-        temp_result = job_ranges_result.result()
-        logger.info(f"job_ranges_result: {temp_result}")
-        for i, event_range in enumerate(temp_result):
+        logger.info(f"job_ranges_result: {job_ranges_result.result()}")
+        for i, event_range in enumerate(job_ranges_result.result()):
             # Setup file IO
             output_filename = Path(input_file.filepath)
             # Path becomes ../parquet/events_per_job_.../filename.00.parquet
@@ -600,7 +615,6 @@ def setup_convert_to_parquet(
                     event_range=event_range,
                     inputs=[input_file],
                     outputs=[output_file],
-                    # stdout=f"{i_file}_{i}.log",
                 )
             )
     # Store with the rest of the results
@@ -610,7 +624,9 @@ def setup_convert_to_parquet(
     logger.info(f"number_of_entries_per_file_results: {number_of_entries_per_file_results}")
 
     # Write cache if needed.
+    # NOTE: This won't show up the dependency tree because we've already asked for the results...
     if number_of_entries_per_file_results:
+        logger.info("Writing the number of entries per file cache.")
         results.append(
             _write_number_of_entries_per_file_cache(
                 # Apparently we need to request the result here to avoid some pickling issues.
@@ -622,50 +638,6 @@ def setup_convert_to_parquet(
                 outputs=[File(str(number_of_entries_filename))],
             )
         )
-
-    if False:
-        # Based on the number of events desired per job, split the files into jobs with those number of events.
-        # NOTE: The input root files _must_ be repaired first because we need to access the repaired files
-        #       here outside of an app (ie. it can't be executed lazily).
-        number_of_entries_per_file = _number_of_entries_per_file(
-            input_filenames=dataset_config["files"],
-            tree_name=dataset_config["tree_name"],
-            collision_system=collision_system,
-            dataset_name=dataset_config["name"],
-            # recreate=True,
-        )
-        job_ranges = _distribute_entries_to_jobs(
-            number_of_entries_per_file=number_of_entries_per_file, entries_per_job=entries_per_job
-        )
-        # logger.debug(job_ranges)
-        # Sanity check.
-        logger.debug(f"Total entries: {sum([len(l) for l in job_ranges.values()])}")
-
-        # Iterate over the file and event ranges, setting up an app for each entry.
-        for i_file, (filename, event_ranges) in enumerate(job_ranges.items()):
-            for i, event_range in enumerate(event_ranges):
-                # Setup file IO
-                parsl_input_file = File(str(filename))
-                output_filename = Path(parsl_input_file.filepath)
-                # Path becomes ../parquet/events_per_job_.../filename.00.parquet
-                output_filename = (
-                    output_filename.parent / "parquet" / f"events_per_job_{entries_per_job}" / output_filename.name
-                )
-                output_filename = output_filename.with_suffix(f".{i:02}.parquet")
-                parsl_output_file = File(str(output_filename))
-
-                results.append(
-                    _convert_to_parquet(
-                        tree_name=dataset_config["tree_name"],
-                        prefixes=list(dataset_config["prefixes"].values()),
-                        branches=dataset_config["branches"],
-                        prefix_branches=dataset_config["prefix_branches"],
-                        event_range=event_range,
-                        inputs=[parsl_input_file],
-                        outputs=[parsl_output_file],
-                        stdout=f"{i_file}_{i}.log",
-                    )
-                )
 
     return results, parquet_results
 
@@ -927,7 +899,7 @@ def setup_calculate_embedding_skim(
     dataset_config: Mapping[str, Any],
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[DataFuture]] = None,
+    input_results: Optional[MutableSequence[AppFuture]] = None,
 ) -> List[AppFuture]:
     """Setup to calculate embedding skim.
 
@@ -937,7 +909,7 @@ def setup_calculate_embedding_skim(
         iterative_splittings: True if iterative splittings are selected rather than recursive splittings. Default: True.
         selected_train_numbers: Use only a selection of train numbers. Default: None. All train numbers are
             taken from the config.
-        input_files: DataFuture from an AppFuture from a previous execution.
+        input_results: AppFuture from a previous step.
     Returns:
         List of `AppFuture` created when defining the jobs.
     """
@@ -1041,7 +1013,7 @@ def setup_calculate_data_skim(
     dataset_config: Mapping[str, Any],
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[DataFuture]] = None,
+    input_results: Optional[MutableSequence[AppFuture]] = None,
 ) -> List[AppFuture]:
     """Setup to calculate data skim.
 
@@ -1051,7 +1023,7 @@ def setup_calculate_data_skim(
         iterative_splittings: True if iterative splittings are selected rather than recursive splittings. Default: True.
         selected_train_numbers: Use only a selection of train numbers. Default: None. All train numbers are
             taken from the config.
-        input_files: DataFuture from an AppFuture from a previous execution.
+        input_results: AppFuture from a previous step.
     Returns:
         List of `AppFuture` created when defining the jobs.
     """
@@ -1252,12 +1224,12 @@ class RootDataFrameProcessingMode:
 def setup_root_data_frame(
     processing_mode: str,
     collision_system: str,
-    jobs_per_node: int,
+    n_cores_per_job: int,
     dataset_config: Mapping[str, Any],
     default_grooming_methods: Sequence[str],
     cores_per_node: int = 8,
     selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[DataFuture]] = None,
+    input_results: Optional[MutableSequence[AppFuture]] = None,
 ) -> List[AppFuture]:
     # Validation
     # NOTE: I only compromised on specifying the function here because it loses the typing
@@ -1306,7 +1278,7 @@ def setup_root_data_frame(
                 input_files.append(File(str(filename)))
 
     # logger.info(f"Input files (len: {len(input_files)}: {input_files}")
-    logger.info(f"N cores per job: {math.floor(cores_per_node / jobs_per_node)}")
+    logger.info(f"N cores per job: {n_cores_per_job}")
     cross_check_task = dataset_config.get("cross_check_task", False)
     logger.info(f"Cross check task: {cross_check_task}")
     if cross_check_task:
@@ -1329,7 +1301,7 @@ def setup_root_data_frame(
                 prefixes=list(prefixes.values()),
                 grooming_method=grooming_method,
                 jet_R=dataset_config["jet_R"],
-                n_cores=math.floor(cores_per_node / jobs_per_node),
+                n_cores=n_cores_per_job,
                 cross_check_task=cross_check_task,
                 # Need to grab the outputs here to ensure that the dependencies are tracked properly.
                 inputs=[r.outputs[0] for r in input_results] if input_results else input_files,
@@ -1560,6 +1532,7 @@ if __name__ == "__main__":  # noqa: C901
         "soft_drop_z_cut_02",
         "soft_drop_z_cut_04",
     ]
+    max_cores_to_use_per_node = 8
 
     # Basic setup for jobs
     _possible_jobs = [
@@ -1587,6 +1560,11 @@ if __name__ == "__main__":  # noqa: C901
             raise RuntimeError(
                 f"Requested to run job {job_name}, but the name is invalid." f" Possible jobs: {_possible_jobs}"
             )
+    # In principle, we actually have 6 cores per node + hyperthreading, so we assume 8 cores
+    # at max to ensure that we minimize idle cores, while avoiding overloading everything.
+    # This only matters for jobs which can use multiple cores for a single task. So this
+    # basically means ROOT jobs.
+    n_cores_per_job = math.floor(max_cores_to_use_per_node / jobs_per_node)
 
     # Setup parsl
     setup_parsl_587(
@@ -1612,9 +1590,9 @@ if __name__ == "__main__":  # noqa: C901
     all_results = []
     logger.info(f"Jobs to execute: {jobs_to_execute}")
     if "repair_root_files" in jobs_to_execute:
+        # NOTE: No input_results here because it's the first step.
         results = setup_repair_root_files(
-            collision_system=collision_system,
-            jobs_per_node=jobs_per_node,
+            n_cores_per_job=n_cores_per_job,
             dataset_config=dataset_config,
             # selected_train_numbers=list(range(6296, 6297)),
         )
@@ -1625,7 +1603,7 @@ if __name__ == "__main__":  # noqa: C901
             collision_system=collision_system,
             entries_per_job=entries_per_job,
             dataset_config=dataset_config,
-            input_files=[r.outputs[0] for r in results] if results else None,
+            input_results=results if results else None,
         )
         all_results.extend(_all_results)
     if "extract_scale_factors_for_embedding" in jobs_to_execute:
@@ -1668,7 +1646,7 @@ if __name__ == "__main__":  # noqa: C901
         results = setup_root_data_frame(
             processing_mode="standard",
             collision_system=collision_system,
-            jobs_per_node=jobs_per_node,
+            n_cores_per_job=n_cores_per_job,
             dataset_config=dataset_config,
             default_grooming_methods=grooming_methods,
             # selected_train_numbers=list(range(5977, 5978)),
@@ -1679,7 +1657,7 @@ if __name__ == "__main__":  # noqa: C901
         results = setup_root_data_frame(
             processing_mode="response",
             collision_system=collision_system,
-            jobs_per_node=jobs_per_node,
+            n_cores_per_job=n_cores_per_job,
             dataset_config=dataset_config,
             default_grooming_methods=grooming_methods,
             # selected_train_numbers=list(range(6338, 6339)),
@@ -1694,7 +1672,7 @@ if __name__ == "__main__":  # noqa: C901
                 setup_root_data_frame(
                     processing_mode="closure",
                     collision_system=_collision_system,
-                    jobs_per_node=jobs_per_node,
+                    n_cores_per_job=n_cores_per_job,
                     dataset_config=dataset_config,
                     default_grooming_methods=grooming_methods,
                     # selected_train_numbers=list(range(5977, 5978)),
