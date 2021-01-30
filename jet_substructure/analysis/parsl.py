@@ -926,6 +926,7 @@ def _calculate_embedding_skim(
 def setup_calculate_embedding_skim(
     collision_system: str,
     entries_per_job: int,
+    dataset_config: Dict[str, Any],
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_files: Optional[Sequence[DataFuture]] = None,
@@ -948,14 +949,14 @@ def setup_calculate_embedding_skim(
 
     # Setup
     results = []
-    dataset_config = read_config(collision_system=collision_system)
-    train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
     scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
 
     # If input files aren't passed, then we need to determine them ourselves.
     if input_files is None:
         logger.info("Determining input files independently.")
         input_files = []
+        # First, determine the train directories so we can skip over some of them if requested.
+        train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
         for train_directory in sorted(train_directories):
             # Select train numbers.
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
@@ -1037,6 +1038,7 @@ def _calculate_data_skim(
 def setup_calculate_data_skim(
     collision_system: str,
     entries_per_job: int,
+    dataset_config: Dict[str, Any],
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_files: Optional[Sequence[DataFuture]] = None,
@@ -1059,8 +1061,6 @@ def setup_calculate_data_skim(
 
     # Setup
     results = []
-    dataset_config = read_config(collision_system=collision_system)
-    train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
     # Only meaningful for pythia.
     scale_factors = {}
     if collision_system == "pythia":
@@ -1072,6 +1072,8 @@ def setup_calculate_data_skim(
     if input_files is None:
         logger.info("Determining input files independently.")
         input_files = []
+        # First, determine the train directories so we can skip over some of them if requested.
+        train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
         for train_directory in sorted(train_directories):
             # Select train numbers.
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
@@ -1288,8 +1290,7 @@ def setup_root_data_frame(
     input_files = []
     if input_results is None:
         logger.info("Determining input files independently.")
-        # First, determine the train directories so we can skip over some of
-        # them if requested.
+        # First, determine the train directories so we can skip over some of them if requested.
         train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
         for train_directory in sorted(train_directories):
             # Select train numbers.
@@ -1321,135 +1322,6 @@ def setup_root_data_frame(
         parsl_output_file = File(str(output_file))
         results.append(
             mode.func(
-                collision_system=collision_system,
-                tree_name="tree" if not cross_check_task else dataset_config["tree_name"],
-                prefixes=list(prefixes.values()),
-                grooming_method=grooming_method,
-                jet_R=dataset_config["jet_R"],
-                n_cores=math.floor(cores_per_node / jobs_per_node),
-                cross_check_task=cross_check_task,
-                # Need to grab the outputs here to ensure that the dependencies are tracked properly.
-                inputs=[r.outputs[0] for r in input_results] if input_results else input_files,
-                outputs=[parsl_output_file],
-            )
-        )
-
-    return results
-
-
-def setup_root_data_frame_response(
-    collision_system: str,
-    jobs_per_node: int,
-    dataset_config: Dict[str, Any],
-    default_grooming_methods: Sequence[str],
-    selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[DataFuture]] = None,
-    cores_per_node: int = 8,
-) -> List[AppFuture]:
-    # Setup
-    output_dir = Path("output") / collision_system / "RDF"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
-    prefixes = dataset_config["prefixes"]
-
-    # If input files aren't passed, then we need to determine them ourselves.
-    input_files = []
-    if input_results is None:
-        logger.info("Determining input files independently.")
-        for train_directory in sorted(train_directories):
-            # Select train numbers.
-            if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
-                logger.debug(f"Skipping train number {train_directory.name}")
-                continue
-            logger.info(f"Processing train number {train_directory.name}")
-
-            # Then iterate over the directories.
-            for filename in Path(f"{train_directory}/skim/").glob("*.root"):
-                input_files.append(File(str(filename)))
-
-    # logger.info(f"Input files (len: {len(input_files)}: {input_files}")
-    logger.info(f"N cores per job: {math.floor(cores_per_node / jobs_per_node)}")
-    cross_check_task = dataset_config.get("cross_check_task", False)
-    logger.info(f"Cross check task: {cross_check_task}")
-    if cross_check_task:
-        grooming_methods = dataset_config["grooming_methods"]
-    else:
-        grooming_methods = default_grooming_methods
-
-    results = []
-    for grooming_method in grooming_methods:
-        # Setup file IO
-        output_file = (
-            output_dir
-            / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.values())}_response.root"
-        )
-        parsl_output_file = File(str(output_file))
-        results.append(
-            _root_data_frame_response(
-                collision_system=collision_system,
-                tree_name="tree" if not cross_check_task else dataset_config["tree_name"],
-                prefixes=list(prefixes.values()),
-                grooming_method=grooming_method,
-                jet_R=dataset_config["jet_R"],
-                n_cores=math.floor(cores_per_node / jobs_per_node),
-                cross_check_task=cross_check_task,
-                # Need to grab the outputs here to ensure that the dependencies are tracked properly.
-                inputs=[r.outputs[0] for r in input_results] if input_results else input_files,
-                outputs=[parsl_output_file],
-            )
-        )
-
-    return results
-
-
-def setup_root_data_frame_closure(
-    collision_system: str,
-    jobs_per_node: int,
-    dataset_config: Dict[str, Any],
-    default_grooming_methods: Sequence[str],
-    selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[DataFuture]] = None,
-    cores_per_node: int = 8,
-) -> List[AppFuture]:
-    # Setup
-    output_dir = Path("output") / collision_system / "RDF"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
-    prefixes = dataset_config["prefixes"]
-    logger.info(f"RDF Closure for {collision_system}")
-
-    # If input files aren't passed, then we need to determine them ourselves.
-    input_files = []
-    if input_results is None:
-        logger.info("Determining input files independently.")
-        for train_directory in sorted(train_directories):
-            # Select train numbers.
-            if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
-                logger.debug(f"Skipping train number {train_directory.name}")
-                continue
-            logger.info(f"Processing train number {train_directory.name}")
-
-            # Then iterate over the directories.
-            for filename in Path(f"{train_directory}/skim/").glob("*.root"):
-                input_files.append(File(str(filename)))
-
-    logger.info(f"N cores per job: {math.floor(cores_per_node / jobs_per_node)}")
-    cross_check_task = dataset_config.get("cross_check_task", False)
-    if cross_check_task:
-        grooming_methods = dataset_config["grooming_methods"]
-    else:
-        grooming_methods = default_grooming_methods
-
-    results = []
-    for grooming_method in grooming_methods:
-        # Setup file IO
-        output_file = (
-            output_dir
-            / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.values())}_closure.root"
-        )
-        parsl_output_file = File(str(output_file))
-        results.append(
-            _root_data_frame_closure(
                 collision_system=collision_system,
                 tree_name="tree" if not cross_check_task else dataset_config["tree_name"],
                 prefixes=list(prefixes.values()),
@@ -1772,6 +1644,7 @@ if __name__ == "__main__":  # noqa: C901
         results = setup_calculate_embedding_skim(
             collision_system=collision_system,
             entries_per_job=entries_per_job,
+            dataset_config=dataset_config,
             # selected_train_numbers=list(range(5966, 5967)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
@@ -1780,23 +1653,25 @@ if __name__ == "__main__":  # noqa: C901
         results = setup_calculate_data_skim(
             collision_system=collision_system,
             entries_per_job=entries_per_job,
+            dataset_config=dataset_config,
+            # selected_train_numbers=list(range(5977, 5978)),
             input_files=[r.outputs[0] for r in results] if results else None,
         )
         # all_results.extend(results)
     if "root_data_frame" in jobs_to_execute:
         results = setup_root_data_frame(
+            processing_mode="standard",
             collision_system=collision_system,
             jobs_per_node=jobs_per_node,
             dataset_config=dataset_config,
             default_grooming_methods=grooming_methods,
             # selected_train_numbers=list(range(5977, 5978)),
-            # TODO: Maybe this counts as calling??
-            # input_files=[r.outputs[0] for r in results] if results else None,
             input_results=results if results else None,
         )
         all_results.extend(results)
     if "root_data_frame_response" in jobs_to_execute:
-        results = setup_root_data_frame_response(
+        results = setup_root_data_frame(
+            processing_mode="response",
             collision_system=collision_system,
             jobs_per_node=jobs_per_node,
             dataset_config=dataset_config,
@@ -1810,7 +1685,8 @@ if __name__ == "__main__":  # noqa: C901
         temp_results = []
         for _collision_system in ["PbPb", "embedPythia"]:
             temp_results.extend(
-                setup_root_data_frame_closure(
+                setup_root_data_frame(
+                    processing_mode="closure",
                     collision_system=_collision_system,
                     jobs_per_node=jobs_per_node,
                     dataset_config=dataset_config,
