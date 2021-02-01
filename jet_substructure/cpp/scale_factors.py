@@ -181,7 +181,7 @@ def embedded_pt_hard_spectra(
 ) -> bool:
     """Extract and save embedding pt hard spectra.
 
-    This functionaliy is exceptional because we only have the histograms, not the tree.
+    This functionality is exceptional because we only have the histograms, not the tree.
 
     Note:
         I write to yaml using binned_data because I'm not sure errors, etc would be handled properly
@@ -197,11 +197,13 @@ def embedded_pt_hard_spectra(
     pt_hard_spectra = []
     for pt_hard_bin, pt_hard_filenames in filenames.items():
         single_bin_pt_hard_spectra = []
-        for filename in filenames:
+        for filename in pt_hard_filenames:
             with uproot.open(filename) as f:
                 embedding_hists = f["AliAnalysisTaskEmcalEmbeddingHelper_histos"]
                 single_bin_pt_hard_spectra.append(
-                    [h for h in embedding_hists if h.has_member("fName") and h.member("fName") == "fHistPtHard"][0]
+                    binned_data.BinnedData.from_existing_data(
+                        [h for h in embedding_hists if h.has_member("fName") and h.member("fName") == "fHistPtHard"][0]
+                    )
                 )
         h_temp = sum(single_bin_pt_hard_spectra)
         pt_hard_spectra.append(h_temp * scale_factors[pt_hard_bin])
@@ -211,7 +213,7 @@ def embedded_pt_hard_spectra(
     output_filename.parent.mkdir(exist_ok=True, parents=True)
     y = yaml.yaml(modules_to_register=[binned_data])
     with open(output_filename, "w") as f_out:
-        y.dump([final_spectra], f_out)
+        y.dump([final_spectra, {i: p for i, p in enumerate(pt_hard_spectra, start=1)}], f_out)
 
     return True
 
