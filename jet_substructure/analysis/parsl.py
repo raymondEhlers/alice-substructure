@@ -1271,7 +1271,7 @@ def setup_root_data_frame(
     collision_system: str,
     n_cores_per_job: int,
     dataset_config: Mapping[str, Any],
-    default_grooming_methods: Sequence[str],
+    grooming_methods: Sequence[str],
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[AppFuture]] = None,
 ) -> List[AppFuture]:
@@ -1325,10 +1325,6 @@ def setup_root_data_frame(
     logger.info(f"N cores per job: {n_cores_per_job}")
     cross_check_task = dataset_config.get("cross_check_task", False)
     logger.info(f"Cross check task: {cross_check_task}")
-    if cross_check_task:
-        grooming_methods = dataset_config["grooming_methods"]
-    else:
-        grooming_methods = list(default_grooming_methods)
 
     results = []
     for grooming_method in grooming_methods:
@@ -1633,6 +1629,11 @@ if __name__ == "__main__":  # noqa: C901
     # Helpers
     full_config = read_full_config()
     dataset_config = read_dataset_config(collision_system=collision_system)
+    # If we have a cross check task, it only has the output from a limited set of grooming methods.
+    # In that case, we should restrict to only the valid ones.
+    cross_check_task = dataset_config.get("cross_check_task", False)
+    if cross_check_task:
+        grooming_methods = dataset_config["grooming_methods"]
 
     results = []
     all_results = []
@@ -1704,7 +1705,7 @@ if __name__ == "__main__":  # noqa: C901
             collision_system=collision_system,
             n_cores_per_job=n_cores_per_job,
             dataset_config=dataset_config,
-            default_grooming_methods=grooming_methods,
+            grooming_methods=grooming_methods,
             # selected_train_numbers=list(range(5977, 5978)),
             input_results=results if results else None,
         )
@@ -1715,7 +1716,7 @@ if __name__ == "__main__":  # noqa: C901
             collision_system=collision_system,
             n_cores_per_job=n_cores_per_job,
             dataset_config=dataset_config,
-            default_grooming_methods=grooming_methods,
+            grooming_methods=grooming_methods,
             # selected_train_numbers=list(range(6338, 6339)),
             input_results=results if results else None,
         )
@@ -1730,7 +1731,7 @@ if __name__ == "__main__":  # noqa: C901
                     collision_system=_collision_system,
                     n_cores_per_job=n_cores_per_job,
                     dataset_config=dataset_config,
-                    default_grooming_methods=grooming_methods,
+                    grooming_methods=grooming_methods,
                     # selected_train_numbers=list(range(5977, 5978)),
                     input_results=results if results else None,
                 )
