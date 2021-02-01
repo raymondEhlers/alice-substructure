@@ -39,21 +39,36 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def read_config(collision_system: str, config_path: Path = Path("config/new_config.yaml")) -> Dict[str, Any]:
+def read_full_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
+    """Read full YAML configuration file.
+
+    Args:
+        config_path: Path to the configuration file. Default: "config/new_config.yaml".
+    Returns:
+        Full YAML configuration. Requires some interpretation.
+    """
+    if config_path is None:
+        config_path = Path("config/new_config.yaml")
+
+    y = yaml.yaml()
+    with open(config_path, "r") as f:
+        full_config: Dict[str, Any] = y.load(f)
+
+    return full_config
+
+
+def read_dataset_config(collision_system: str, config_path: Optional[Path] = None) -> Dict[str, Any]:
     """Read collision system configuration from YAML file.
 
     The collision system specification is defined in the YAML file.
 
     Args:
         collision_system: Name of the collision system.
-        config_path: Path to the configuration file. Default: "config/new_config.yaml".
+        config_path: Path to the configuration file.
     Returns:
         The collision system configuration.
     """
-    y = yaml.yaml()
-    with open(config_path, "r") as f:
-        full_config = y.load(f)
-
+    full_config = read_full_config(config_path=config_path)
     config: Dict[str, Any] = full_config["execution"][collision_system]["dataset"]
 
     return config
@@ -1401,10 +1416,10 @@ def setup_unfolding(
     output_dir = Path("output") / "PbPb" / "unfolding" / "parsl"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    PbPb_dataset_config = read_config(collision_system="PbPb")
+    PbPb_dataset_config = read_dataset_config(collision_system="PbPb")
     PbPb_train_directories = set([Path(filename).parent for filename in PbPb_dataset_config["files"]])
     # PbPb_prefixes = PbPb_dataset_config["prefixes"]
-    embedded_dataset_config = read_config(collision_system="embedPythia")
+    embedded_dataset_config = read_dataset_config(collision_system="embedPythia")
     embedded_train_directories = set([Path(filename).parent for filename in embedded_dataset_config["files"]])
     # embedded_prefixes = embedded_dataset_config["prefixes"]
 
@@ -1542,10 +1557,12 @@ if __name__ == "__main__":  # noqa: C901
     collision_system = "embedPythia"
     jobs_to_execute = [
         # "repair_root_files",
-        # "convert_to_parquet",
-        "calculate_embedding_skim",
+        "convert_to_parquet",
+        # "calculate_embedding_skim",
+        # "root_data_frame",
+        # "root_data_frame_response",
     ]
-    nodes_to_allocate = 11
+    nodes_to_allocate = 5
     jobs_per_node = 6
     entries_per_job = int(1e5)
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
@@ -1600,7 +1617,9 @@ if __name__ == "__main__":  # noqa: C901
         jobs_per_node=jobs_per_node,
         use_root=any((job in _jobs_requiring_root for job in jobs_to_execute)),
         # We need the AliPhysics definitions for the Substructure output classes and AliEmcalList.
-        use_aliphysics=any((job == "repair_root_files" for job in jobs_to_execute)),
+        use_aliphysics=any(
+            (job in ["repair_root_files", "extract_scale_factors_for_embedding"] for job in jobs_to_execute)
+        ),
         use_roounfold=any((job == "unfolding" for job in jobs_to_execute)),
     )
 
@@ -1612,7 +1631,8 @@ if __name__ == "__main__":  # noqa: C901
     logging.getLogger("parsl").setLevel(logging.WARNING)
 
     # Helpers
-    dataset_config = read_config(collision_system=collision_system)
+    full_config = read_full_config()
+    dataset_config = read_dataset_config(collision_system=collision_system)
 
     results = []
     all_results = []
@@ -1679,7 +1699,7 @@ if __name__ == "__main__":  # noqa: C901
         )
         all_results.extend(results)
     if "root_data_frame" in jobs_to_execute:
-        results = setup_root_data_frame(
+        rdf_results = setup_root_data_frame(
             processing_mode="standard",
             collision_system=collision_system,
             n_cores_per_job=n_cores_per_job,
@@ -1688,9 +1708,9 @@ if __name__ == "__main__":  # noqa: C901
             # selected_train_numbers=list(range(5977, 5978)),
             input_results=results if results else None,
         )
-        all_results.extend(results)
+        all_results.extend(rdf_results)
     if "root_data_frame_response" in jobs_to_execute:
-        results = setup_root_data_frame(
+        rdf_results = setup_root_data_frame(
             processing_mode="response",
             collision_system=collision_system,
             n_cores_per_job=n_cores_per_job,
@@ -1699,7 +1719,7 @@ if __name__ == "__main__":  # noqa: C901
             # selected_train_numbers=list(range(6338, 6339)),
             input_results=results if results else None,
         )
-        all_results.extend(results)
+        all_results.extend(rdf_results)
     if "root_data_frame_closure" in jobs_to_execute:
         # We'll always want both, so let's just do both.
         temp_results = []
