@@ -739,7 +739,9 @@ def _write_scale_factors_to_yaml(
 
     # Write them to YAML for later.
     y = yaml.yaml(classes_to_register=[skim_analysis_objects.ScaleFactor])
-    with open(Path(outputs[0].filepath), "w") as f:
+    output_dir = Path(outputs[0].filepath)
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_dir, "w") as f:
         y.dump(scale_factors, f)
 
     return True
@@ -794,6 +796,8 @@ def setup_write_scale_factors(
         dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
     )
     # Must read the scale factors from file to get the properly scaled values.
+    # We need to wait until the scale_factors are written, so we block on the result here.
+    _ = yaml_result.result()
     read_scale_factors = read_extracted_scale_factors(
         collision_system=collision_system, dataset_name=dataset_config["name"]
     )

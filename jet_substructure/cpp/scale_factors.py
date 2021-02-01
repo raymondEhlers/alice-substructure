@@ -155,7 +155,7 @@ def create_scale_factor_tree_for_cross_check_task_output(
     # Get number of entries in the tree to determine
     with uproot.open(filename) as f:
         # This should usually get us the tree name, regardless of what task actually generated it.
-        tree_name = [k for k in f.keys() if "RawTreee" in k][0]
+        tree_name = [k for k in f.keys() if "RawTree" in k][0]
         n_entries = f[tree_name].num_entries
         logger.debug(f"n entries: {n_entries}")
 
@@ -200,6 +200,9 @@ def embedded_pt_hard_spectra(
         for filename in pt_hard_filenames:
             with uproot.open(filename) as f:
                 embedding_hists = f["AliAnalysisTaskEmcalEmbeddingHelper_histos"]
+                if not isinstance(embedding_hists, uproot.models.TList.Model_TList):
+                    # Grab the underlying TList rather than the AliEmcalList...
+                    embedding_hists = embedding_hists.bases[0]
                 single_bin_pt_hard_spectra.append(
                     binned_data.BinnedData.from_existing_data(
                         [h for h in embedding_hists if h.has_member("fName") and h.member("fName") == "fHistPtHard"][0]
