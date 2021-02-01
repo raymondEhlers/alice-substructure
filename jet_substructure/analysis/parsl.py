@@ -582,10 +582,33 @@ def setup_convert_to_parquet(
         job_ranges_results.append((input_file, _job_ranges_result))
 
     # logger.info(f"Partially done results: {results}")
-    # logger.info(f"job_range_results: {job_ranges_results}")
+    # logger.info(f"job_ranges_results: {job_ranges_results}")
     logger.info("About to determine job ranges for conversion to parquet.")
     if number_of_entries_per_file_results:
         logger.warning("This is going to hang for a while during the job range calculations...")
+
+    # Write cache if needed.
+    # NOTE: Putting this here has two consequences:
+    #       1. It will break the dependency tree that shows up in the monitoring because we ask
+    #          for the results here.
+    #       2. By just asking for the result, it seems that it won't be considered a dependency
+    #          of the previous tasks in the monitoring.
+    # NOTE: Both of these consequences cause no issues with the real dependency tree. The apps
+    #       will still be executed in the proper order.
+    if number_of_entries_per_file_results:
+        logger.info("Writing the number of entries per file cache.")
+        results.append(
+            _write_number_of_entries_per_file_cache(
+                # It really, really seems like we should just be able to pass the results here,
+                # but for some reason, it crashes with `TypeError: can't pickle _thread.RLock objects`.
+                # It's super unclear, because even a simplified example seems to fail. But this
+                # works, and since it's often already been calculated, we don't really lose any time with
+                # this approach. However, it's frustrating that it doesn't work as expected...
+                number_of_entries_per_file={k: v.result() for k, v in number_of_entries_per_file_results.items()},
+                # number_of_entries_per_file=number_of_entries_per_file_results,
+                outputs=[File(str(number_of_entries_filename))],
+            )
+        )
 
     parquet_results = []
     for input_file, job_ranges_result in job_ranges_results:
@@ -625,30 +648,13 @@ def setup_convert_to_parquet(
     # logger.info(f"Almost done: {results}")
     # logger.info(f"number_of_entries_per_file_results: {number_of_entries_per_file_results}")
 
-    # Write cache if needed.
-    # NOTE: This won't show up the dependency tree because we've already asked for the results...
-    if number_of_entries_per_file_results:
-        logger.info("Writing the number of entries per file cache.")
-        results.append(
-            _write_number_of_entries_per_file_cache(
-                # It really, really seems like we should just be able to pass the results here,
-                # but for some reason, it crashes with `TypeError: can't pickle _thread.RLock objects`.
-                # It's super unclear, because even a simplified example seems to fail. But this
-                # works, and since it's already been calculated, we don't really lose any time with
-                # this approach. However, it's frustrating that it doesn't work as expected...
-                number_of_entries_per_file={k: v.result() for k, v in number_of_entries_per_file_results.items()},
-                # number_of_entries_per_file=number_of_entries_per_file_results,
-                outputs=[File(str(number_of_entries_filename))],
-            )
-        )
-
     return results, parquet_results
 
 
 def _determine_input_files_per_pt_hard_bin(
     dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> Dict[int, List[File]]:
+) -> Dict[int, List[Path]]:
     input_files_per_pt_hard_bin = {}
     for filename_base in dataset_config["files"]:
         filename_base = Path(filename_base)
@@ -668,7 +674,7 @@ def _determine_input_files_per_pt_hard_bin(
 
         # Expand the filenames
         input_files_per_pt_hard_bin[pt_hard_bin] = [
-            File(f) for f in helpers.expand_wildcards_in_filenames([filename_base])
+            Path(f) for f in helpers.expand_wildcards_in_filenames([filename_base])
         ]
 
     return input_files_per_pt_hard_bin
@@ -761,17 +767,17 @@ def _write_cross_check_task_scale_factor_trees(
 def setup_write_scale_factors(
     collision_system: str,
     dataset_config: Mapping[str, Any],
-    scale_factors: Mapping[int, skim_analysis_objects.ScaleFactor],
+    scale_factors: Mapping[int, AppFuture],
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> Tuple[AppFuture, List[AppFuture]]:
     """Write scale factors to YAML and to trees if necessary."""
     # First, we write to YAML.
     # We want to do this regardless of potentially writing the scale factor trees.
-    logger.info("Writing scale factors to YAML.")
+    logger.info("Writing scale factors to YAML. Jobs are executing, so this will take a minute...")
     output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/scale_factors.yaml")
     parsl_output_file = File(str(output_filename))
     yaml_result = _write_scale_factors_to_yaml(
-        scale_factors=scale_factors,
+        scale_factors={k: v.result() for k, v in scale_factors.items()},
         outputs=[parsl_output_file],
     )
 
@@ -787,6 +793,10 @@ def setup_write_scale_factors(
     input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
         dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
     )
+    # Must read the scale factors from file to get the properly scaled values.
+    read_scale_factors = read_extracted_scale_factors(
+        collision_system=collision_system, dataset_name=dataset_config["name"]
+    )
 
     tree_results = []
     for pt_hard_bin, input_files in input_files_per_pt_hard_bin.items():
@@ -795,7 +805,7 @@ def setup_write_scale_factors(
             # tree_results[f"{pt_hard_bin}_{input_file}"] = _write_cross_check_task_scale_factor_trees(
             tree_results.append(
                 _write_cross_check_task_scale_factor_trees(
-                    scale_factor=scale_factors[pt_hard_bin],
+                    scale_factor=read_scale_factors[pt_hard_bin],
                     inputs=[File(str(input_file)), yaml_result.outputs[0]],
                 )
             )
@@ -839,7 +849,7 @@ def _extract_embedding_pt_hard_spectra(
 def setup_extract_embedding_pt_hard_spectra(
     collision_system: str,
     dataset_config: Mapping[str, Any],
-    scale_factors: Mapping[int, skim_analysis_objects.ScaleFactor],
+    input_results: MutableSequence[AppFuture],
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> AppFuture:
     # Input files
@@ -847,7 +857,8 @@ def setup_extract_embedding_pt_hard_spectra(
     input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
         dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
     )
-    # scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
+    # Must read the scale factors from file to get the properly scaled values.
+    scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
 
     # Convert inputs to Parsl files.
     # Needs to be a list, so flatten them, and then unflatten in the App.
@@ -857,6 +868,8 @@ def setup_extract_embedding_pt_hard_spectra(
         converted_filenames = [File(str(f)) for f in list_of_files]
         offsets[pt_hard_bin] = len(converted_filenames)
         parsl_files.extend(converted_filenames)
+    # Add the dependency. We won't actually open the file in the task, but this will provide explicit dependence.
+    parsl_files.extend([i.outputs[0] for i in input_results])
 
     output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/pt_hard_spectra.yaml")
     results = _extract_embedding_pt_hard_spectra(
@@ -1523,16 +1536,15 @@ def setup_unfolding(
 
 if __name__ == "__main__":  # noqa: C901
     # Settings
-    collision_system = "PbPb"
+    collision_system = "embedPythia"
     jobs_to_execute = [
         # "repair_root_files",
-        "convert_to_parquet",
-        "calculate_data_skim",
-        "root_data_frame",
+        # "convert_to_parquet",
+        "calculate_embedding_skim",
     ]
-    nodes_to_allocate = 2
+    nodes_to_allocate = 11
     jobs_per_node = 6
-    entries_per_job = int(2e5)
+    entries_per_job = int(1e5)
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
     grooming_methods = [
         "leading_kt",
@@ -1629,22 +1641,22 @@ if __name__ == "__main__":  # noqa: C901
             dataset_config=dataset_config,
             # selected_train_numbers=list(range(6316, 6318)),
         )
-        all_results.extend(scale_factors)
+        all_results.extend(list(scale_factors.values()))
         yaml_result, tree_results = setup_write_scale_factors(
             collision_system=collision_system,
             dataset_config=dataset_config,
             scale_factors=scale_factors,
             # selected_train_numbers=list(range(6316, 6318)),
         )
-        all_results.extend(yaml_result)
+        all_results.append(yaml_result)
         all_results.extend(tree_results)
         results = setup_extract_embedding_pt_hard_spectra(
             collision_system=collision_system,
             dataset_config=dataset_config,
-            scale_factors=scale_factors,
+            input_results=[yaml_result],
             # selected_train_numbers=list(range(6316, 6318)),
         )
-        all_results.extend(results)
+        all_results.append(results)
     if "calculate_embedding_skim" in jobs_to_execute:
         results = setup_calculate_embedding_skim(
             collision_system=collision_system,
@@ -1702,6 +1714,7 @@ if __name__ == "__main__":  # noqa: C901
             )
         results.extend(temp_results)
     if "unfolding" in jobs_to_execute:
+        # TODO: Configure binning, some options, etc, via the dataset config.
         results = setup_unfolding(
             grooming_methods=grooming_methods,
             run_closures=False,
