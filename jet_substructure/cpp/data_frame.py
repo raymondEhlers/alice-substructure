@@ -566,7 +566,7 @@ def run_response(  # noqa: C901
         # Add friends with scale factors
         main_tree.AddFriend(friend_tree)
 
-        # Could add the alises here. However, they don't seem to propagate to the df, so we wait.
+        # Could add the aliases here. However, they don't seem to propagate to the df, so we wait.
         # renames = cross_check_task_renames(grooming_method=grooming_method, input_branches=[b.GetName() for b in main_tree.GetListOfBranches()])
         # for k, v in renames.items():
         #    if not main_tree.SetAlias(k, v):

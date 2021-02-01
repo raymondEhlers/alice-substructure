@@ -732,9 +732,9 @@ if __name__ == "__main__":
 
     helpers.setup_logging(level=logging.DEBUG)
     convert_tree_to_parquet(
-        filename=Path("trains/embedPythia/5966/AnalysisResults.18r.repaired.root"),
+        filename=Path("trains/embedPythia/6632/AnalysisResults.18r.repaired.root"),
         tree_name="AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
-        prefixes=list({"hybrid": "data", "true": "matched", "det_level": "detLevel"}.keys()),
+        prefixes=list({"hybrid": "data", "true": "matched", "det_level": "detLevel"}.values()),
         branches=[],
         prefix_branches=[
             "{prefix}.fJetPt",
@@ -752,7 +752,7 @@ if __name__ == "__main__":
         ],
         entries=(0, None),
         output_filename=Path(
-            "trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18r.repaired.00.parquet"
+            "trains/embedPythia/6632/parquet/events_per_job_100000/bak/AnalysisResults.18r.repaired.00.parquet"
         ),
     )
 
