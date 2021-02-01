@@ -192,7 +192,7 @@ available_datasets:
     #
     # Pb-Pb
     # Semi-central data R = 0.4 for pass1 AOD
-    LHC18qr_semi_central_R04_5863:
+    LHC18qr_semi_central_R04_5863: &LHC18qr_semi_central_R04_pass1
         name: "LHC18qr_semi_central_R04_5863"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
@@ -207,7 +207,7 @@ available_datasets:
         files:
             - "trains/PbPb/5863/AnalysisResults.*.repaired.root"
     # Rmax = 0.6 systematic.
-    LHC18qr_semi_central_R04_Rmax060:
+    LHC18qr_semi_central_R04_Rmax060: &LHC18qr_semi_central_R04_pass1_Rmax060
         name: "LHC18qr_semi_central_R04_Rmax060_5862"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
@@ -222,7 +222,7 @@ available_datasets:
         files:
             - "trains/PbPb/5862/AnalysisResults.*.repaired.root"
     # Unsubtracted constituents, and therefore not usable. Kept only for comparison to show that the subtraction worked.
-    LHC18qr_semi_central_unsub: &LHC18qr_semi_central_unsub
+    LHC18qr_semi_central_unsub: &LHC18qr_semi_central_R04_pass1_unsub
         name: "LHC18qr_semi_central_5537"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
@@ -264,7 +264,7 @@ available_datasets:
         jet_R: 0.4
         files:
             - "trains/PbPb/6672/AnalysisResults.*.repaired.root"
-    # Rmax = 0.7 systmeatic. NOTE: This is different than the pass1 AOD value
+    # Rmax = 0.7 systmeatic. NOTE: This value is different than the pass1 AOD value
     LHC18qr_semi_central_R04_Rmax070_6673: &LHC18qr_semi_central_R04_Rmax070
         name: "LHC18qr_semi_central_R04_Rmax070_6673"
         # yamllint disable-line rule:line-length
@@ -281,7 +281,7 @@ available_datasets:
             - "trains/PbPb/6673/AnalysisResults.*.repaired.root"
     # Embedded pythia
     # LHC19f4 embedded into LHC18qr semi-central R = 0.4 for pass1 AOD
-    LHC19f4_embedded_into_LHC18qr_semi_central_R04_5966_5985:
+    LHC19f4_embedded_into_LHC18qr_semi_central_R04_5966_5985: &LHC18qr_semi_central_R04_pass1_embedded
         name: "LHC19f4_embedded_into_LHC18qr_semi_central_R04_5966_5985"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -317,7 +317,7 @@ available_datasets:
             - "trains/embedPythia/5984/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/5985/AnalysisResults.*.repaired.root"
     # Systematics: Rmax = 0.6
-    LHC19f4_embedded_into_LHC18qr_semi_central_R04_Rmax060_6316_6335:
+    LHC19f4_embedded_into_LHC18qr_semi_central_R04_Rmax060_6316_6335: &LHC18qr_semi_central_R04_pass1_embedded_Rmax060
         name: "LHC19f4_embedded_into_LHC18qr_semi_central_R04_Rmax060_6316_6335"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -354,7 +354,8 @@ available_datasets:
             - "trains/embedPythia/6335/AnalysisResults.*.repaired.root"
     # Systematics: Rmax = 0.05
     # NOTE: This may not be helpful because unfolding with z = 0.2 for any grooming method seems to be quite difficult!
-    LHC19f4_embedded_into_LHC18qr_semi_central_R04_Rmax005_6046_6048_6066: &LHC18qr_semi_central_R04_embedded_Rmax005
+    # yamllint disable-line rule:line-length
+    LHC19f4_embedded_into_LHC18qr_semi_central_R04_Rmax005_6046_6048_6066: &LHC18qr_semi_central_R04_pass1_embedded_Rmax005
         name: "LHC19f4_embedded_into_LHC18qr_semi_central_Rmax005_6046_6048_6066"
         # Important to note that this is a cross check task output!
         cross_check_task: true
@@ -395,7 +396,7 @@ available_datasets:
             - "trains/embedPythia/6066/AnalysisResults.*.repaired.root"
     # Systematics: Tracking efficiency
     # yamllint disable-line rule:line-length
-    LHC19f4_embedded_into_LHC18qr_semi_central_R04_tracking_efficiency_6296_6315: &LHC18qr_semi_central_R04_embedded_tracking_efficiency
+    LHC19f4_embedded_into_LHC18qr_semi_central_R04_tracking_efficiency_6296_6315: &LHC18qr_semi_central_R04_pass1_embedded_tracking_efficiency
         # yamllint disable-line rule:line-length
         name: "LHC19f4_embedded_into_LHC18qr_semi_central_R04_tracking_efficiency_6296_6315"
         # yamllint disable-line rule:line-length
@@ -432,7 +433,7 @@ available_datasets:
             - "trains/embedPythia/6314/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/6315/AnalysisResults.*.repaired.root"
     # Unsubtracted embedded output. Not meaningful, but kept for comparison.
-    LHC19f4_embedded_into_LHC18qr_semi_central_R04_5780_5799: &LHC18qr_semi_central_R04_embedded_unsubtracted
+    LHC19f4_embedded_into_LHC18qr_semi_central_R04_5780_5799: &LHC18qr_semi_central_R04_pass1_embedded_unsubtracted
         name: "LHC19f4_embedded_into_LHC18qr_unsubtracted_5780_5799"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -655,6 +656,78 @@ available_datasets:
             - "trains/embedPythia/6474/AnalysisResults.*.root"
             - "trains/embedPythia/6475/AnalysisResults.*.root"
 
+analysis_configurations:
+    PbPb_semi_central_R04_pass1:
+        datasets:
+            standard:
+                PbPb: *LHC18qr_semi_central_R04_pass1
+                embedPythia: *LHC18qr_semi_central_R04_pass1_embedded
+            tracking_efficiency:
+                PbPb: *LHC18qr_semi_central_R04_pass1
+                embedPythia: *LHC18qr_semi_central_R04_pass1_embedded_tracking_efficiency
+            rmax_005:
+                PbPb: null  #*LHC18qr_semi_central_R04_pass1_Rmax005
+                # For now, we don't fill this in because it's not really useful....
+                embedPythia: null  #*LHC18qr_semi_central_R04_pass1_embedded_Rmax005
+            rmax_060:
+                PbPb: *LHC18qr_semi_central_R04_pass1_Rmax060
+                embedPythia: *LHC18qr_semi_central_R04_pass1_embedded_Rmax060
+        unfolding:
+            nominal_binning:
+                jet_pt_true: [0, 30, 40, 60, 80, 100, 120, 160]
+                jet_pt_smeared: [30, 40, 50, 60, 80, 100, 120]
+                kt_true: [-0.05, 0, 2, 3, 4, 5, 7, 9, 15, 100]
+                kt_smeared: [1, 2, 3, 4, 5, 7, 10, 15]
+            systematics:
+                random_binning:
+                    # kt_smeared random binning
+                    kt_smeared: [1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15]
+    PbPb_semi_central_R04_pass3:
+        datasets:
+            nominal:
+                PbPb: *LHC18qr_semi_central_R04
+                embedPythia: *LHC18qr_semi_central_R04_embedded
+            tracking_efficiency:
+                PbPb: *LHC18qr_semi_central_R04
+                embedPythia: null  #*LHC18qr_semi_central_R04_embedded_tracking_efficiency
+            rmax_005:
+                PbPb: null  #*LHC18qr_semi_central_R04_Rmax005
+                embedPythia: null  #*LHC18qr_semi_central_R04_embedded_Rmax005
+            rmax_070:
+                PbPb: *LHC18qr_semi_central_R04_Rmax070
+                embedPythia: *LHC18qr_semi_central_R04_embedded_Rmax070
+        unfolding:
+            nominal_binning:
+                jet_pt_true: [0, 30, 40, 60, 80, 100, 120, 160]
+                jet_pt_smeared: [30, 40, 50, 60, 80, 100, 120]
+                kt_true: [-0.05, 0, 2, 3, 4, 5, 7, 9, 15, 100]
+                kt_smeared: [1, 2, 3, 4, 5, 7, 10, 15]
+            systematics:
+                random_binning:
+                    # kt_smeared random binning
+                    kt_smeared: [1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15]
+    PbPb_central_R02:
+        datasets:
+            nominal:
+                PbPb: *LHC18qr_central_R02
+                embedPythia: *LHC18qr_central_R02_embedded
+            tracking_efficiency:
+                PbPb: *LHC18qr_central_R02
+                embedPythia: null  #*LHC18qr_central_R02_embedded_tracking_efficiency
+            rmax_005:
+                PbPb: null  #*LHC18qr_central_R02_Rmax005
+                embedPythia: null  #*LHC18qr_central_R02_embedded_Rmax005
+            rmax_070:
+                PbPb: null  #*LHC18qr_central_R02_Rmax070
+                embedPythia: null  #*LHC18qr_central_R02_embedded_Rmax070
+        nominal_binning:
+            jet_pt_true: [0, 40, 60, 80, 100, 120, 160]
+            jet_pt_smeared: [40, 50, 60, 80, 100, 120]
+            kt_true: [-0.05, 0, 2, 3, 4, 8, 100]
+            kt_smeared: [1, 2, 3, 4, 8]
+        systematics:
+            # kt_smeared random binning
+            random_binning: [1, 2, 3.02, 4.13, 8]
 
 execution:
     PbPb:
