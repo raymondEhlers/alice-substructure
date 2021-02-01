@@ -327,7 +327,7 @@ available_datasets:
             "true": "matched"
             det_level: "detLevel"
         # Branches which don't contain a prefix
-        branches: []
+        branches: ["data_leading_track_pt"]
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
         prefix_branches: *prefix_branches
         jet_R: 0.4
@@ -406,7 +406,7 @@ available_datasets:
             "true": "matched"
             det_level: "detLevel"
         # Branches which don't contain a prefix
-        branches: []
+        branches: ["data_leading_track_pt"]
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
         prefix_branches: *prefix_branches
         jet_R: 0.4
@@ -492,7 +492,7 @@ available_datasets:
             "true": "matched"
             det_level: "detLevel"
         # Branches which don't contain a prefix
-        branches: []
+        branches: ["data_leading_track_pt"]
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
         prefix_branches: *prefix_branches
         jet_R: 0.4
@@ -529,7 +529,7 @@ available_datasets:
             "true": "matched"
             det_level: "detLevel"
         # Branches which don't contain a prefix
-        branches: []
+        branches: ["data_leading_track_pt"]
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
         prefix_branches: *prefix_branches
         jet_R: 0.4
@@ -571,7 +571,7 @@ available_datasets:
         files:
             - "trains/PbPb/6359/AnalysisResults.*.repaired.root"
     # Central R = 0.2 Embedding for Leading kt for pass1 AOD
-    LHC19f4_embedded_into_LHC18qr_central_R02_6338_6357: &LHC18qr_central_R02_embedded
+    LHC19f4_embedded_into_LHC18qr_central_R02_6338_6357:
         name: "LHC19f4_embedded_into_LHC18qr_central_R02_6338_6357"
         # Important to note that this is a cross check task output!
         cross_check_task: true
@@ -612,13 +612,55 @@ available_datasets:
             - "trains/embedPythia/6355/AnalysisResults.*.root"
             - "trains/embedPythia/6356/AnalysisResults.*.root"
             - "trains/embedPythia/6357/AnalysisResults.*.root"
+    # Central R = 0.2 Embedding for dynamical core for pass1 AOD
+    LHC19f4_embedded_into_LHC18qr_central_R02_6456_6475: &LHC18qr_central_R02_embedded
+        name: "LHC19f4_embedded_into_LHC18qr_central_R02_6456_6475"
+        # Important to note that this is a cross check task output!
+        cross_check_task: true
+        grooming_methods:
+            - "dynamical_core"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "data"
+            "true": "matched"
+            det_level: "det_level"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        # Since this is a cross check task, we don't need to repair the trees, nor
+        # skim them to flat.
+        files:
+            - "trains/embedPythia/6456/AnalysisResults.*.root"
+            - "trains/embedPythia/6457/AnalysisResults.*.root"
+            - "trains/embedPythia/6458/AnalysisResults.*.root"
+            - "trains/embedPythia/6459/AnalysisResults.*.root"
+            - "trains/embedPythia/6460/AnalysisResults.*.root"
+            - "trains/embedPythia/6461/AnalysisResults.*.root"
+            - "trains/embedPythia/6462/AnalysisResults.*.root"
+            - "trains/embedPythia/6463/AnalysisResults.*.root"
+            - "trains/embedPythia/6464/AnalysisResults.*.root"
+            - "trains/embedPythia/6465/AnalysisResults.*.root"
+            - "trains/embedPythia/6466/AnalysisResults.*.root"
+            - "trains/embedPythia/6467/AnalysisResults.*.root"
+            - "trains/embedPythia/6468/AnalysisResults.*.root"
+            - "trains/embedPythia/6469/AnalysisResults.*.root"
+            - "trains/embedPythia/6470/AnalysisResults.*.root"
+            - "trains/embedPythia/6471/AnalysisResults.*.root"
+            - "trains/embedPythia/6472/AnalysisResults.*.root"
+            - "trains/embedPythia/6473/AnalysisResults.*.root"
+            - "trains/embedPythia/6474/AnalysisResults.*.root"
+            - "trains/embedPythia/6475/AnalysisResults.*.root"
 
 
 execution:
     PbPb:
-        dataset: *LHC18qr_semi_central_R04_Rmax070
+        dataset: *LHC18qr_central_R02
     embedPythia:
-        dataset: *LHC18qr_semi_central_R04_embedded_Rmax070
+        dataset: *LHC18qr_semi_central_R04_embedded
     pp:
         dataset: *LHC17pq_pp_R02
     pythia:

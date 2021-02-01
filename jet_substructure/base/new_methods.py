@@ -639,7 +639,7 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Mapping[str, str]
             }
         )
     additional_columns = {}
-    # Add unsubstracted leading track pt for data if it was stored.
+    # Add unsubtracted leading track pt for data if it was stored.
     # We'll need to handle this later in the skim.
     # NOTE: This always has prefix "data" if it's included!
     if "data_leading_track_pt" in ak.fields(arrays):

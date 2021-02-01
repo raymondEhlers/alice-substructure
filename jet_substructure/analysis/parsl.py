@@ -1257,7 +1257,6 @@ def setup_root_data_frame(
     n_cores_per_job: int,
     dataset_config: Mapping[str, Any],
     default_grooming_methods: Sequence[str],
-    cores_per_node: int = 8,
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[AppFuture]] = None,
 ) -> List[AppFuture]:
@@ -1321,14 +1320,14 @@ def setup_root_data_frame(
         # Setup file IO
         tag = f"_{mode.tag}" if mode.tag else ""
         output_file = (
-            output_dir / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.values())}{tag}.root"
+            output_dir / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.keys())}{tag}.root"
         )
         parsl_output_file = File(str(output_file))
         results.append(
             mode.func(
                 collision_system=collision_system,
                 tree_name="tree" if not cross_check_task else dataset_config["tree_name"],
-                prefixes=list(prefixes.values()),
+                prefixes=list(prefixes.keys()),
                 grooming_method=grooming_method,
                 jet_R=dataset_config["jet_R"],
                 n_cores=n_cores_per_job,
