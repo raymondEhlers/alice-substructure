@@ -755,7 +755,7 @@ def calculate_embedding_skim(  # noqa: C901
             if prefix == "hybrid":
                 # First, store the unsubstracted (which we use for the double counting cut) as the normal leading track pt.
                 if "leading_track_pt" in ak.fields(input_jets.jets):
-                    grooming_results[leading_track_name] = to_float(input_jets.jets[f"{prefix}_leading_track_pt"])
+                    grooming_results[leading_track_name] = to_float(input_jets.jets["leading_track_pt"])
                 # Then update the name for the substracted constituents in data.
                 leading_track_name = f"{prefix}_leading_track_pt_sub"
             grooming_results[leading_track_name] = to_float(ak.max(input_jets.jets.jet_constituents.pt, axis=1))
@@ -1002,7 +1002,7 @@ def calculate_data_skim(  # noqa: C901
             if prefix == "data" and collision_system == "PbPb":
                 # First, store the unsubstracted (which we use for the double counting cut).
                 if "leading_track_pt" in ak.fields(input_jets.jets):
-                    grooming_results[leading_track_name] = to_float(input_jets.jets[f"{prefix}_leading_track_pt"])
+                    grooming_results[leading_track_name] = to_float(input_jets.jets["leading_track_pt"])
                 # Then update the name for the substracted constituents in data.
                 leading_track_name = f"{prefix}_leading_track_pt_sub"
             grooming_results[leading_track_name] = to_float(ak.max(input_jets.jets.jet_constituents.pt, axis=1))
@@ -1114,15 +1114,15 @@ if __name__ == "__main__":
     helpers.setup_logging()
     res = calculate_embedding_skim(
         input_filename=Path(
-            "trains/embedPythia/5966/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"
+            "trains/embedPythia/6650/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"
         ),
         iterative_splittings=True,
         prefixes={"hybrid": "data", "true": "matched", "det_level": "detLevel"},
         scale_factors={1: 16.0695},
-        train_directory=Path("trains/embedPythia/5966/"),
+        train_directory=Path("trains/embedPythia/6650/"),
         jet_R=0.4,
         output_filename=Path(
-            "trains/embedPythia/5966/skim/test3/AnalysisResults.18q.repaired.00_iterative_splittings.root"
+            "trains/embedPythia/6650/skim/test/AnalysisResults.18q.repaired.00_iterative_splittings.root"
         ),
         write_parquet=True,
         write_feather=True,
