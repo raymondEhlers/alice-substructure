@@ -708,6 +708,9 @@ analysis_configurations:
                     label: ""
                     # NOTE: Untagged bin above is included in the closures!
                     closures: True
+                    # TODO: Need closure settings for.
+                    #       - fraction of MC split
+                    #       - value of untaggecd max upper bin.
                     reweight_prior: False
                     datasets: "nominal"
                 tracking_efficiency:
@@ -735,6 +738,9 @@ analysis_configurations:
                     reweight_prior: False
                     datasets: "nominal"
                     binning:
+                        # NOTE: Generate 5 random edges of 5% (+/-, so 10% total) with:
+                        #       np.random.random_sample(5) / 10 + 0.95
+                        #       it can then be multiplied with the inner binning.
                         kt_smeared: [1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15]
                 reweight_prior:
                     label: "reweight_prior"

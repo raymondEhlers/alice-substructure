@@ -561,6 +561,7 @@ ResponseResult create_closure_response_2D(
  double smearedUntaggedBinValue, double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
  const std::vector<std::string>& embeddedFilenames, const ClosureVariation_t closureVariation,
  const double fractionForResponse = 0.75, const bool usePureMatches = false, TH2D* hReweighting = nullptr,
+ const std::map<std::string, std::string> renameBranchMap = {},
  const std::string& embeddedTreeName = "tree", const std::string& truePrefix = "true",
  const std::string& hybridPrefix = "hybrid", const std::string& detLevelPrefix = "det_level")
 {
@@ -583,6 +584,10 @@ ResponseResult create_closure_response_2D(
   TChain embeddedChain(embeddedTreeName.c_str());
   for (auto filename : embeddedFilenames) {
     embeddedChain.Add(filename.c_str());
+  }
+  // Add aliases
+  for (const auto & m : ) {
+      embeddedChain.SetAlias(m.first, m.second);
   }
   TTreeReader mcReader(&embeddedChain);
 

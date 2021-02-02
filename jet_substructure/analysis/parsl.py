@@ -1395,8 +1395,8 @@ def _unfolding_standard(
 def _unfolding_closure(
     settings: "unfolding_2D.Settings",  # noqa: F821
     closure_variation: str,
-    data_dataset_name: str,
-    embedded_dataset_name: str,
+    reweight_data_dataset_name: str,
+    reweight_embedded_dataset_name: str,
     embedded_tree_name: str,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
@@ -1417,8 +1417,8 @@ def _unfolding_closure(
         embedded_filenames=embedded_filenames,
         embedded_tree_name=embedded_tree_name,
         closure_variation=closure_variation,
-        data_dataset_name=data_dataset_name,
-        embedded_dataset_name=embedded_dataset_name,
+        reweight_data_dataset_name=reweight_data_dataset_name,
+        reweight_embedded_dataset_name=reweight_embedded_dataset_name,
     )
 
 
@@ -1753,8 +1753,11 @@ def setup_all_unfolding(
                             _unfolding_closure(
                                 settings=s,
                                 closure_variation=closure_variation,
-                                data_dataset_name=PbPb_dataset_config["name"],
-                                embedded_dataset_name=embedded_dataset_config["name"],
+                                # We always want to reweight with the nominal datasets.
+                                reweight_data_dataset_name=base_dataset_config["datasets"]["nominal"]["PbPb"]["name"],
+                                reweight_embedded_dataset_name=base_dataset_config["datasets"]["nominal"][
+                                    "embedPythia"
+                                ]["name"],
                                 inputs=input_files,
                                 outputs=[parsl_output_file],
                             )
@@ -1777,6 +1780,7 @@ if __name__ == "__main__":  # noqa: C901
         # "calculate_embedding_skim",
         # "root_data_frame",
         # "root_data_frame_response",
+        "unfolding",
     ]
     nodes_to_allocate = 9
     jobs_per_node = 7
@@ -1967,7 +1971,7 @@ if __name__ == "__main__":  # noqa: C901
         results = setup_all_unfolding(
             base_dataset_config=base_dataset_config,
             grooming_methods=grooming_methods,
-            # selected_unfolding_settings=["default"]
+            selected_unfolding_settings=["default"],
         )
 
     logger.info(f"About to ask for result. len: {len(all_results)}")

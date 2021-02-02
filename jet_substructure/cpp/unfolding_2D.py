@@ -536,6 +536,47 @@ def get_reweighted_ratio(
     return h_ratio
 
 
+def _get_reweighting_ratio(
+    reweight_data_dataset_name: str, reweight_embedded_dataset_name: str, settings: Settings
+) -> TH2D:
+    # Validation
+    if not reweight_data_dataset_name or not reweight_embedded_dataset_name:
+        raise ValueError(
+            f"Must pass data and embedded dataset names. Passed data: {reweight_data_dataset_name}, embedded: {reweight_embedded_dataset_name}"
+        )
+
+    h_reweighting_ratio = get_reweighted_ratio(
+        data_dataset_name=reweight_data_dataset_name,
+        embedded_dataset_name=reweight_embedded_dataset_name,
+        grooming_method=settings.grooming_method,
+    )
+
+    # Validate the reweighting ratio
+    # x axis should contain the smeared substructure variable
+    # y axis contains the smeared jet pt.
+    temp_hist = binned_data.BinnedData.from_existing_data(h_reweighting_ratio)
+    np.testing.assert_allclose(temp_hist.axes[0].bin_edges, settings.substructure_variable.smeared_bins)
+    np.testing.assert_allclose(temp_hist.axes[1].bin_edges, settings.jet_pt.smeared_bins)
+
+    return h_reweighting_ratio
+
+
+def _create_branch_rename_shim(
+    embedded_filenames: Sequence[Path], embedded_tree_name: str, grooming_method: str
+) -> Dict[str, str]:
+    # Need to do a quick read of the branch names. The branch names shouldn't vary by file, so we can
+    # use the first one.
+    with uproot.open(embedded_filenames[0]) as f:
+        input_branches = list(f[embedded_tree_name].keys())
+
+    branch_renames = skim_analysis_objects.cross_check_task_branch_name_shim(
+        grooming_method=grooming_method,
+        input_branches=input_branches,
+    )
+
+    return branch_renames
+
+
 def run_unfolding(
     settings: Settings,
     data_filenames: Sequence[Path],
@@ -559,38 +600,21 @@ def run_unfolding(
 
     h_reweighting_response_ratio = ROOT.nullptr
     if reweight_prior:
-        # Validation
-        if not reweight_data_dataset_name or not reweight_embedded_dataset_name:
-            raise ValueError(
-                f"Must pass data and embedded dataset names. Passed data: {reweight_data_dataset_name}, embedded: {reweight_embedded_dataset_name}"
-            )
-
-        h_reweighting_response_ratio = get_reweighted_ratio(
-            data_dataset_name=reweight_data_dataset_name,
-            embedded_dataset_name=reweight_embedded_dataset_name,
-            grooming_method=settings.grooming_method,
+        h_reweighting_response_ratio = _get_reweighting_ratio(
+            reweight_data_dataset_name=reweight_data_dataset_name,
+            reweight_embedded_dataset_name=reweight_embedded_dataset_name,
+            settings=settings,
         )
 
-        # Validate the reweighting ratio
-        # x axis should contain the smeared substructure variable
-        # y axis contains the smeared jet pt.
-        temp_hist = binned_data.BinnedData.from_existing_data(h_reweighting_response_ratio)
-        np.testing.assert_allclose(temp_hist.axes[0].bin_edges, settings.substructure_variable.smeared_bins)
-        np.testing.assert_allclose(temp_hist.axes[1].bin_edges, settings.jet_pt.smeared_bins)
-
+    # Create cross check task shim if necessary
     branch_renames = {}
     if embedded_cross_check_task:
-        # Need to do a quick read of the branch names. The branch names shouldn't vary by file, so we can
-        # use the first one.
-        with uproot.open(embedded_filenames[0]) as f:
-            input_branches = list(f[embedded_tree_name].keys())
-
-        branch_renames = skim_analysis_objects.cross_check_task_branch_name_shim(
+        branch_renames = _create_branch_rename_shim(
+            embedded_filenames=embedded_filenames,
+            embedded_tree_name=embedded_tree_name,
             grooming_method=settings.grooming_method,
-            input_branches=input_branches,
         )
 
-    # TODO: Add shim here!
     # Create the responses. We assume some conventions about column names.
     # They should generally be reasonable, but may require tweaks from time to time.
     responses = ROOT.create_response_2D(
@@ -664,8 +688,9 @@ def run_unfolding_closure_reweighting(
     embedded_tree_name: str,
     closure_variation: str,
     fraction_for_response: float = 0.75,
-    data_dataset_name: Optional[str] = "",
-    embedded_dataset_name: Optional[str] = "",
+    reweight_data_dataset_name: str = "",
+    reweight_embedded_dataset_name: str = "",
+    embedded_cross_check_task: bool = False,
 ) -> bool:
     """Run unfolding closure with reweighting.
 
@@ -684,7 +709,6 @@ def run_unfolding_closure_reweighting(
     # Delayed import to avoid direct dependence.
     import ROOT
 
-    # TODO: Need to chain creating the reweighting hists unless they already exists.
     # Setup
     _setup_unfolding()
     # Validate variations.
@@ -706,26 +730,20 @@ def run_unfolding_closure_reweighting(
     # Load hists for reweighting and calculate ratio.
     h_reweighting_ratio = ROOT.nullptr
     if variation != ROOT.ClosureVariation_t.splitMC:
-        # Validation
-        if not data_dataset_name or not embedded_dataset_name:
-            raise ValueError(
-                f"Must pass data and embedded dataset names. Passed data: {data_dataset_name}, embedded: {embedded_dataset_name}"
-            )
-
-        h_reweighting_ratio = get_reweighted_ratio(
-            # embedded_dataset_name="LHC19f4_embedded_into_LHC18qr_5966_5985",
-            # data_dataset_name="LHC18qr_5863",
-            embedded_dataset_name=embedded_dataset_name,
-            data_dataset_name=data_dataset_name,
-            grooming_method=settings.grooming_method,
+        h_reweighting_ratio = _get_reweighting_ratio(
+            reweight_data_dataset_name=reweight_data_dataset_name,
+            reweight_embedded_dataset_name=reweight_embedded_dataset_name,
+            settings=settings,
         )
 
-        # Validate the reweighting ratio
-        # x axis should contain the smeared substructure variable
-        # y axis contains the smeared jet pt.
-        temp_hist = binned_data.BinnedData.from_existing_data(h_reweighting_ratio)
-        np.testing.assert_allclose(temp_hist.axes[0].bin_edges, settings.substructure_variable.smeared_bins)
-        np.testing.assert_allclose(temp_hist.axes[1].bin_edges, settings.jet_pt.smeared_bins)
+    # Create cross check task shim if necessary
+    branch_renames = {}
+    if embedded_cross_check_task:
+        branch_renames = _create_branch_rename_shim(
+            embedded_filenames=embedded_filenames,
+            embedded_tree_name=embedded_tree_name,
+            grooming_method=settings.grooming_method,
+        )
 
     # Create the responses. We assume some conventions about column names.
     # They should generally be reasonable, but may require tweaks from time to time.
@@ -746,6 +764,7 @@ def run_unfolding_closure_reweighting(
         settings.use_pure_matches,
         h_reweighting_ratio,
         embedded_tree_name,
+        _branch_name_shim_to_map_for_ROOT(branch_renames=branch_renames),
     )
 
     # Perform the actual unfolding.
@@ -845,7 +864,8 @@ def run_unfolding_tree(
     #    true_substructure_variable_bins,
     # )
 
-    # TODO: Determine the untagged bin value
+    # Should determine the untagged bin value (?)
+    # untagged_bin_value = [1, 2]
 
     data_prefix = "data"
     data_jet_pt_name = f"{data_prefix}_jet_pt"
@@ -968,8 +988,7 @@ def run_unfolding_rdf(
     #    true_substructure_variable_bins,
     # )
 
-    # TODO: Determine the untagged bin value
-    # TODO: Make arguments, cleanup, consolidate...
+    # Need to make arguments, cleanup, consolidate...
     n_cores = 1
     data_prefix = "data"
     data_jet_pt_name = f"{data_prefix}_jet_pt"
@@ -1067,7 +1086,7 @@ def run_unfolding_rdf(
 
     # Starting embedding from here, but needs cleanup...
     data_chain_embedded = ROOT.TChain("tree")
-    # TODO: Make these an argument...
+    # Make these an argument...
     data_chain_embedded.Add("trains/embedPythia/5966/skim/*.root")
     data_chain_embedded.Add("trains/embedPythia/5967/skim/*.root")
     data_chain_embedded.Add("trains/embedPythia/5968/skim/*.root")
@@ -1090,7 +1109,7 @@ def run_unfolding_rdf(
     data_chain_embedded.Add("trains/embedPythia/5985/skim/*.root")
     df_embedded = ROOT.RDataFrame(data_chain_embedded)
 
-    # TODO: Make these arguments
+    # Make these arguments
     smeared_cut_prefix = "hybrid"
 
     # Implement all of the embedding cuts via filters.
