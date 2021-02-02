@@ -591,6 +591,10 @@ def convert_tree_to_parquet(
 def parquet_to_substructure_analysis(filename: Path, prefixes: Mapping[str, str]) -> Dict[str, ak.Array]:
     """Convert an existing parquet file to arrays for substructure analysis.
 
+    Note:
+        We have implicitly built in the map of branches that we want to access into the
+        ak.Array structure that we return.
+
     Args:
         filename: Filename of the parquet file.
         prefixes: Prefixes of the branches to be loaded from the parquet file. The template branches
@@ -598,7 +602,7 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Mapping[str, str]
             We map from the desired prefixes to those which are used in storing the data.
     Returns:
         One substructure array per prefix, along with a few individual columns if available in the input data
-            (related to pt hard info).
+            (related to pt hard info or unsubtracted leading track pt).
     """
     # Read all of the arrays from parquet.
     # NOTE: In principle, we could read fewer branches here. However, it doesn't seem to be necessary
@@ -643,7 +647,7 @@ def parquet_to_substructure_analysis(filename: Path, prefixes: Mapping[str, str]
     # We'll need to handle this later in the skim.
     # NOTE: This always has prefix "data" if it's included!
     if "data_leading_track_pt" in ak.fields(arrays):
-        prefix_for_leading_track = "hybrid" if "hybrid" in list(prefixes.values()) else "data"
+        prefix_for_leading_track = "hybrid" if "hybrid" in list(prefixes.keys()) else "data"
         additional_columns[prefix_for_leading_track] = {
             "leading_track_pt": arrays["data_leading_track_pt"],
         }
