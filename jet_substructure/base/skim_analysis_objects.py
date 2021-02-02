@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Type
+from typing import Any, Dict, Sequence, Type
 
 import attr
 from pachyderm import binned_data
@@ -58,6 +58,31 @@ class ScaleFactor:
             n_entries=n_entries,
             n_accepted_events=n_accepted_events,
         )
+
+
+def cross_check_task_branch_name_shim(grooming_method: str, input_branches: Sequence[str]) -> Dict[str, str]:
+    # Validation
+    input_branches = list(input_branches)
+
+    renames = {}
+    # First, some specifics:
+    for subjet_name in ["leading", "subleading"]:
+        renames[
+            f"{grooming_method}_det_level_{subjet_name}_subjet_momentum_fraction_in_hybrid_jet"
+        ] = f"{grooming_method}_hybrid_det_level_matching_{subjet_name}_pt_fraction_in_hybrid_jet"
+
+    for branch_name in input_branches:
+        new_branch_name = branch_name
+        # data -> hybrid
+        # matched -> true
+        # det_level -> det_level
+        for old, new in [("data", "hybrid"), ("matched", "true"), ("det_level", "det_level")]:
+            new_branch_name = new_branch_name.replace(old, new)
+
+        if new_branch_name != branch_name and "subjet_momentum_fraction" not in new_branch_name:
+            renames[new_branch_name] = branch_name
+
+    return renames
 
 
 @attr.s

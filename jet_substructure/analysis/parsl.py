@@ -8,9 +8,9 @@
 from __future__ import annotations
 
 import copy
+import functools
 import logging
 import math
-import random
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
 
@@ -57,19 +57,20 @@ def read_full_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
     return full_config
 
 
-def read_dataset_config(collision_system: str, config_path: Optional[Path] = None) -> Dict[str, Any]:
+def read_dataset_config(base_dataset_name: str, config_path: Optional[Path] = None) -> Dict[str, Any]:
     """Read collision system configuration from YAML file.
 
     The collision system specification is defined in the YAML file.
 
     Args:
+        base_dataset_name: Name of the base dataset.
         collision_system: Name of the collision system.
         config_path: Path to the configuration file.
     Returns:
         The collision system configuration.
     """
     full_config = read_full_config(config_path=config_path)
-    config: Dict[str, Any] = full_config["execution"][collision_system]["dataset"]
+    config: Dict[str, Any] = full_config["analysis_configurations"][base_dataset_name]
 
     return config
 
@@ -1358,21 +1359,35 @@ def _unfolding_standard(
     reweight_prior: bool,
     reweight_data_dataset_name: str,
     reweight_embedded_dataset_name: str,
+    data_tree_name: str,
+    embedded_tree_name: str,
+    embedded_cross_check_task: bool,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> AppFuture:
+    import random
     from pathlib import Path
 
     from jet_substructure.cpp import unfolding_2D
 
+    # Randomize the input list so we don't always hit the same files at the same time.
+    # 0 are the data filenames, 1 are the embedded filenames
+    # Note: It randomizes in place.
+    data_filenames = [Path(f.filepath) for f in inputs[0]]
+    random.shuffle(data_filenames)
+    embedded_filenames = [Path(f.filepath) for f in inputs[1]]
+    random.shuffle(embedded_filenames)
+
     return unfolding_2D.run_unfolding(
         settings=settings,
+        data_filenames=data_filenames,
+        data_tree_name=data_tree_name,
+        embedded_filenames=embedded_filenames,
+        embedded_tree_name=embedded_tree_name,
         reweight_prior=reweight_prior,
         reweight_data_dataset_name=reweight_data_dataset_name,
         reweight_embedded_dataset_name=reweight_embedded_dataset_name,
-        # 0 are the data filenames, 1 are the embedded filenames
-        data_filenames=[Path(f.filepath) for f in inputs[0]],
-        embedded_filenames=[Path(f.filepath) for f in inputs[1]],
+        embedded_cross_check_task=cross_check_task,
     )
 
 
@@ -1382,175 +1397,380 @@ def _unfolding_closure(
     closure_variation: str,
     data_dataset_name: str,
     embedded_dataset_name: str,
+    embedded_tree_name: str,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> AppFuture:
+    import random
     from pathlib import Path
 
     from jet_substructure.cpp import unfolding_2D
 
+    # Randomize the input list so we don't always hit the same files at the same time.
+    # 0 are the data filenames, 1 are the embedded filenames
+    # Note: It randomizes in place.
+    embedded_filenames = [Path(f.filepath) for f in inputs[1]]
+    random.shuffle(embedded_filenames)
+
     return unfolding_2D.run_unfolding_closure_reweighting(
         settings=settings,
-        # 0 are the data filenames, 1 are the embedded filenames
-        embedded_filenames=[Path(f.filepath) for f in inputs[1]],
+        embedded_filenames=embedded_filenames,
+        embedded_tree_name=embedded_tree_name,
         closure_variation=closure_variation,
         data_dataset_name=data_dataset_name,
         embedded_dataset_name=embedded_dataset_name,
     )
 
 
-def setup_unfolding(
+# def setup_unfolding(
+#    grooming_methods: Sequence[str],
+#    tag: str,
+#    run_closures: bool = True,
+#    reweight_prior: bool = False,
+# ) -> List[AppFuture]:
+#    # Setup
+#    from jet_substructure.cpp import unfolding_2D
+#
+#    # TODO: Update after testing...
+#    output_dir = Path("output") / "PbPb" / "unfolding" / "parsl"
+#    output_dir.mkdir(parents=True, exist_ok=True)
+#
+#    PbPb_dataset_config = read_dataset_config(collision_system="PbPb")
+#    PbPb_train_directories = set([Path(filename).parent for filename in PbPb_dataset_config["files"]])
+#    # PbPb_prefixes = PbPb_dataset_config["prefixes"]
+#    embedded_dataset_config = read_dataset_config(collision_system="embedPythia")
+#    embedded_train_directories = set([Path(filename).parent for filename in embedded_dataset_config["files"]])
+#    # embedded_prefixes = embedded_dataset_config["prefixes"]
+#
+#    # Determine filenames first since they don't depend on grooming methods
+#    data_files: List[File] = []
+#    embedded_files: List[File] = []
+#    for label, train_directories, files in [
+#        ("PbPb", PbPb_train_directories, data_files),
+#        ("embedded", embedded_train_directories, embedded_files),
+#    ]:
+#        for train_directory in sorted(train_directories):
+#            logger.info(f"Processing {label} train number {train_directory.name}")
+#
+#            # Then iterate over the directories.
+#            for filename in Path(f"{train_directory}/skim/").glob("*.root"):
+#                files.append(File(str(filename)))
+#
+#    # For parsl to keep track of the embedded files
+#    input_files = [data_files, embedded_files]
+#
+#    # Then we determine the settings.
+#    results = []
+#    for grooming_method in grooming_methods:
+#        settings = {}
+#
+#        # First, define the default settings.
+#        _default_settings = unfolding_2D.Settings(
+#            grooming_method=grooming_method,
+#            jet_pt=unfolding_2D.ParameterSettings(
+#                true_bins=np.array([0, 40, 60, 80, 100, 120, 160], dtype=np.float64),
+#                smeared_bins=np.array([40, 50, 60, 80, 100, 120], dtype=np.float64),
+#            ),
+#            substructure_variable=unfolding_2D.SubstructureVariableSettings.from_binning(
+#                true_bins=np.array(
+#                    # NOTE: (-0.05, 0) is the untagged bin.
+#                    [-0.05, 0, 2, 3, 4, 8, 100],
+#                    dtype=np.float64,
+#                ),
+#                smeared_bins=np.array([1, 2, 3, 4, 8], dtype=np.float64),
+#                name="kt",
+#                variable_name="kt",
+#                untagged_bin_below_range=True,
+#            ),
+#            tag=tag,
+#            output_dir=output_dir,
+#            use_pure_matches=False,
+#        )
+#        settings[_default_settings.output_tag] = _default_settings
+#        # TODO: Make these settings more formal and selectable.
+#        # NOTE: Generate 5 random edges of 5% (+/-, so 10% total) with:
+#        #       np.random.random_sample(5) / 10 + 0.95
+#        #       it can then be multiplied with the inner binning.
+#        #       Semi-central:
+#        #       Standard binning:
+#        #           true_bins=np.array([-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],, dtype=np.float64)
+#        #           smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64)
+#        #       Random binning: smeared_bins=np.array([1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15], dtype=np.float64),
+#        #       Central:
+#        #       Standard binning:
+#        #           true_bins=np.array([-0.05, 0, 2, 3, 4, 8, 100], dtype=np.float64)
+#        #           smeared_bins=np.array([1, 2, 3, 4, 8], dtype=np.float64),
+#        #       Random binning: smeared_bins=np.array([1, 2, 3.02, 4.13, 8], dtype=np.float64)
+#
+#        if run_closures:
+#            # And then add the variations.
+#            # Pure matches
+#            _temp_settings = copy.deepcopy(_default_settings)
+#            _temp_settings.use_pure_matches = True
+#            settings[_temp_settings.output_tag] = _temp_settings
+#
+#            # Untagged above
+#            _temp_settings = copy.deepcopy(_default_settings)
+#            _smeared_bins = _temp_settings.substructure_variable.smeared_bins
+#            # Replace the untagged value with our new untagged value, and then move it to the upper edge.
+#            _smeared_bins[0] = 20
+#            _smeared_bins = np.roll(_smeared_bins, -1)
+#            _temp_settings.substructure_variable = unfolding_2D.SubstructureVariableSettings.from_binning(
+#                true_bins=_temp_settings.substructure_variable.true_bins,
+#                smeared_bins=_smeared_bins,
+#                name=_temp_settings.substructure_variable.name,
+#                variable_name=_temp_settings.substructure_variable.variable_name,
+#                untagged_bin_below_range=False,
+#            )
+#            settings[_temp_settings.output_tag] = _temp_settings
+#
+#        # Standard unfolding
+#        for s in settings.values():
+#            # Randomize the input list so we don't always hit the same files at the same time.
+#            # Note: It randomizes in place.
+#            # random.shuffle(data_files)
+#            # random.shuffle(embedded_files)
+#            random.shuffle(input_files[0])
+#            random.shuffle(input_files[1])
+#            logger.info(f"Adding standard unfolding: {s.output_tag}")
+#            # NOTE: This is missing some output files. But good enough for now...
+#            parsl_output_file = File(str(s.output_filename))
+#            results.append(
+#                _unfolding_standard(
+#                    settings=s,
+#                    reweight_prior=reweight_prior,
+#                    reweight_data_dataset_name=PbPb_dataset_config["name"],
+#                    reweight_embedded_dataset_name=embedded_dataset_config["name"],
+#                    inputs=input_files,
+#                    outputs=[parsl_output_file],
+#                )
+#            )
+#
+#        # Skip the untagged bin moved to above the smeared range.
+#        if run_closures:
+#            for s in list(settings.values())[:-1]:
+#                for closure_variation in ["split_MC", "reweight_pseudo_data", "reweight_response"]:
+#                    logger.info(f"Adding unfolding closures: {s.output_tag}, variation: {closure_variation}")
+#                    # Setup file I/O
+#                    # Randomize the input list so we don't always hit the same files at the same time.
+#                    # Note: It randomizes in place.
+#                    random.shuffle(input_files[0])
+#                    random.shuffle(input_files[1])
+#                    parsl_output_file = File(f"{s.output_filename}_closure_{closure_variation}")
+#                    results.append(
+#                        _unfolding_closure(
+#                            settings=s,
+#                            closure_variation=closure_variation,
+#                            data_dataset_name=PbPb_dataset_config["name"],
+#                            embedded_dataset_name=embedded_dataset_config["name"],
+#                            inputs=input_files,
+#                            outputs=[parsl_output_file],
+#                        )
+#                    )
+#
+#    return results
+
+
+def _get_binning(
+    unfolding_settings: Mapping[str, Any],
+    base_unfolding_config: Mapping[str, Any],
+    name: str,
+) -> np.ndarray:
+
+    binning = None
+    specialized_binning = unfolding_settings.get("binning", {})
+    if specialized_binning:
+        binning = specialized_binning.get(name, [])
+    # If not available in the specialized unfolding config, then grab it from the base config.
+    if not binning:
+        binning = base_unfolding_config["nominal_binning"][name]
+
+    return np.array(binning, dtype=np.float64)
+
+
+def setup_all_unfolding(
+    base_dataset_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
-    tag: str,
-    run_closures: bool = True,
-    reweight_prior: bool = False,
+    selected_unfolding_settings: Optional[List[str]] = None,
 ) -> List[AppFuture]:
+    """Setup unfolding jobs.
+
+    Args:
+        base_dataset_config: Base dataset configuration.
+        grooming_methods: Grooming methods to unfold.
+        selected_unfolding_settings: Subset of unfolding settings to run. Default: all defined in the config.
+    Returns:
+        List of `AppFuture` created when defining the jobs.
+    """
+    # Validation
+    if selected_unfolding_settings is None:
+        selected_unfolding_settings = list(base_dataset_config["unfolding"]["settings"].keys())
     # Setup
     from jet_substructure.cpp import unfolding_2D
 
+    base_unfolding_config = base_dataset_config["unfolding"]
     # TODO: Update after testing...
-    output_dir = Path("output") / "PbPb" / "unfolding" / "parsl"
+    output_dir = Path("output") / "PbPb" / "unfolding" / "parsl" / "test"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    PbPb_dataset_config = read_dataset_config(collision_system="PbPb")
-    PbPb_train_directories = set([Path(filename).parent for filename in PbPb_dataset_config["files"]])
-    # PbPb_prefixes = PbPb_dataset_config["prefixes"]
-    embedded_dataset_config = read_dataset_config(collision_system="embedPythia")
-    embedded_train_directories = set([Path(filename).parent for filename in embedded_dataset_config["files"]])
-    # embedded_prefixes = embedded_dataset_config["prefixes"]
-
-    # Determine filenames first since they don't depend on grooming methods
-    data_files: List[File] = []
-    embedded_files: List[File] = []
-    for label, train_directories, files in [
-        ("PbPb", PbPb_train_directories, data_files),
-        ("embedded", embedded_train_directories, embedded_files),
-    ]:
-        for train_directory in sorted(train_directories):
-            logger.info(f"Processing {label} train number {train_directory.name}")
-
-            # Then iterate over the directories.
-            for filename in Path(f"{train_directory}/skim/").glob("*.root"):
-                files.append(File(str(filename)))
-
-    # For parsl to keep track of the embedded files
-    input_files = [data_files, embedded_files]
-
-    # Then we determine the settings.
     results = []
-    for grooming_method in grooming_methods:
-        settings = {}
-
-        # First, define the default settings.
-        _default_settings = unfolding_2D.Settings(
-            grooming_method=grooming_method,
-            jet_pt=unfolding_2D.ParameterSettings(
-                true_bins=np.array([0, 40, 60, 80, 100, 120, 160], dtype=np.float64),
-                smeared_bins=np.array([40, 50, 60, 80, 100, 120], dtype=np.float64),
-            ),
-            substructure_variable=unfolding_2D.SubstructureVariableSettings.from_binning(
-                true_bins=np.array(
-                    # NOTE: (-0.05, 0) is the untagged bin.
-                    [-0.05, 0, 2, 3, 4, 8, 100],
-                    dtype=np.float64,
-                ),
-                smeared_bins=np.array([1, 2, 3, 4, 8], dtype=np.float64),
-                name="kt",
-                variable_name="kt",
-                untagged_bin_below_range=True,
-            ),
-            tag=tag,
-            output_dir=output_dir,
-            use_pure_matches=False,
+    for unfolding_settings_name in selected_unfolding_settings:
+        # Setup
+        unfolding_settings = base_unfolding_config["settings"][unfolding_settings_name]
+        datasets_name = unfolding_settings["datasets"]
+        _get_bins = functools.partial(
+            _get_binning, base_unfolding_config=base_unfolding_config, unfolding_settings=unfolding_settings
         )
-        settings[_default_settings.output_tag] = _default_settings
-        # TODO: Make these settings more formal and selectable.
-        # NOTE: Generate 5 random edges of 5% (+/-, so 10% total) with:
-        #       np.random.random_sample(5) / 10 + 0.95
-        #       it can then be multiplied with the inner binning.
-        #       Semi-central:
-        #       Standard binning:
-        #           true_bins=np.array([-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],, dtype=np.float64)
-        #           smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64)
-        #       Random binning: smeared_bins=np.array([1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15], dtype=np.float64),
-        #       Central:
-        #       Standard binning:
-        #           true_bins=np.array([-0.05, 0, 2, 3, 4, 8, 100], dtype=np.float64)
-        #           smeared_bins=np.array([1, 2, 3, 4, 8], dtype=np.float64),
-        #       Random binning: smeared_bins=np.array([1, 2, 3.02, 4.13, 8], dtype=np.float64)
 
-        if run_closures:
-            # And then add the variations.
-            # Pure matches
-            _temp_settings = copy.deepcopy(_default_settings)
-            _temp_settings.use_pure_matches = True
-            settings[_temp_settings.output_tag] = _temp_settings
+        # Datasets config and input files.
+        PbPb_dataset_config = base_dataset_config["datasets"][datasets_name]["PbPb"]
+        PbPb_train_directories = set([Path(filename).parent for filename in PbPb_dataset_config["files"]])
+        embedded_dataset_config = base_dataset_config["datasets"][datasets_name]["embedPythia"]
+        embedded_train_directories = set([Path(filename).parent for filename in embedded_dataset_config["files"]])
 
-            # Untagged above
-            _temp_settings = copy.deepcopy(_default_settings)
-            _smeared_bins = _temp_settings.substructure_variable.smeared_bins
-            # Replace the untagged value with our new untagged value, and then move it to the upper edge.
-            _smeared_bins[0] = 20
-            _smeared_bins = np.roll(_smeared_bins, -1)
-            _temp_settings.substructure_variable = unfolding_2D.SubstructureVariableSettings.from_binning(
-                true_bins=_temp_settings.substructure_variable.true_bins,
-                smeared_bins=_smeared_bins,
-                name=_temp_settings.substructure_variable.name,
-                variable_name=_temp_settings.substructure_variable.variable_name,
-                untagged_bin_below_range=False,
+        # Determine filenames first since they don't depend on grooming methods
+        data_files: List[File] = []
+        embedded_files: List[File] = []
+        for label, train_directories, files in [
+            ("PbPb", PbPb_train_directories, data_files),
+            ("embedded", embedded_train_directories, embedded_files),
+        ]:
+            for train_directory in sorted(train_directories):
+                logger.info(f"Processing {label} train number {train_directory.name}")
+
+                # Then iterate over the directories.
+                for filename in Path(f"{train_directory}/skim/").glob("*.root"):
+                    files.append(File(str(filename)))
+
+        # For parsl to keep track of the embedded files
+        input_files = [data_files, embedded_files]
+
+        # Then we determine the settings.
+        for grooming_method in grooming_methods:
+            settings = {}
+
+            # First, define the default settings.
+            _default_settings = unfolding_2D.Settings(
+                grooming_method=grooming_method,
+                jet_pt=unfolding_2D.ParameterSettings(
+                    true_bins=_get_bins("jet_pt_true"),
+                    smeared_bins=_get_bins("jet_pt_smeared"),
+                    # true_bins=np.array([0, 40, 60, 80, 100, 120, 160], dtype=np.float64),
+                    # smeared_bins=np.array([40, 50, 60, 80, 100, 120], dtype=np.float64),
+                ),
+                substructure_variable=unfolding_2D.SubstructureVariableSettings.from_binning(
+                    true_bins=_get_bins("kt_true"),
+                    smeared_bins=_get_bins("kt_smeared"),
+                    # true_bins=np.array(
+                    #    # NOTE: (-0.05, 0) is the untagged bin.
+                    #    [-0.05, 0, 2, 3, 4, 8, 100],
+                    #    dtype=np.float64,
+                    # ),
+                    # smeared_bins=np.array([1, 2, 3, 4, 8], dtype=np.float64),
+                    name="kt",
+                    variable_name="kt",
+                    untagged_bin_below_range=True,
+                ),
+                suffix=base_unfolding_config["suffix"],
+                label=unfolding_settings.get("label", ""),
+                output_dir=output_dir,
+                use_pure_matches=False,
             )
-            settings[_temp_settings.output_tag] = _temp_settings
+            settings[_default_settings.output_tag] = _default_settings
+            # TODO: Make these settings more formal and selectable.
+            # NOTE: Generate 5 random edges of 5% (+/-, so 10% total) with:
+            #       np.random.random_sample(5) / 10 + 0.95
+            #       it can then be multiplied with the inner binning.
+            #       Semi-central:
+            #       Standard binning:
+            #           true_bins=np.array([-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],, dtype=np.float64)
+            #           smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64)
+            #       Random binning: smeared_bins=np.array([1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15], dtype=np.float64),
+            #       Central:
+            #       Standard binning:
+            #           true_bins=np.array([-0.05, 0, 2, 3, 4, 8, 100], dtype=np.float64)
+            #           smeared_bins=np.array([1, 2, 3, 4, 8], dtype=np.float64),
+            #       Random binning: smeared_bins=np.array([1, 2, 3.02, 4.13, 8], dtype=np.float64)
 
-        # Standard unfolding
-        for s in settings.values():
-            # Randomize the input list so we don't always hit the same files at the same time.
-            # Note: It randomizes in place.
-            # random.shuffle(data_files)
-            # random.shuffle(embedded_files)
-            random.shuffle(input_files[0])
-            random.shuffle(input_files[1])
-            logger.info(f"Adding standard unfolding: {s.output_tag}")
-            # NOTE: This is missing some output files. But good enough for now...
-            parsl_output_file = File(str(s.output_filename))
-            results.append(
-                _unfolding_standard(
-                    settings=s,
-                    reweight_prior=reweight_prior,
-                    reweight_data_dataset_name=PbPb_dataset_config["name"],
-                    reweight_embedded_dataset_name=embedded_dataset_config["name"],
-                    inputs=input_files,
-                    outputs=[parsl_output_file],
+            if unfolding_settings["closures"]:
+                # And then add the variations.
+                # Pure matches
+                _temp_settings = copy.deepcopy(_default_settings)
+                _temp_settings.use_pure_matches = True
+                settings[_temp_settings.output_tag] = _temp_settings
+
+                # Untagged above
+                _temp_settings = copy.deepcopy(_default_settings)
+                _smeared_bins = _temp_settings.substructure_variable.smeared_bins
+                # Replace the untagged value with our new untagged value, and then move it to the upper edge.
+                _smeared_bins[0] = 20
+                _smeared_bins = np.roll(_smeared_bins, -1)
+                _temp_settings.substructure_variable = unfolding_2D.SubstructureVariableSettings.from_binning(
+                    true_bins=_temp_settings.substructure_variable.true_bins,
+                    smeared_bins=_smeared_bins,
+                    name=_temp_settings.substructure_variable.name,
+                    variable_name=_temp_settings.substructure_variable.variable_name,
+                    untagged_bin_below_range=False,
                 )
-            )
+                settings[_temp_settings.output_tag] = _temp_settings
 
-        # Skip the untagged bin moved to above the smeared range.
-        if run_closures:
-            for s in list(settings.values())[:-1]:
-                for closure_variation in ["split_MC", "reweight_pseudo_data", "reweight_response"]:
-                    logger.info(f"Adding unfolding closures: {s.output_tag}, variation: {closure_variation}")
-                    # Setup file I/O
-                    # Randomize the input list so we don't always hit the same files at the same time.
-                    # Note: It randomizes in place.
-                    random.shuffle(input_files[0])
-                    random.shuffle(input_files[1])
-                    parsl_output_file = File(f"{s.output_filename}_closure_{closure_variation}")
-                    results.append(
-                        _unfolding_closure(
-                            settings=s,
-                            closure_variation=closure_variation,
-                            data_dataset_name=PbPb_dataset_config["name"],
-                            embedded_dataset_name=embedded_dataset_config["name"],
-                            inputs=input_files,
-                            outputs=[parsl_output_file],
-                        )
+            # TODO: If we're reweighting the priors, we need to make sure they existing with the proper binning.
+            #       We should chain those dependences on input files with the rest of the tasks.
+
+            # Standard unfolding
+            for s in settings.values():
+                logger.info(f"Adding standard unfolding: {s.output_tag}")
+                # NOTE: This is missing some output files (like the trivial closures). But good enough for now...
+                parsl_output_file = File(str(s.output_filename))
+                results.append(
+                    _unfolding_standard(
+                        settings=s,
+                        reweight_prior=unfolding_settings["reweight_prior"],
+                        # We always want to reweight with the nominal datasets.
+                        reweight_data_dataset_name=base_dataset_config["datasets"]["nominal"]["PbPb"]["name"],
+                        reweight_embedded_dataset_name=base_dataset_config["datasets"]["nominal"]["embedPythia"][
+                            "name"
+                        ],
+                        data_tree_name="tree"
+                        if not PbPb_dataset_config.get("cross_check_task", False)
+                        else PbPb_dataset_config["tree_name"],
+                        embedded_tree_name="tree"
+                        if not embedded_dataset_config.get("cross_check_task", False)
+                        else embedded_dataset_config["tree_name"],
+                        embedded_cross_check_task=embedded_dataset_config.get("cross_check_task", False),
+                        inputs=input_files,
+                        outputs=[parsl_output_file],
                     )
+                )
+
+            # Skip the untagged bin moved to above the smeared range.
+            if unfolding_settings["closures"]:
+                for s in list(settings.values())[:-1]:
+                    for closure_variation in ["split_MC", "reweight_pseudo_data", "reweight_response"]:
+                        logger.info(f"Adding unfolding closures: {s.output_tag}, variation: {closure_variation}")
+                        parsl_output_file = File(f"{s.output_filename}_closure_{closure_variation}")
+                        results.append(
+                            _unfolding_closure(
+                                settings=s,
+                                closure_variation=closure_variation,
+                                data_dataset_name=PbPb_dataset_config["name"],
+                                embedded_dataset_name=embedded_dataset_config["name"],
+                                inputs=input_files,
+                                outputs=[parsl_output_file],
+                            )
+                        )
 
     return results
 
 
 if __name__ == "__main__":  # noqa: C901
     # Settings
+    # Base settings
+    base_dataset_name = "LHC18qr_semi_central_R04"
+    dataset_type = "nominal"
     collision_system = "embedPythia"
+
+    # Job settings
     jobs_to_execute = [
         # "repair_root_files",
         "convert_to_parquet",
@@ -1558,9 +1778,10 @@ if __name__ == "__main__":  # noqa: C901
         # "root_data_frame",
         # "root_data_frame_response",
     ]
-    nodes_to_allocate = 5
-    jobs_per_node = 6
+    nodes_to_allocate = 9
+    jobs_per_node = 7
     entries_per_job = int(1e5)
+
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
     grooming_methods = [
         "leading_kt",
@@ -1627,8 +1848,8 @@ if __name__ == "__main__":  # noqa: C901
     logging.getLogger("parsl").setLevel(logging.WARNING)
 
     # Helpers
-    full_config = read_full_config()
-    dataset_config = read_dataset_config(collision_system=collision_system)
+    base_dataset_config = read_dataset_config(base_dataset_name=base_dataset_name)
+    dataset_config = base_dataset_config["datasets"][dataset_type][collision_system]
     # If we have a cross check task, it only has the output from a limited set of grooming methods.
     # In that case, we should restrict to only the valid ones.
     cross_check_task = dataset_config.get("cross_check_task", False)
@@ -1739,11 +1960,14 @@ if __name__ == "__main__":  # noqa: C901
         results.extend(temp_results)
     if "unfolding" in jobs_to_execute:
         # TODO: Configure binning, some options, etc, via the dataset config.
-        results = setup_unfolding(
+        #       Need to pass the options all the way down.
+        # TODO: Integrate the closure
+        # TODO: Integrate configuring and running the tasks with the tags.
+        #       There are now enough options that it's way too easy to make a mistake.
+        results = setup_all_unfolding(
+            base_dataset_config=base_dataset_config,
             grooming_methods=grooming_methods,
-            run_closures=False,
-            reweight_prior=True,
-            tag="central_reweight_prior",
+            # selected_unfolding_settings=["default"]
         )
 
     logger.info(f"About to ask for result. len: {len(all_results)}")

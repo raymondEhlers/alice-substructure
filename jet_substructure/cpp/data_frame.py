@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import attr
 import numpy as np
 
-from jet_substructure.base import helpers
+from jet_substructure.base import helpers, skim_analysis_objects
 
 
 logger = logging.getLogger(__name__)
@@ -30,31 +30,6 @@ class MatchingIndex:
     @property
     def matching_level(self) -> str:
         return f"{self.measured_like_prefix}_{self.generator_like_prefix}"
-
-
-def cross_check_task_branch_name_shim(grooming_method: str, input_branches: Sequence[str]) -> Dict[str, str]:
-    # Validation
-    input_branches = list(input_branches)
-
-    renames = {}
-    # First, some specifics:
-    for subjet_name in ["leading", "subleading"]:
-        renames[
-            f"{grooming_method}_det_level_{subjet_name}_subjet_momentum_fraction_in_hybrid_jet"
-        ] = f"{grooming_method}_hybrid_det_level_matching_{subjet_name}_pt_fraction_in_hybrid_jet"
-
-    for branch_name in input_branches:
-        new_branch_name = branch_name
-        # data -> hybrid
-        # matched -> true
-        # det_level -> det_level
-        for old, new in [("data", "hybrid"), ("matched", "true"), ("det_level", "det_level")]:
-            new_branch_name = new_branch_name.replace(old, new)
-
-        if new_branch_name != branch_name and "subjet_momentum_fraction" not in new_branch_name:
-            renames[new_branch_name] = branch_name
-
-    return renames
 
 
 def new_matching_hists(
@@ -457,7 +432,7 @@ def run_create_closure_ratio(
 
     if cross_check_task:
         # Add the aliases. This has to be done after the df is defined because apparently they don't carry over.
-        renames = cross_check_task_branch_name_shim(
+        renames = skim_analysis_objects.cross_check_task_branch_name_shim(
             grooming_method=grooming_method, input_branches=df_original.GetColumnNames()
         )
         for k, v in renames.items():
@@ -579,15 +554,11 @@ def run_response(  # noqa: C901
 
     if cross_check_task:
         # Add the aliases. This has to be done after the df is defined because apparently they don't carry over.
-        renames = cross_check_task_branch_name_shim(
+        renames = skim_analysis_objects.cross_check_task_branch_name_shim(
             grooming_method=grooming_method, input_branches=df_original.GetColumnNames()
         )
         for k, v in renames.items():
             df_original = df_original.Alias(k, v)
-
-    import IPython
-
-    IPython.embed()
 
     # Scale factors _must_ be defined here, so we don't provide a fall back.
 
@@ -922,7 +893,7 @@ def run(  # noqa: C901
 
     if cross_check_task:
         # Add the aliases. This has to be done after the df is defined because apparently they don't carry over.
-        renames = cross_check_task_branch_name_shim(
+        renames = skim_analysis_objects.cross_check_task_branch_name_shim(
             grooming_method=grooming_method, input_branches=df_original.GetColumnNames()
         )
         for k, v in renames.items():

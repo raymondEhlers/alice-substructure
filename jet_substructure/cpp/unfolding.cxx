@@ -350,8 +350,10 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
                  const std::vector<std::string>& dataFilenames,
                  const std::vector<std::string>& embeddedFilenames, const bool usePureMatches = false,
                  TH2D* hReweightingResponse = nullptr,
-                 const std::string& dataTreeName = "tree", const std::string& dataPrefix = "data",
+                 const std::map<std::string, std::string> renameBranchMap = {},
+                 const std::string& dataTreeName = "tree",
                  const std::string& embeddedTreeName = "tree",
+                 const std::string& dataPrefix = "data",
                  const std::string& hybridPrefix = "hybrid",
                  const std::string& truePrefix = "true",
                  const std::string& detLevelPrefix = "det_level")
@@ -443,6 +445,10 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
       embeddedScaleFactors.Add((temp + "/scale_factor/" + name).c_str());
   }
   embeddedChain.AddFriend(&embeddedScaleFactors);
+  // Add aliases
+  for (const auto & m : ) {
+      embeddedChain.SetAlias(m.first, m.second);
+  }
   TTreeReader mcReader(&embeddedChain);
 
   // Values

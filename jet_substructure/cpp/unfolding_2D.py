@@ -15,13 +15,14 @@ Conventions:
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Type
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Type
 
 import attr
 import numpy as np
+import uproot
 from pachyderm import binned_data
 
-from jet_substructure.base import helpers
+from jet_substructure.base import helpers, skim_analysis_objects
 
 
 logger = logging.getLogger(__name__)
@@ -128,8 +129,9 @@ class Settings:
     grooming_method: str = attr.ib()
     jet_pt: ParameterSettings = attr.ib()
     substructure_variable: SubstructureVariableSettings = attr.ib()
-    tag: str = attr.ib()
+    suffix: str = attr.ib()
     output_dir: Path = attr.ib()
+    label: str = attr.ib(default="")
     use_pure_matches: bool = attr.ib(default=False)
     filename_padding_factor: int = attr.ib(default=0)
 
@@ -149,10 +151,11 @@ class Settings:
         # Then the jet pt
         smeared_jet_pt = helpers.JetPtRange(min=self.jet_pt.smeared_bins[0], max=self.jet_pt.smeared_bins[-1])
         base_filename += f"_smeared_{smeared_jet_pt.zero_padded_str(self.filename_padding_factor)}"
+        base_filename += f"_{self.suffix}"
         # Additional options
         # Optional tag
-        if self.tag:
-            base_filename += f"_{self.tag}"
+        if self.label:
+            base_filename += f"_{self.label}"
         # Put other possible options after the tag so we can sort by tag if it exists.
         if self.use_pure_matches:
             base_filename += "_pure_matches"
@@ -161,6 +164,24 @@ class Settings:
     @property
     def output_filename(self) -> Path:
         return (self.output_dir / self.output_tag).with_suffix(".root")
+
+
+@attr.s
+class InputFileSettings:
+    filenames: Sequence[Path] = attr.ib()
+    tree_name: str = attr.ib()
+
+
+@attr.s
+class DataSettings(InputFileSettings):
+    prefix: str = attr.ib()
+
+
+@attr.s
+class EmbeddedSettings(InputFileSettings):
+    hybrid_prefix: str = attr.ib()
+    true_prefix: str = attr.ib()
+    det_level_prefix: str = attr.ib()
 
 
 def _pass_filenames_to_ROOT(filenames: Sequence[Path]) -> List[str]:
@@ -468,13 +489,63 @@ def _hists_to_map_for_ROOT(hists: Dict[str, TH2D]) -> Any:
     return hists_map_for_root
 
 
+def _branch_name_shim_to_map_for_ROOT(branch_renames: Mapping[str, str]) -> Any:
+    # Delayed import to avoid direct dependence.
+    import ROOT
+
+    map = ROOT.std.map("std::string", "TH2D *")()
+    for k, h in branch_renames.items():
+        # Why not via __setitem__? Because that would be too easy...
+        map.insert((k, h))
+        # map[k] = ROOT.addressof(h, True)
+
+    return map
+
+
+def get_reweighted_ratio(
+    embedded_dataset_name: str, data_dataset_name: str, grooming_method: str, base_directory: Path = Path("output")
+) -> TH2D:
+    # Delayed import to avoid direct dependence.
+    import ROOT
+
+    # Retrieve embedded hist
+    embedded_filename = (
+        base_directory
+        / "embedPythia"
+        / "RDF"
+        / f"{embedded_dataset_name}_{grooming_method}_prefixes_hybrid_true_det_level_closure.root"
+    )
+    f_embedded = ROOT.TFile(str(embedded_filename), "READ")
+    h_embedded = f_embedded.Get(f"{grooming_method}_hybrid_kt_jet_pt")
+    # Retrieve data hist
+    data_filename = (
+        base_directory / "PbPb" / "RDF" / f"{data_dataset_name}_{grooming_method}_prefixes_data_closure.root"
+    )
+    f_PbPb = ROOT.TFile(str(data_filename), "READ")
+    h_PbPb = f_PbPb.Get(f"{grooming_method}_data_kt_jet_pt")
+
+    # Calculate the ratio and cleanup
+    h_ratio = h_embedded.Clone("h_ratio")
+    h_ratio.Divide(h_PbPb)
+    h_ratio.SetDirectory(0)
+
+    # Cleanup
+    f_embedded.Close()
+    f_PbPb.Close()
+
+    return h_ratio
+
+
 def run_unfolding(
     settings: Settings,
     data_filenames: Sequence[Path],
+    data_tree_name: str,
     embedded_filenames: Sequence[Path],
+    embedded_tree_name: str,
     reweight_prior: bool = False,
     reweight_data_dataset_name: str = "",
     reweight_embedded_dataset_name: str = "",
+    embedded_cross_check_task: bool = False,
 ) -> bool:
     # Delayed import to avoid direct dependence.
     import ROOT
@@ -495,10 +566,8 @@ def run_unfolding(
             )
 
         h_reweighting_response_ratio = get_reweighted_ratio(
-            # embedded_dataset_name="LHC19f4_embedded_into_LHC18qr_5966_5985",
-            # data_dataset_name="LHC18qr_5863",
-            embedded_dataset_name=reweight_embedded_dataset_name,
             data_dataset_name=reweight_data_dataset_name,
+            embedded_dataset_name=reweight_embedded_dataset_name,
             grooming_method=settings.grooming_method,
         )
 
@@ -509,13 +578,19 @@ def run_unfolding(
         np.testing.assert_allclose(temp_hist.axes[0].bin_edges, settings.substructure_variable.smeared_bins)
         np.testing.assert_allclose(temp_hist.axes[1].bin_edges, settings.jet_pt.smeared_bins)
 
-    # TODO: Make configurable...
-    data_tree_name = "tree"
-    data_prefix = "data"
-    embedded_tree_name = "AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
-    embedded_hybrid_prefix = "data"
-    embedded_true_prefix = "matched"
-    embedded_det_level_prefix = "det_level"
+    branch_renames = {}
+    if embedded_cross_check_task:
+        # Need to do a quick read of the branch names. The branch names shouldn't vary by file, so we can
+        # use the first one.
+        with uproot.open(embedded_filenames[0]) as f:
+            input_branches = list(f[embedded_tree_name].keys())
+
+        branch_renames = skim_analysis_objects.cross_check_task_branch_name_shim(
+            grooming_method=settings.grooming_method,
+            input_branches=input_branches,
+        )
+
+    # TODO: Add shim here!
     # Create the responses. We assume some conventions about column names.
     # They should generally be reasonable, but may require tweaks from time to time.
     responses = ROOT.create_response_2D(
@@ -533,12 +608,9 @@ def run_unfolding(
         _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
         settings.use_pure_matches,
         h_reweighting_response_ratio,
+        _branch_name_shim_to_map_for_ROOT(branch_renames=branch_renames),
         data_tree_name,
-        data_prefix,
         embedded_tree_name,
-        embedded_hybrid_prefix,
-        embedded_true_prefix,
-        embedded_det_level_prefix,
     )
 
     logger.debug(responses)
@@ -586,43 +658,10 @@ def run_unfolding(
     return True
 
 
-def get_reweighted_ratio(
-    embedded_dataset_name: str, data_dataset_name: str, grooming_method: str, base_directory: Path = Path("output")
-) -> TH2D:
-    # Delayed import to avoid direct dependence.
-    import ROOT
-
-    # Retrieve embedded hist
-    embedded_filename = (
-        base_directory
-        / "embedPythia"
-        / "RDF"
-        / f"{embedded_dataset_name}_{grooming_method}_prefixes_hybrid_true_det_level_closure.root"
-    )
-    f_embedded = ROOT.TFile(str(embedded_filename), "READ")
-    h_embedded = f_embedded.Get(f"{grooming_method}_hybrid_kt_jet_pt")
-    # Retrieve data hist
-    data_filename = (
-        base_directory / "PbPb" / "RDF" / f"{data_dataset_name}_{grooming_method}_prefixes_data_closure.root"
-    )
-    f_PbPb = ROOT.TFile(str(data_filename), "READ")
-    h_PbPb = f_PbPb.Get(f"{grooming_method}_data_kt_jet_pt")
-
-    # Calculate the ratio and cleanup
-    h_ratio = h_embedded.Clone("h_ratio")
-    h_ratio.Divide(h_PbPb)
-    h_ratio.SetDirectory(0)
-
-    # Cleanup
-    f_embedded.Close()
-    f_PbPb.Close()
-
-    return h_ratio
-
-
 def run_unfolding_closure_reweighting(
     settings: Settings,
     embedded_filenames: Sequence[Path],
+    embedded_tree_name: str,
     closure_variation: str,
     fraction_for_response: float = 0.75,
     data_dataset_name: Optional[str] = "",
@@ -706,6 +745,7 @@ def run_unfolding_closure_reweighting(
         fraction_for_response,
         settings.use_pure_matches,
         h_reweighting_ratio,
+        embedded_tree_name,
     )
 
     # Perform the actual unfolding.
@@ -1148,7 +1188,7 @@ if __name__ == "__main__":
             variable_name="kt",
             untagged_bin_below_range=True,
         ),
-        tag="central",
+        suffix="central",
         output_dir=Path("output/PbPb/unfolding/test"),
         use_pure_matches=False,
     )
@@ -1161,6 +1201,8 @@ if __name__ == "__main__":
         embedded_filenames=[
             Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(6338, 6358)
         ],
+        data_tree_name="tree",
+        embedded_tree_name="name",
     )
 
     # run_unfolding_closure_reweighting(
