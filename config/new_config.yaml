@@ -772,14 +772,65 @@ analysis_configurations:
             rmax_070:
                 PbPb: null  #*LHC18qr_central_R02_Rmax070
                 embedPythia: null  #*LHC18qr_central_R02_embedded_Rmax070
-        nominal_binning:
-            jet_pt_true: [0, 40, 60, 80, 100, 120, 160]
-            jet_pt_smeared: [40, 50, 60, 80, 100, 120]
-            kt_true: [-0.05, 0, 2, 3, 4, 8, 100]
-            kt_smeared: [1, 2, 3, 4, 8]
-        systematics:
-            # kt_smeared random binning
-            random_binning: [1, 2, 3.02, 4.13, 8]
+        unfolding:
+            suffix: "semi_central_R04"
+            nominal_binning:
+                jet_pt_true: [0, 40, 60, 80, 100, 120, 160]
+                jet_pt_smeared: [40, 50, 60, 80, 100, 120]
+                kt_true: [-0.05, 0, 2, 3, 4, 8, 100]
+                kt_smeared: [1, 2, 3, 4, 8]
+            settings:
+                default:
+                    label: ""
+                    # NOTE: Untagged bin above is included in the closures!
+                    # TODO: TEMP disabled.
+                    closures: False
+                    # TODO: Need closure settings for.
+                    #       - fraction of MC split
+                    #       - value of untaggecd max upper bin.
+                    reweight_prior: False
+                    datasets: "nominal"
+                tracking_efficiency:
+                    label: "tracking_efficiency"
+                    closures: False
+                    reweight_prior: False
+                    datasets: "tracking_efficiency"
+                truncation_low:
+                    label: "truncation"
+                    closures: False
+                    reweight_prior: False
+                    datasets: "nominal"
+                    binning:
+                        jet_pt_smeared: [35, 50, 60, 80, 100, 120]
+                tuncation_high:
+                    label: "truncation"
+                    closures: False
+                    reweight_prior: False
+                    datasets: "nominal"
+                    binning:
+                        jet_pt_smeared: [45, 50, 60, 80, 100, 120]
+                random_binning:
+                    label: "random_binning"
+                    closures: False
+                    reweight_prior: False
+                    datasets: "nominal"
+                    binning:
+                        kt_smeared: [1, 2, 3.02, 4.13, 8]
+                reweight_prior:
+                    label: "reweight_prior"
+                    closures: False
+                    reweight_prior: True
+                    datasets: "nominal"
+                background_low:
+                    label: "Rmax005"
+                    closures: False
+                    reweight_prior: False
+                    datasets: "rmax_005"
+                background_high:
+                    label: "Rmax070"
+                    closures: False
+                    reweight_prior: False
+                    datasets: "rmax_070"
     pp_R04:
         datasets:
             nominal:
