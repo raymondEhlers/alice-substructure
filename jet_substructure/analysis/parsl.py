@@ -1138,6 +1138,112 @@ def setup_calculate_data_skim(
 
 
 @python_app  # type: ignore
+def _calculate_cross_check_task_skim(
+    dataset_config: Mapping[str, Any],
+    grooming_method: str,
+    scale_factor: float,
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+) -> AppFuture:
+    from pathlib import Path
+
+    from jet_substructure.analysis import new_skim_to_flat_tree
+
+    result = new_skim_to_flat_tree.skim_cross_check_task_to_uniform_output(
+        input_filename=Path(inputs[0].filepath),
+        grooming_method=grooming_method,
+        input_tree_name=dataset_config["tree_name"],
+        scale_factor=scale_factor,
+        prefixes=dataset_config["prefixes"],
+        output_filename=Path(outputs[0].filepath),
+    )
+    logger.debug(result)
+    return result
+
+
+def setup_calculate_cross_check_task_skim(
+    collision_system: str,
+    dataset_config: Mapping[str, Any],
+    grooming_methods: Sequence[str],
+    selected_train_numbers: Optional[Sequence[int]] = None,
+    input_results: Optional[MutableSequence[AppFuture]] = None,
+    iterative_splittings: bool = True,
+) -> List[AppFuture]:
+    # Validation
+    if selected_train_numbers is None:
+        selected_train_numbers = []
+
+    # Setup
+    results = []
+    # Retrieve the scale factors.
+    # Only possible input is the yaml scale factors, so we block on that result, so we need it immeaditely.
+    if input_results:
+        _ = input_results[0].result()
+    scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
+
+    # File setup.
+    logger.info("Determining input files independently.")
+    # We'll always have to determine the input files ourselves.
+    input_filenames = helpers.expand_wildcards_in_filenames([Path(f) for f in dataset_config["files"]])
+    # Determine the train directories so we can skip over some of them if requested and map the scale factors.
+    train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
+
+    # Create map from train directories to scale factors.
+    train_number_to_pt_hard_bin = {}
+    for train_directory in train_directories:
+        y = yaml.yaml()
+        with open(train_directory / "config.yaml", "r") as f:
+            train_config = y.load(f)
+        # Validation
+        if train_config["number"] != int(train_directory.name):
+            raise ValueError(
+                f"Mismatch between train number in config ({train_config['number']}) and directory ({train_directory.name})."
+            )
+        train_number_to_pt_hard_bin[train_directory.name] = train_config["pt_hard_bin"]
+
+    # Now, setup the Apps based on the input filenames
+    for input_filename in input_filenames:
+        # NOTE: Although we nominally iterate over grooming methods, cross check tasks should only ever have one.
+        #       It's mostly to keep consistentcy with other tasks.
+        for grooming_method in grooming_methods:
+            train_directory = input_filename.parent
+            # Select train numbers.
+            if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
+                logger.debug(f"Skipping input file {input_filename} due to skipped train number {train_directory.name}")
+                continue
+
+            # Setup
+            # We keep this convention here even though the cross check task always outputs iterative splittings.
+            iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
+            # Setup file I/O
+            parsl_input_file = File(str(input_filename))
+            output_dir = train_directory / "skim"
+            if not output_dir.exists():
+                output_dir.mkdir(parents=True, exist_ok=True)
+            # Since we're splitting in the app, we can't predict the splitting here. However,
+            # we know that at least file 00 must exist so we require that (and perhaps others
+            # will be created). Consequently, this isn't a super reliable dependency based on
+            # files, and it would be better to depend on the return value (although it's not
+            # meaningful in itself).
+            output_filename = (
+                output_dir / f"{Path(parsl_input_file.filepath).stem}.00_{iterative_splittings_label}_splittings.root"
+            )
+            parsl_output_file = File(str(output_filename))
+
+            results.append(
+                _calculate_cross_check_task_skim(
+                    dataset_config=dataset_config,
+                    grooming_method=grooming_method,
+                    scale_factor=scale_factors[train_number_to_pt_hard_bin[train_directory.name]],
+                    inputs=[parsl_input_file],
+                    outputs=[parsl_output_file],
+                )
+            )
+
+    return results
+
+
+@python_app  # type: ignore
 def _root_data_frame(
     collision_system: str,
     tree_name: str,
@@ -1353,7 +1459,7 @@ def setup_root_data_frame(
     return results
 
 
-@python_app  # type: ignore
+# @python_app  # type: ignore
 def _unfolding_standard(
     settings: "unfolding_2D.Settings",  # noqa: F821
     reweight_prior: bool,
@@ -1776,14 +1882,14 @@ if __name__ == "__main__":  # noqa: C901
     # Job settings
     jobs_to_execute = [
         # "repair_root_files",
-        "convert_to_parquet",
+        # "convert_to_parquet",
         # "calculate_embedding_skim",
         # "root_data_frame",
         # "root_data_frame_response",
         "unfolding",
     ]
-    nodes_to_allocate = 9
-    jobs_per_node = 7
+    nodes_to_allocate = 1
+    jobs_per_node = 1
     entries_per_job = int(1e5)
 
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
@@ -1880,6 +1986,7 @@ if __name__ == "__main__":  # noqa: C901
             input_results=results if results else None,
         )
         all_results.extend(_all_results)
+    yaml_result: Optional[AppFuture] = None
     if "extract_scale_factors_for_embedding" in jobs_to_execute:
         # NOTE: We don't take any input_results because we're super dependent on knowing the
         #       pt hard bins. We would have to reorganize the outputs heavily, so it's
@@ -1907,13 +2014,22 @@ if __name__ == "__main__":  # noqa: C901
         )
         all_results.append(results)
     if "calculate_embedding_skim" in jobs_to_execute:
-        results = setup_calculate_embedding_skim(
-            collision_system=collision_system,
-            entries_per_job=entries_per_job,
-            dataset_config=dataset_config,
-            # selected_train_numbers=list(range(5966, 5967)),
-            input_results=results if results else None,
-        )
+        if not cross_check_task:
+            results = setup_calculate_embedding_skim(
+                collision_system=collision_system,
+                entries_per_job=entries_per_job,
+                dataset_config=dataset_config,
+                # selected_train_numbers=list(range(5966, 5967)),
+                input_results=results if results else None,
+            )
+        else:
+            results = setup_calculate_cross_check_task_skim(
+                collision_system=collision_system,
+                dataset_config=dataset_config,
+                grooming_methods=grooming_methods,
+                # selected_train_numbers=list(range(5966, 5967)),
+                input_results=[yaml_result] if yaml_result else None,
+            )
         all_results.extend(results)
     if "calculate_data_skim" in jobs_to_execute:
         results = setup_calculate_data_skim(

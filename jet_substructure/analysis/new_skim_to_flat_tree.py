@@ -17,6 +17,7 @@ import attr
 import awkward as ak
 import numba as nb
 import numpy as np
+import uproot
 
 
 # We know already - nothing to be done...
@@ -26,7 +27,7 @@ with warnings.catch_warnings():
 
 from pachyderm import yaml
 
-from jet_substructure.base import new_methods
+from jet_substructure.base import new_methods, skim_analysis_objects
 from jet_substructure.base.helpers import UprootArray
 
 
@@ -1107,6 +1108,113 @@ def calculate_data_skim(  # noqa: C901
     return True, "processed"
 
 
+def cross_check_task_names_to_export(
+    grooming_method: str,
+    prefixes: Mapping[str, str],
+) -> Dict[str, np.dtype]:
+    branch_names = {}
+
+    substructure_variables = [
+        "{grooming_method}_{prefix}_delta_R",
+        "{grooming_method}_{prefix}_kt",
+        "{grooming_method}_{prefix}_z",
+        "{grooming_method}_{prefix}_n_to_split",
+        "{grooming_method}_{prefix}_n_groomed_to_split",
+        "{grooming_method}_{prefix}_n_passed_grooming",
+    ]
+
+    # Contain 8 * 3 + 1 (scale_factor) + 1 (hybrid_leading_track_pt_sub)
+    branch_names["scale_factor"] = np.float32
+    for prefix in prefixes:
+        # Jet properties
+        for var_name in ["{prefix}_jet_pt", "{prefix}_leading_track_pt"]:
+            branch_names[var_name.format(prefix=prefix)] = np.float32
+        if prefix == "hybrid":
+            branch_names["hybrid_leading_track_pt_sub"] = np.float32
+
+        # Substructure properties
+        for var_name in substructure_variables:
+            branch_names[var_name.format(grooming_method=grooming_method, prefix=prefix)] = np.float32
+
+    # Matching properties
+    for measured_like, generator_like in [("det_level", "true"), ("hybrid", "det_level")]:
+        for level in ["leading", "subleading"]:
+            # branch_names[f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}"] = "bool"
+            # branch_names[f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}"] = "int8_t"
+            branch_names[f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}"] = np.int8
+            if measured_like == "hybrid":
+                branch_names[
+                    f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}_pt_fraction_in_hybrid_jet"
+                ] = np.float32
+
+    return branch_names
+
+
+def skim_cross_check_task_to_uniform_output(
+    input_filename: Path,
+    grooming_method: str,
+    input_tree_name: str,
+    scale_factor: float,
+    prefixes: Mapping[str, str],
+    output_filename: Path,
+    output_tree_name: str = "tree",
+) -> bool:
+    """Skim the cross-check task to uniform names and types.
+
+    Args:
+        input_filename: Input filename. Expected to be in the main directory.
+        grooming_method: Name of the grooming method.
+        input_tree_name: Name of the input tree.
+        scale_factor: Scale factor to be written to the tree. We assume it is
+            constant for the given file (ie. suitable for embedding trains).
+        prefixes: Mapping from our standard names to those which are used in
+            the stored data.
+        output_filename: Output filename. It's expected to be stored in the
+            "skim" directory.
+        output_tree_name: Name of the output tree. Default: "tree".
+
+    Returns:
+        True if successful.
+    """
+    filename = f"{str(input_filename)}:{input_tree_name}"
+    # Iterate over relatively small sizes to ensure that we don't blow up the memory usage.
+    for i, array in enumerate(uproot.iterate(filename, step_size="200 MB")):
+        renames = skim_analysis_objects.cross_check_task_branch_name_shim(
+            grooming_method=grooming_method,
+            input_branches=ak.fields(array),
+        )
+        # This shouldn't cause a copy (hoepfully...)
+        for k, v in renames.items():
+            array[k] = array[v]
+
+        # Use array[k] as a convenient way to access the length of the tree.
+        array["scale_factor"] = np.full(len(array[k]), scale_factor, dtype=np.float32)
+
+        # Determine the branch names to export. It's basically the same as in the
+        # original files, but with uniform names and types.
+        branch_names = cross_check_task_names_to_export(grooming_method=grooming_method, prefixes=prefixes)
+
+        # For extra safety
+        output_filename.parent.mkdir(parents=True, exist_ok=True)
+        # Remap from "00" -> "index number" (may still be "00")
+        _output_filename = Path(str(output_filename).replace("00", f"{i:02d}"))
+
+        # Setup outputs and write the tree.
+        outputs = {}
+        for k, v in branch_names.items():
+            outputs[k] = ak.values_astype(array[k], to=v)
+        outputs_np = {k: np.asarray(v) for k, v in outputs.items()}
+        branches = {k: v.dtype for k, v in outputs_np.items()}
+        logger.info(f"Writing cross check task skim to {_output_filename}")
+        # Write with uproot
+        with uproot3.recreate(_output_filename) as output_file:
+            output_file[output_tree_name] = uproot3.newtree(branches)
+            # Write all of the calculations
+            output_file[output_tree_name].extend(outputs_np)
+
+    return True
+
+
 if __name__ == "__main__":
     # An example for testing...
     from jet_substructure.base import helpers
@@ -1127,6 +1235,7 @@ if __name__ == "__main__":
         write_parquet=True,
         write_feather=True,
     )
+    # Skim data.
     # collision_system = "PbPb"
     # train_number = 5863
     # res = calculate_data_skim(
@@ -1138,6 +1247,17 @@ if __name__ == "__main__":
     #     output_filename=Path(f"trains/{collision_system}/{train_number}/skim/test/AnalysisResults.18q.repaired.00_iterative_splittings.root"),
     #     write_parquet=True,
     #     write_feather=True,
+    # )
+    # Skim cross check task.
+    # res = skim_cross_check_task_to_uniform_output(
+    #     # n_cores=2,
+    #     # input_filenames=[Path("trains/embedPythia/6458/AnalysisResults.18q.root")],
+    #     input_filename=Path("trains/embedPythia/6474/AnalysisResults.18q.root"),
+    #     grooming_method="dynamical_core",
+    #     scale_factor=16.1,
+    #     input_tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+    #     prefixes={"hybrid": "data", "true": "matched", "det_level": "det_level"},
+    #     output_filename=Path("trains/embedPythia/6474/skim/AnalysisResults.18q.root"),
     # )
     logger.info(res)
     # import IPython; IPython.start_ipython(user_ns=locals())
