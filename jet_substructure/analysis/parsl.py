@@ -1387,7 +1387,7 @@ def _unfolding_standard(
         reweight_prior=reweight_prior,
         reweight_data_dataset_name=reweight_data_dataset_name,
         reweight_embedded_dataset_name=reweight_embedded_dataset_name,
-        embedded_cross_check_task=cross_check_task,
+        embedded_cross_check_task=embedded_cross_check_task,
     )
 
 
@@ -1653,14 +1653,14 @@ def setup_all_unfolding(
             _default_settings = unfolding_2D.Settings(
                 grooming_method=grooming_method,
                 jet_pt=unfolding_2D.ParameterSettings(
-                    true_bins=_get_bins("jet_pt_true"),
-                    smeared_bins=_get_bins("jet_pt_smeared"),
+                    true_bins=_get_bins(name="jet_pt_true"),
+                    smeared_bins=_get_bins(name="jet_pt_smeared"),
                     # true_bins=np.array([0, 40, 60, 80, 100, 120, 160], dtype=np.float64),
                     # smeared_bins=np.array([40, 50, 60, 80, 100, 120], dtype=np.float64),
                 ),
                 substructure_variable=unfolding_2D.SubstructureVariableSettings.from_binning(
-                    true_bins=_get_bins("kt_true"),
-                    smeared_bins=_get_bins("kt_smeared"),
+                    true_bins=_get_bins(name="kt_true"),
+                    smeared_bins=_get_bins(name="kt_smeared"),
                     # true_bins=np.array(
                     #    # NOTE: (-0.05, 0) is the untagged bin.
                     #    [-0.05, 0, 2, 3, 4, 8, 100],
@@ -1769,7 +1769,7 @@ def setup_all_unfolding(
 if __name__ == "__main__":  # noqa: C901
     # Settings
     # Base settings
-    base_dataset_name = "LHC18qr_semi_central_R04"
+    base_dataset_name = "PbPb_central_R02_pass1"
     dataset_type = "nominal"
     collision_system = "embedPythia"
 
