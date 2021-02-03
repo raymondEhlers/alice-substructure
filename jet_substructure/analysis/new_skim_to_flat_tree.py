@@ -188,7 +188,8 @@ def calculate_splitting_number(  # noqa: C901
 ) -> np.ndarray:
     # NOTE: I would like to use uint8 here, but it's not implemented in uproot3's writing.
     #       However, int8 gives us enough range, so it's fine to use it instead.
-    output = np.zeros(len(selected_splittings), dtype=np.int8)
+    #       Further, root doesn't handle int8 correctly, so we have to use int16.
+    output = np.zeros(len(selected_splittings), dtype=np.int16)
 
     for i, (selected_splitting, restricted_splitting_indices, available_splittings_parents) in enumerate(
         zip(selected_splittings, restricted_splittings_indices, all_splittings.parent_index)
@@ -354,8 +355,8 @@ def determine_matched_jets_numba(
     match_using_distance: bool,
 ) -> Tuple[np.ndarray, np.ndarray]:
     n_jets = len(measured_like_jets)
-    leading_matching = np.full(n_jets, -1, dtype=np.int8)
-    subleading_matching = np.full(n_jets, -1, dtype=np.int8)
+    leading_matching = np.full(n_jets, -1, dtype=np.int16)
+    subleading_matching = np.full(n_jets, -1, dtype=np.int16)
 
     for (
         i,
@@ -814,7 +815,8 @@ def calculate_embedding_skim(  # noqa: C901
                     # Number of splittings which pass the grooming condition. For SoftDrop, this is n_sd.
                     # NOTE: I would like to use uint8 here, but it's not implemented in uproot3's writing.
                     #       However, int8 gives us enough range, so it's fine to use it instead.
-                    n_passed_grooming=ak.values_astype(ak.num(calculation.possible_indices, axis=1), np.int8),
+                    #       Further, root doesn't handle int8 correctly, so we have to use int16.
+                    n_passed_grooming=ak.values_astype(ak.num(calculation.possible_indices, axis=1), np.int16),
                 )
                 grooming_results.update(grooming_result.asdict(prefix=prefix))
 
@@ -1056,7 +1058,8 @@ def calculate_data_skim(  # noqa: C901
                     # Number of splittings which pass the grooming condition. For SoftDrop, this is n_sd.
                     # NOTE: I would like to use uint8 here, but it's not implemented in uproot3's writing.
                     #       However, int8 gives us enough range, so it's fine to use it instead.
-                    n_passed_grooming=ak.values_astype(ak.num(calculation.possible_indices, axis=1), np.int8),
+                    #       Further, root doesn't handle int8 correctly, so we have to use int16.
+                    n_passed_grooming=ak.values_astype(ak.num(calculation.possible_indices, axis=1), np.int16),
                 )
                 grooming_results.update(grooming_result.asdict(prefix=prefix))
 
@@ -1141,7 +1144,7 @@ def cross_check_task_names_to_export(
         for level in ["leading", "subleading"]:
             # branch_names[f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}"] = "bool"
             # branch_names[f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}"] = "int8_t"
-            branch_names[f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}"] = np.int8
+            branch_names[f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}"] = np.int16
             if measured_like == "hybrid":
                 branch_names[
                     f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}_pt_fraction_in_hybrid_jet"
