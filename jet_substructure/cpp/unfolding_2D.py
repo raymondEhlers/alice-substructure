@@ -493,7 +493,7 @@ def _branch_name_shim_to_map_for_ROOT(branch_renames: Mapping[str, str]) -> Any:
     # Delayed import to avoid direct dependence.
     import ROOT
 
-    map = ROOT.std.map("std::string", "TH2D *")()
+    map = ROOT.std.map("std::string", "std::string")()
     for k, h in branch_renames.items():
         # Why not via __setitem__? Because that would be too easy...
         map.insert((k, h))
