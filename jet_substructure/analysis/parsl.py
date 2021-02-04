@@ -807,6 +807,7 @@ def setup_write_scale_factors(
         )
         return yaml_result, []
 
+    # TODO: We can remove this...
     logger.info("Determining input files for writing scale factor trees.")
     input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
         dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
@@ -1459,7 +1460,7 @@ def setup_root_data_frame(
     return results
 
 
-# @python_app  # type: ignore
+@python_app  # type: ignore
 def _unfolding_standard(
     settings: "unfolding_2D.Settings",  # noqa: F821
     reweight_prior: bool,
@@ -1837,12 +1838,12 @@ def setup_all_unfolding(
                         reweight_embedded_dataset_name=base_dataset_config["datasets"]["nominal"]["embedPythia"][
                             "name"
                         ],
-                        data_tree_name="tree"
-                        if not PbPb_dataset_config.get("cross_check_task", False)
-                        else PbPb_dataset_config["tree_name"],
-                        embedded_tree_name="tree"
-                        if not embedded_dataset_config.get("cross_check_task", False)
-                        else embedded_dataset_config["tree_name"],
+                        data_tree_name="tree",
+                        # if not PbPb_dataset_config.get("cross_check_task", False)
+                        # else PbPb_dataset_config["tree_name"],
+                        embedded_tree_name="tree",
+                        # if not embedded_dataset_config.get("cross_check_task", False)
+                        # else embedded_dataset_config["tree_name"],
                         embedded_cross_check_task=embedded_dataset_config.get("cross_check_task", False),
                         inputs=input_files,
                         outputs=[parsl_output_file],
@@ -1864,6 +1865,9 @@ def setup_all_unfolding(
                                 reweight_embedded_dataset_name=base_dataset_config["datasets"]["nominal"][
                                     "embedPythia"
                                 ]["name"],
+                                embedded_tree_name="tree",
+                                # if not embedded_dataset_config.get("cross_check_task", False)
+                                # else embedded_dataset_config["tree_name"],
                                 inputs=input_files,
                                 outputs=[parsl_output_file],
                             )
@@ -2089,6 +2093,7 @@ if __name__ == "__main__":  # noqa: C901
             grooming_methods=grooming_methods,
             selected_unfolding_settings=["default"],
         )
+        all_results.extend(results)
 
     logger.info(f"About to ask for result. len: {len(all_results)}")
     # import IPython; IPython.embed()
