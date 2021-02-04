@@ -6,7 +6,7 @@
 import argparse
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import attr
 import numpy as np
@@ -394,6 +394,8 @@ def run_create_closure_ratio(
     grooming_method: str,
     jet_R: float,
     output_filename: Path,
+    # NOTE: This is the only argument which varies from the other run functions.
+    base_unfolding_config: Mapping[str, Any],
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
@@ -454,12 +456,13 @@ def run_create_closure_ratio(
         # smeared_cut_prefix = "data"
         prefix_for_ratio = "data"
 
+    # We always want the nominal binning for this unfolding configuration.
     smeared_substructure_variable_bins = np.array(
-        [1, 2, 3, 4, 5, 7, 10, 15],
+        base_unfolding_config["nominal_binning"]["smeared_kt"],
         dtype=np.float64,
     )
     smeared_jet_pt_bins = np.array(
-        [30, 40, 50, 60, 80, 100, 120],
+        base_unfolding_config["nominal_binning"]["smeared_jet_pt"],
         dtype=np.float64,
     )
     hists = []

@@ -674,14 +674,14 @@ analysis_configurations:
                 embedPythia: *LHC18qr_semi_central_R04_pass1_embedded_Rmax060
         unfolding:
             nominal_binning:
-                jet_pt_true: [0, 30, 40, 60, 80, 100, 120, 160]
-                jet_pt_smeared: [30, 40, 50, 60, 80, 100, 120]
-                kt_true: [-0.05, 0, 2, 3, 4, 5, 7, 9, 15, 100]
-                kt_smeared: [1, 2, 3, 4, 5, 7, 10, 15]
+                true_jet_pt: [0, 30, 40, 60, 80, 100, 120, 160]
+                smeared_jet_pt: [30, 40, 50, 60, 80, 100, 120]
+                true_kt: [-0.05, 0, 2, 3, 4, 5, 7, 9, 15, 100]
+                smeared_kt: [1, 2, 3, 4, 5, 7, 10, 15]
             systematics:
                 random_binning:
-                    # kt_smeared random binning
-                    kt_smeared: [1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15]
+                    # smeared_kt random binning
+                    smeared_kt: [1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15]
     PbPb_semi_central_R04_pass3:
         datasets:
             nominal:
@@ -699,10 +699,10 @@ analysis_configurations:
         unfolding:
             suffix: "semi_central_R04"
             nominal_binning:
-                jet_pt_true: [0, 30, 40, 60, 80, 100, 120, 160]
-                jet_pt_smeared: [30, 40, 50, 60, 80, 100, 120]
-                kt_true: [-0.05, 0, 2, 3, 4, 5, 7, 9, 15, 100]
-                kt_smeared: [1, 2, 3, 4, 5, 7, 10, 15]
+                true_jet_pt: [0, 30, 40, 60, 80, 100, 120, 160]
+                smeared_jet_pt: [30, 40, 50, 60, 80, 100, 120]
+                true_kt: [-0.05, 0, 2, 3, 4, 5, 7, 9, 15, 100]
+                smeared_kt: [1, 2, 3, 4, 5, 7, 10, 15]
             settings:
                 default:
                     label: ""
@@ -724,14 +724,14 @@ analysis_configurations:
                     reweight_prior: False
                     datasets: "nominal"
                     binning:
-                        jet_pt_smeared: [25, 40, 50, 60, 80, 100, 120]
+                        smeared_jet_pt: [25, 40, 50, 60, 80, 100, 120]
                 tuncation_high:
                     label: "truncation"
                     closures: False
                     reweight_prior: False
                     datasets: "nominal"
                     binning:
-                        jet_pt_smeared: [35, 40, 50, 60, 80, 100, 120]
+                        smeared_jet_pt: [35, 40, 50, 60, 80, 100, 120]
                 random_binning:
                     label: "random_binning"
                     closures: False
@@ -741,7 +741,7 @@ analysis_configurations:
                         # NOTE: Generate 5 random edges of 5% (+/-, so 10% total) with:
                         #       np.random.random_sample(5) / 10 + 0.95
                         #       it can then be multiplied with the inner binning.
-                        kt_smeared: [1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15]
+                        smeared_kt: [1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15]
                 reweight_prior:
                     label: "reweight_prior"
                     closures: False
@@ -775,15 +775,15 @@ analysis_configurations:
         unfolding:
             suffix: "semi_central_R04"
             nominal_binning:
-                jet_pt_true: [0, 40, 60, 80, 100, 120, 160]
-                jet_pt_smeared: [40, 50, 60, 80, 100, 120]
-                kt_true: [-0.05, 0, 2, 3, 4, 8, 100]
-                kt_smeared: [1, 2, 3, 4, 8]
+                true_jet_pt: [0, 40, 60, 80, 100, 120, 160]
+                smeared_jet_pt: [40, 50, 60, 80, 100, 120]
+                true_kt: [-0.05, 0, 2, 3, 4, 8, 100]
+                smeared_kt: [1, 2, 3, 4, 8]
             settings:
                 default:
                     label: ""
                     # NOTE: Untagged bin above is included in the closures!
-                    # TODO: TEMP disabled.
+                    # TEMP: Diasble closure for simplicity in testing.
                     closures: False
                     # TODO: Need closure settings for.
                     #       - fraction of MC split
@@ -801,21 +801,21 @@ analysis_configurations:
                     reweight_prior: False
                     datasets: "nominal"
                     binning:
-                        jet_pt_smeared: [35, 50, 60, 80, 100, 120]
+                        smeared_jet_pt: [35, 50, 60, 80, 100, 120]
                 tuncation_high:
                     label: "truncation"
                     closures: False
                     reweight_prior: False
                     datasets: "nominal"
                     binning:
-                        jet_pt_smeared: [45, 50, 60, 80, 100, 120]
+                        smeared_jet_pt: [45, 50, 60, 80, 100, 120]
                 random_binning:
                     label: "random_binning"
                     closures: False
                     reweight_prior: False
                     datasets: "nominal"
                     binning:
-                        kt_smeared: [1, 2, 3.02, 4.13, 8]
+                        smeared_kt: [1, 2, 3.02, 4.13, 8]
                 reweight_prior:
                     label: "reweight_prior"
                     closures: False

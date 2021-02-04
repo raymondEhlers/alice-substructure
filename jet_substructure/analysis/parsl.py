@@ -1339,6 +1339,7 @@ def _root_data_frame_closure(
     jet_R: float,
     n_cores: int,
     cross_check_task: bool,
+    base_unfolding_config: Mapping[str, Any],
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
 ) -> AppFuture:
@@ -1359,6 +1360,7 @@ def _root_data_frame_closure(
         grooming_method=grooming_method,
         jet_R=jet_R,
         output_filename=Path(outputs[0].filepath),
+        base_unfolding_config=base_unfolding_config,
         jet_pt_prefix_first=True,
         n_cores=n_cores,
         cross_check_task=cross_check_task,
@@ -1382,6 +1384,7 @@ def setup_root_data_frame(
     grooming_methods: Sequence[str],
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[AppFuture]] = None,
+    base_unfolding_config: Optional[Mapping[str, Any]] = None,
 ) -> List[AppFuture]:
     # Validation
     # NOTE: I only compromised on specifying the function here because it loses the typing
@@ -1405,6 +1408,8 @@ def setup_root_data_frame(
     ]
     if processing_mode not in [p.name for p in _processing_modes]:
         raise ValueError('Invalid processing mode "{processing_mode}"')
+    if processing_mode != "closure" and base_unfolding_config is not None:
+        raise ValueError("Unfolding configuration is only a valid option for the closure")
 
     # Setup
     mode = [p for p in _processing_modes if processing_mode == p.name][0]
@@ -1434,6 +1439,11 @@ def setup_root_data_frame(
     cross_check_task = dataset_config.get("cross_check_task", False)
     logger.info(f"Cross check task: {cross_check_task}")
 
+    # Setup optional args
+    optional_kwargs = {}
+    if base_unfolding_config:
+        optional_kwargs = {"base_unfolding_config": base_unfolding_config}
+
     results = []
     for grooming_method in grooming_methods:
         # Setup file IO
@@ -1454,6 +1464,7 @@ def setup_root_data_frame(
                 # Need to grab the outputs here to ensure that the dependencies are tracked properly.
                 inputs=[r.outputs[0] for r in input_results] if input_results else input_files,
                 outputs=[parsl_output_file],
+                **optional_kwargs,
             )
         )
 
@@ -1536,7 +1547,6 @@ def _unfolding_closure(
 #    # Setup
 #    from jet_substructure.cpp import unfolding_2D
 #
-#    # TODO: Update after testing...
 #    output_dir = Path("output") / "PbPb" / "unfolding" / "parsl"
 #    output_dir.mkdir(parents=True, exist_ok=True)
 #
@@ -1696,6 +1706,7 @@ def _get_binning(
 def setup_all_unfolding(
     base_dataset_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
+    n_cores_per_job: int,
     selected_unfolding_settings: Optional[List[str]] = None,
 ) -> List[AppFuture]:
     """Setup unfolding jobs.
@@ -1758,14 +1769,14 @@ def setup_all_unfolding(
             _default_settings = unfolding_2D.Settings(
                 grooming_method=grooming_method,
                 jet_pt=unfolding_2D.ParameterSettings(
-                    true_bins=_get_bins(name="jet_pt_true"),
-                    smeared_bins=_get_bins(name="jet_pt_smeared"),
+                    true_bins=_get_bins(name="true_jet_pt"),
+                    smeared_bins=_get_bins(name="smeared_jet_pt"),
                     # true_bins=np.array([0, 40, 60, 80, 100, 120, 160], dtype=np.float64),
                     # smeared_bins=np.array([40, 50, 60, 80, 100, 120], dtype=np.float64),
                 ),
                 substructure_variable=unfolding_2D.SubstructureVariableSettings.from_binning(
-                    true_bins=_get_bins(name="kt_true"),
-                    smeared_bins=_get_bins(name="kt_smeared"),
+                    true_bins=_get_bins(name="true_kt"),
+                    smeared_bins=_get_bins(name="smeared_kt"),
                     # true_bins=np.array(
                     #    # NOTE: (-0.05, 0) is the untagged bin.
                     #    [-0.05, 0, 2, 3, 4, 8, 100],
@@ -1819,8 +1830,30 @@ def setup_all_unfolding(
                 )
                 settings[_temp_settings.output_tag] = _temp_settings
 
+            # If we're requesting a reweighted prior, we need to ensure that it's created before
+            # we attempt to unfold it.
             # TODO: If we're reweighting the priors, we need to make sure they existing with the proper binning.
-            #       We should chain those dependences on input files with the rest of the tasks.
+            #       We check later, but it would better to found about the issues here.
+            # NOTE: We could put this above the itearation over grooming methods, but then we would have to match
+            #       the grooming method outputs to the unfolding, which could be potentially quite tedious.
+            #       Instead, we take a slight hit in efficiency and just call it here, and then easily match them.
+            reweight_prior_results = []
+            if unfolding_settings["reweight_prior"]:
+                for _collision_system in ["PbPb", "embedPythia"]:
+                    reweight_prior_results.extend(
+                        setup_root_data_frame(
+                            processing_mode="closure",
+                            collision_system=_collision_system,
+                            n_cores_per_job=n_cores_per_job,
+                            # We always want the nominal dataset.
+                            dataset_config=base_dataset_config["datasets"]["nominal"][_collision_system],
+                            grooming_methods=[grooming_method],
+                        )
+                    )
+
+            # Add in the reweighted prior results when appropriate.
+            job_input_files = input_files
+            job_input_files.extend([r.outputs[0] for r in reweight_prior_results])
 
             # Standard unfolding
             for s in settings.values():
@@ -1841,7 +1874,7 @@ def setup_all_unfolding(
                         embedded_tree_name="tree",
                         # if not embedded_dataset_config.get("cross_check_task", False)
                         # else embedded_dataset_config["tree_name"],
-                        inputs=input_files,
+                        inputs=job_input_files,
                         outputs=[parsl_output_file],
                     )
                 )
@@ -1865,7 +1898,7 @@ def setup_all_unfolding(
                                 embedded_tree_name="tree",
                                 # if not embedded_dataset_config.get("cross_check_task", False)
                                 # else embedded_dataset_config["tree_name"],
-                                inputs=input_files,
+                                inputs=job_input_files,
                                 outputs=[parsl_output_file],
                             )
                         )
@@ -2080,14 +2113,13 @@ if __name__ == "__main__":  # noqa: C901
             )
         results.extend(temp_results)
     if "unfolding" in jobs_to_execute:
-        # TODO: Configure binning, some options, etc, via the dataset config.
-        #       Need to pass the options all the way down.
         # TODO: Integrate the closure
-        # TODO: Integrate configuring and running the tasks with the tags.
+        # TODO: Integrate configuring and running the systematics tasks with the tags.
         #       There are now enough options that it's way too easy to make a mistake.
         results = setup_all_unfolding(
             base_dataset_config=base_dataset_config,
             grooming_methods=grooming_methods,
+            n_cores_per_job=n_cores_per_job,
             selected_unfolding_settings=["default"],
         )
         all_results.extend(results)
