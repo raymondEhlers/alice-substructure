@@ -61,6 +61,14 @@ class ScaleFactor:
 
 
 def cross_check_task_branch_name_shim(grooming_method: str, input_branches: Sequence[str]) -> Dict[str, str]:
+    """Map existing cross check task branch names to standardized names.
+
+    Args:
+        grooming_method: Grooming method stored in the cross check task.
+        input_branches: Names of existing branches in the cross check task.
+    Returns:
+        Mapping from standardized branch names to existing branch names in the cross check task.
+    """
     # Validation
     input_branches = list(input_branches)
 

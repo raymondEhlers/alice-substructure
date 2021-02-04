@@ -1468,7 +1468,6 @@ def _unfolding_standard(
     reweight_embedded_dataset_name: str,
     data_tree_name: str,
     embedded_tree_name: str,
-    embedded_cross_check_task: bool,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> AppFuture:
@@ -1494,7 +1493,6 @@ def _unfolding_standard(
         reweight_prior=reweight_prior,
         reweight_data_dataset_name=reweight_data_dataset_name,
         reweight_embedded_dataset_name=reweight_embedded_dataset_name,
-        embedded_cross_check_task=embedded_cross_check_task,
     )
 
 
@@ -1839,12 +1837,10 @@ def setup_all_unfolding(
                             "name"
                         ],
                         data_tree_name="tree",
-                        # if not PbPb_dataset_config.get("cross_check_task", False)
-                        # else PbPb_dataset_config["tree_name"],
+                        # Since we skim everything now, we should have uniform input names here.
                         embedded_tree_name="tree",
                         # if not embedded_dataset_config.get("cross_check_task", False)
                         # else embedded_dataset_config["tree_name"],
-                        embedded_cross_check_task=embedded_dataset_config.get("cross_check_task", False),
                         inputs=input_files,
                         outputs=[parsl_output_file],
                     )
@@ -1865,6 +1861,7 @@ def setup_all_unfolding(
                                 reweight_embedded_dataset_name=base_dataset_config["datasets"]["nominal"][
                                     "embedPythia"
                                 ]["name"],
+                                # Since we skim everything now, we should have uniform input names here.
                                 embedded_tree_name="tree",
                                 # if not embedded_dataset_config.get("cross_check_task", False)
                                 # else embedded_dataset_config["tree_name"],

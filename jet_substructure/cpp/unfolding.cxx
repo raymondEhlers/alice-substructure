@@ -350,7 +350,6 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
                  const std::vector<std::string>& dataFilenames,
                  const std::vector<std::string>& embeddedFilenames, const bool usePureMatches = false,
                  TH2D* hReweightingResponse = nullptr,
-                 const std::map<std::string, std::string> renameBranchMap = {},
                  const std::string& dataTreeName = "tree",
                  const std::string& embeddedTreeName = "tree",
                  const std::string& dataPrefix = "data",
@@ -557,7 +556,6 @@ ResponseResult create_closure_response_2D(
  double smearedUntaggedBinValue, double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
  const std::vector<std::string>& embeddedFilenames, const ClosureVariation_t closureVariation,
  const double fractionForResponse = 0.75, const bool usePureMatches = false, TH2D* hReweighting = nullptr,
- const std::map<std::string, std::string> renameBranchMap = {},
  const std::string& embeddedTreeName = "tree", const std::string& truePrefix = "true",
  const std::string& hybridPrefix = "hybrid", const std::string& detLevelPrefix = "det_level")
 {
@@ -581,10 +579,6 @@ ResponseResult create_closure_response_2D(
   for (auto filename : embeddedFilenames) {
     embeddedChain.Add(filename.c_str());
   }
-  // Add aliases
-  /*for (const auto & m : renameBranchMap) {
-      embeddedChain.SetAlias(m.first.c_str(), m.second.c_str());
-  }*/
   TTreeReader mcReader(&embeddedChain);
 
   // Values

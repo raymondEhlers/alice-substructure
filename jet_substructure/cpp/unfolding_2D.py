@@ -564,6 +564,21 @@ def _get_reweighting_ratio(
 def _create_branch_rename_shim(
     embedded_filenames: Sequence[Path], embedded_tree_name: str, grooming_method: str
 ) -> Dict[str, str]:
+    """Create cross check task branch rename shim.
+
+    Used to standardize the output of the cross check task. However, ROOT makes
+    this wayyyyyyy to difficult to do sustainably, so we eventually ended up
+    just skimming the cross check task output.
+
+    Args:
+        embedded_filenames: Embedded filenames.
+        embedded_tree_name: Embedded tree name.
+        grooming_method: Name of the grooming method stored in the cross check task.
+
+    Returns:
+        Map from standardized branch names to existing branch names. To be used with
+        `RDataFrame.Define(...)` or `TTree.Alias(...)`.
+    """
     # Need to do a quick read of the branch names. The branch names shouldn't vary by file, so we can
     # use the first one.
     with uproot.open(embedded_filenames[0]) as f:
@@ -586,7 +601,6 @@ def run_unfolding(
     reweight_prior: bool = False,
     reweight_data_dataset_name: str = "",
     reweight_embedded_dataset_name: str = "",
-    embedded_cross_check_task: bool = False,
 ) -> bool:
     # Delayed import to avoid direct dependence.
     import ROOT
@@ -606,15 +620,6 @@ def run_unfolding(
             settings=settings,
         )
 
-    # Create cross check task shim if necessary
-    branch_renames = {}
-    if embedded_cross_check_task:
-        branch_renames = _create_branch_rename_shim(
-            embedded_filenames=embedded_filenames,
-            embedded_tree_name=embedded_tree_name,
-            grooming_method=settings.grooming_method,
-        )
-
     # Create the responses. We assume some conventions about column names.
     # They should generally be reasonable, but may require tweaks from time to time.
     responses = ROOT.create_response_2D(
@@ -632,7 +637,6 @@ def run_unfolding(
         _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
         settings.use_pure_matches,
         h_reweighting_response_ratio,
-        _branch_name_shim_to_map_for_ROOT(branch_renames=branch_renames),
         data_tree_name,
         embedded_tree_name,
     )
@@ -690,7 +694,6 @@ def run_unfolding_closure_reweighting(
     fraction_for_response: float = 0.75,
     reweight_data_dataset_name: str = "",
     reweight_embedded_dataset_name: str = "",
-    embedded_cross_check_task: bool = False,
 ) -> bool:
     """Run unfolding closure with reweighting.
 
@@ -736,15 +739,6 @@ def run_unfolding_closure_reweighting(
             settings=settings,
         )
 
-    # Create cross check task shim if necessary
-    branch_renames = {}
-    if embedded_cross_check_task:
-        branch_renames = _create_branch_rename_shim(
-            embedded_filenames=embedded_filenames,
-            embedded_tree_name=embedded_tree_name,
-            grooming_method=settings.grooming_method,
-        )
-
     # Create the responses. We assume some conventions about column names.
     # They should generally be reasonable, but may require tweaks from time to time.
     responses = ROOT.create_closure_response_2D(
@@ -764,7 +758,6 @@ def run_unfolding_closure_reweighting(
         settings.use_pure_matches,
         h_reweighting_ratio,
         embedded_tree_name,
-        _branch_name_shim_to_map_for_ROOT(branch_renames=branch_renames),
     )
 
     # Perform the actual unfolding.
