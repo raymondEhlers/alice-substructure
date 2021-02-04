@@ -390,7 +390,6 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
   }
   TTreeReader dataReader(&dataChain);
 
-  // TODO: Will need template for the cross check task...
   TTreeReaderValue<float> dataJetPt(dataReader, (dataPrefix + "_jet_pt").c_str());
   TTreeReaderValue<float> dataSubstructureVariable(
    dataReader, (groomingMethod + "_" + dataPrefix + "_" + substructureVariableName).c_str());
@@ -430,7 +429,10 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
     std::cout << " - " << filename << "\n";
     embeddedChain.Add(filename.c_str());
   }
-  // TODO: Add friend with scale factors!
+  // NOTE: We have no more need for friend trees because we skim everything. But we'll
+  //       keep the below code commented as an example if we need to revive it.
+  // NOTE: If we were to use this, we would need to make it conditional, as it's most
+  //       likely wouldn't always be appropriate.
   /*TChain embeddedScaleFactors("tree");
   for (const auto filename : embeddedFilenames) {
       // This is supposed to be equivalent to python with:
@@ -445,16 +447,6 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
       embeddedScaleFactors.Add((temp + "/scale_factor/" + name).c_str());
   }
   embeddedChain.AddFriend(&embeddedScaleFactors);*/
-  // Add aliases
-  /*std::cout << "len: " << renameBranchMap.size() << "\n";
-  for (const auto & m : renameBranchMap) {
-      //bool res = embeddedChain.SetAlias(m.first.c_str(), m.second.c_str());
-      bool res = true;
-      std::cout << "m.first: " << m.first << ", m.second: " << m.second << std::boolalpha << ", res: " << res << "\n";
-      // Another approach for renaiming?
-      embeddedChain.GetBranch(m.second.c_str())->SetName(m.first.c_str());
-      embeddedChain.GetLeaf(m.second.c_str())->SetName(m.first.c_str());
-  }*/
   //embeddedChain.Print();
   TTreeReader mcReader(&embeddedChain);
 
@@ -466,12 +458,11 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
   TTreeReaderValue<float> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
   TTreeReaderValue<float> trueSubstructureVariable(
    mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
-  TTreeReaderValue<int8_t> matchingLeading(mcReader,
+  TTreeReaderValue<int16_t> matchingLeading(mcReader,
                         (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
-  TTreeReaderValue<int8_t> matchingSubleading(mcReader,
+  TTreeReaderValue<int16_t> matchingSubleading(mcReader,
                           (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
   // For the double counting cut.
-  // TEMP: Commented out. TODO: Fix!
   TTreeReaderValue<float> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
   TTreeReaderValue<float> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
 
@@ -494,11 +485,9 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
       continue;
     }
     // Double counting cut
-    // TEMP: Commented out. Note that we don't need this right now because the double counting cut is applied at the analysis task level.
-    // TODO: However, this should be fixed...
-    /*if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
+    if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
       continue;
-    }*/
+    }
 
     // Potentially Reweight
     double reweightFactor = 1;
@@ -599,21 +588,20 @@ ResponseResult create_closure_response_2D(
   TTreeReader mcReader(&embeddedChain);
 
   // Values
-  TTreeReaderValue<double> scaleFactor(mcReader, "scale_factor");
-  TTreeReaderValue<double> hybridJetPt(mcReader, (hybridPrefix + "_jet_pt").c_str());
-  TTreeReaderValue<double> hybridSubstructureVariable(
+  TTreeReaderValue<float> scaleFactor(mcReader, "scale_factor");
+  TTreeReaderValue<float> hybridJetPt(mcReader, (hybridPrefix + "_jet_pt").c_str());
+  TTreeReaderValue<float> hybridSubstructureVariable(
    mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
-  TTreeReaderValue<double> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
-  TTreeReaderValue<double> trueSubstructureVariable(
+  TTreeReaderValue<float> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
+  TTreeReaderValue<float> trueSubstructureVariable(
    mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
-  TTreeReaderValue<long long> matchingLeading(mcReader,
+  TTreeReaderValue<int16_t> matchingLeading(mcReader,
                         (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
-  TTreeReaderValue<long long> matchingSubleading(mcReader,
+  TTreeReaderValue<int16_t> matchingSubleading(mcReader,
                           (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
   // For the double counting cut.
-  // TEMP: Commented out. TODO: Fix!
-  TTreeReaderValue<double> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
-  TTreeReaderValue<double> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
+  TTreeReaderValue<float> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
+  TTreeReaderValue<float> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
 
   int treeNumber = -1;
   // double scaleFactor = 0;
@@ -634,11 +622,9 @@ ResponseResult create_closure_response_2D(
       continue;
     }
     // Double counting cut
-    // TEMP: Commented out. Note that we don't need this right now because the double counting cut is applied at the analysis task level.
-    // TODO: However, this should be fixed...
-    /*if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
+    if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
       continue;
-    }*/
+    }
 
     // Full efficiency hists (and response).
     hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
