@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
 
 import attr
+import IPython
 import numpy as np
 import parsl
 import uproot
@@ -1435,9 +1436,13 @@ def setup_root_data_frame(
                 input_files.append(File(str(filename)))
 
     # logger.info(f"Input files (len: {len(input_files)}: {input_files}")
-    logger.info(f"N cores per job: {n_cores_per_job}")
-    cross_check_task = dataset_config.get("cross_check_task", False)
-    logger.info(f"Cross check task: {cross_check_task}")
+    logger.info(f"{processing_mode} RDF, with N cores per job: {n_cores_per_job}")
+    # NOTE: Since we now skim the cross check task, we don't need to modify the behavior.
+    #       However, in case we need to go back, we avoid wiping out the code entirely.
+    #       So for now, we set it always to false.
+    cross_check_task = False
+    # cross_check_task = dataset_config.get("cross_check_task", False)
+    # logger.info(f"Cross check task: {cross_check_task}")
 
     # Setup optional args
     optional_kwargs = {}
@@ -1703,7 +1708,7 @@ def _get_binning(
     return np.array(binning, dtype=np.float64)
 
 
-def setup_all_unfolding(
+def setup_all_unfolding(  # noqa: C901
     base_dataset_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
     n_cores_per_job: int,
@@ -1832,13 +1837,13 @@ def setup_all_unfolding(
 
             # If we're requesting a reweighted prior, we need to ensure that it's created before
             # we attempt to unfold it.
-            # TODO: If we're reweighting the priors, we need to make sure they existing with the proper binning.
-            #       We check later, but it would better to found about the issues here.
             # NOTE: We could put this above the itearation over grooming methods, but then we would have to match
             #       the grooming method outputs to the unfolding, which could be potentially quite tedious.
             #       Instead, we take a slight hit in efficiency and just call it here, and then easily match them.
             reweight_prior_results = []
-            if unfolding_settings["reweight_prior"]:
+            if unfolding_settings["reweight_prior"] or unfolding_settings["closures"]:
+                # We enable for both the straightforward reweighting, as well as for the closures where we take
+                # advantage of the reweighting.
                 for _collision_system in ["PbPb", "embedPythia"]:
                     reweight_prior_results.extend(
                         setup_root_data_frame(
@@ -1848,12 +1853,20 @@ def setup_all_unfolding(
                             # We always want the nominal dataset.
                             dataset_config=base_dataset_config["datasets"]["nominal"][_collision_system],
                             grooming_methods=[grooming_method],
+                            base_unfolding_config=base_unfolding_config,
                         )
                     )
-
-            # Add in the reweighted prior results when appropriate.
-            job_input_files = input_files
-            job_input_files.extend([r.outputs[0] for r in reweight_prior_results])
+            # Handle reweighted prior results.
+            # And add to final outputs
+            results.extend(reweight_prior_results)
+            # Add as job inputs to make them dependencies.
+            job_input_files = list(input_files)
+            # Apparently if we take the outputs it complete messes up the dependency because one of the
+            # outputs is considered to be infinitely pending, despite the fact that it already exists and
+            # the task has already returned... So instead, we pass the AppFuture to make the dependency.
+            # That means our typing information is a little fudged, but it works fine anyway since we don't
+            # actually care about the value of the result - just that the file was created.
+            job_input_files.extend([r for r in reweight_prior_results])
 
             # Standard unfolding
             for s in settings.values():
@@ -1922,8 +1935,8 @@ if __name__ == "__main__":  # noqa: C901
         # "root_data_frame_response",
         "unfolding",
     ]
-    nodes_to_allocate = 1
-    jobs_per_node = 1
+    nodes_to_allocate = 2
+    jobs_per_node = 6
     entries_per_job = int(1e5)
 
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
@@ -2113,7 +2126,6 @@ if __name__ == "__main__":  # noqa: C901
             )
         results.extend(temp_results)
     if "unfolding" in jobs_to_execute:
-        # TODO: Integrate the closure
         # TODO: Integrate configuring and running the systematics tasks with the tags.
         #       There are now enough options that it's way too easy to make a mistake.
         results = setup_all_unfolding(
@@ -2124,9 +2136,13 @@ if __name__ == "__main__":  # noqa: C901
         )
         all_results.extend(results)
 
-    logger.info(f"About to ask for result. len: {len(all_results)}")
-    # import IPython; IPython.embed()
-    # Wait on results
+    logger.info(f"Accumulated {len(all_results)} results")
+
+    # As far as I can tell, jobs will start executing as soon as they can, regardless of
+    # asking for the result. By embedded here, we can inspect results, etc in the meantime.
+    IPython.start_ipython(user_ns=locals())
+
+    # In case we close IPython early, wait on results
     # print each job status, initially all are running
     # print ("Job Status: {}".format([r.done() for r in results]))
     # Wait for all apps to complete

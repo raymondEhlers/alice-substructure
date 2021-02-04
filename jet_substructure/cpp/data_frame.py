@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import attr
 import numpy as np
+import uproot
+from pachyderm import binned_data
 
 from jet_substructure.base import helpers, skim_analysis_objects
 
@@ -386,7 +388,7 @@ def _substructure_hists(
     return hists
 
 
-def run_create_closure_ratio(
+def run_create_closure_ratio(  # noqa: C901
     collision_system: str,
     input_filenames: Sequence[Path],
     tree_name: str,
@@ -399,9 +401,28 @@ def run_create_closure_ratio(
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
-) -> bool:
+) -> Tuple[bool, str]:
     # TODO: I think I can just refactor this in the standard case...?
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
+
+    # Setup
+    prefix_for_ratio = "hybrid" if collision_system == "embedPythia" else "data"
+    # Parameters
+    jet_pt_column_format = "{prefix}_jet_pt" if jet_pt_prefix_first else "jet_pt_{prefix}"
+
+    # Check for existing file. If it sexists, check that the binning is the same.
+    # We do this check early because it allows us to bail out it it already exists.
+    if output_filename.exists():
+        with uproot.open(output_filename) as f:
+            h_temp = binned_data.BinnedData.from_existing_data(f[f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt"])
+
+            tests_for_same_binning = [
+                np.allclose(h_temp.axes[0].bin_edges, base_unfolding_config["nominal_binning"]["smeared_kt"]),
+                np.allclose(h_temp.axes[1].bin_edges, base_unfolding_config["nominal_binning"]["smeared_jet_pt"]),
+            ]
+            # If output already exists, we can return immediately.
+            if all(tests_for_same_binning):
+                return (True, "Same binning. Returning early.")
 
     # Delay ROOT import so we don't explicitly rely on it.
     import ROOT
@@ -411,11 +432,6 @@ def run_create_closure_ratio(
     ROOT.ROOT.EnableImplicitMT(n_cores)
     # Sumw2
     ROOT.TH1.SetDefaultSumw2(True)
-
-    # Parameters
-    jet_pt_column_format = "jet_pt_{prefix}"
-    if jet_pt_prefix_first:
-        jet_pt_column_format = "{prefix}_jet_pt"
 
     # Setup tree
     main_tree = ROOT.TChain(tree_name)
@@ -450,11 +466,6 @@ def run_create_closure_ratio(
     if collision_system == "embedPythia":
         double_counting_cut = "det_level_leading_track_pt >= hybrid_leading_track_pt"
         df_original = df_original.Filter(double_counting_cut)
-        # smeared_cut_prefix = "hybrid"
-        prefix_for_ratio = "hybrid"
-    else:
-        # smeared_cut_prefix = "data"
-        prefix_for_ratio = "data"
 
     # We always want the nominal binning for this unfolding configuration.
     smeared_substructure_variable_bins = np.array(
@@ -501,7 +512,7 @@ def run_create_closure_ratio(
 
     logger.info("Done!")
 
-    return True
+    return (True, "Processed")
 
 
 def run_response(  # noqa: C901
@@ -515,7 +526,7 @@ def run_response(  # noqa: C901
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
-) -> bool:
+) -> Tuple[bool, str]:
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
 
     # Delay ROOT import so we don't explicitly rely on it.
@@ -851,7 +862,7 @@ def run_response(  # noqa: C901
 
     logger.info("Done!")
 
-    return True
+    return (True, "Processed")
 
 
 def run(  # noqa: C901
@@ -865,7 +876,7 @@ def run(  # noqa: C901
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
-) -> bool:
+) -> Tuple[bool, str]:
     # Delay ROOT import so we don't explicitly rely on it.
     import ROOT
 
@@ -992,7 +1003,7 @@ def run(  # noqa: C901
 
     logger.info("Done!")
 
-    return True
+    return (True, "Processed")
 
 
 def run_standalone(
@@ -1005,7 +1016,7 @@ def run_standalone(
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
-) -> bool:
+) -> Tuple[bool, str]:
     # Determine the filenames based on the train numbers and predefined path here.
     base_path = Path("trains/") / collision_system / "{train_number}/skim/AnalysisResults.*.root"
     # TODO: Fix this bullshit!
