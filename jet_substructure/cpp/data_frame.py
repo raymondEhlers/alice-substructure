@@ -414,6 +414,8 @@ def run_create_closure_ratio(  # noqa: C901
     # We do this check early because it allows us to bail out it it already exists.
     if output_filename.exists():
         with uproot.open(output_filename) as f:
+            # TODO: Probably better to encoede the binning into the hist name.
+            #       Also included: UPDATE the file instead of recreate.
             h_temp = binned_data.BinnedData.from_existing_data(f[f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt"])
 
             tests_for_same_binning = [

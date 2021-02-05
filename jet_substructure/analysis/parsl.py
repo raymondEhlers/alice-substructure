@@ -1922,7 +1922,7 @@ def setup_all_unfolding(  # noqa: C901
 if __name__ == "__main__":  # noqa: C901
     # Settings
     # Base settings
-    base_dataset_name = "PbPb_central_R02_pass1"
+    base_dataset_name = "PbPb_semi_central_R04_pass3"
     dataset_type = "nominal"
     collision_system = "embedPythia"
 
@@ -1935,7 +1935,7 @@ if __name__ == "__main__":  # noqa: C901
         # "root_data_frame_response",
         "unfolding",
     ]
-    nodes_to_allocate = 2
+    nodes_to_allocate = 4
     jobs_per_node = 6
     entries_per_job = int(1e5)
 
@@ -1944,12 +1944,12 @@ if __name__ == "__main__":  # noqa: C901
         "leading_kt",
         "leading_kt_z_cut_02",
         "leading_kt_z_cut_04",
-        "dynamical_core",
-        "dynamical_z",
-        "dynamical_kt",
-        "dynamical_time",
-        "soft_drop_z_cut_02",
-        "soft_drop_z_cut_04",
+        # "dynamical_core",
+        # "dynamical_z",
+        # "dynamical_kt",
+        # "dynamical_time",
+        # "soft_drop_z_cut_02",
+        # "soft_drop_z_cut_04",
     ]
     max_cores_to_use_per_node = 8
 
@@ -2132,7 +2132,9 @@ if __name__ == "__main__":  # noqa: C901
             base_dataset_config=base_dataset_config,
             grooming_methods=grooming_methods,
             n_cores_per_job=n_cores_per_job,
-            selected_unfolding_settings=["default"],
+            selected_unfolding_settings=[
+                "default",
+            ],
         )
         all_results.extend(results)
 
@@ -2140,6 +2142,8 @@ if __name__ == "__main__":  # noqa: C901
 
     # As far as I can tell, jobs will start executing as soon as they can, regardless of
     # asking for the result. By embedded here, we can inspect results, etc in the meantime.
+    # NOTE: This may be commented out sometimes when I have long running processes and wil
+    #       probably forget to close it.
     IPython.start_ipython(user_ns=locals())
 
     # In case we close IPython early, wait on results

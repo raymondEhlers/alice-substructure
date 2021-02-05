@@ -713,6 +713,7 @@ analysis_configurations:
                     #       - value of untaggecd max upper bin.
                     reweight_prior: False
                     datasets: "nominal"
+                # TODO: Here, we can make new labels with each new binning variety.
                 tracking_efficiency:
                     label: "tracking_efficiency"
                     closures: False
