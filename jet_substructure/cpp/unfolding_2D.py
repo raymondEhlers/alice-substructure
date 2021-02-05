@@ -369,17 +369,20 @@ def _setup_unfolding() -> None:
     # Delayed import to avoid direct dependence.
     import ROOT
 
+    # Nominally setup for MT. It's not really going to do us any good here, but it doesn't hurt anything.
+    # NOTE: We do need to specify 1 to ensure that we don't use extra cores.
+    ROOT.ROOT.EnableImplicitMT(1)
     # Load RooUnfold
     ROOT.gSystem.Load("libRooUnfold")
     # Load the unfolding utilities. We're careful to be (relatively) position independent.
     # This just assumes that this file is in the same directory as the unfolding.cxx file, which should
     # usually be a reasonable assumption.
     unfolding_cxx = Path(__file__).resolve().parent / "unfolding.cxx"
-    # ROOT.gInterpreter.ProcessLine(f"""#include "{str(unfolding_cxx)}" """)
-    ROOT.gInterpreter.ProcessLine(f""".L {str(unfolding_cxx)} """)
-    # Nominally additional setup for MT. It's not really going to do us any good here, but it doesn't hurt anything.
-    # NOTE: We do need to specify 1 to ensure that we don't use extra cores.
-    ROOT.ROOT.EnableImplicitMT(1)
+    # We only want to load it if it hasn't been already, so we use the `create_response_2D` function
+    # as a proxy for this. Loading it twice appears to cause segfaults in some cases.
+    if not hasattr(ROOT, "create_response_2D"):
+        # ROOT.gInterpreter.ProcessLine(f"""#include "{str(unfolding_cxx)}" """)
+        ROOT.gInterpreter.ProcessLine(f""".L {str(unfolding_cxx)} """)
 
 
 def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path, additional_tag: str = "") -> None:
@@ -1201,7 +1204,7 @@ if __name__ == "__main__":
             untagged_bin_below_range=True,
         ),
         suffix="central",
-        output_dir=Path("output/PbPb/unfolding/test"),
+        output_dir=Path("output/PbPb/unfolding/test_2"),
         use_pure_matches=False,
     )
 
@@ -1209,12 +1212,12 @@ if __name__ == "__main__":
     run_unfolding(
         settings=default_settings,
         # NOTE: TChain can only handle one "*" in the filename.
-        data_filenames=[Path("trains/PbPb/6359/skim/*.root")],
+        data_filenames=[Path("trains/PbPb/6672/skim/*.root")],
         embedded_filenames=[
-            Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(6338, 6358)
+            Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in list(range(6650, 6669)) + [6671]
         ],
         data_tree_name="tree",
-        embedded_tree_name="name",
+        embedded_tree_name="tree",
     )
 
     # run_unfolding_closure_reweighting(
