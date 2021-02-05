@@ -1730,8 +1730,7 @@ def setup_all_unfolding(  # noqa: C901
     from jet_substructure.cpp import unfolding_2D
 
     base_unfolding_config = base_dataset_config["unfolding"]
-    # TODO: Update after testing...
-    output_dir = Path("output") / "PbPb" / "unfolding" / "parsl" / "test"
+    output_dir = Path("output") / "PbPb" / "unfolding" / "parsl"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     results = []
