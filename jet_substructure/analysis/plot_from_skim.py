@@ -2220,11 +2220,13 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                 panels=[
                     # Main axis.
                     Panel(
-                        axes=AxisConfig(
-                            "y",
-                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
-                            log=True,
-                        ),
+                        axes=[
+                            AxisConfig(
+                                "y",
+                                label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                                log=True,
+                            )
+                        ],
                         text=TextConfig(x=0.96, y=0.96, text=text),
                         legend=LegendConfig(location="lower left"),
                     ),

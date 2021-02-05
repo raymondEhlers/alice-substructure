@@ -246,11 +246,11 @@ class UnfoldingOutput:
         name += f"_smeared_{self.smeared_jet_pt_range}"
         if self.suffix:
             name += f"_{self.suffix}"
+        if self.label:
+            name += f"_{self.label}"
         # Put other possible options after the tag so we can sort by tag if it exists.
         if self.pure_matches:
             name += "_pure_matches"
-        if self.label:
-            name += f"_{self.label}"
         return name
 
     @property
