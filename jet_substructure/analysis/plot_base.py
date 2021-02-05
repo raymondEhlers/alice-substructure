@@ -291,7 +291,7 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
     reds = sns.color_palette("Reds_d", 3)
     # greys = sns.color_palette("Greys_r", 5)
     blues = sns.color_palette("Blues_r", 3)
-    # oranges = sns.color_palette("Oranges_r", 3)
+    oranges = sns.color_palette("Oranges_r", 3)
     for label in ["", "_compare"]:
         if label == "":
             # These are our main colors.
@@ -308,17 +308,20 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
         markers = ["o", "d", "s"]
         grooming_styling = {
             f"dynamical_z{label}": GroomingMethodStyle(
-                color=dynamical_grooming_colors[0], marker=markers[0], fillstyle="full", label="$z$Drop", zorder=10
+                color=dynamical_grooming_colors[0], marker=markers[0], fillstyle="full", label="DyG. $z$", zorder=10
             ),
             f"dynamical_kt{label}": GroomingMethodStyle(
                 color=greens[1],
                 marker=markers[0],
                 fillstyle="full",
-                label=r"$k_{\text{T}}$Drop",
+                label=r"DyG $k_{\text{T}}$",
                 zorder=10,
             ),
             f"dynamical_time{label}": GroomingMethodStyle(
-                color=reds[1], marker=markers[2], fillstyle="full", label=r"timeDrop", zorder=10
+                color=reds[1], marker=markers[2], fillstyle="full", label=r"DyG time", zorder=10
+            ),
+            f"dynamical_core{label}": GroomingMethodStyle(
+                color=oranges[1], marker=markers[2], fillstyle="full", label=r"DyG core", zorder=10
             ),
             f"leading_kt{label}": GroomingMethodStyle(
                 color=purples[1],
