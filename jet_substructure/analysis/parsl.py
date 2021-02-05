@@ -1944,12 +1944,12 @@ if __name__ == "__main__":  # noqa: C901
         "leading_kt",
         "leading_kt_z_cut_02",
         "leading_kt_z_cut_04",
-        # "dynamical_core",
-        # "dynamical_z",
-        # "dynamical_kt",
-        # "dynamical_time",
-        # "soft_drop_z_cut_02",
-        # "soft_drop_z_cut_04",
+        "dynamical_core",
+        "dynamical_z",
+        "dynamical_kt",
+        "dynamical_time",
+        "soft_drop_z_cut_02",
+        "soft_drop_z_cut_04",
     ]
     max_cores_to_use_per_node = 8
 
