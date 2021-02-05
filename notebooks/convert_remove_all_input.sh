@@ -14,7 +14,7 @@ notebook=${1}
 #jupyter nbconvert hardestKtSummary.ipynb --to html --template "test_html" \
 #jupyter nbconvert hardestKtSummary.ipynb --to html --template "classic" \
 #jupyter nbconvert hardestKtSummary.ipynb --to html --template "my_html_with_toc" \
-jupyter nbconvert ${notebook} --to html --template "my_html_with_toc" \
+jupyter nbconvert ${notebook} --to html_embed --template "my_html_with_toc" \
     --TagRemovePreprocessor.remove_cell_tags "remove_cell" \
     --TagRemovePreprocessor.remove_all_outputs_tags "remove_output" \
     --TagRemovePreprocessor.remove_input_tags "remove_input" \
