@@ -2176,6 +2176,56 @@ def plot_kt_unfolding(
             plot_png=plot_png,
         )
 
+        # Slice the refolded in jet pt just to get a sense of what they look like.
+        _small_jet_pt_bins = np.array([40, 60, 80, 100, 120])
+        for _low, _high in zip(_small_jet_pt_bins[:-1], _small_jet_pt_bins[1:]):
+            _small_jet_pt_range = helpers.JetPtRange(_low, _high)
+            text = f"${_small_jet_pt_range.display_str(label='data')}$"
+            plot_refolded(
+                unfolding_output=unfolding_output,
+                hist_raw=unfolding_output.smeared_substructure(
+                    hist_name=unfolding_output.raw_hist_name, smeared_jet_pt_range=_small_jet_pt_range
+                ),
+                hist_smeared=unfolding_output.smeared_substructure(
+                    hist_name=unfolding_output.smeared_hist_name, smeared_jet_pt_range=_small_jet_pt_range
+                ),
+                refolded_hists={
+                    n_iter: unfolding_output.refolded_substructure(
+                        n_iter=n_iter, smeared_jet_pt_range=_small_jet_pt_range
+                    )
+                    for n_iter in unfolding_output.n_iter_range_to_plot()
+                },
+                plot_config=pb.PlotConfig(
+                    name=f"refolded_{unfolding_output.substructure_variable}_{_small_jet_pt_range.histogram_str(label='smeared')}",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
+                                )
+                            ],
+                            legend=pb.LegendConfig(location="lower left", ncol=2, anchor=(0.15, 0.025)),
+                            text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                        # Ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
+                                # y label is set in the function.
+                                pb.AxisConfig(
+                                    "y",
+                                    label="Ratio to smeared" if unfolding_output.smeared_input else "Ratio to data",
+                                    range=(0.5, 1.5),
+                                ),
+                            ],
+                        ),
+                    ],
+                    figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+                ),
+                plot_png=plot_png,
+            )
+
     # Plot the response
     if "h2_substructure_variable" in unfolding_output.hists:
         text = f"${unfolding_output.smeared_jet_pt_range.display_str(label='hybrid')}$"
