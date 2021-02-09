@@ -160,7 +160,9 @@ class Settings:
 
     @property
     def output_filename(self) -> Path:
-        return (self.output_dir / self.output_tag).with_suffix(".root")
+        # NOTE: We can't use with_suffix here because the filename may contain ".", which will mess up
+        #       the detection of the suffix to replace.
+        return Path(f"{self.output_dir / self.output_tag}.root")
 
 
 @attr.s
@@ -390,7 +392,9 @@ def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path, additi
     output_filename.parent.mkdir(parents=True, exist_ok=True)
     # Add an additional tag if requested
     if additional_tag:
-        output_filename = (output_filename.parent / f"{output_filename.stem}_{additional_tag}").with_suffix(".root")
+        # NOTE: We can't use with_suffix here because the filename may contain ".", which will mess up
+        #       the detection of the suffix to replace.
+        output_filename = Path(f"{output_filename.parent / output_filename.stem}_{additional_tag}.root")
 
     logger.debug(f"Writing hists to {output_filename}")
     # Uproot3 also works, but it's far less space efficient. Since we already have to import ROOT,
