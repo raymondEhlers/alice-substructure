@@ -88,6 +88,11 @@ class SubstructureVariableSettings(ParameterSettings):
     def untagged_value(self) -> float:
         return (self.untagged_bin.max - self.untagged_bin.min) / 2 + self.untagged_bin.min
 
+    @property
+    def disable_untagged_bin(self) -> bool:
+        """If the untagged bin min and max are the same, we want to disable it."""
+        return self.untagged_bin.min == self.untagged_bin.max
+
     @classmethod
     def from_binning(
         cls: Type["SubstructureVariableSettings"],
@@ -635,6 +640,7 @@ def run_unfolding(
         _array_to_ROOT(settings.substructure_variable.smeared_bins, "double"),
         _array_to_ROOT(settings.substructure_variable.true_bins, "double"),
         settings.substructure_variable.untagged_value,
+        settings.substructure_variable.disable_untagged_bin,
         settings.substructure_variable.smeared_range.min,
         settings.substructure_variable.smeared_range.max,
         _array_to_ROOT(_pass_filenames_to_ROOT(data_filenames), "std::string"),
@@ -754,6 +760,7 @@ def run_unfolding_closure_reweighting(
         _array_to_ROOT(settings.substructure_variable.smeared_bins, "double"),
         _array_to_ROOT(settings.substructure_variable.true_bins, "double"),
         settings.substructure_variable.untagged_value,
+        settings.substructure_variable.disable_untagged_bin,
         settings.substructure_variable.smeared_range.min,
         settings.substructure_variable.smeared_range.max,
         _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),

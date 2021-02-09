@@ -346,6 +346,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
                  const std::string substructureVariableName, std::vector<double> smearedJetPtBins,
                  std::vector<double> trueJetPtBins, std::vector<double> smearedSplittingVariableBins,
                  std::vector<double> trueSplittingVariableBins, double smearedUntaggedBinValue,
+                 bool disableUntaggedBin,
                  double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
                  const std::vector<std::string>& dataFilenames,
                  const std::vector<std::string>& embeddedFilenames, const bool usePureMatches = false,
@@ -377,8 +378,18 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
   }
   std::cout << "\n";
   std::cout << "Smeared untagged bin value: " << smearedUntaggedBinValue << "\n";
+  std::cout << std::boolalpha << "Disable untagged bin: " << disableUntaggedBin << "\n";
   std::cout << "Min smeared substructure variable: " << minSmearedSplittingVariable << "\n";
   std::cout << "Max smeared substructure variable: " << maxSmearedSplittingVariable << "\n";
+
+  // General setup
+  double untaggedBelowThisValue = 0.;
+  if (disableUntaggedBin) {
+      // Select a very large negative value. We'll never have such a large negative value, so
+      // pratically this means that we'll never mark a value as untagged. This means that everything
+      // will have to be encapsulated in the standard binning or it will be cut.
+      untaggedBelowThisValue = -1e5;
+  }
 
   // First, we handle the data. Setup the Reader, the columns, and store the data in the appropriate hists.
   TChain dataChain(dataTreeName.c_str());
@@ -399,7 +410,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
     }
     // Substructure variable cut.
     double dataSubstructureVariableValue = *dataSubstructureVariable;
-    if (dataSubstructureVariableValue < 0) {
+    if (dataSubstructureVariableValue < untaggedBelowThisValue) {
       // Assign to the untagged bin.
       dataSubstructureVariableValue = smearedUntaggedBinValue;
     } else {
@@ -483,6 +494,9 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
     if (*trueSubstructureVariable > trueSplittingVariableBins.back()) {
       continue;
     }
+    if (disableUntaggedBin && *trueSubstructureVariable < trueSplittingVariableBins.front()) {
+      continue;
+    }
     // Double counting cut
     if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
       continue;
@@ -511,7 +525,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
     }
     // Also cut on hybrid substructure variable.
     double hybridSubstructureVariableValue = *hybridSubstructureVariable;
-    if (hybridSubstructureVariableValue < 0) {
+    if (hybridSubstructureVariableValue < untaggedBelowThisValue) {
       // Assign to the untagged bin.
       hybridSubstructureVariableValue = smearedUntaggedBinValue;
     } else {
@@ -545,7 +559,6 @@ enum ClosureVariation_t { splitMC = 0, reweightPseudoData = 1, reweightResponse 
  *
  * Since we utilize pseudo-data here, we split statistics according to a specified fraction.
  * Consequently, this also covers the split MC closure.
- *
  * NOTE: We rely on the user to validate that the binning matches the reweighting hist.
  *
  */
@@ -553,7 +566,7 @@ ResponseResult create_closure_response_2D(
  std::map<std::string, TH2D*> hists, const std::string groomingMethod, const std::string substructureVariableName,
  std::vector<double> smearedJetPtBins, std::vector<double> trueJetPtBins,
  std::vector<double> smearedSplittingVariableBins, std::vector<double> trueSplittingVariableBins,
- double smearedUntaggedBinValue, double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
+ double smearedUntaggedBinValue, bool diasbleUntaggedBin, double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
  const std::vector<std::string>& embeddedFilenames, const ClosureVariation_t closureVariation,
  const double fractionForResponse = 0.75, const bool usePureMatches = false, TH2D* hReweighting = nullptr,
  const std::string& embeddedTreeName = "tree", const std::string& truePrefix = "true",
@@ -562,6 +575,14 @@ ResponseResult create_closure_response_2D(
   // NOTE: We rely on the user to validate that the binning matches the reweighting hist.
   // Setup
   TRandom3 random(0);
+  // Handle untagged bin.
+  double untaggedBelowThisValue = 0.;
+  if (diasbleUntaggedBin) {
+      // Select a very large negative value. We'll never have such a large negative value, so
+      // pratically this means that we'll never mark a value as untagged. This means that everything
+      // will have to be encapsulated in the standard binning or it will be cut.
+      untaggedBelowThisValue = -1e5;
+  }
 
   // We don't have to deal with data for this closure test. It's all based around the embedded data.
   // So we go directly to the response.
@@ -633,7 +654,7 @@ ResponseResult create_closure_response_2D(
     }
     // Also cut on hybrid substructure variable.
     double hybridSubstructureVariableValue = *hybridSubstructureVariable;
-    if (hybridSubstructureVariableValue < 0) {
+    if (hybridSubstructureVariableValue < untaggedBelowThisValue) {
       // Assign to the untagged bin.
       hybridSubstructureVariableValue = smearedUntaggedBinValue;
     } else {
