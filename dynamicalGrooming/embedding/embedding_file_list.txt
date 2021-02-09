@@ -1,0 +1,3 @@
+/Volumes/Elements/alice/data/sim/2019/LHC19f4_2/13/296060/AOD/001/aod_archive.zip#AliAOD.root
+/Volumes/Elements/alice/data/sim/2019/LHC19f4_2/13/296060/AOD/002/aod_archive.zip#AliAOD.root
+/Volumes/Elements/alice/data/sim/2019/LHC19f4_2/13/296060/AOD/003/aod_archive.zip#AliAOD.root
