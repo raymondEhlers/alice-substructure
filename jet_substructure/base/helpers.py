@@ -276,7 +276,7 @@ class RangeSelector:
         )
 
     def __str__(self) -> str:
-        return f"{self._variable_name}_{self.min}_{self.max}"
+        return f"{self._variable_name}_{self.min:g}_{self.max:g}"
 
     def histogram_str(self, label: str = "") -> str:
         if label:
