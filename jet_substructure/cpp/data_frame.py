@@ -112,8 +112,7 @@ def new_matching_hists(
                     0,
                     1,
                 ),
-                # f"{grooming_method}_{matching_index.generator_like_prefix}_{subjet_name}_subjet_momentum_fraction_in_{matching_index.measured_like_prefix}_jet",
-                f"{grooming_method}_{matching_index.measured_like_prefix}_{matching_index.generator_like_prefix}_matching_{subjet_name}_pt_fraction_in_{matching_index.measured_like_prefix}_jet",
+                f"{grooming_method}_{matching_index.generator_like_prefix}_{subjet_name}_subjet_momentum_fraction_in_{matching_index.measured_like_prefix}_jet",
                 "scale_factor",
             )
             hists.append(h_subjet_pt_fraction)
