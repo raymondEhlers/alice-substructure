@@ -141,16 +141,13 @@ class Settings:
         base_filename = f"unfolding_{self.substructure_variable.name}_grooming_method_{self.grooming_method}"
         # Then add the binning information.
         # First, the substructure edges.
-        base_filename += (
-            f"_smeared_{self.substructure_variable.smeared_range.zero_padded_str(self.filename_padding_factor)}"
-        )
+        base_filename += f"_smeared_{self.substructure_variable.smeared_range}"
         # Then the untagged
-        base_filename += (
-            f"_untagged_{self.substructure_variable.untagged_bin.zero_padded_str(self.filename_padding_factor)}"
-        )
+        base_filename += f"_untagged_{self.substructure_variable.untagged_bin}"
         # Then the jet pt
         smeared_jet_pt = helpers.JetPtRange(min=self.jet_pt.smeared_bins[0], max=self.jet_pt.smeared_bins[-1])
-        base_filename += f"_smeared_{smeared_jet_pt.zero_padded_str(self.filename_padding_factor)}"
+        # base_filename += f"_smeared_{smeared_jet_pt.zero_padded_str(self.filename_padding_factor)}"
+        base_filename += f"_smeared_{smeared_jet_pt}"
         base_filename += f"_{self.suffix}"
         # Additional options
         # Optional tag
