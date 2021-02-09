@@ -784,12 +784,62 @@ analysis_configurations:
                 default:
                     label: ""
                     # NOTE: Untagged bin above is included in the closures!
-                    closures: True
+                    # TEMP: disabled for conveience.
+                    closures: False
                     # TODO: Need closure settings for.
                     #       - fraction of MC split
                     #       - value of untaggecd max upper bin.
                     reweight_prior: False
                     datasets: "nominal"
+                default_no_untagged:
+                    label: ""
+                    closures: False
+                    reweight_prior: False
+                    datasets: "nominal"
+                    binning:
+                        # No untagged means that we repeat what would have been the untagged bins.
+                        true_kt: [0, 2, 3, 4, 8, 100]
+                        smeared_kt: [2, 2, 3, 4, 8]
+                default_kt_1:
+                    label: ""
+                    closures: False
+                    reweight_prior: False
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1, 2, 3, 4, 8, 100]
+                        smeared_kt: [0, 1, 2, 3, 4, 8]
+                default_kt_1_no_untagged:
+                    label: ""
+                    closures: False
+                    reweight_prior: False
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [0, 1, 2, 3, 4, 8, 100]
+                        smeared_kt: [1, 1, 2, 3, 4, 8]
+                default_kt_1.5:
+                    label: ""
+                    closures: False
+                    reweight_prior: False
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 8, 100]
+                        smeared_kt: [0, 1.5, 2, 3, 4, 8]
+                default_kt_1.5_no_untagged:
+                    label: ""
+                    closures: False
+                    reweight_prior: False
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [0, 1.5, 2, 3, 4, 8, 100]
+                        smeared_kt: [1.5, 1.5, 2, 3, 4, 8]
+                default_kt_2_6:
+                    label: ""
+                    closures: False
+                    reweight_prior: False
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 2, 3, 4, 6, 100]
+                        smeared_kt: [1, 2, 3, 4, 6]
                 tracking_efficiency:
                     label: "tracking_efficiency"
                     closures: False
