@@ -1142,12 +1142,10 @@ def cross_check_task_names_to_export(
     # Matching properties
     for measured_like, generator_like in [("det_level", "true"), ("hybrid", "det_level")]:
         for level in ["leading", "subleading"]:
-            # branch_names[f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}"] = "bool"
-            # branch_names[f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}"] = "int8_t"
             branch_names[f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}"] = np.int16
             if measured_like == "hybrid":
                 branch_names[
-                    f"{grooming_method}_{measured_like}_{generator_like}_matching_{level}_pt_fraction_in_hybrid_jet"
+                    f"{grooming_method}_{generator_like}_{level}_subjet_momentum_fraction_in_{measured_like}_jet"
                 ] = np.float32
 
     return branch_names
