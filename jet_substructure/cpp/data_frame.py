@@ -54,7 +54,7 @@ def new_matching_hists(
 
     kt_axis = np.arange(-1, 26, dtype=np.float64)
     jet_pt_axis = np.arange(0, 151, dtype=np.float64)
-    kt_selection_axis = np.array([-1, 2, 3, 5, 25], dtype=np.float64)
+    kt_selection_axis = np.array([-1, 1, 2, 3, 5, 25], dtype=np.float64)
 
     # Matching
     name = f"{grooming_method}_matching_{matching_index.matching_level}_type_{matching_index.matching_type}_jet_pt_axis_{matching_jet_pt_prefix}{hist_suffix}"
@@ -112,7 +112,8 @@ def new_matching_hists(
                     0,
                     1,
                 ),
-                f"{grooming_method}_{matching_index.generator_like_prefix}_{subjet_name}_subjet_momentum_fraction_in_{matching_index.measured_like_prefix}_jet",
+                # f"{grooming_method}_{matching_index.generator_like_prefix}_{subjet_name}_subjet_momentum_fraction_in_{matching_index.measured_like_prefix}_jet",
+                f"{grooming_method}_{matching_index.measured_like_prefix}_{matching_index.generator_like_prefix}_matching_{subjet_name}_pt_fraction_in_{matching_index.measured_like_prefix}_jet",
                 "scale_factor",
             )
             hists.append(h_subjet_pt_fraction)
