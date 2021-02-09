@@ -28,7 +28,7 @@ class CppEnum:
     value: str = attr.ib()
 
     def __str__(self) -> str:
-        """ Return the str without quotes by calling `str`.
+        """Return the str without quotes by calling `str`.
 
         This ensures that ROOT will evaluate the enum correctly when evaluating the AddTask.
         """
@@ -36,7 +36,7 @@ class CppEnum:
 
 
 def _normalize_period(period: str) -> str:
-    """ Normalize period name to have "LHC" in all caps.
+    """Normalize period name to have "LHC" in all caps.
 
     Args:
         period: Period name to be normalized.
@@ -47,7 +47,7 @@ def _normalize_period(period: str) -> str:
 
 
 def _is_run2_data(period: str) -> bool:
-    """ Determine if the period was data taken during Run 2.
+    """Determine if the period was data taken during Run 2.
 
     Performed by checking for the years LHC{15..18}. In principle, this should fail for MC productions
     (which is the desired behavior - the year of the MC production doesn't dictate the year of the data
@@ -65,7 +65,7 @@ def _is_run2_data(period: str) -> bool:
 
 
 def _is_MC(period: str) -> bool:
-    """ Determine if we are running over MC.
+    """Determine if we are running over MC.
 
     Takes advantage of the fact that MC period names are always longer then 6 characters.
     For example, we compared "LHC17p" (data) vs "LHC18b8" (MC).
@@ -79,7 +79,7 @@ def _is_MC(period: str) -> bool:
 
 
 class DataType(enum.Enum):
-    """ ALICE data type.
+    """ALICE data type.
 
     Either AOD or ESD.
     """
@@ -92,7 +92,7 @@ _T_BeamType = TypeVar("_T_BeamType", bound="BeamType")
 
 
 class BeamType(enum.Enum):
-    """ Beam type.
+    """Beam type.
 
     Uses the AliAnalysisTaskEmcal enum.
     """
@@ -103,7 +103,7 @@ class BeamType(enum.Enum):
 
     @classmethod
     def from_period(cls: Type[_T_BeamType], period: str) -> _T_BeamType:
-        """ Determine the beam type from the run period.
+        """Determine the beam type from the run period.
 
         Note:
             This is based on a enumerated list of PbPb and pPb run periods
@@ -138,9 +138,7 @@ class BeamType(enum.Enum):
 
 
 class AnalysisMode(enum.Enum):
-    """ Analysis mode.
-
-    """
+    """Analysis mode."""
 
     pp = enum.auto()
     pythia = enum.auto()
@@ -149,7 +147,7 @@ class AnalysisMode(enum.Enum):
 
 
 def _run_add_task_macro(task_path: Union[str, Path], task_class_name: str, *args: Any) -> Any:
-    """ Run a given add task macro.
+    """Run a given add task macro.
 
     Note:
         This is a cute idea, but it's also rather fragile. See the comments in the code for details how this
@@ -214,10 +212,10 @@ def _add_mult_selection(is_run2_data: bool, physics_selection: int) -> Optional[
     return None
 
 
-def run_dynamical_grooming(
+def run_dynamical_grooming(  # noqa: C901
     task_name: str, analysis_mode: AnalysisMode, period: str, physics_selection: int, data_type: DataType
 ) -> ROOT.AliAnalysisManager:
-    """ Run the event extractor.
+    """Run the event extractor.
 
     Args:
         task_name: Name of the analysis (ie. given to the analysis manager).
@@ -602,7 +600,7 @@ def run_dynamical_grooming(
 def run_dynamical_grooming_embedding(
     task_name: str, analysis_mode: AnalysisMode, period: str, physics_selection: int, data_type: DataType
 ) -> ROOT.AliAnalysisManager:
-    """ Run dynamical grooming embedding.
+    """Run dynamical grooming embedding.
 
     Args:
         task_name: Name of the analysis (ie. given to the analysis manager).
@@ -629,7 +627,7 @@ def run_dynamical_grooming_embedding(
             [0, 5, 7, 9, 12, 16, 21, 28, 36, 45, 57, 70, 85, 99, 115, 132, 150, 169, 190, 212, 235, 1000],
             dtype=np.int32,
         )
-        pt_hard_binning_root = ROOT.TArrayI(len(pt_hard_binning), pt_hard_binning)
+        pt_hard_binning_root = ROOT.TArrayI(len(pt_hard_binning), pt_hard_binning)  # noqa: F841
 
     # Basic setup (analysis manager and input handler).
     analysis_manager = ROOT.AliAnalysisManager(task_name)
@@ -1058,7 +1056,7 @@ def run_dynamical_grooming_embedding(
     partLevelJetCont.SetMaxTrackPt(1000)
     hardest_kt.SetUseNewCentralityEstimation(True)
     hardest_kt.SetJetPtThreshold(20)
-    hardest_kt.SetCutDoubleCounts(False)
+    hardest_kt.SetCutDoubleCounts(True)
     hardest_kt.SetCheckResolution(True)
     hardest_kt.SelectCollisionCandidates(physics_selection)
     hardest_kt.SetNeedEmcalGeom(False)
@@ -1154,7 +1152,7 @@ def run_dynamical_grooming_embedding(
 def start_analysis_manager(
     analysis_manager: ROOT.AliAnalysisManager, mode: str, n_events: int, input_files: Sequence[Path]
 ) -> None:
-    """ Start the given analysis manager.
+    """Start the given analysis manager.
 
     Note:
         The only mode current supported is local.
