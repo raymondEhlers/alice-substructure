@@ -89,8 +89,6 @@ def _plot_subjet_matching(
     rdf_plots: bool = False,
     plot_png: bool = False,
 ) -> None:
-    fig, ax = plt.subplots(figsize=(10, 8))
-
     axis_to_keep_map = {"pt": 2, "kt": 3}
     axis_to_keep = axis_to_keep_map[axis_parameter]
     matching_type_label_map = {
@@ -118,6 +116,8 @@ def _plot_subjet_matching(
             bh_hist=hists[f"{grooming_method}_{matching_level}_kt_response_matching_type_all"],
             axis_to_keep=axis_to_keep,
         )
+
+    fig, ax = plt.subplots(figsize=(10, 8))
 
     values = np.zeros_like(normalization.values)
     for matching_type in matching_types:
@@ -198,7 +198,7 @@ def plot_prong_matching(
         ("hybrid_det_level", "det_level", "det"),
         ("det_level_true", "matched", "true"),
     ]:
-        for min_kt_hybrid in [-1, 2, 3, 5]:
+        for min_kt_hybrid in [-1, 1, 2, 3, 5]:
             for grooming_method in grooming_methods:
                 text = "Iterative splittings"
                 text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
@@ -206,28 +206,32 @@ def plot_prong_matching(
                 hist_suffix = hybrid_jet_pt_bin.histogram_str(label="hybrid")
                 if min_kt_hybrid > 0:
                     text += "\n" + r"$k_{\text{T}}^{\text{hybrid}} >$ " + f"{min_kt_hybrid}"
-                _plot_subjet_matching(
-                    hists=hists,
-                    axis_parameter="pt",
-                    grooming_method=grooming_method,
-                    matching_types=matching_types,
-                    matching_level=matching_level,
-                    hist_suffix=hist_suffix,
-                    hybrid_jet_pt_bin=hybrid_jet_pt_bin,
-                    min_kt_hybrid=min_kt_hybrid,
-                    plot_config=PlotConfig(
-                        name=f"subjet_matching_{matching_level}",
-                        panels=Panel(
-                            axes=[AxisConfig("y", label="Tagging Fraction", log=True, range=(1e-3, 10))],
-                            legend=LegendConfig(location="upper left", ncol=2, font_size=14),
-                            text=TextConfig(x=0.975, y=0.8, text=text),
+                try:
+                    _plot_subjet_matching(
+                        hists=hists,
+                        axis_parameter="pt",
+                        grooming_method=grooming_method,
+                        matching_types=matching_types,
+                        matching_level=matching_level,
+                        hist_suffix=hist_suffix,
+                        hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                        min_kt_hybrid=min_kt_hybrid,
+                        plot_config=PlotConfig(
+                            name=f"subjet_matching_{matching_level}",
+                            panels=Panel(
+                                axes=[AxisConfig("y", label="Tagging Fraction", log=True, range=(1e-3, 10))],
+                                legend=LegendConfig(location="upper left", ncol=2, font_size=14),
+                                text=TextConfig(x=0.975, y=0.8, text=text),
+                            ),
+                            figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
                         ),
-                        figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
-                    ),
-                    output_dir=output_dir,
-                    rdf_plots=rdf_plots,
-                    plot_png=plot_png,
-                )
+                        output_dir=output_dir,
+                        rdf_plots=rdf_plots,
+                        plot_png=plot_png,
+                    )
+                except ValueError as e:
+                    # The hist wasn't available, so note it and continue.
+                    logger.warning(f"Probably missing hist for {min_kt_hybrid}. Full ValueError {e}")
 
                 # TEMP
                 continue
