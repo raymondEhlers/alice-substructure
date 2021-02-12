@@ -169,7 +169,7 @@ def setup_parsl_587(
             )
         )
 
-    machines_to_exclude = [
+    machines_to_exclude: List[str] = [
         # pc051 and pc075 have two OSDs, so they will always be short of memory. Better to avoid until we have more memory.
         # "pc051",
         # "pc075",
@@ -183,7 +183,6 @@ def setup_parsl_587(
 
     b587_executor = Config(
         executors=[
-            # TODO: Add an additional executor for the other nodes with fewer jobs?
             HighThroughputExecutor(
                 label="b587",
                 worker_debug=debug,
@@ -1870,6 +1869,8 @@ def setup_all_unfolding(  # noqa: C901
             # Standard unfolding
             for s in settings.values():
                 logger.info(f"Adding standard unfolding: {s.output_tag}")
+                if s.substructure_variable.disable_untagged_bin:
+                    logger.info("NOTE: Disabled untagged bin")
                 # NOTE: This is missing some output files (like the trivial closures). But good enough for now...
                 parsl_output_file = File(str(s.output_filename))
                 results.append(
@@ -1921,7 +1922,7 @@ def setup_all_unfolding(  # noqa: C901
 if __name__ == "__main__":  # noqa: C901
     # Settings
     # Base settings
-    base_dataset_name = "PbPb_semi_central_R04_pass3"
+    base_dataset_name = "PbPb_central_R02_pass1"
     dataset_type = "nominal"
     collision_system = "embedPythia"
 
@@ -1930,12 +1931,11 @@ if __name__ == "__main__":  # noqa: C901
         # "repair_root_files",
         # "convert_to_parquet",
         # "calculate_embedding_skim",
-        # "root_data_frame",
         # "root_data_frame_response",
         "unfolding",
     ]
-    nodes_to_allocate = 4
-    jobs_per_node = 6
+    nodes_to_allocate = 1
+    jobs_per_node = 4
     entries_per_job = int(1e5)
 
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
@@ -1988,6 +1988,7 @@ if __name__ == "__main__":  # noqa: C901
     setup_parsl_587(
         nodes_to_allocate=nodes_to_allocate,
         jobs_per_node=jobs_per_node,
+        # partition="vip",
         use_root=any((job in _jobs_requiring_root for job in jobs_to_execute)),
         # We need the AliPhysics definitions for the Substructure output classes and AliEmcalList.
         use_aliphysics=any(
@@ -2132,7 +2133,13 @@ if __name__ == "__main__":  # noqa: C901
             grooming_methods=grooming_methods,
             n_cores_per_job=n_cores_per_job,
             selected_unfolding_settings=[
-                "default",
+                # "default",
+                # "default_kt_1",
+                # "default_kt_1.5",
+                "default_no_untagged",
+                "default_kt_1_no_untagged",
+                "default_kt_1.5_no_untagged",
+                # "default_kt_2_6",
             ],
         )
         all_results.extend(results)

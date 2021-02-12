@@ -119,9 +119,19 @@ class SubstructureVariableSettings(ParameterSettings):
             smeared_range = range_class(min=smeared_bins[0], max=smeared_bins[-2])
             untagged_bin = range_class(min=smeared_bins[-2], max=smeared_bins[-1])
 
+        # Account for disabled untagged bin.
+        # We indicate it by making the untagged bin edges identical, but then
+        # we need to drop that from the smeared_bins so we have valid binning.
+        smeared_bins_selection = slice(None, None)
+        if untagged_bin.min == untagged_bin.max:
+            if untagged_bin_below_range:
+                smeared_bins_selection = slice(1, None)
+            else:
+                smeared_bins_selection = slice(None, -1)
+
         return cls(
             true_bins=true_bins,
-            smeared_bins=smeared_bins,
+            smeared_bins=smeared_bins[smeared_bins_selection],
             name=name,
             variable_name=variable_name,
             smeared_range=smeared_range,
