@@ -1,12 +1,12 @@
 ---
 train: "Jets_EMC_PbPb"
-number: 6688
+number: 6689
 dataset: "LHC18{q,r}"
 pass: 3
 AOD: 242
 aliphysics_tag: "v5-09-57-01_ROOT6-1"
 embedded_dataset: "LHC20g4"
-pt_hard_bin: 15
+pt_hard_bin: 16
 alien_output_info:
     child_1:
         name: "LHC18q"
@@ -15,35 +15,35 @@ alien_output_info:
             295676: "merged"
             295755: "merged"
             295822: "Stage_5"
-            295913: "merged"
+            295913: "Stage_5"
             296065: "merged"
             296068: "Stage_5"
-            296132: "merged"
+            296132: "Stage_5"
             296133: "merged"
             296244: "merged"
-            296270: "merged"
+            296270: "Stage_5"
             296377: "merged"
-            296414: "merged"
+            296414: "Stage_5"
             296433: "merged"
-            296550: "merged"
+            296550: "Stage_5"
     child_2:
         name: "LHC18r"
         stage_to_download: "manual"
         manual:
             296694: "merged"
             296894: "merged"
-            296899: "merged"
+            296899: "Stage_5"
             296903: "merged"
             296934: "Stage_5"
             297193: "merged"
-            297218: "merged"
-            297221: "merged"
-            297380: "merged"
+            297218: "Stage_5"
+            297221: "Stage_5"
+            297380: "Stage_5"
             297415: "merged"
             297446: "merged"
-            297450: "merged"
+            297450: "Stage_5"
             297544: "merged"
-            297590: "merged"
+            297590: "Stage_5"
 status: |
     "Substructure embedding semi-central, record all splittings. Double counting cut applied (with fix),"
     " updated to pass 3, Rmax=0.05 systematic."

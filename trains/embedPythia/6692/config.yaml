@@ -1,0 +1,49 @@
+---
+train: "Jets_EMC_PbPb"
+number: 6692
+dataset: "LHC18{q,r}"
+pass: 3
+AOD: 242
+aliphysics_tag: "v5-09-57-01_ROOT6-1"
+embedded_dataset: "LHC20g4"
+pt_hard_bin: 19
+alien_output_info:
+    child_1:
+        name: "LHC18q"
+        stage_to_download: "manual"
+        manual:
+            295676: "merged"
+            295755: "Stage_5"
+            295822: "Stage_5"
+            295913: "Stage_5"
+            296065: "Stage_5"
+            296068: "Stage_5"
+            296132: "Stage_5"
+            296133: "Stage_5"
+            296244: "Stage_5"
+            296270: "Stage_5"
+            296377: "Stage_5"
+            296414: "Stage_5"
+            296433: "Stage_5"
+            296550: "Stage_5"
+    child_2:
+        name: "LHC18r"
+        stage_to_download: "manual"
+        manual:
+            296694: "Stage_5"
+            296894: "Stage_5"
+            296899: "Stage_5"
+            296903: "merged"
+            296934: "Stage_5"
+            297193: "Stage_5"
+            297218: "Stage_5"
+            297221: "Stage_5"
+            297380: "Stage_5"
+            297415: "merged"
+            297446: "Stage_5"
+            297450: "Stage_5"
+            297544: "Stage_5"
+            297590: "Stage_5"
+status: |
+    "Substructure embedding semi-central, record all splittings. Double counting cut applied (with fix),"
+    " updated to pass 3, Rmax=0.05 systematic."
