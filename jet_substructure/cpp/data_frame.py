@@ -388,6 +388,117 @@ def _substructure_hists(
     return hists
 
 
+def run_embedded_pt_hard_scaling(  # noqa: C901
+    collision_system: str,
+    input_filenames: Sequence[Path],
+    tree_name: str,
+    prefixes: Sequence[str],
+    grooming_method: str,
+    jet_R: float,
+    output_filename: Path,
+    jet_pt_prefix_first: bool = False,
+    n_cores: int = 8,
+    cross_check_task: bool = False,
+) -> Tuple[bool, str]:
+    # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
+
+    # Setup
+    smeared_cut_prefix = "hybrid" if collision_system == "embedPythia" else "data"
+    # Parameters
+    jet_pt_column_format = "{prefix}_jet_pt" if jet_pt_prefix_first else "jet_pt_{prefix}"
+
+    # Delay ROOT import so we don't explicitly rely on it.
+    import ROOT
+
+    # Setup for ROOT
+    # Enable multithreading
+    ROOT.ROOT.EnableImplicitMT(n_cores)
+    # Sumw2
+    ROOT.TH1.SetDefaultSumw2(True)
+
+    # Setup tree
+    main_tree = ROOT.TChain(tree_name)
+    for filename in input_filenames:
+        main_tree.Add(str(filename))
+    if cross_check_task:
+        friend_tree = ROOT.TChain("tree")
+        for filename in input_filenames:
+            friend_tree.Add(str(filename.parent.parent / "scale_factor" / filename.name))
+        # Add friends with scale factors
+        main_tree.AddFriend(friend_tree)
+
+    # Keep the fully original DF so we can see everything applied to it.
+    df_true_original = ROOT.RDataFrame(main_tree)
+    df_original = df_true_original
+
+    if cross_check_task:
+        # Add the aliases. This has to be done after the df is defined because apparently they don't carry over.
+        renames = skim_analysis_objects.cross_check_task_branch_name_shim(
+            grooming_method=grooming_method, input_branches=df_original.GetColumnNames()
+        )
+        for k, v in renames.items():
+            df_original = df_original.Alias(k, v)
+
+    # Add scale factor column with 1s if it doesn't exist yet.
+    if "scale_factor" not in df_original.GetColumnNames():
+        logger.info("Defining scale_factor column")
+        df_original = df_original.Define("scale_factor", "1")
+
+    # Apply general cuts.
+    # Double counting must be applied for embedding.
+    if collision_system == "embedPythia":
+        double_counting_cut = "det_level_leading_track_pt >= hybrid_leading_track_pt"
+        df_original = df_original.Filter(double_counting_cut)
+
+    hists = []
+    # We simply want the scaled true jet spectra.
+    # No additional cuts.
+    hists.append(
+        df_original.Histo1D(
+            ("true_pt_spectra", "true_pt_spectra", 200, 0, 200),
+            f"{jet_pt_column_format.format(prefix='true')}",
+            "scale_factor",
+        )
+    )
+    # And with the hybrid pt cut.
+    jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= 40 && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < 120"
+    df = df_original.Filter(jet_pt_cut)
+    hists.append(
+        df.Histo1D(
+            (
+                f"true_pt_spectra_{jet_pt_column_format.format(prefix=smeared_cut_prefix)}_40_120",
+                f"true_pt_spectra_{jet_pt_column_format.format(prefix=smeared_cut_prefix)}_40_120",
+                200,
+                0,
+                200,
+            ),
+            f"{jet_pt_column_format.format(prefix='true')}",
+            "scale_factor",
+        )
+    )
+
+    # Calculate the DataFrame by forcing it determine a property.
+    # Discard the result - we don't really care. We just need a meaningless property.
+    logger.info("Calculating DF...")
+    hists[0].GetEntries()
+
+    logger.info(f"Creating output file for {collision_system}, {grooming_method}, {prefixes}")
+    logger.info(f"Writing to {output_filename}")
+    output = ROOT.TFile(str(output_filename), "RECREATE")
+    output.cd()
+    for h in hists:
+        h.SetDirectory(output)
+        # Why doesn't h.Write() work? Because ROOT. It fucking sucks.
+        # h.Write()
+    output.Write()
+    # output.ls()
+    output.Close()
+
+    logger.info("Done!")
+
+    return (True, "Processed")
+
+
 def run_create_closure_ratio(  # noqa: C901
     collision_system: str,
     input_filenames: Sequence[Path],
@@ -402,7 +513,6 @@ def run_create_closure_ratio(  # noqa: C901
     n_cores: int = 8,
     cross_check_task: bool = False,
 ) -> Tuple[bool, str]:
-    # TODO: I think I can just refactor this in the standard case...?
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
 
     # Setup
@@ -410,7 +520,7 @@ def run_create_closure_ratio(  # noqa: C901
     # Parameters
     jet_pt_column_format = "{prefix}_jet_pt" if jet_pt_prefix_first else "jet_pt_{prefix}"
 
-    # Check for existing file. If it sexists, check that the binning is the same.
+    # Check for existing file. If it exists, check that the binning is the same.
     # We do this check early because it allows us to bail out it it already exists.
     if output_filename.exists():
         with uproot.open(output_filename) as f:

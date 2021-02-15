@@ -1369,6 +1369,49 @@ def _root_data_frame_closure(
     return res
 
 
+@python_app  # type: ignore
+def _root_data_frame_embedded_pt_hard_scaling(
+    collision_system: str,
+    tree_name: str,
+    prefixes: Sequence[str],
+    grooming_method: str,
+    jet_R: float,
+    n_cores: int,
+    cross_check_task: bool,
+    inputs: MutableSequence[File] = [],
+    outputs: MutableSequence[File] = [],
+) -> AppFuture:
+    """ROOT data frame pt hard scaling app.
+
+    We keep them separate even though they are quite similar so their app names will be different.
+    Since they're so simple, this isn't a big sacrifice.
+    """
+    import random
+    from pathlib import Path
+
+    from jet_substructure.cpp import data_frame
+
+    # Shuffle inputs
+    # Randomize the input list so we don't always hit the same files at the same time.
+    # Note: It randomizes in place.
+    random.shuffle(inputs)
+
+    res = data_frame.run_embedded_pt_hard_scaling(
+        collision_system=collision_system,
+        input_filenames=[Path(f.filepath) for f in inputs],
+        tree_name=tree_name,
+        prefixes=prefixes,
+        grooming_method=grooming_method,
+        jet_R=jet_R,
+        output_filename=Path(outputs[0].filepath),
+        jet_pt_prefix_first=True,
+        n_cores=n_cores,
+        cross_check_task=cross_check_task,
+    )
+
+    return res
+
+
 @attr.s
 class RootDataFrameProcessingMode:
     name: str = attr.ib()
@@ -1404,6 +1447,11 @@ def setup_root_data_frame(
             name="closure",
             tag="closure",
             func=_root_data_frame_closure,
+        ),
+        RootDataFrameProcessingMode(
+            name="embedded_pt_hard_scaling",
+            tag="embedded_pt_hard_scaling",
+            func=_root_data_frame_embedded_pt_hard_scaling,
         ),
     ]
     if processing_mode not in [p.name for p in _processing_modes]:
@@ -1452,6 +1500,9 @@ def setup_root_data_frame(
     for grooming_method in grooming_methods:
         # Setup file IO
         tag = f"_{mode.tag}" if mode.tag else ""
+        # If we have a single train, then append the train number to the tag.
+        if selected_train_numbers and len(selected_train_numbers) == 1:
+            tag += f"_{selected_train_numbers[0]}"
         output_file = (
             output_dir / f"{dataset_config['name']}_{grooming_method}_prefixes_{'_'.join(prefixes.keys())}{tag}.root"
         )
@@ -1469,6 +1520,34 @@ def setup_root_data_frame(
                 inputs=[r.outputs[0] for r in input_results] if input_results else input_files,
                 outputs=[parsl_output_file],
                 **optional_kwargs,
+            )
+        )
+
+    return results
+
+
+def embedded_pt_hard_scaling_cross_check(
+    collision_system: str,
+    n_cores_per_job: int,
+    dataset_config: Mapping[str, Any],
+    grooming_methods: Sequence[str],
+) -> List[AppFuture]:
+    results = []
+
+    # Assume that we have on train per line. That's usually a pretty good assumption.
+    # Each one will be written to separate files.
+    train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
+    for train_directory in sorted(train_directories):
+        results.extend(
+            setup_root_data_frame(
+                processing_mode="embedded_pt_hard_scaling",
+                collision_system=collision_system,
+                n_cores_per_job=n_cores_per_job,
+                dataset_config=dataset_config,
+                # Take just the first grooming method - they'll all be the same because we don't care
+                # about the grooming method for this check.
+                grooming_methods=[grooming_methods[0]],
+                selected_train_numbers=[int(train_directory.name)],
             )
         )
 
@@ -1922,7 +2001,7 @@ def setup_all_unfolding(  # noqa: C901
 if __name__ == "__main__":  # noqa: C901
     # Settings
     # Base settings
-    base_dataset_name = "PbPb_central_R02_pass1"
+    base_dataset_name = "PbPb_semi_central_R04_pass3"
     dataset_type = "nominal"
     collision_system = "embedPythia"
 
@@ -1931,10 +2010,11 @@ if __name__ == "__main__":  # noqa: C901
         # "repair_root_files",
         # "convert_to_parquet",
         # "calculate_embedding_skim",
+        "root_data_frame_embedded_pt_hard_scaling",
         # "root_data_frame_response",
-        "unfolding",
+        # "unfolding",
     ]
-    nodes_to_allocate = 1
+    nodes_to_allocate = 5
     jobs_per_node = 4
     entries_per_job = int(1e5)
 
@@ -1959,6 +2039,7 @@ if __name__ == "__main__":  # noqa: C901
         "extract_scale_factors_for_embedding",
         "calculate_embedding_skim",
         "calculate_data_skim",
+        "root_data_frame_embedded_pt_hard_scaling",
         "root_data_frame",
         "root_data_frame_response",
         "root_data_frame_closure",
@@ -1967,6 +2048,7 @@ if __name__ == "__main__":  # noqa: C901
     _jobs_requiring_root = [
         "repair_root_files",
         "extract_scale_factors_for_embedding",
+        "root_data_frame_embedded_pt_hard_scaling",
         "root_data_frame",
         "root_data_frame_response",
         "root_data_frame_closure",
@@ -2109,6 +2191,16 @@ if __name__ == "__main__":  # noqa: C901
             input_results=results if results else None,
         )
         all_results.extend(rdf_results)
+    if "root_data_frame_embedded_pt_hard_scaling" in jobs_to_execute:
+        # We're doing something special here, so we don't want previous job inputs.
+        all_results.extend(
+            embedded_pt_hard_scaling_cross_check(
+                collision_system=collision_system,
+                n_cores_per_job=n_cores_per_job,
+                dataset_config=dataset_config,
+                grooming_methods=grooming_methods,
+            )
+        )
     if "root_data_frame_closure" in jobs_to_execute:
         # We'll always want both, so let's just do both.
         temp_results = []
@@ -2133,11 +2225,11 @@ if __name__ == "__main__":  # noqa: C901
             grooming_methods=grooming_methods,
             n_cores_per_job=n_cores_per_job,
             selected_unfolding_settings=[
-                # "default",
+                "default",
                 # "default_kt_1",
-                # "default_kt_1.5",
+                "default_kt_1.5",
                 "default_no_untagged",
-                "default_kt_1_no_untagged",
+                # "default_kt_1_no_untagged",
                 "default_kt_1.5_no_untagged",
                 # "default_kt_2_6",
             ],
