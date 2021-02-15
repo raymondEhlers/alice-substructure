@@ -11,4 +11,4 @@ alien_output_info:
         name: "LHC18q"
         stage_to_download: "merged"
 status: |
-    "Recorded all recursive splittings in central data. Rmax=0.25, nominal settings."
+    "Recorded all recursive splittings in central data, R=0.2. Rmax=0.25, nominal settings."
