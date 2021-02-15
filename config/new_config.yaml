@@ -279,6 +279,20 @@ available_datasets:
         jet_R: 0.4
         files:
             - "trains/PbPb/6673/AnalysisResults.*.repaired.root"
+    LHC18qr_semi_central_R04_Rmax005_6748: &LHC18qr_semi_central_R04_Rmax005
+        name: "LHC18qr_semi_central_R04_Rmax005_6748"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.4
+        files:
+            - "trains/PbPb/6748/AnalysisResults.*.repaired.root"
     # Embedded pythia
     # LHC19f4 embedded into LHC18qr semi-central R = 0.4 for pass1 AOD
     LHC19f4_embedded_into_LHC18qr_semi_central_R04_5966_5985: &LHC18qr_semi_central_R04_pass1_embedded
@@ -555,6 +569,42 @@ available_datasets:
             - "trains/embedPythia/6647/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/6648/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/6649/AnalysisResults.*.repaired.root"
+    # Systematic: Rmax = 0.05
+    LHC20g4_embedded_into_LHC18qr_semi_central_R04_Rmax005_6674_6693: &LHC18qr_semi_central_R04_embedded_Rmax005
+        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R04_Rmax005_6674_6693"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "data"
+            "true": "matched"
+            det_level: "detLevel"
+        # Branches which don't contain a prefix
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.4
+        files:
+            - "trains/embedPythia/6674/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6675/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6676/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6677/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6678/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6679/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6680/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6681/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6682/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6683/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6684/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6685/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6686/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6687/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6688/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6689/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6690/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6691/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6692/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6693/AnalysisResults.*.repaired.root"
     # Central PbPb
     # Central R = 0.2 data for pass1 AOD
     LHC18qr_central_R02_6359: &LHC18qr_central_R02
@@ -691,8 +741,8 @@ analysis_configurations:
                 PbPb: *LHC18qr_semi_central_R04
                 embedPythia: null  #*LHC18qr_semi_central_R04_embedded_tracking_efficiency
             rmax_005:
-                PbPb: null  #*LHC18qr_semi_central_R04_Rmax005
-                embedPythia: null  #*LHC18qr_semi_central_R04_embedded_Rmax005
+                PbPb: *LHC18qr_semi_central_R04_Rmax005
+                embedPythia: *LHC18qr_semi_central_R04_embedded_Rmax005
             rmax_070:
                 PbPb: *LHC18qr_semi_central_R04_Rmax070
                 embedPythia: *LHC18qr_semi_central_R04_embedded_Rmax070
@@ -701,7 +751,7 @@ analysis_configurations:
             nominal_binning:
                 true_jet_pt: [0, 30, 40, 60, 80, 100, 120, 160]
                 smeared_jet_pt: [30, 40, 50, 60, 80, 100, 120]
-                true_kt: [-0.05, 0, 2, 3, 4, 5, 7, 9, 15, 100]
+                true_kt: [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100]
                 smeared_kt: [1, 2, 3, 4, 5, 7, 10, 15]
             settings:
                 default:
@@ -713,6 +763,32 @@ analysis_configurations:
                     #       - value of untaggecd max upper bin.
                     reweight_prior: False
                     datasets: "nominal"
+                default_no_untagged:
+                    label: ""
+                    closures: False
+                    reweight_prior: False
+                    datasets: "nominal"
+                    binning:
+                        # No untagged means that we repeat what would have been the untagged bins.
+                        true_kt: [0, 2, 3, 4, 5, 7, 10, 15, 100]
+                        smeared_kt: [2, 2, 3, 4, 5, 7, 10, 15]
+                default_kt_1.5:
+                    label: ""
+                    closures: False
+                    reweight_prior: False
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 5, 7, 10, 15, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 5, 7, 10, 15]
+                default_kt_1.5_no_untagged:
+                    label: ""
+                    closures: False
+                    reweight_prior: False
+                    datasets: "nominal"
+                    binning:
+                        # No untagged means that we repeat what would have been the untagged bins.
+                        true_kt: [0, 1.5, 2, 3, 4, 5, 7, 10, 15, 100]
+                        smeared_kt: [1.5, 1.5, 2, 3, 4, 5, 7, 10, 15]
                 # TODO: Here, we can make new labels with each new binning variety.
                 tracking_efficiency:
                     label: "tracking_efficiency"
