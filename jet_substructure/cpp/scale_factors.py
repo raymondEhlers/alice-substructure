@@ -229,22 +229,25 @@ def scale_factor_from_hists(n_accepted_events: int, n_entries: int, cross_sectio
         n_entries=n_entries,
     )
 
-    return scale_factor.value()
+    # return scale_factor.value()
+    return scale_factor
 
 
 def test() -> None:
     scale_factors_ROOT = {}
     scale_factors_uproot = {}
-    train_numbers = list(range(6316, 6318))
+    # train_numbers = list(range(6316, 6318))
+    train_numbers = [6650, 6659]
 
     base_path = Path("trains/embedPythia/{train_number}/AnalysisResults.*.repaired.root")
     for train_number in train_numbers:
+        logger.info(f"train_number: {train_number}")
         scale_factors_ROOT[train_number] = scale_factor_from_hists(
             *scale_factor_ROOT_wrapper(base_path=base_path, train_number=train_number)
         )
-        scale_factors_uproot[train_number] = scale_factor_from_hists(
-            *scale_factor_uproot_wrapper(base_path=base_path, train_number=train_number, run_despite_issues=True)
-        )
+        # scale_factors_uproot[train_number] = scale_factor_from_hists(
+        #    *scale_factor_uproot_wrapper(base_path=base_path, train_number=train_number, run_despite_issues=True)
+        # )
         # res_ROOT = scale_factor_ROOT(base_path=base_path, train_number=train_number)
         # res_uproot = scale_factor_uproot(base_path=base_path, train_number=train_number)
 
@@ -253,10 +256,10 @@ def test() -> None:
         y.dump(scale_factors_ROOT, f)
 
     print(f"scale_factors_ROOT: {scale_factors_ROOT}")
-    print(f"scale_factors_uproot: {scale_factors_uproot}")
+    # print(f"scale_factors_uproot: {scale_factors_uproot}")
     import IPython
 
-    IPython.embed()
+    IPython.start_ipython(user_ns=locals())
 
 
 if __name__ == "__main__":

@@ -79,7 +79,7 @@ def read_dataset_config(base_dataset_name: str, config_path: Optional[Path] = No
 def read_extracted_scale_factors(
     collision_system: str,
     dataset_name: str,
-    normalize_scale_factors: bool = True,
+    normalize_scale_factors: bool = False,
 ) -> Dict[int, float]:
     """Read extracted scale factors.
 
@@ -1404,7 +1404,9 @@ def _root_data_frame_embedded_pt_hard_scaling(
         grooming_method=grooming_method,
         jet_R=jet_R,
         output_filename=Path(outputs[0].filepath),
-        jet_pt_prefix_first=True,
+        # Workaround for older pythia productions that we can't reskim so easily.
+        # We can remove this eventually when train 2110 is replaced.
+        jet_pt_prefix_first=collision_system != "pythia",
         n_cores=n_cores,
         cross_check_task=cross_check_task,
     )
@@ -2014,7 +2016,7 @@ if __name__ == "__main__":  # noqa: C901
         # "root_data_frame_response",
         # "unfolding",
     ]
-    nodes_to_allocate = 5
+    nodes_to_allocate = 1
     jobs_per_node = 4
     entries_per_job = int(1e5)
 

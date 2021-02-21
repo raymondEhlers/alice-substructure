@@ -450,13 +450,21 @@ def run_embedded_pt_hard_scaling(  # noqa: C901
         double_counting_cut = "det_level_leading_track_pt >= hybrid_leading_track_pt"
         df_original = df_original.Filter(double_counting_cut)
 
+    # Emulate the double counting cut
+    if collision_system == "pythia":
+        df_original = df_original.Filter("pt_hard >= 10")
+
+    # Workaround for older pythia productions that we can't reskim so easily.
+    # We can remove this eventually when train 2110 is replaced.
+    true_prefix = "matched" if collision_system == "pythia" else "true"
+
     hists = []
     # We simply want the scaled true jet spectra.
     # No additional cuts.
     hists.append(
         df_original.Histo1D(
             ("true_pt_spectra", "true_pt_spectra", 200, 0, 200),
-            f"{jet_pt_column_format.format(prefix='true')}",
+            f"{jet_pt_column_format.format(prefix=true_prefix)}",
             "scale_factor",
         )
     )
@@ -472,10 +480,20 @@ def run_embedded_pt_hard_scaling(  # noqa: C901
                 0,
                 200,
             ),
-            f"{jet_pt_column_format.format(prefix='true')}",
+            f"{jet_pt_column_format.format(prefix=true_prefix)}",
             "scale_factor",
         )
     )
+
+    # Add the plots as a function of hybrid pt (if we can)
+    if collision_system == "embedPythia":
+        hists.append(
+            df_original.Histo1D(
+                ("hybrid_pt_spectra", "hybrid_pt_spectra", 200, 0, 200),
+                f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)}",
+                "scale_factor",
+            )
+        )
 
     # Calculate the DataFrame by forcing it determine a property.
     # Discard the result - we don't really care. We just need a meaningless property.
