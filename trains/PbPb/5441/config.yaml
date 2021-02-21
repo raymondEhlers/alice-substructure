@@ -1,9 +1,0 @@
----
-train: "Jets_EMC_PbPb"
-trainNumber: 5441
-production: "LHC17{q,r}"
-alienOutputDir:
-    LHC17q: "/alice/cern.ch/user/a/alitrain/PWGJE/Jets_EMC_PbPb/5441_20200210-1752_child_2/merge"
-    LHC17r: "/alice/cern.ch/user/a/alitrain/PWGJE/Jets_EMC_PbPb/5441_20200210-1752_child_1/merge"
-status: |
-    "First pass at jet splittings on PbPb data."
