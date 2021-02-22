@@ -279,6 +279,7 @@ available_datasets:
         jet_R: 0.4
         files:
             - "trains/PbPb/6673/AnalysisResults.*.repaired.root"
+    # Rmax = 0.05 systmeatic.
     LHC18qr_semi_central_R04_Rmax005_6748: &LHC18qr_semi_central_R04_Rmax005
         name: "LHC18qr_semi_central_R04_Rmax005_6748"
         # yamllint disable-line rule:line-length
@@ -642,6 +643,58 @@ available_datasets:
             - "trains/embedPythia/6712/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/6713/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/6714/AnalysisResults.*.repaired.root"
+    # Semi-central PbPb R = 0.2
+    # Semi-central data R = 0.2 for pass3 AOD
+    LHC18qr_semi_central_R02_6765: &LHC18qr_semi_central_R02
+        name: "LHC18qr_semi_central_R02_6765"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't contain a prefix
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        files:
+            - "trains/PbPb/6765/AnalysisResults.*.repaired.root"
+    # LHC20g4 embedded into LHC18qr semi-central R = 0.2 for pass3 AOD
+    LHC20g4_embedded_into_LHC18qr_semi_central_R02_6798_6817: &LHC18qr_semi_central_R02_embedded
+        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_6798_6817"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "data"
+            "true": "matched"
+            det_level: "detLevel"
+        # Branches which don't exist for all prefixes
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        files:
+            - "trains/embedPythia/6798/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6799/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6800/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6801/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6802/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6803/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6804/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6805/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6806/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6807/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6808/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6809/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6810/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6811/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6812/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6813/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6814/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6815/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6816/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6817/AnalysisResults.*.repaired.root"
     # Central PbPb
     # Central R = 0.2 data for pass1 AOD
     LHC18qr_central_R02_6359: &LHC18qr_central_R02
