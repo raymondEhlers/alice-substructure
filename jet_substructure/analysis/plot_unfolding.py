@@ -49,7 +49,6 @@ def _efficiency_substructure_variable(
 
         # Select true pt range.
         selection = slice(bh.loc(true_jet_pt_range.min), bh.loc(true_jet_pt_range.max), bh.sum)
-        # Only project if necessary
         cut = binned_data.BinnedData.from_existing_data(bh_cut_efficiency[:, selection])
         full = binned_data.BinnedData.from_existing_data(bh_full_efficiency[:, selection])
 
@@ -230,7 +229,7 @@ class UnfoldingOutput:
     def __attrs_post_init__(self) -> None:
         # Fully setup base dir.
         # NOTE: Added "parsl" for the newer output results.
-        self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl"
+        self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "feb2021_test"
 
         # Initialize the file if the histograms aren't specified.
         if not self.hists:
@@ -1873,7 +1872,8 @@ def plot_kt_unfolding(
             ),
             unfolded_hists={
                 n_iter: unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
-                for n_iter in unfolding_output.n_iter_range_to_plot()
+                # for n_iter in unfolding_output.n_iter_range_to_plot()
+                for n_iter in range(1, unfolding_output.n_iter_compare + 5)
             },
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
@@ -1904,7 +1904,12 @@ def plot_kt_unfolding(
                     pb.Panel(
                         axes=[
                             # pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 8)),
+                            # Take advantage of the smeared and true level substructure var being the same range.
+                            pb.AxisConfig(
+                                "x",
+                                label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                                range=(-0.5, unfolding_output.smeared_var_range.max),
+                            ),
                             pb.AxisConfig(
                                 "y",
                                 label="Ratio to true",
@@ -1930,7 +1935,8 @@ def plot_kt_unfolding(
             ),
             unfolded_hists={
                 n_iter: unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
-                for n_iter in unfolding_output.n_iter_range_to_plot()
+                # for n_iter in unfolding_output.n_iter_range_to_plot()
+                for n_iter in range(1, unfolding_output.n_iter_compare + 5)
             },
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
@@ -1960,7 +1966,12 @@ def plot_kt_unfolding(
                     ),
                     pb.Panel(
                         axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
+                            # Take advantage of the smeared and true level substructure var being the same range.
+                            pb.AxisConfig(
+                                "x",
+                                label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                                range=(-0.5, unfolding_output.smeared_var_range.max),
+                            ),
                             pb.AxisConfig(
                                 "y",
                                 label="Ratio to true",
@@ -1986,7 +1997,8 @@ def plot_kt_unfolding(
             ),
             unfolded_hists={
                 n_iter: unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
-                for n_iter in unfolding_output.n_iter_range_to_plot()
+                # for n_iter in unfolding_output.n_iter_range_to_plot()
+                for n_iter in range(1, unfolding_output.n_iter_compare + 5)
             },
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
@@ -2016,7 +2028,12 @@ def plot_kt_unfolding(
                     ),
                     pb.Panel(
                         axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(-0.5, 15)),
+                            # Take advantage of the smeared and true level substructure var being the same range.
+                            pb.AxisConfig(
+                                "x",
+                                label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                                range=(-0.5, unfolding_output.smeared_var_range.max),
+                            ),
                             pb.AxisConfig(
                                 "y",
                                 label="Ratio to true",
@@ -2030,6 +2047,7 @@ def plot_kt_unfolding(
             plot_png=plot_png,
         )
         # Unfolded jet pt
+        # First, over the full kt range.
         true_substructure_variable_range = helpers.KtRange(-1, 100)
         text = f"${true_substructure_variable_range.display_str(label='true')}$"
         plot_unfolded(
@@ -2044,10 +2062,66 @@ def plot_kt_unfolding(
                 n_iter: unfolding_output.unfolded_jet_pt(
                     n_iter=n_iter, true_substructure_variable_range=true_substructure_variable_range
                 )
-                for n_iter in unfolding_output.n_iter_range_to_plot()
+                # for n_iter in unfolding_output.n_iter_range_to_plot()
+                for n_iter in range(1, unfolding_output.n_iter_compare + 5)
             },
             plot_config=pb.PlotConfig(
                 name="unfolded_pt",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
+                        ],
+                        legend=pb.LegendConfig(location="lower left", ncol=2),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"Ratio to iter {unfolding_output.n_iter_compare}",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to true",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            ),
+            plot_png=plot_png,
+        )
+        # Since our smeared and true kt ranges usually match, we'll restrict it here.
+        true_substructure_variable_range = unfolding_output.smeared_var_range  # type: ignore
+        text = f"${true_substructure_variable_range.display_str(label='true')}$"
+        plot_unfolded(
+            unfolding_output=unfolding_output,
+            hist_true=unfolding_output.true_jet_pt(
+                unfolding_output.true_hist_name, true_substructure_variable_range=true_substructure_variable_range
+            ),
+            hist_n_iter_compare=unfolding_output.unfolded_jet_pt(
+                unfolding_output.n_iter_compare, true_substructure_variable_range=true_substructure_variable_range
+            ),
+            unfolded_hists={
+                n_iter: unfolding_output.unfolded_jet_pt(
+                    n_iter=n_iter, true_substructure_variable_range=true_substructure_variable_range
+                )
+                # for n_iter in unfolding_output.n_iter_range_to_plot()
+                for n_iter in range(1, unfolding_output.n_iter_compare + 5)
+            },
+            plot_config=pb.PlotConfig(
+                # Display with f"unfolded_pt_true_{unfolding_output.smeared_var_range}"
+                name=f"unfolded_pt_true_{str(true_substructure_variable_range)}",
                 panels=[
                     # Main panel
                     pb.Panel(
