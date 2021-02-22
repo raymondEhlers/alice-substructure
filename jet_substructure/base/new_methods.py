@@ -206,14 +206,9 @@ ak.behavior["*", "JetConstituent"] = JetConstituentArray
 class SubjetCommon:
     """ Common subjet related methods. """
 
-    part_of_iterative_splitting: bool
-    parent_splitting_index: int
+    part_of_iterative_splitting: ArrayOrScalar[bool]
+    parent_splitting_index: ArrayOrScalar[int]
     constituents_indices: UprootArray[int]
-
-    @property
-    def iterative_splitting_index(self) -> UprootArray[int]:
-        """ Indices of splittings which were part of the iterative splitting chain. """
-        return self.parent_splitting_index[self.part_of_iterative_splitting]
 
     @typing.overload
     def parent_splitting(self, splittings: UprootArray[JetSplittingArray]) -> JetSplittingArray:
@@ -249,6 +244,11 @@ class SubjetArray(ak.Array, SubjetCommon):  # type: ignore
     parent_splitting_index: UprootArray[int]
     constituents_indices: UprootArray[int]
 
+    @property
+    def iterative_splitting_index(self) -> UprootArray[int]:
+        """ Indices of splittings which were part of the iterative splitting chain. """
+        return self.parent_splitting_index[self.part_of_iterative_splitting]
+
 
 # Register behavior
 ak.behavior["Subjet"] = Subjet
@@ -258,10 +258,10 @@ ak.behavior["*", "Subjet"] = SubjetArray
 class JetSplittingCommon:
     """ Common jet splitting related methods. """
 
-    kt: float
-    delta_R: float
-    z: float
-    parent_index: int
+    kt: ArrayOrScalar[float]
+    delta_R: ArrayOrScalar[float]
+    z: ArrayOrScalar[float]
+    parent_index: ArrayOrScalar[int]
 
     @property
     def parent_pt(self) -> ArrayOrScalar[float]:
@@ -279,7 +279,7 @@ class JetSplittingCommon:
         # parent_pt = subleading / z = kt / sin(delta_R) / z
         return cast(UprootArray[float], self.kt / np.sin(self.delta_R) / self.z)
 
-    def theta(self, jet_R: float) -> float:
+    def theta(self, jet_R: float) -> ArrayOrScalar[float]:
         """Theta of the splitting.
 
         This is defined as delta_R normalized by the jet resolution parameter.
@@ -383,7 +383,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
         """
         return cast(SubjetArray, self[subjets.iterative_splitting_index])
 
-    def dynamical_core(self, R: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
+    def dynamical_core(self, R: float) -> Tuple[np.ndarray, UprootArray[int], UprootArray[int]]:
         """Dynamical core of the jet splittings.
 
         Args:
@@ -392,9 +392,9 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
             Leading dynamical core values, leading dynamical core indices, indices of all splittings.
         """
         values, indices = find_leading(dynamical_core(self.delta_R, self.z, self.parent_pt, R))
-        return values, indices, ak.Array(self.z.layout.localindex())
+        return values, indices, ak.local_index(self.z, axis=-1)
 
-    def dynamical_z(self, R: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
+    def dynamical_z(self, R: float) -> Tuple[np.ndarray, UprootArray[int], UprootArray[int]]:
         """Dynamical z of the jet splittings.
 
         Args:
@@ -403,9 +403,9 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
             Leading dynamical z values, leading dynamical z indices, indices of all splittings.
         """
         values, indices = find_leading(dynamical_z(self.delta_R, self.z, self.parent_pt, R))
-        return values, indices, ak.Array(self.z.layout.localindex())
+        return values, indices, ak.local_index(self.z, axis=-1)
 
-    def dynamical_kt(self, R: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
+    def dynamical_kt(self, R: float) -> Tuple[np.ndarray, UprootArray[int], UprootArray[int]]:
         """Dynamical kt of the jet splittings.
 
         Args:
@@ -414,9 +414,9 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
             Leading dynamical kt values, leading dynamical kt indices, indices of all splittings.
         """
         values, indices = find_leading(dynamical_kt(self.delta_R, self.z, self.parent_pt, R))
-        return values, indices, ak.Array(self.z.layout.localindex())
+        return values, indices, ak.local_index(self.z, axis=-1)
 
-    def dynamical_time(self, R: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
+    def dynamical_time(self, R: float) -> Tuple[np.ndarray, UprootArray[int], UprootArray[int]]:
         """Dynamical time of the jet splittings.
 
         Args:
@@ -425,11 +425,9 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
             Leading dynamical time values, leading dynamical time indices, indices of all splittings.
         """
         values, indices = find_leading(dynamical_time(self.delta_R, self.z, self.parent_pt, R))
-        return values, indices, ak.Array(self.z.layout.localindex())
+        return values, indices, ak.local_index(self.z, axis=-1)
 
-    def leading_kt(
-        self, z_cutoff: Optional[float] = None
-    ) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
+    def leading_kt(self, z_cutoff: Optional[float] = None) -> Tuple[np.ndarray, UprootArray[int], UprootArray[int]]:
         """Leading kt of the jet splittings.
 
         Args:
@@ -441,9 +439,9 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
         # z values, it it is applied to the unmasked array later, it will give nonsense. So we mask the local index,
         # find the leading, and then apply that index back to the local index, which then gives us the leading index
         # in the unmasked array.
-        indices_passing_cutoff = ak.Array(self.z.layout.localindex())
+        indices_passing_cutoff = ak.local_index(self.z, axis=-1)
         if z_cutoff is not None:
-            indices_passing_cutoff = ak.Array(self.z.layout.localindex())[self.z > z_cutoff]
+            indices_passing_cutoff = ak.local_index(self.z, axis=-1)[self.z > z_cutoff]
         values, indices = find_leading(self.kt[indices_passing_cutoff])
         return values, indices_passing_cutoff[indices], indices_passing_cutoff
 
@@ -463,7 +461,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
             First z passing cutoff (z_g), index of z passing cutoff, indices of all splittings which pass the cutoff.
         """
         z_cutoff_mask = self.z > z_cutoff
-        indices_passing_cutoff = ak.Array(self.z.layout.localindex())[z_cutoff_mask]
+        indices_passing_cutoff = ak.local_index(self.z, axis=-1)[z_cutoff_mask]
         # We use :1 because this maintains the jagged structure. That way, we can apply it to initial arrays.
         z_index = indices_passing_cutoff[:, :1]
         z_g = ak.flatten(ak.fill_none(ak.pad_none(self.z[z_index], 1), UNFILLED_VALUE))

@@ -72,6 +72,10 @@ class UprootArray(Collection[T]):
         ...
 
     @typing.overload
+    def __getitem__(self, key: np.ndarray) -> UprootArray[T]:
+        ...
+
+    @typing.overload
     def __getitem__(self, key: bool) -> T:
         ...
 
@@ -82,7 +86,16 @@ class UprootArray(Collection[T]):
     def __getitem__(self, key):  # type: ignore
         raise NotImplementedError("Just typing information.")
 
-    def __add__(self, other: int) -> UprootArray[int]:
+    def __add__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
+        raise NotImplementedError("Just typing information.")
+
+    def __radd__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
+        raise NotImplementedError("Just typing information.")
+
+    def __sub__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
+        raise NotImplementedError("Just typing information.")
+
+    def __rsub__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
         raise NotImplementedError("Just typing information.")
 
     def __mul__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:

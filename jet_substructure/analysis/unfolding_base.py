@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from functools import reduce
-from typing import Any, Optional, Type, cast
+from typing import Any, Optional, Type
 
 import attr
 import numpy as np
@@ -27,7 +27,7 @@ class AsymmetricErrors:
     def __eq__(self, other: Any) -> bool:
         if other.__class__ is not self.__class__:
             return NotImplemented
-        return cast(bool, np.allclose(self.low, other.low) and np.allclose(self.high, other.high))
+        return np.allclose(self.low, other.low) and np.allclose(self.high, other.high)
 
     @classmethod
     def calculate_errors(
@@ -124,7 +124,7 @@ def relative_error(*inputs: ErrorInput) -> np.ndarray:
         relative_error_squared = reduce(lambda x, y: ((x.error / x.value) ** 2) + ((y.error / y.value) ** 2), inputs)  # type: ignore
     else:
         relative_error_squared = (inputs[0].error / inputs[0].value) ** 2
-    return np.sqrt(relative_error_squared)
+    return np.sqrt(relative_error_squared)  # type: ignore
 
 
 def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelector) -> binned_data.BinnedData:
