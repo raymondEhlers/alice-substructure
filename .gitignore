@@ -3,6 +3,8 @@
 
 # Data
 trains
+trains/
+output
 output/
 
 # Virtualenv
@@ -13,6 +15,8 @@ env/
 temp/
 .vscode/
 bak/
+# Batch submission is now handled by parsl
+batch/
 
 # Python
 __pycache__/
@@ -32,3 +36,4 @@ jet_substructure.egg-info/
 bin/
 build/
 lib/
+
