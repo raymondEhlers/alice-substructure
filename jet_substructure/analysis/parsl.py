@@ -1866,20 +1866,6 @@ def setup_all_unfolding(  # noqa: C901
                 use_pure_matches=False,
             )
             settings[_default_settings.output_tag] = _default_settings
-            # TODO: Make these settings more formal and selectable.
-            # NOTE: Generate 5 random edges of 5% (+/-, so 10% total) with:
-            #       np.random.random_sample(5) / 10 + 0.95
-            #       it can then be multiplied with the inner binning.
-            #       Semi-central:
-            #       Standard binning:
-            #           true_bins=np.array([-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],, dtype=np.float64)
-            #           smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64)
-            #       Random binning: smeared_bins=np.array([1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15], dtype=np.float64),
-            #       Central:
-            #       Standard binning:
-            #           true_bins=np.array([-0.05, 0, 2, 3, 4, 8, 100], dtype=np.float64)
-            #           smeared_bins=np.array([1, 2, 3, 4, 8], dtype=np.float64),
-            #       Random binning: smeared_bins=np.array([1, 2, 3.02, 4.13, 8], dtype=np.float64)
 
             if unfolding_settings["closures"]:
                 # And then add the variations.
@@ -2209,8 +2195,6 @@ if __name__ == "__main__":  # noqa: C901
             )
         results.extend(temp_results)
     if "unfolding" in jobs_to_execute:
-        # TODO: Integrate configuring and running the systematics tasks with the tags.
-        #       There are now enough options that it's way too easy to make a mistake.
         results = setup_all_unfolding(
             base_dataset_config=base_dataset_config,
             grooming_methods=grooming_methods,
