@@ -13,37 +13,40 @@ from pachyderm import binned_data
 
 @attr.s
 class ScaleFactor:
+    """Store scale factors for a particular pt hard bin.
+
+    In the case of going event-by-event in pythia, we would scale by cross_section / n_trials
+    for that bin. However, if we're going by the single histograms per output file, it gets a
+    good deal more complicated. This calculation has evolved significantly once we thought about
+    this carefully and ran a bunch of tests. The right answer is simply cross_section / n_trials_total
+    where n_trials_total much be the n_trials for the _entire_ pt hard bin!
+
+    Attributes:
+        cross_section: Cross section.
+        n_trials_total: Total number of trials from the whole pt hard bin.
+    """
+
     # float cast to ensure that we get a standard float instead of an np.float
     cross_section: float = attr.ib(converter=float)
-    n_trials: int = attr.ib(converter=int)
+    n_trials_total: int = attr.ib(converter=int)
     n_entries: int = attr.ib(converter=int)
     n_accepted_events: int = attr.ib(converter=int)
 
     def value(self) -> float:
         """Value of the scale factor.
 
-        NOTE:
-            Leticia's integral method (copied below) is the same as above if we didn't scale by n_entries.
-            However, I've historically scaled by n_entries, and will continue to do so here.
-            `scaleFactor = hcross->Integral(ptHardBin, ptHardBin) / htrials->Integral(ptHardBin, ptHardBin);`.
-
-        NOTE:
-            It is the user's responsibility to utilize the number of accepted events to normalize the
-            scale factors.
-
         Args:
             None.
         Returns:
             Scale factor calculated based on the extracted values.
         """
-        return self.cross_section * self.n_entries / self.n_trials
+        return self.cross_section / self.n_trials_total
 
     @classmethod
     def from_hists(
         cls: Type["ScaleFactor"], n_accepted_events: int, n_entries: int, cross_section: Any, n_trials: Any
     ) -> "ScaleFactor":
-        # Validation
-        # (and for convenience)
+        # Validation (ensure that hists are valid)
         h_cross_section = binned_data.BinnedData.from_existing_data(cross_section)
         h_n_trials = binned_data.BinnedData.from_existing_data(n_trials)
 
@@ -54,7 +57,7 @@ class ScaleFactor:
 
         return cls(
             cross_section=h_cross_section.values[pt_hard_bin],
-            n_trials=h_n_trials.values[pt_hard_bin],
+            n_trials_total=h_n_trials.values[pt_hard_bin],
             n_entries=n_entries,
             n_accepted_events=n_accepted_events,
         )

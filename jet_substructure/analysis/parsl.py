@@ -79,14 +79,12 @@ def read_dataset_config(base_dataset_name: str, config_path: Optional[Path] = No
 def read_extracted_scale_factors(
     collision_system: str,
     dataset_name: str,
-    normalize_scale_factors: bool = False,
 ) -> Dict[int, float]:
     """Read extracted scale factors.
 
     Args:
         collision_system: Name of the collision system.
         dataset_name: Name of the dataset.
-        normalize_scale_factors: If True, normalize the scale factors based on the number of accepted events.
 
     Returns:
         Normalized scaled factors
@@ -96,16 +94,7 @@ def read_extracted_scale_factors(
     with open(p, "r") as f:
         scale_factors: Dict[int, skim_analysis_objects.ScaleFactor] = y.load(f)
 
-    # Normalize scale factors based on the number of entries.
-    if normalize_scale_factors:
-        average_number_of_events = sum([v.n_accepted_events for v in scale_factors.values()]) / len(scale_factors)
-        normalized_scale_factors = {
-            pt_hard_bin: v.value() / (v.n_accepted_events / average_number_of_events)
-            for pt_hard_bin, v in scale_factors.items()
-        }
-        return normalized_scale_factors
-    else:
-        return {pt_hard_bin: v.value() for pt_hard_bin, v in scale_factors.items()}
+    return {pt_hard_bin: v.value() for pt_hard_bin, v in scale_factors.items()}
 
 
 def setup_parsl_587(

@@ -221,7 +221,9 @@ def embedded_pt_hard_spectra(
     return True
 
 
-def scale_factor_from_hists(n_accepted_events: int, n_entries: int, cross_section: Any, n_trials: Any) -> float:
+def scale_factor_from_hists(
+    n_accepted_events: int, n_entries: int, cross_section: Any, n_trials: Any
+) -> skim_analysis_objects.ScaleFactor:
     scale_factor = skim_analysis_objects.ScaleFactor.from_hists(
         n_accepted_events=n_accepted_events,
         cross_section=cross_section,
@@ -229,13 +231,12 @@ def scale_factor_from_hists(n_accepted_events: int, n_entries: int, cross_sectio
         n_entries=n_entries,
     )
 
-    # return scale_factor.value()
     return scale_factor
 
 
 def test() -> None:
     scale_factors_ROOT = {}
-    scale_factors_uproot = {}
+    # scale_factors_uproot = {}
     # train_numbers = list(range(6316, 6318))
     train_numbers = [6650, 6659]
 
