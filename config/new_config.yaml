@@ -605,6 +605,43 @@ available_datasets:
             - "trains/embedPythia/6691/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/6692/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/6693/AnalysisResults.*.repaired.root"
+    # Systematic: Tracking efficiency
+    # yamllint disable-line rule:line-length
+    LHC20g4_embedded_into_LHC18qr_semi_central_R04__tracking_efficiency_6695_6714: &LHC18qr_semi_central_R04_embedded_tracking_efficiency
+        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R04__tracking_efficiency_6695_6714"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "data"
+            "true": "matched"
+            det_level: "detLevel"
+        # Branches which don't contain a prefix
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.4
+        files:
+            - "trains/embedPythia/6695/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6696/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6697/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6698/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6699/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6700/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6701/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6702/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6703/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6704/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6705/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6706/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6707/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6708/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6709/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6710/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6711/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6712/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6713/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6714/AnalysisResults.*.repaired.root"
     # Central PbPb
     # Central R = 0.2 data for pass1 AOD
     LHC18qr_central_R02_6359: &LHC18qr_central_R02
@@ -739,7 +776,7 @@ analysis_configurations:
                 embedPythia: *LHC18qr_semi_central_R04_embedded
             tracking_efficiency:
                 PbPb: *LHC18qr_semi_central_R04
-                embedPythia: null  #*LHC18qr_semi_central_R04_embedded_tracking_efficiency
+                embedPythia: *LHC18qr_semi_central_R04_embedded_tracking_efficiency
             rmax_005:
                 PbPb: *LHC18qr_semi_central_R04_Rmax005
                 embedPythia: *LHC18qr_semi_central_R04_embedded_Rmax005
