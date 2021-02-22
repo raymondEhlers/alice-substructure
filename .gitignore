@@ -6,6 +6,10 @@ trains
 trains/
 output
 output/
+toyInput
+# Mazama specific (with copies on slow and fast drives)
+trains_HD
+trains_SSD
 
 # Virtualenv
 env/
