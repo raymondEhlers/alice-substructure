@@ -1986,14 +1986,14 @@ if __name__ == "__main__":  # noqa: C901
     jobs_to_execute = [
         # "repair_root_files",
         # "convert_to_parquet",
+        "extract_scale_factors_for_embedding",
         # "calculate_embedding_skim",
-        "root_data_frame_embedded_pt_hard_scaling",
+        # "root_data_frame_embedded_pt_hard_scaling",
         # "root_data_frame_response",
         # "unfolding",
     ]
-    nodes_to_allocate = 1
-    jobs_per_node = 4
-    entries_per_job = int(1e5)
+    nodes_to_allocate = 4
+    jobs_per_node = 8
 
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
     grooming_methods = [
@@ -2066,6 +2066,12 @@ if __name__ == "__main__":  # noqa: C901
     # Helpers
     base_dataset_config = read_dataset_config(base_dataset_name=base_dataset_name)
     dataset_config = base_dataset_config["datasets"][dataset_type][collision_system]
+
+    # Determine main settings
+    # How many events we split into each parquet file.
+    # This size is a balance: we need to be able to run many jobs in parallel, but we need
+    # to avoid using too much memory per job. Default: 1e5
+    entries_per_job = int(dataset_config.get("entries_per_job", 1e5))
     # If we have a cross check task, it only has the output from a limited set of grooming methods.
     # In that case, we should restrict to only the valid ones.
     cross_check_task = dataset_config.get("cross_check_task", False)
