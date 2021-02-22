@@ -815,7 +815,7 @@ test = ["jupyter-contrib-core", "nose", "requests", "selenium", "mock"]
 
 [[package]]
 name = "jupyter-server"
-version = "1.4.0"
+version = "1.4.1"
 description = "The backend—i.e. core services, APIs, and REST endpoints—to Jupyter web applications."
 category = "dev"
 optional = false
@@ -1217,7 +1217,7 @@ version = "3.0"
 description = "Physics Analysis Core for Heavy-Ions"
 category = "main"
 optional = false
-python-versions = "^3.6.1"
+python-versions = "^3.7.1"
 develop = true
 
 [package.dependencies]
@@ -1225,7 +1225,7 @@ attrs = ">=19.3.0"
 iminuit = "^1.5.2"
 matplotlib = "^3.3.2"
 numdifftools = "^0.9.39"
-numpy = "^1.19.3"
+numpy = "^1.20"
 "ruamel.yaml" = "^0.16.12"
 scipy = "^1.5.3"
 
@@ -2106,7 +2106,7 @@ testing = ["pytest (>=3.5,!=3.7.3)", "pytest-checkdocs (>=1.2.3)", "pytest-flake
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7.1,<4.0"
-content-hash = "4c2b2677eee7fb95f2ce527fe9d88a4b2f33083872ae341449061afa054db6a4"
+content-hash = "a06dee92476a5147c192ffc5cbad9a7d0c2cae59dd52614ec5c48983e94d434b"
 
 [metadata.files]
 ansicon = [
@@ -2537,8 +2537,8 @@ jupyter-nbextensions-configurator = [
     {file = "jupyter_nbextensions_configurator-0.4.1.tar.gz", hash = "sha256:e5e86b5d9d898e1ffb30ebb08e4ad8696999f798fef3ff3262d7b999076e4e83"},
 ]
 jupyter-server = [
-    {file = "jupyter_server-1.4.0-py3-none-any.whl", hash = "sha256:c21f4a607aab1f3a1289209b5483ec42aeefaf6f9cc6f51ccdc23d9c09ea2387"},
-    {file = "jupyter_server-1.4.0.tar.gz", hash = "sha256:023431125ffeae8330eb0daab78658dffc51b3886ec5621ee006dcb0f267cc49"},
+    {file = "jupyter_server-1.4.1-py3-none-any.whl", hash = "sha256:af518ce295bfaa0d5c05031f963bdcfcd2ab156cb2223c0a70665219aed338da"},
+    {file = "jupyter_server-1.4.1.tar.gz", hash = "sha256:b0126f237f679533eec46244cfc66d61e3a1f8ec0fad2d47352fa19d3e754e47"},
 ]
 jupyterlab = [
     {file = "jupyterlab-3.0.8-py3-none-any.whl", hash = "sha256:50da506d8881fb9137928341f8d7509d5d4110c94bed43116e14ec10de9e9e60"},
