@@ -636,6 +636,9 @@ ResponseResult create_closure_response_2D(
     if (*trueSubstructureVariable > trueSplittingVariableBins.back()) {
       continue;
     }
+    if (disableUntaggedBin && *trueSubstructureVariable < trueSplittingVariableBins.front()) {
+      continue;
+    }
     // Double counting cut
     if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
       continue;
