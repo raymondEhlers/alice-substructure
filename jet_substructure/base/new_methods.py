@@ -132,8 +132,20 @@ def find_leading(values: UprootArray[_T]) -> Tuple[np.ndarray, UprootArray[int]]
         Leading value, index of value.
     """
     # As of August 2020, keepdims doesn't seem to play nice with applying to the values, so we restore the dimensions with ak.singletons.
+    # As of February 2021, we still can't replace this with keepdims...
+    # argmax with singletons gives empty lists when there is no max, while keepdims uses None.
+    # It looks like the max_values agree, however.
     arg_max = ak.singletons(ak.argmax(values, axis=1))
     max_values = ak.fill_none(ak.pad_none(values[arg_max], 1), UNFILLED_VALUE)
+
+    # Try with keepdims:
+    # new_arg_max = ak.argmax(values, axis=1, keepdims=True)
+    # new_max_values = ak.fill_none(ak.pad_none(values[new_arg_max], 1), UNFILLED_VALUE)
+    # Cross check
+    # assert ak.all(ak.flatten(arg_max == new_arg_max, axis=-1))
+    # assert ak.all(ak.flatten(max_values == new_max_values, axis=-1))
+
+    # return ak.flatten(new_max_values), new_arg_max
     return ak.flatten(max_values), arg_max
 
 
