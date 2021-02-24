@@ -19,6 +19,8 @@ except ImportError:
 
 import awkward as ak
 import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
 import uproot
 
 from jet_substructure.base.helpers import ArrayOrScalar, UprootArray
@@ -486,6 +488,26 @@ ak.behavior["JetSplitting"] = JetSplitting
 ak.behavior["*", "JetSplitting"] = JetSplittingArray
 
 
+def _is_valid_parquet_file(
+    filename: Path,
+) -> bool:
+    """Check if the given parquet file is valid by opening the file.
+
+    It appears that if there is an issue with the file, it will immediately be obvious
+    because opening it with parquet will fail.
+
+    Args:
+        filename: Filename of the parquet file.
+    Returns:
+        True if the file was opened successfully.
+    """
+    try:
+        _ = pq.ParquetFile(filename)
+    except pa.ArrowInvalid:
+        return False
+    return True
+
+
 def _convert_tree_to_parquet(
     tree: Any,
     prefixes: Sequence[str],
@@ -583,7 +605,11 @@ def convert_tree_to_parquet(
 
     # Bail out early if the file already exists.
     if output_filename.exists():
-        return True, output_filename
+        if _is_valid_parquet_file(filename=output_filename):
+            return True, output_filename
+        # Remove the parquet file so we can try again.
+        logger.info("Parquet is invalid. Try to convert again.")
+        output_filename.unlink()
 
     with uproot.open(filename) as f:
         tree = f[tree_name]
