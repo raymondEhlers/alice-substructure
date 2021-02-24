@@ -163,7 +163,7 @@ class JetConstituentCommon:
 
     def delta_R(self: _T_JetConstituent, other: _T_JetConstituent) -> ArrayOrScalar[float]:
         """ Separation between jet constituents. """
-        return cast(ArrayOrScalar[float], np.sqrt((self.phi - other.phi) ** 2 + (self.eta - other.eta) ** 2))
+        return cast(ArrayOrScalar[float], np.sqrt((self.phi - other.phi) ** 2 + (self.eta - other.eta) ** 2))  # type: ignore
 
 
 class JetConstituent(ak.Record, JetConstituentCommon):  # type: ignore
@@ -291,7 +291,7 @@ class JetSplittingCommon:
             None.
         """
         # parent_pt = subleading / z = kt / sin(delta_R) / z
-        return cast(UprootArray[float], self.kt / np.sin(self.delta_R) / self.z)
+        return cast(UprootArray[float], self.kt / np.sin(self.delta_R) / self.z)  # type: ignore
 
     def theta(self, jet_R: float) -> ArrayOrScalar[float]:
         """Theta of the splitting.
