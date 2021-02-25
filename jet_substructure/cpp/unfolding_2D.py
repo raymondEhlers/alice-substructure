@@ -15,10 +15,11 @@ Conventions:
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Type
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Type, Union
 
 import attr
 import numpy as np
+import numpy.typing as npt
 import uproot
 from pachyderm import binned_data
 
@@ -35,7 +36,7 @@ TH2D = Any
 TMatrixD = Any
 
 
-def _np_array_converter(value: Any, dtype: np.dtype = np.float64) -> np.ndarray:
+def _np_array_converter(value: Any, dtype: npt.DTypeLike = np.float64) -> np.ndarray:
     """Convert the given value to a numpy array.
 
     Normally, we would just use np.array directly as the converter function. However, mypy will complain if
@@ -203,7 +204,7 @@ def _pass_filenames_to_ROOT(filenames: Sequence[Path]) -> List[str]:
     return [str(f) for f in filenames]
 
 
-def _array_to_ROOT(arr: np.ndarray, type_name: str = "double") -> Any:
+def _array_to_ROOT(arr: Union[List[str], np.ndarray], type_name: str = "double") -> Any:
     """Convert numpy array to std::vector via ROOT.
 
     Because it apparently can't handle conversions directly. Which is really dumb...
