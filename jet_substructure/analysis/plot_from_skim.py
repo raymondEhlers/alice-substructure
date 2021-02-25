@@ -1742,6 +1742,25 @@ def _project_and_prepare_grooming_variable_hist(
     return h
 
 
+def _project_and_prepare_jet_pt_hist(bh_hist: bh.Histogram, set_zero_to_nan: bool) -> binned_data.BinnedData:
+    # Need to project to just the attr of interest.
+    h = binned_data.BinnedData.from_existing_data(bh_hist[:, :: bh.sum])  # noqa: E203
+
+    # Normalize
+    # Normalize by the sum of the values to get the n_jets values.
+    # Then, we still need to normalize by the bin widths.
+    h /= np.sum(h.values)
+    h /= h.axes[0].bin_widths
+
+    # Set 0s to NaN (for example, in z_g where have a good portion of the range cut off).
+    if set_zero_to_nan:
+        mask = h.values == 0
+        h.errors[mask] = np.nan
+        h.values[mask] = np.nan
+
+    return h
+
+
 def _plot_compare_grooming_methods_for_attribute(
     hists: Mapping[str, bh.Histogram],
     grooming_methods: Sequence[str],
@@ -2062,6 +2081,117 @@ def compare_grooming_methods_for_substructure_prod(
     # )
 
 
+def plot_compare_grooming_methods_for_jet_pt_embed(
+    hists: Sequence[PlotHists],
+    grooming_methods: Sequence[str],
+    selected_jet_pt_bin: helpers.RangeSelector,
+    selected_jet_pt_prefix: str,
+    set_zero_to_nan: bool,
+    plot_config: PlotConfig,
+    output_dir: Path,
+    plot_png: bool = False,
+) -> None:
+    """Plot comparison of embedded jet spectra.
+
+    Note that it's only good for comparing embedded jet spectra (say pass 3 vs pass 1).
+    This is to simplify configuration.
+
+    """
+    # Setup
+    display_labels_vs = " vs. ".join([obj.display_label for obj in hists])
+    logger.info(
+        f"Plotting grooming method comparison for jet pt, {display_labels_vs}, grooming_methods: {grooming_methods}"
+    )
+    fig, (ax, ax_ratio) = plt.subplots(
+        2,
+        1,
+        figsize=(12, 9),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
+    grooming_styling = define_grooming_styles()
+
+    for grooming_method in grooming_methods:
+        main_hist = None
+        for hists_obj in hists:
+            # Setup and project
+            # Axes: jet_pt, attr_name
+            # We just use kt because it's easy. We could use anything.
+            h = _project_and_prepare_jet_pt_hist(
+                bh_hist=hists_obj.hists[
+                    f"{grooming_method}_{hists_obj.prefix}_kt_{selected_jet_pt_bin.histogram_str(selected_jet_pt_prefix)}"
+                ],
+                set_zero_to_nan=set_zero_to_nan,
+            )
+
+            # Setup
+            # First, we determine the style
+            style = grooming_styling[grooming_method]
+            if main_hist is not None:
+                style = grooming_styling[f"{grooming_method}_compare"]
+            # And then the label
+            label = f"{hists_obj.display_label}, {style.label}"
+
+            # Additional plot styling
+            kwargs = {
+                "markerfacecolor": "white" if style.fillstyle == "none" else style.color,
+                "alpha": 1 if style.fillstyle == "none" else 0.8,
+            }
+            if style.fillstyle != "none":
+                kwargs["markeredgewidth"] = 0
+
+            ax.errorbar(
+                h.axes[0].bin_centers,
+                h.values,
+                yerr=h.errors,
+                xerr=h.axes[0].bin_widths / 2,
+                color=style.color,
+                marker=style.marker,
+                fillstyle=style.fillstyle,
+                linestyle="",
+                label=label,
+                zorder=style.zorder,
+                **kwargs,
+            )
+
+            # We've plotted the main obj, so now we store that hist, and we will treat the rest as comparisons.
+            # For those comparisons, we want to create ratios.
+            if main_hist is None:
+                main_hist = h
+            else:
+                ratio = main_hist / h
+                ax_ratio.errorbar(
+                    ratio.axes[0].bin_centers,
+                    ratio.values,
+                    yerr=ratio.errors,
+                    xerr=ratio.axes[0].bin_widths / 2,
+                    color=style.color,
+                    marker=style.marker,
+                    fillstyle=style.fillstyle,
+                    linestyle="",
+                    zorder=style.zorder,
+                    **kwargs,
+                )
+
+    # Reference value for ratio
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+
+    # Apply the PlotConfig
+    plot_config.apply(fig=fig, axes=[ax, ax_ratio])
+
+    grooming_methods_filename_label = ""
+    if len(grooming_methods) == 1:
+        grooming_methods_filename_label = f"_{grooming_methods[0]}"
+    identifiers = "_".join([obj.identifier for obj in hists])
+    filename = f"{plot_config.name}_{selected_jet_pt_bin.histogram_str(selected_jet_pt_prefix)}{grooming_methods_filename_label}_{identifiers}_iterative_splittings"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{filename}.png")
+    plt.close(fig)
+
+
 def _plot_compare_grooming_methods_for_attribute_data_embed(
     hists: Sequence[PlotHists],
     attr_name: str,
@@ -2238,7 +2368,8 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
                     Panel(
                         axes=[
                             AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$"),
-                            AxisConfig("y", label=ratio_label, range=(-0.2, 4)),
+                            AxisConfig("y", label=ratio_label, range=(0.5, 1.5)),
+                            # AxisConfig("y", label=ratio_label, range=(-0.2, 4)),
                         ]
                     ),
                 ],
