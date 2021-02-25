@@ -669,7 +669,7 @@ def calculate_embedding_skim(  # noqa: C901
     draw_example_splittings: bool = False,
     write_feather: bool = False,
     write_parquet: bool = False,
-) -> Tuple[bool, str]:
+) -> Tuple[bool, Path, str]:
     """Determine the response and prong matching for jets substructure techniques.
 
     Args:
@@ -683,7 +683,7 @@ def calculate_embedding_skim(  # noqa: C901
     # Validation
     # Bail out early if the file already exists.
     if output_filename.exists():
-        return True, "already exists"
+        return True, output_filename, "already exists"
 
     # Output consistent types.
     float_type = np.float32
@@ -931,7 +931,7 @@ def calculate_embedding_skim(  # noqa: C901
         pyarrow.feather.write_feather(pa_table, output_filename.with_suffix(".feather"), compression="zstd")
 
     logger.info(f"Finished processing tree from file {input_filename}")
-    return True, "processed"
+    return True, output_filename, "processed"
 
 
 def calculate_data_skim(  # noqa: C901
@@ -946,13 +946,13 @@ def calculate_data_skim(  # noqa: C901
     scale_factors: Optional[Mapping[int, float]] = None,
     write_feather: bool = False,
     write_parquet: bool = False,
-) -> Tuple[bool, str]:
+) -> Tuple[bool, Path, str]:
     # Validation
     if scale_factors is None and collision_system == "pythia":
         raise ValueError("Need scale factors for pythia to be provided externally.")
     # Bail out early if the file already exists.
     if output_filename.exists():
-        return True, "already exists"
+        return True, output_filename, "already exists"
 
     # Setup
     # Output consistent types.
@@ -1108,7 +1108,7 @@ def calculate_data_skim(  # noqa: C901
         pyarrow.feather.write_feather(pa_table, output_filename.with_suffix(".feather"), compression="zstd")
 
     logger.info(f"Finished processing tree from file {input_filename}")
-    return True, "processed"
+    return True, output_filename, "processed"
 
 
 def cross_check_task_names_to_export(

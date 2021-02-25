@@ -929,7 +929,7 @@ def _calculate_embedding_skim(
         # Skip any problems for now
         logger.warning(e)
         # Match the expected format if the calculation succeeded
-        res = (False, traceback.format_exc())
+        res = (False, inputs[0].filepath, traceback.format_exc())
 
     logger.debug(outputs)
     return res
@@ -1043,7 +1043,7 @@ def _calculate_data_skim(
         # Skip any problems for now
         logger.warning(e)
         # Match the expected format if the calculation succeeded
-        res = (False, traceback.format_exc())
+        res = (False, inputs[0].filepath, traceback.format_exc())
 
     logger.debug(outputs)
     return res
