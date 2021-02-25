@@ -107,7 +107,7 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},
+        hists={"ignore": "this"},  # type: ignore
     )
     convert_file(input_path=input_path, tag="", unfolding_output=unfolding_output)
 
@@ -122,7 +122,7 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04_tracking_efficiency",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},
+        hists={"ignore": "this"},  # type: ignore
     )
     convert_file(input_path=input_path, tag="Eff", unfolding_output=unfolding_output)
 
@@ -137,7 +137,7 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04_truncation",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},
+        hists={"ignore": "this"},  # type: ignore
     )
     convert_file(input_path=input_path, tag="TruncLow", unfolding_output=unfolding_output)
     unfolding_output = plot_unfolding.UnfoldingOutput(
@@ -150,7 +150,7 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04_truncation",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},
+        hists={"ignore": "this"},  # type: ignore
     )
     convert_file(input_path=input_path, tag="TruncHigh", unfolding_output=unfolding_output)
 
@@ -165,7 +165,7 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04_random_binning",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},
+        hists={"ignore": "this"},  # type: ignore
     )
     convert_file(input_path=input_path, tag="Bin", unfolding_output=unfolding_output)
 
@@ -180,7 +180,7 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},
+        hists={"ignore": "this"},  # type: ignore
     )
     convert_file(input_path=input_path, tag="Displaced", unfolding_output=unfolding_output)
 
@@ -195,7 +195,7 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04_reweight_prior",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},
+        hists={"ignore": "this"},  # type: ignore
     )
     convert_file(input_path=input_path, tag="Prior", unfolding_output=unfolding_output)
 

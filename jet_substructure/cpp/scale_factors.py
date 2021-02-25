@@ -115,7 +115,7 @@ def scale_factor_uproot(filenames: Sequence[Path], run_despite_issues: bool = Fa
 
     cross_section_hists = []
     n_trials_hists = []
-    n_entries: np.ndarray = []
+    n_entries_list = []
     n_accepted_events = []
     for filename in filenames:
         with uproot.open(filename) as input_file:
@@ -124,7 +124,7 @@ def scale_factor_uproot(filenames: Sequence[Path], run_despite_issues: bool = Fa
             cross_section_hist = [
                 h for h in embedding_hists if h.has_member("fName") and h.member("fName") == "fHistXsection"
             ][0]
-            n_entries += cross_section_hist.effective_entries()
+            n_entries_list.append(cross_section_hist.effective_entries())
             cross_section_hists.append(binned_data.BinnedData.from_existing_data(cross_section_hist))
             n_trials_hists.append(
                 binned_data.BinnedData.from_existing_data(
@@ -137,6 +137,9 @@ def scale_factor_uproot(filenames: Sequence[Path], run_despite_issues: bool = Fa
                 [h for h in embedding_hists if h.has_member("fName") and h.member("fName") == "fHistEventCount"][0]
             )
             n_accepted_events.append(n_events_hist.values[0])
+
+    # Convert to numpy array for help in finding first empty bin.
+    n_entries = np.array(n_entries_list)
 
     # Take the first non-zero value of n_entries (there should only be 1)
     return (
