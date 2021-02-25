@@ -783,6 +783,9 @@ def setup_write_scale_factors(
     logger.info("Writing scale factors to YAML. Jobs are executing, so this will take a minute...")
     output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/scale_factors.yaml")
     parsl_output_file = File(str(output_filename))
+    # TODO: I'm guessing passing this is a problem because it's a class that's imported in an app, and then
+    #       we're trying to pass the result into another app. I think we can go one direction or the other,
+    #       but not both. So we just take the result.
     yaml_result = _write_scale_factors_to_yaml(
         scale_factors={k: v.result() for k, v in scale_factors.items()},
         outputs=[parsl_output_file],
@@ -867,6 +870,9 @@ def setup_extract_embedding_pt_hard_spectra(
     input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
         dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
     )
+    # Need a hard dependency on the writing of the yaml output, so we ask for the result here.
+    # We don't actually care about the result, but it avoids a race condition.
+    _ = input_results[0].result()
     # Must read the scale factors from file to get the properly scaled values.
     scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
 
