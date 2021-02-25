@@ -498,7 +498,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
       continue;
     }
     // Double counting cut
-    if ((*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) && (trueJetPt > 10)) {
+    if ((*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) && (*trueJetPt > 10)) {
       continue;
     }
 
@@ -566,7 +566,7 @@ ResponseResult create_closure_response_2D(
  std::map<std::string, TH2D*> hists, const std::string groomingMethod, const std::string substructureVariableName,
  std::vector<double> smearedJetPtBins, std::vector<double> trueJetPtBins,
  std::vector<double> smearedSplittingVariableBins, std::vector<double> trueSplittingVariableBins,
- double smearedUntaggedBinValue, bool diasbleUntaggedBin, double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
+ double smearedUntaggedBinValue, bool disableUntaggedBin, double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
  const std::vector<std::string>& embeddedFilenames, const ClosureVariation_t closureVariation,
  const double fractionForResponse = 0.75, const bool usePureMatches = false, TH2D* hReweighting = nullptr,
  const std::string& embeddedTreeName = "tree", const std::string& truePrefix = "true",
@@ -577,7 +577,7 @@ ResponseResult create_closure_response_2D(
   TRandom3 random(0);
   // Handle untagged bin.
   double untaggedBelowThisValue = 0.;
-  if (diasbleUntaggedBin) {
+  if (disableUntaggedBin) {
       // Select a very large negative value. We'll never have such a large negative value, so
       // pratically this means that we'll never mark a value as untagged. This means that everything
       // will have to be encapsulated in the standard binning or it will be cut.
@@ -640,7 +640,7 @@ ResponseResult create_closure_response_2D(
       continue;
     }
     // Double counting cut
-    if ((*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) && (trueJetPt > 10)) {
+    if ((*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) && (*trueJetPt > 10)) {
       continue;
     }
 
