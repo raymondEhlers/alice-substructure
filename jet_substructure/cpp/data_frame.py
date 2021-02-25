@@ -447,7 +447,7 @@ def run_embedded_pt_hard_scaling(  # noqa: C901
     # Apply general cuts.
     # Double counting must be applied for embedding.
     if collision_system == "embedPythia":
-        double_counting_cut = "det_level_leading_track_pt >= hybrid_leading_track_pt"
+        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
         df_original = df_original.Filter(double_counting_cut)
 
     # Emulate the double counting cut
@@ -594,7 +594,7 @@ def run_create_closure_ratio(  # noqa: C901
     # Apply general cuts.
     # Double counting must be applied for embedding.
     if collision_system == "embedPythia":
-        double_counting_cut = "det_level_leading_track_pt >= hybrid_leading_track_pt"
+        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
         df_original = df_original.Filter(double_counting_cut)
 
     # We always want the nominal binning for this unfolding configuration.
@@ -709,7 +709,7 @@ def run_response(  # noqa: C901
     # Apply general cuts.
     # Double counting must be applied for embedding.
     if collision_system == "embedPythia":
-        double_counting_cut = "det_level_leading_track_pt >= hybrid_leading_track_pt"
+        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
         df_original = df_original.Filter(double_counting_cut)
         smeared_cut_prefix = "hybrid"
     else:
@@ -1051,7 +1051,8 @@ def run(  # noqa: C901
     # Apply general cuts.
     # Double counting must be applied for embedding.
     if collision_system == "embedPythia":
-        double_counting_cut = "det_level_leading_track_pt >= hybrid_leading_track_pt"
+        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
+        # double_counting_cut = f"{jet_pt_column_format.format(prefix='true')} >= 10"
         df_original = df_original.Filter(double_counting_cut)
         smeared_cut_prefix = "hybrid"
     else:

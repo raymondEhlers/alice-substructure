@@ -498,7 +498,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
       continue;
     }
     // Double counting cut
-    if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
+    if ((*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) && (trueJetPt > 10)) {
       continue;
     }
 
@@ -640,7 +640,7 @@ ResponseResult create_closure_response_2D(
       continue;
     }
     // Double counting cut
-    if (*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) {
+    if ((*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) && (trueJetPt > 10)) {
       continue;
     }
 
