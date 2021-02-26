@@ -1801,6 +1801,7 @@ def setup_all_unfolding(  # noqa: C901
     # Validation
     if selected_unfolding_settings is None:
         selected_unfolding_settings = list(base_dataset_config["unfolding"]["settings"].keys())
+    logger.info(f"Unfolding settings: {selected_unfolding_settings}")
     # Setup
     from jet_substructure.cpp import unfolding_2D
 
@@ -1985,18 +1986,20 @@ if __name__ == "__main__":  # noqa: C901
     # Settings
     # Base settings
     base_dataset_name = "PbPb_semi_central_R04_pass3"
+    #dataset_type = "rmax_070"
     dataset_type = "nominal"
-    collision_system = "embedPythia"
+    collision_system = "PbPb"
 
     # Job settings
     jobs_to_execute = [
         # "repair_root_files",
         # "convert_to_parquet",
-        "extract_scale_factors_for_embedding",
+        # "extract_scale_factors_for_embedding",
         # "calculate_embedding_skim",
+        # "root_data_frame",
         # "root_data_frame_embedded_pt_hard_scaling",
         # "root_data_frame_response",
-        # "unfolding",
+        "unfolding",
     ]
     nodes_to_allocate = 4
     jobs_per_node = 8
@@ -2132,6 +2135,7 @@ if __name__ == "__main__":  # noqa: C901
         )
         all_results.append(results)
     if "calculate_embedding_skim" in jobs_to_execute:
+        # TODO: Devise an approach to retry.
         if not cross_check_task:
             results = setup_calculate_embedding_skim(
                 collision_system=collision_system,
@@ -2150,6 +2154,7 @@ if __name__ == "__main__":  # noqa: C901
             )
         all_results.extend(results)
     if "calculate_data_skim" in jobs_to_execute:
+        # TODO: Devise an approach to retry.
         results = setup_calculate_data_skim(
             collision_system=collision_system,
             entries_per_job=entries_per_job,
