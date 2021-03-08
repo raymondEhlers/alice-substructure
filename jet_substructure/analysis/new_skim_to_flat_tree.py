@@ -960,6 +960,7 @@ def calculate_data_skim(  # noqa: C901
     to_float = functools.partial(ak.values_astype, to=np.float32)
     # Jets setup
     logger.info(f"Skimming tree from file {input_filename}")
+    # Careful, this can return general columns, not just jets in prefixes (for example, the pt_hard in pythia)
     all_jets = new_methods.parquet_to_substructure_analysis(filename=input_filename, prefixes=prefixes)
 
     # Dataset wide masks
@@ -973,7 +974,9 @@ def calculate_data_skim(  # noqa: C901
         mask = mask & (all_jets["pt_hard"] >= 5.0)
 
     masked_jets: Dict[str, MaskedJets] = {}
-    for prefix, input_jets in all_jets.items():
+    # for prefix, input_jets in all_jets.items():
+    for prefix in prefixes:
+        input_jets = all_jets[prefix]
         masked_jets[prefix] = MaskedJets(
             *_select_and_retrieve_splittings(
                 input_jets,
@@ -1074,13 +1077,14 @@ def calculate_data_skim(  # noqa: C901
             # So we copy the scale factor for pt hard bin 20 to 21 to cover it. It should be more or less correct.
             output_scale_factors[21] = output_scale_factors[20]
 
-            pt_hard_bins = np.array(all_jets["pt_hard_bin"], dtype=np.uint8)
+            # Need to mask because we didn't when masking the original jets.
+            pt_hard_bins = np.array(all_jets["pt_hard_bin"][mask], dtype=np.int16)
             logger.debug(f"Pt hard bins contained in the file: {np.unique(pt_hard_bins)}")
             grooming_results.update(
                 {
                     "scale_factor": np.array([output_scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
                     "pt_hard_bin": pt_hard_bins,
-                    "pt_hard": to_float(all_jets["pt_hard"]),
+                    "pt_hard": to_float(all_jets["pt_hard"][mask]),
                 }
             )
 
