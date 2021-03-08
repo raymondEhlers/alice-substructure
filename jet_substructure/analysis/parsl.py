@@ -656,7 +656,27 @@ def setup_convert_to_parquet(
     return results, parquet_results
 
 
-def _determine_input_files_per_pt_hard_bin(
+def _determine_pythia_input_files_per_pt_hard_bin(
+    dataset_config: Mapping[str, Any],
+) -> Dict[int, List[Path]]:
+    input_files_per_pt_hard_bin: Dict[int, List[Path]] = {}
+    all_filenames = []
+    for filename_base in dataset_config["files"]:
+        filename_base = Path(filename_base)
+        all_filenames.extend([Path(f) for f in helpers.expand_wildcards_in_filenames([filename_base])])
+
+    # Sort by pt hard bins
+    # We're in Run 2, so pretty safe to assume 20 pt hard bins
+    input_files_per_pt_hard_bin
+    for pt_hard_bin in range(1, 21):
+        input_files_per_pt_hard_bin[pt_hard_bin] = [f for f in all_filenames if f"{pt_hard_bin:02g}" in str(f.name)]
+
+    logger.info(f"input_files_per_pt_hard_bin: {input_files_per_pt_hard_bin}")
+
+    return input_files_per_pt_hard_bin
+
+
+def _determine_embedding_input_files_per_pt_hard_bin(
     dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> Dict[int, List[Path]]:
@@ -686,7 +706,7 @@ def _determine_input_files_per_pt_hard_bin(
 
 
 @python_app  # type: ignore
-def _extract_scale_factors_for_embedding(
+def _extract_scale_factors_from_hists(
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
     stdout: Optional[str] = None,
@@ -703,28 +723,38 @@ def _extract_scale_factors_for_embedding(
     return res
 
 
-def setup_extract_scale_factors_for_embedding(
+def setup_extract_scale_factors(
+    collision_system: str,
     dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> Dict[int, AppFuture]:
-    """Extract scale factors from embedding hists.
+    """Extract scale factors from embedding or pythia hists.
 
     Note:
-        This is surprisingly fast, at least for the Rmax=0.6 case where I tried this
-        as an example.
+        This is surprisingly fast.
     """
+    # Validation
+    if collision_system not in ["pythia", "embedPythia"]:
+        raise ValueError(f"Invalid collision system for extracting scale factors: {collision_system}")
+
     # Setup
     scale_factors = {}
-
     logger.info("Determining input files for extracting scale factors.")
-    input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
-        dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
-    )
+    if collision_system == "embedPythia":
+        input_files_per_pt_hard_bin = _determine_embedding_input_files_per_pt_hard_bin(
+            dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
+        )
+    elif collision_system == "pythia":
+        input_files_per_pt_hard_bin = _determine_pythia_input_files_per_pt_hard_bin(
+            dataset_config=dataset_config,
+        )
+    else:
+        raise ValueError(f"Invalid collision system for extracting scale factors: {collision_system}")
 
     for pt_hard_bin, input_files in input_files_per_pt_hard_bin.items():
         logger.debug(f"pt_hard_bin: {pt_hard_bin}, filenames: {input_files}")
-        scale_factors[pt_hard_bin] = _extract_scale_factors_for_embedding(
-            inputs=[File(str(fname)) for fname in input_files]
+        scale_factors[pt_hard_bin] = _extract_scale_factors_from_hists(
+            inputs=[File(str(fname)) for fname in input_files],
         )
 
     return scale_factors
@@ -801,7 +831,7 @@ def setup_write_scale_factors(
 
     # TODO: We can remove this...
     logger.info("Determining input files for writing scale factor trees.")
-    input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
+    input_files_per_pt_hard_bin = _determine_embedding_input_files_per_pt_hard_bin(
         dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
     )
     # Must read the scale factors from file to get the properly scaled values.
@@ -827,7 +857,7 @@ def setup_write_scale_factors(
 
 
 @python_app  # type: ignore
-def _extract_embedding_pt_hard_spectra(
+def _extract_pt_hard_spectra(
     scale_factors: Mapping[int, float],
     offsets: Mapping[int, int],
     inputs: Sequence[File] = [],
@@ -851,7 +881,7 @@ def _extract_embedding_pt_hard_spectra(
     #    pt_hard_bin: {Path(f.filepath) for pt_hard_bin, f in enumerate(inputs, start=1)}
     # }
 
-    res = sf.embedded_pt_hard_spectra(
+    res = sf.pt_hard_spectra_from_hists(
         filenames=filenames,
         scale_factors=scale_factors,
         output_filename=Path(outputs[0].filepath),
@@ -865,11 +895,22 @@ def setup_extract_embedding_pt_hard_spectra(
     input_results: MutableSequence[AppFuture],
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> AppFuture:
+    # Validation
+    if collision_system not in ["pythia", "embedPythia"]:
+        raise ValueError(f"Invalid collision system for extracting scale factors: {collision_system}")
+
     # Input files
-    logger.info("Determining input files.")
-    input_files_per_pt_hard_bin = _determine_input_files_per_pt_hard_bin(
-        dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
-    )
+    logger.info("Determining input files")
+    if collision_system == "embedPythia":
+        input_files_per_pt_hard_bin = _determine_embedding_input_files_per_pt_hard_bin(
+            dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
+        )
+    elif collision_system == "pythia":
+        input_files_per_pt_hard_bin = _determine_pythia_input_files_per_pt_hard_bin(
+            dataset_config=dataset_config,
+        )
+    else:
+        raise ValueError(f"Invalid collision system for extracting scale factors: {collision_system}")
     # Need a hard dependency on the writing of the yaml output, so we ask for the result here.
     # We don't actually care about the result, but it avoids a race condition.
     _ = input_results[0].result()
@@ -888,7 +929,7 @@ def setup_extract_embedding_pt_hard_spectra(
     parsl_files.extend([i.outputs[0] for i in input_results])
 
     output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/pt_hard_spectra.yaml")
-    results = _extract_embedding_pt_hard_spectra(
+    results = _extract_pt_hard_spectra(
         scale_factors=scale_factors,
         offsets=offsets,
         inputs=parsl_files,
@@ -2114,10 +2155,12 @@ if __name__ == "__main__":  # noqa: C901
         #       in fact easier for us to determine them independently. Note also that we
         #       we could only take the outputs from repair_root_files because we need to
         #       go back to the original repaired root files.
-        scale_factors = setup_extract_scale_factors_for_embedding(
+        scale_factors = setup_extract_scale_factors(
+            collision_system=collision_system,
             dataset_config=dataset_config,
             # selected_train_numbers=list(range(6316, 6318)),
         )
+
         all_results.extend(list(scale_factors.values()))
         yaml_result, tree_results = setup_write_scale_factors(
             collision_system=collision_system,

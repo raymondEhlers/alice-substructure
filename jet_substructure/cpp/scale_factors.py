@@ -48,15 +48,33 @@ def scale_factor_ROOT(filenames: Sequence[Path]) -> Tuple[int, int, Any, Any]:
     n_accepted_events = 0
     for filename in filenames:
         f = ROOT.TFile(str(filename), "READ")
-        embedding_hists = f.Get("AliAnalysisTaskEmcalEmbeddingHelper_histos")
-        cross_section_hists.append(embedding_hists.FindObject("fHistXsection"))
+
+        # Retrieve the output list. First try the embedding hists. If not available, then
+        # try to find the task output.
+        hists = f.Get("AliAnalysisTaskEmcalEmbeddingHelper_histos")
+        # If the embedding helper isn't available, let's try to get the task output.
+        if not hists:
+            # This will only work for my tasks. But this should be fine, and can be improved later if needed.
+            task_hists_name = [
+                key.GetName()
+                for key in f.GetListOfKeys()
+                if "DynamicalGrooming" in key.GetName() and "Tree" not in key.GetName()
+            ]
+            if len(task_hists_name) != 1:
+                raise RuntimeError(f"Cannot find unique task name. Names: {task_hists_name}. Skipping!")
+            else:
+                hists = f.Get(task_hists_name[0])
+                if not hists:
+                    raise RuntimeError(f"Cannot find a task output list. Tried: {task_hists_name[0]}. Keys: {list(f.GetListOfKeys())}")
+
+        cross_section_hists.append(hists.FindObject("fHistXsection"))
         cross_section_hists[-1].SetDirectory(0)
         n_entries += cross_section_hists[-1].GetEntries()
-        n_trials_hists.append(embedding_hists.FindObject("fHistTrials"))
+        n_trials_hists.append(hists.FindObject("fHistTrials"))
         n_trials_hists[-1].SetDirectory(0)
 
         # Keep track of accepted events for normalizing the scale factors later.
-        n_events_hist = embedding_hists.FindObject("fHistEventCount")
+        n_events_hist = hists.FindObject("fHistEventCount")
         n_accepted_events += n_events_hist.GetBinContent(1)
 
         f.Close()
@@ -179,10 +197,10 @@ def create_scale_factor_tree_for_cross_check_task_output(
     return True
 
 
-def embedded_pt_hard_spectra(
+def pt_hard_spectra_from_hists(
     filenames: Mapping[int, Sequence[Path]], scale_factors: Mapping[int, float], output_filename: Path
 ) -> bool:
-    """Extract and save embedding pt hard spectra.
+    """Extract and save pt hard spectra from embedding or pythia.
 
     This functionality is exceptional because we only have the histograms, not the tree.
 
@@ -202,13 +220,27 @@ def embedded_pt_hard_spectra(
         single_bin_pt_hard_spectra = []
         for filename in pt_hard_filenames:
             with uproot.open(filename) as f:
-                embedding_hists = f["AliAnalysisTaskEmcalEmbeddingHelper_histos"]
-                if not isinstance(embedding_hists, uproot.models.TList.Model_TList):
+                hists = f.get("AliAnalysisTaskEmcalEmbeddingHelper_histos", None)
+                if not hists:
+                    # If not the embedding helper, look for the analysis task output.
+                    task_hists_name = [
+                        k
+                        for k in f.keys()
+                        if "DynamicalGrooming" in k and "Tree" not in k
+                    ]
+                    if len(task_hists_name) != 1:
+                        raise RuntimeError(f"Cannot find unique task name. Names: {task_hists_name}. Skipping!")
+                    else:
+                        hists = f.get(task_hists_name[0], None)
+                        if not hists:
+                            raise RuntimeError(f"Cannot find a task output list. Tried: {task_hists_name[0]}. Keys: {list(f.GetListOfKeys())}")
+
+                if not isinstance(hists, uproot.models.TList.Model_TList):
                     # Grab the underlying TList rather than the AliEmcalList...
-                    embedding_hists = embedding_hists.bases[0]
+                    hists = hists.bases[0]
                 single_bin_pt_hard_spectra.append(
                     binned_data.BinnedData.from_existing_data(
-                        [h for h in embedding_hists if h.has_member("fName") and h.member("fName") == "fHistPtHard"][0]
+                        [h for h in hists if h.has_member("fName") and h.member("fName") == "fHistPtHard"][0]
                     )
                 )
         h_temp = sum(single_bin_pt_hard_spectra)

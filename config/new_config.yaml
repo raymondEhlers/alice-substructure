@@ -96,6 +96,7 @@ available_datasets:
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
         prefix_branches: *prefix_branches
         jet_R: 0.4
+        entries_per_job: 2e5
         files:
             - "trains/pp/2039/AnalysisResults.*.repaired.root"
             - "trains/pp/2040/AnalysisResults.*.repaired.root"
@@ -112,10 +113,10 @@ available_datasets:
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
         prefix_branches: *prefix_branches
         jet_R: 0.2
+        entries_per_job: 2e5
         files:
             - "trains/pp/1998/AnalysisResults.*.repaired.root"
             - "trains/pp/1999/AnalysisResults.*.repaired.root"
-    #
     # pythia
     # pythia R = 0.4
     LHC18b8_pythia_R04_2110: &LHC18b8_pythia_R04
@@ -170,6 +171,7 @@ available_datasets:
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
         prefix_branches: *prefix_branches
         jet_R: 0.2
+        entries_per_job: 2e5
         files:
             - "trains/pythia/2461/AnalysisResults.FAST.*.repaired.root"
             - "trains/pythia/2461/AnalysisResults.cent_woSDD.*.repaired.root"
@@ -186,6 +188,7 @@ available_datasets:
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
         prefix_branches: *prefix_branches
         jet_R: 0.2
+        entries_per_job: 2e5
         files:
             - "trains/pythia/2461/AnalysisResults.FAST.*.repaired.root"
             - "trains/pythia/2461/AnalysisResults.cent_woSDD.*.repaired.root"
@@ -680,6 +683,7 @@ available_datasets:
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
         prefix_branches: *prefix_branches
         jet_R: 0.2
+        entries_per_job: 1.5e5
         files:
             - "trains/embedPythia/6798/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/6799/AnalysisResults.*.repaired.root"
@@ -845,8 +849,8 @@ analysis_configurations:
         unfolding:
             suffix: "semi_central_R04"
             nominal_binning:
-                true_jet_pt: [0, 30, 40, 60, 80, 100, 120, 160]
-                smeared_jet_pt: [30, 40, 50, 60, 80, 100, 120]
+                true_jet_pt: [0, 40, 60, 80, 100, 120, 160]
+                smeared_jet_pt: [40, 50, 60, 80, 100, 120]
                 true_kt: [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100]
                 smeared_kt: [1, 2, 3, 4, 5, 7, 10, 15]
             settings:
@@ -868,6 +872,22 @@ analysis_configurations:
                         # No untagged means that we repeat what would have been the untagged bins.
                         true_kt: [0, 2, 3, 4, 5, 7, 10, 15, 100]
                         smeared_kt: [2, 2, 3, 4, 5, 7, 10, 15]
+                default_kt_1:
+                    label: ""
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1, 2, 3, 4, 5, 7, 10, 15, 100]
+                        smeared_kt: [0, 1, 2, 3, 4, 5, 7, 10, 15]
+                default_kt_1_no_untagged:
+                    label: ""
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1, 2, 3, 4, 5, 7, 10, 15, 100]
+                        smeared_kt: [1, 1, 2, 3, 4, 5, 7, 10, 15]
                 default_kt_1.5:
                     label: ""
                     closures: false
@@ -930,6 +950,115 @@ analysis_configurations:
                     closures: false
                     reweight_prior: false
                     datasets: "rmax_070"
+                # Binning scan
+                var_1:
+                    label: "var_1"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 5, 7, 9, 15, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 5, 7, 9, 15]
+                var_2:
+                    label: "var_2"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 5, 7, 9, 14, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 5, 7, 9, 14]
+                var_3:
+                    label: "var_3"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 5, 8, 15, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 5, 8, 15]
+                var_4:
+                    label: "var_4"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 6, 9, 15, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 6, 9, 15]
+                var_5:
+                    label: "var_5"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 6, 9, 15, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 5, 6, 7, 9, 15]
+                var_6:
+                    label: "var_6"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 5, 7, 10, 14, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 5, 7, 10, 14]
+                var_11:
+                    label: "var_11"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_jet_pt: [0, 40, 60, 80, 100, 120, 160]
+                        smeared_jet_pt: [40, 50, 60, 80, 100, 120]
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 5, 7, 9, 15, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 5, 7, 9, 15]
+                var_12:
+                    label: "var_12"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_jet_pt: [0, 40, 60, 80, 100, 120, 160]
+                        smeared_jet_pt: [40, 50, 60, 80, 100, 120]
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 5, 7, 9, 14, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 5, 7, 9, 14]
+                var_13:
+                    label: "var_13"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_jet_pt: [0, 40, 60, 80, 100, 120, 160]
+                        smeared_jet_pt: [40, 50, 60, 80, 100, 120]
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 5, 8, 15, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 5, 8, 15]
+                var_14:
+                    label: "var_14"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_jet_pt: [0, 40, 60, 80, 100, 120, 160]
+                        smeared_jet_pt: [40, 50, 60, 80, 100, 120]
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 6, 9, 15, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 6, 9, 15]
+                var_15:
+                    label: "var_15"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_jet_pt: [0, 40, 60, 80, 100, 120, 160]
+                        smeared_jet_pt: [40, 50, 60, 80, 100, 120]
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 6, 9, 15, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 5, 6, 7, 9, 15]
+                var_16:
+                    label: "var_16"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_jet_pt: [0, 40, 60, 80, 100, 120, 160]
+                        smeared_jet_pt: [40, 50, 60, 80, 100, 120]
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 5, 7, 10, 14, 100]
+                        smeared_kt: [1, 1.5, 2, 3, 4, 5, 7, 10, 14]
     PbPb_semi_central_R02_pass3:
         datasets:
             nominal:
@@ -944,6 +1073,40 @@ analysis_configurations:
             rmax_070:
                 PbPb: null  #*LHC18qr_semi_central_R02_Rmax070
                 embedPythia: null  #*LHC18qr_semi_central_R02_embedded_Rmax070
+        unfolding:
+            suffix: "semi_central_R02"
+            nominal_binning:
+                true_jet_pt: [0, 40, 60, 80, 100, 120, 160]
+                smeared_jet_pt: [40, 50, 60, 80, 100, 120]
+                true_kt: [-0.05, 0, 2, 3, 4, 8, 100]
+                smeared_kt: [1, 2, 3, 4, 8]
+            settings:
+                default:
+                    label: ""
+                    # NOTE: Untagged bin above is included in the closures!
+                    # TEMP: disabled for conveience.
+                    closures: false
+                    # TODO: Need closure settings for.
+                    #       - fraction of MC split
+                    #       - value of untaggecd max upper bin.
+                    reweight_prior: false
+                    datasets: "nominal"
+                default_kt_1:
+                    label: ""
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1, 2, 3, 4, 8, 100]
+                        smeared_kt: [0, 1, 2, 3, 4, 8]
+                default_kt_1.5:
+                    label: ""
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 8, 100]
+                        smeared_kt: [0, 1.5, 2, 3, 4, 8]
 
     PbPb_central_R02_pass1:
         datasets:
