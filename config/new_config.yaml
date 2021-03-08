@@ -117,9 +117,10 @@ available_datasets:
         files:
             - "trains/pp/1998/AnalysisResults.*.repaired.root"
             - "trains/pp/1999/AnalysisResults.*.repaired.root"
+    #
     # pythia
     # pythia R = 0.4
-    LHC18b8_pythia_R04_2110: &LHC18b8_pythia_R04
+    LHC18b8_pythia_R04_2110:
         name: "LHC18b8_pythia_R04_2110"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
@@ -138,7 +139,7 @@ available_datasets:
             - "trains/pythia/2110/AnalysisResults.FAST.*.repaired.root"
             - "trains/pythia/2110/AnalysisResults.woSDD.*.repaired.root"
             - "trains/pythia/2110/AnalysisResults.woSDD.*.chunk*.root"
-    LHC18b8_pythia_R04_tracking_efficiency_2161: &LHC18b8_pythia_R04_tracking_efficiency
+    LHC18b8_pythia_R04_tracking_efficiency_2161:
         name: "LHC18b8_pythia_R04_tracking_efficiency_2161"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
@@ -157,6 +158,44 @@ available_datasets:
             - "trains/pythia/2161/AnalysisResults.FAST.*.repaired.root"
             - "trains/pythia/2161/AnalysisResults.woSDD.*.repaired.root"
             - "trains/pythia/2161/AnalysisResults.woSDD.*.chunk*.root"
+    LHC18b8_pythia_R04_2520: &LHC18b8_pythia_R04
+        # NOTE: This is nominally the same output as in 2110, but produced with the newer
+        #       substructure task output, so it's much easier to work with.
+        name: "LHC18b8_pythia_R04_2520"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+            "true": "matched"
+        # Branches which don't exist for all prefixes
+        branches: ["ptHard", "ptHardBin"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.4
+        entries_per_job: 2e5
+        files:
+            - "trains/pythia/2520/AnalysisResults.FAST.*.repaired.root"
+            - "trains/pythia/2520/AnalysisResults.cent_woSDD.*.repaired.root"
+    LHC18b8_pythia_R04_tracking_efficiency_2521: &LHC18b8_pythia_R04_tracking_efficiency
+        # NOTE: This is nominally the same output as in 2161, but produced with the newer
+        #       substructure task output, so it's much easier to work with.
+        name: "LHC18b8_pythia_R04_tracking_efficiency_2521"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_responseTree_PythiaDef_NoSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+            "true": "matched"
+        # Branches which don't exist for all prefixes
+        branches: ["ptHard", "ptHardBin"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.4
+        entries_per_job: 2e5
+        files:
+            - "trains/pythia/2521/AnalysisResults.FAST.*.repaired.root"
+            - "trains/pythia/2521/AnalysisResults.cent_woSDD.*.repaired.root"
     # pythia R = 0.2
     LHC18b8_pythia_R02_2461: &LHC18b8_pythia_R02
         name: "LHC18b8_pythia_R02_2461"
@@ -167,7 +206,7 @@ available_datasets:
             data: "data"
             "true": "matched"
         # Branches which don't exist for all prefixes
-        branches: []
+        branches: ["ptHard", "ptHardBin"]
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
         prefix_branches: *prefix_branches
         jet_R: 0.2
@@ -184,14 +223,14 @@ available_datasets:
             data: "data"
             "true": "matched"
         # Branches which don't exist for all prefixes
-        branches: []
+        branches: ["ptHard", "ptHardBin"]
         # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
         prefix_branches: *prefix_branches
         jet_R: 0.2
         entries_per_job: 2e5
         files:
-            - "trains/pythia/2461/AnalysisResults.FAST.*.repaired.root"
-            - "trains/pythia/2461/AnalysisResults.cent_woSDD.*.repaired.root"
+            - "trains/pythia/2462/AnalysisResults.FAST.*.repaired.root"
+            - "trains/pythia/2462/AnalysisResults.cent_woSDD.*.repaired.root"
     #
     # Pb-Pb
     # Semi-central data R = 0.4 for pass1 AOD
