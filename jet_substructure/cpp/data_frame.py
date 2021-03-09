@@ -1163,6 +1163,7 @@ def run_standalone(
     prefixes: Sequence[str],
     grooming_method: str,
     jet_R: float,
+    main_jet_pt_range: helpers.JetPtRange,
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
@@ -1191,6 +1192,7 @@ def run_standalone(
         prefixes=prefixes,
         grooming_method=grooming_method,
         jet_R=jet_R,
+        main_jet_pt_range=main_jet_pt_range,
         output_filename=output_filename,
         jet_pt_prefix_first=jet_pt_prefix_first,
         n_cores=n_cores,
@@ -1253,6 +1255,7 @@ if __name__ == "__main__":
     #    #grooming_method=grooming_method,
     #    grooming_method="leading_kt",
     #    jet_R=0.4,
+    #    main_jet_pt_range=helpers.JetPtRange(40, 120),
     #    n_cores=6,
     #    jet_pt_prefix_first=True,
     # )

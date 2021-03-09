@@ -1225,34 +1225,43 @@ if __name__ == "__main__":
     from jet_substructure.base import helpers
 
     helpers.setup_logging()
-    res = calculate_embedding_skim(
+    # res = calculate_embedding_skim(
+    #     input_filename=Path(
+    #         "trains/embedPythia/6650/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"
+    #     ),
+    #     iterative_splittings=True,
+    #     prefixes={"hybrid": "data", "true": "matched", "det_level": "detLevel"},
+    #     scale_factors={1: 16.0695},
+    #     train_directory=Path("trains/embedPythia/6650/"),
+    #     jet_R=0.4,
+    #     output_filename=Path(
+    #         "trains/embedPythia/6650/skim/test/AnalysisResults.18q.repaired.00_iterative_splittings.root"
+    #     ),
+    #     write_parquet=True,
+    #     write_feather=True,
+    # )
+    # Skim data.
+    collision_system = "pythia"
+    train_number = 2461
+    res = calculate_data_skim(
         input_filename=Path(
-            "trains/embedPythia/6650/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"
+            f"trains/{collision_system}/{train_number}/parquet/events_per_job_200000/AnalysisResults.cent_woSDD.01.repaired.00.parquet"
         ),
+        collision_system=collision_system,
         iterative_splittings=True,
-        prefixes={"hybrid": "data", "true": "matched", "det_level": "detLevel"},
-        scale_factors={1: 16.0695},
-        train_directory=Path("trains/embedPythia/6650/"),
-        jet_R=0.4,
+        prefixes={
+            "data": "data",
+            "true": "matched",
+        },
+        # These are wrong, but we need to simulate all of them being available for testing.
+        scale_factors={pt_hard_bin: 16.0695 for pt_hard_bin in range(1, 21)},
+        jet_R=0.2,
         output_filename=Path(
-            "trains/embedPythia/6650/skim/test/AnalysisResults.18q.repaired.00_iterative_splittings.root"
+            f"trains/{collision_system}/{train_number}/skim/test/AnalysisResults.cent_woSDD.01.repaired.00_iterative_splittings.root"
         ),
         write_parquet=True,
         write_feather=True,
     )
-    # Skim data.
-    # collision_system = "PbPb"
-    # train_number = 5863
-    # res = calculate_data_skim(
-    #     input_filename=Path(f"trains/{collision_system}/{train_number}/parquet/events_per_job_100000/AnalysisResults.18q.repaired.00.parquet"),
-    #     collision_system=collision_system,
-    #     iterative_splittings=True,
-    #     prefixes={"data": "data"},
-    #     jet_R=0.4,
-    #     output_filename=Path(f"trains/{collision_system}/{train_number}/skim/test/AnalysisResults.18q.repaired.00_iterative_splittings.root"),
-    #     write_parquet=True,
-    #     write_feather=True,
-    # )
     # Skim cross check task.
     # res = skim_cross_check_task_to_uniform_output(
     #     # n_cores=2,

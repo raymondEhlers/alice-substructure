@@ -1677,29 +1677,29 @@ def _unfolding_closure(
 
 # def setup_unfolding(
 #    grooming_methods: Sequence[str],
+#    datasets_name: str,
 #    tag: str,
 #    run_closures: bool = True,
 #    reweight_prior: bool = False,
 # ) -> List[AppFuture]:
 #    # Setup
 #    from jet_substructure.cpp import unfolding_2D
+#    import random
 #
 #    output_dir = Path("output") / "PbPb" / "unfolding" / "parsl"
 #    output_dir.mkdir(parents=True, exist_ok=True)
 #
-#    PbPb_dataset_config = read_dataset_config(collision_system="PbPb")
+#    PbPb_dataset_config = base_dataset_config["datasets"][datasets_name]["PbPb"]
 #    PbPb_train_directories = set([Path(filename).parent for filename in PbPb_dataset_config["files"]])
-#    # PbPb_prefixes = PbPb_dataset_config["prefixes"]
-#    embedded_dataset_config = read_dataset_config(collision_system="embedPythia")
+#    embedded_dataset_config = base_dataset_config["datasets"][datasets_name]["embedPythia"]
 #    embedded_train_directories = set([Path(filename).parent for filename in embedded_dataset_config["files"]])
-#    # embedded_prefixes = embedded_dataset_config["prefixes"]
 #
 #    # Determine filenames first since they don't depend on grooming methods
 #    data_files: List[File] = []
 #    embedded_files: List[File] = []
 #    for label, train_directories, files in [
-#        ("PbPb", PbPb_train_directories, data_files),
-#        ("embedded", embedded_train_directories, embedded_files),
+#            ("PbPb", PbPb_train_directories, data_files),
+#            ("embedded", embedded_train_directories, embedded_files),
 #    ]:
 #        for train_directory in sorted(train_directories):
 #            logger.info(f"Processing {label} train number {train_directory.name}")
@@ -1720,21 +1720,21 @@ def _unfolding_closure(
 #        _default_settings = unfolding_2D.Settings(
 #            grooming_method=grooming_method,
 #            jet_pt=unfolding_2D.ParameterSettings(
-#                true_bins=np.array([0, 40, 60, 80, 100, 120, 160], dtype=np.float64),
-#                smeared_bins=np.array([40, 50, 60, 80, 100, 120], dtype=np.float64),
+#                true_bins=np.array([0, 30, 40, 60, 80, 100, 120, 160], dtype=np.float64),
+#                smeared_bins=np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64),
 #            ),
 #            substructure_variable=unfolding_2D.SubstructureVariableSettings.from_binning(
 #                true_bins=np.array(
 #                    # NOTE: (-0.05, 0) is the untagged bin.
-#                    [-0.05, 0, 2, 3, 4, 8, 100],
+#                    [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],
 #                    dtype=np.float64,
 #                ),
-#                smeared_bins=np.array([1, 2, 3, 4, 8], dtype=np.float64),
+#                smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64),
 #                name="kt",
 #                variable_name="kt",
 #                untagged_bin_below_range=True,
 #            ),
-#            tag=tag,
+#            suffix=tag,
 #            output_dir=output_dir,
 #            use_pure_matches=False,
 #        )
@@ -1745,7 +1745,7 @@ def _unfolding_closure(
 #        #       it can then be multiplied with the inner binning.
 #        #       Semi-central:
 #        #       Standard binning:
-#        #           true_bins=np.array([-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],, dtype=np.float64)
+#        #           true_bins=np.array([-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100], dtype=np.float64)
 #        #           smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64)
 #        #       Random binning: smeared_bins=np.array([1, 2, 3.02, 3.92, 5.06, 7.08, 9.72, 15], dtype=np.float64),
 #        #       Central:
@@ -2042,24 +2042,26 @@ def setup_all_unfolding(  # noqa: C901
 if __name__ == "__main__":  # noqa: C901
     # Settings
     # Base settings
-    base_dataset_name = "PbPb_semi_central_R04_pass3"
-    #dataset_type = "rmax_070"
+    # base_dataset_name = "PbPb_central_R02_pass1"
+    base_dataset_name = "pp_R02"
+    # dataset_type = "rmax_070"
     dataset_type = "nominal"
-    collision_system = "PbPb"
+    collision_system = "pythia"
 
     # Job settings
     jobs_to_execute = [
         # "repair_root_files",
         # "convert_to_parquet",
-        # "extract_scale_factors_for_embedding",
+        # "extract_scale_factors",
         # "calculate_embedding_skim",
-        # "root_data_frame",
+        # "calculate_data_skim",
+        "root_data_frame",
         # "root_data_frame_embedded_pt_hard_scaling",
         # "root_data_frame_response",
-        "unfolding",
+        # "unfolding",
     ]
-    nodes_to_allocate = 4
-    jobs_per_node = 8
+    nodes_to_allocate = 2
+    jobs_per_node = 5
 
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
     grooming_methods = [
@@ -2073,7 +2075,7 @@ if __name__ == "__main__":  # noqa: C901
         "soft_drop_z_cut_02",
         "soft_drop_z_cut_04",
     ]
-    max_cores_to_use_per_node = 8
+    max_cores_to_use_per_node = 10
 
     # Basic setup for jobs
     _possible_jobs = [
@@ -2117,9 +2119,7 @@ if __name__ == "__main__":  # noqa: C901
         # partition="long",
         use_root=any((job in _jobs_requiring_root for job in jobs_to_execute)),
         # We need the AliPhysics definitions for the Substructure output classes and AliEmcalList.
-        use_aliphysics=any(
-            (job in ["repair_root_files", "extract_scale_factors"] for job in jobs_to_execute)
-        ),
+        use_aliphysics=any((job in ["repair_root_files", "extract_scale_factors"] for job in jobs_to_execute)),
         use_roounfold=any((job == "unfolding" for job in jobs_to_execute)),
     )
 
@@ -2276,20 +2276,28 @@ if __name__ == "__main__":  # noqa: C901
             )
         results.extend(temp_results)
     if "unfolding" in jobs_to_execute:
+        # TODO: Run the original unfolding once to make sure that I haven't made a mistake...
         results = setup_all_unfolding(
             base_dataset_config=base_dataset_config,
             grooming_methods=grooming_methods,
             n_cores_per_job=n_cores_per_job,
             selected_unfolding_settings=[
                 "default",
-                # "default_kt_1",
+                "default_kt_1",
                 "default_kt_1.5",
-                "default_no_untagged",
+                # "default_no_untagged",
                 # "default_kt_1_no_untagged",
-                "default_kt_1.5_no_untagged",
+                # "default_kt_1.5_no_untagged",
                 # "default_kt_2_6",
+                # *[f"var_{i}" for i in range(1, 17) if i < 7 or i > 10] + ["default"],
             ],
         )
+        # results = setup_unfolding(
+        #     grooming_methods=grooming_methods,
+        #     datasets_name="nominal",
+        #     tag="test_original_parsl_method",
+        #     run_closures=False,
+        # )
         all_results.extend(results)
 
     logger.info(f"Accumulated {len(all_results)} results")
