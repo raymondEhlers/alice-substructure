@@ -1287,6 +1287,7 @@ def _root_data_frame(
     prefixes: Sequence[str],
     grooming_method: str,
     jet_R: float,
+    main_jet_pt_range: helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
     inputs: MutableSequence[File] = [],
@@ -1314,6 +1315,7 @@ def _root_data_frame(
         prefixes=prefixes,
         grooming_method=grooming_method,
         jet_R=jet_R,
+        main_jet_pt_range=main_jet_pt_range,
         output_filename=Path(outputs[0].filepath),
         jet_pt_prefix_first=True,
         n_cores=n_cores,
@@ -1330,6 +1332,7 @@ def _root_data_frame_response(
     prefixes: Sequence[str],
     grooming_method: str,
     jet_R: float,
+    main_jet_pt_range: helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
     inputs: MutableSequence[File] = [],
@@ -1357,6 +1360,7 @@ def _root_data_frame_response(
         prefixes=prefixes,
         grooming_method=grooming_method,
         jet_R=jet_R,
+        main_jet_pt_range=main_jet_pt_range,
         output_filename=Path(outputs[0].filepath),
         jet_pt_prefix_first=True,
         n_cores=n_cores,
@@ -1373,6 +1377,7 @@ def _root_data_frame_closure(
     prefixes: Sequence[str],
     grooming_method: str,
     jet_R: float,
+    main_jet_pt_range: helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
     base_unfolding_config: Mapping[str, Any],
@@ -1395,6 +1400,7 @@ def _root_data_frame_closure(
         prefixes=prefixes,
         grooming_method=grooming_method,
         jet_R=jet_R,
+        main_jet_pt_range=main_jet_pt_range,
         output_filename=Path(outputs[0].filepath),
         base_unfolding_config=base_unfolding_config,
         jet_pt_prefix_first=True,
@@ -1412,6 +1418,7 @@ def _root_data_frame_embedded_pt_hard_scaling(
     prefixes: Sequence[str],
     grooming_method: str,
     jet_R: float,
+    main_jet_pt_range: helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
     inputs: MutableSequence[File] = [],
@@ -1439,6 +1446,7 @@ def _root_data_frame_embedded_pt_hard_scaling(
         prefixes=prefixes,
         grooming_method=grooming_method,
         jet_R=jet_R,
+        main_jet_pt_range=main_jet_pt_range,
         output_filename=Path(outputs[0].filepath),
         # Workaround for older pythia productions that we can't reskim so easily.
         # We can remove this eventually when train 2110 is replaced.
@@ -1462,10 +1470,10 @@ def setup_root_data_frame(
     collision_system: str,
     n_cores_per_job: int,
     dataset_config: Mapping[str, Any],
+    base_unfolding_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[AppFuture]] = None,
-    base_unfolding_config: Optional[Mapping[str, Any]] = None,
 ) -> List[AppFuture]:
     # Validation
     # NOTE: I only compromised on specifying the function here because it loses the typing
@@ -1494,8 +1502,6 @@ def setup_root_data_frame(
     ]
     if processing_mode not in [p.name for p in _processing_modes]:
         raise ValueError('Invalid processing mode "{processing_mode}"')
-    if processing_mode != "closure" and base_unfolding_config is not None:
-        raise ValueError("Unfolding configuration is only a valid option for the closure")
 
     # Setup
     mode = [p for p in _processing_modes if processing_mode == p.name][0]
@@ -1529,9 +1535,16 @@ def setup_root_data_frame(
     # cross_check_task = dataset_config.get("cross_check_task", False)
     # logger.info(f"Cross check task: {cross_check_task}")
 
+    # Determine the broad smeared jet pt range. We basically want this to cover our
+    # entire range of interest. Since this will usually correspond with our unfolding
+    # nominal smeared jet pt binning, we just advantage of those values.
+    _nominal_smeared_jet_pt_bins = base_unfolding_config["nominal_binning"]["smeared_jet_pt"]
+    main_jet_pt_range = helpers.JetPtRange(_nominal_smeared_jet_pt_bins[0], _nominal_smeared_jet_pt_bins[-1])
+
     # Setup optional args
     optional_kwargs = {}
-    if base_unfolding_config:
+    # We only want to pass the entire configuration for the closure.
+    if processing_mode == "closure":
         optional_kwargs = {"base_unfolding_config": base_unfolding_config}
 
     results = []
@@ -1552,6 +1565,7 @@ def setup_root_data_frame(
                 prefixes=list(prefixes.keys()),
                 grooming_method=grooming_method,
                 jet_R=dataset_config["jet_R"],
+                main_jet_pt_range=main_jet_pt_range,
                 n_cores=n_cores_per_job,
                 cross_check_task=cross_check_task,
                 # Need to grab the outputs here to ensure that the dependencies are tracked properly.
@@ -1568,6 +1582,7 @@ def embedded_pt_hard_scaling_cross_check(
     collision_system: str,
     n_cores_per_job: int,
     dataset_config: Mapping[str, Any],
+    base_unfolding_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
 ) -> List[AppFuture]:
     results = []
@@ -1582,6 +1597,7 @@ def embedded_pt_hard_scaling_cross_check(
                 collision_system=collision_system,
                 n_cores_per_job=n_cores_per_job,
                 dataset_config=dataset_config,
+                base_unfolding_config=base_unfolding_config,
                 # Take just the first grooming method - they'll all be the same because we don't care
                 # about the grooming method for this check.
                 grooming_methods=[grooming_methods[0]],
@@ -2063,7 +2079,7 @@ if __name__ == "__main__":  # noqa: C901
     _possible_jobs = [
         "repair_root_files",
         "convert_to_parquet",
-        "extract_scale_factors_for_embedding",
+        "extract_scale_factors",
         "calculate_embedding_skim",
         "calculate_data_skim",
         "root_data_frame_embedded_pt_hard_scaling",
@@ -2074,7 +2090,7 @@ if __name__ == "__main__":  # noqa: C901
     ]
     _jobs_requiring_root = [
         "repair_root_files",
-        "extract_scale_factors_for_embedding",
+        "extract_scale_factors",
         "root_data_frame_embedded_pt_hard_scaling",
         "root_data_frame",
         "root_data_frame_response",
@@ -2098,10 +2114,11 @@ if __name__ == "__main__":  # noqa: C901
         nodes_to_allocate=nodes_to_allocate,
         jobs_per_node=jobs_per_node,
         # partition="vip",
+        # partition="long",
         use_root=any((job in _jobs_requiring_root for job in jobs_to_execute)),
         # We need the AliPhysics definitions for the Substructure output classes and AliEmcalList.
         use_aliphysics=any(
-            (job in ["repair_root_files", "extract_scale_factors_for_embedding"] for job in jobs_to_execute)
+            (job in ["repair_root_files", "extract_scale_factors"] for job in jobs_to_execute)
         ),
         use_roounfold=any((job == "unfolding" for job in jobs_to_execute)),
     )
@@ -2149,7 +2166,7 @@ if __name__ == "__main__":  # noqa: C901
         )
         all_results.extend(_all_results)
     yaml_result: Optional[AppFuture] = None
-    if "extract_scale_factors_for_embedding" in jobs_to_execute:
+    if "extract_scale_factors" in jobs_to_execute:
         # NOTE: We don't take any input_results because we're super dependent on knowing the
         #       pt hard bins. We would have to reorganize the outputs heavily, so it's
         #       in fact easier for us to determine them independently. Note also that we
@@ -2212,6 +2229,7 @@ if __name__ == "__main__":  # noqa: C901
             collision_system=collision_system,
             n_cores_per_job=n_cores_per_job,
             dataset_config=dataset_config,
+            base_unfolding_config=base_dataset_config["unfolding"],
             grooming_methods=grooming_methods,
             # selected_train_numbers=list(range(5977, 5978)),
             input_results=results if results else None,
@@ -2223,6 +2241,7 @@ if __name__ == "__main__":  # noqa: C901
             collision_system=collision_system,
             n_cores_per_job=n_cores_per_job,
             dataset_config=dataset_config,
+            base_unfolding_config=base_dataset_config["unfolding"],
             grooming_methods=grooming_methods,
             # selected_train_numbers=list(range(6338, 6339)),
             input_results=results if results else None,
@@ -2235,6 +2254,7 @@ if __name__ == "__main__":  # noqa: C901
                 collision_system=collision_system,
                 n_cores_per_job=n_cores_per_job,
                 dataset_config=dataset_config,
+                base_unfolding_config=base_dataset_config["unfolding"],
                 grooming_methods=grooming_methods,
             )
         )
@@ -2248,6 +2268,7 @@ if __name__ == "__main__":  # noqa: C901
                     collision_system=_collision_system,
                     n_cores_per_job=n_cores_per_job,
                     dataset_config=dataset_config,
+                    base_unfolding_config=base_dataset_config["unfolding"],
                     grooming_methods=grooming_methods,
                     # selected_train_numbers=list(range(5977, 5978)),
                     input_results=results if results else None,

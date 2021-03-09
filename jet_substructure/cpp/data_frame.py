@@ -395,6 +395,7 @@ def run_embedded_pt_hard_scaling(  # noqa: C901
     prefixes: Sequence[str],
     grooming_method: str,
     jet_R: float,
+    main_jet_pt_range: helpers.JetPtRange,
     output_filename: Path,
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
@@ -469,7 +470,7 @@ def run_embedded_pt_hard_scaling(  # noqa: C901
         )
     )
     # And with the hybrid pt cut.
-    jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= 40 && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < 120"
+    jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= {main_jet_pt_range.min} && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < {main_jet_pt_range.max}"
     df = df_original.Filter(jet_pt_cut)
     hists.append(
         df.Histo1D(
@@ -517,13 +518,29 @@ def run_embedded_pt_hard_scaling(  # noqa: C901
     return (True, "Processed")
 
 
+def _encode_binning_in_str(array: np.ndarray) -> str:
+    """Encode numpy array in safe string for a histogram name.
+
+    Here, we put "_" between entries, leave "_" signs as is, and encode
+    decimal points as "p". This is ugly, but for our purposes, unambiguous.
+
+    Args:
+        array: Array to be encoded.
+
+    Returns:
+        Array encoded into a string.
+    """
+    return "_".join([f"{v:g}".replace(".", "p") for v in array])
+
+
 def run_create_closure_ratio(  # noqa: C901
     collision_system: str,
     input_filenames: Sequence[Path],
     tree_name: str,
     prefixes: Sequence[str],
     grooming_method: str,
-    jet_R: float,
+    jet_R: float,  # Intentionally ignored, but kept for uniform interface.
+    main_jet_pt_range: helpers.JetPtRange,  # Intentionally ignored, but kept for uniform interface.
     output_filename: Path,
     # NOTE: This is the only argument which varies from the other run functions.
     base_unfolding_config: Mapping[str, Any],
@@ -652,6 +669,7 @@ def run_response(  # noqa: C901
     prefixes: Sequence[str],
     grooming_method: str,
     jet_R: float,
+    main_jet_pt_range: helpers.JetPtRange,
     output_filename: Path,
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
@@ -716,7 +734,7 @@ def run_response(  # noqa: C901
         smeared_cut_prefix = "data"
 
     # For the substructure variables, we also apply a jet pt cut at the measured level (ie. data or hybrid).
-    jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= 40 && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < 120"
+    jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= {main_jet_pt_range.min} && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < {main_jet_pt_range.max}"
     df_measured_selections = df_original.Filter(jet_pt_cut)
 
     hists = []
@@ -866,7 +884,7 @@ def run_response(  # noqa: C901
 
         # Apply hybrid jet pt cut.
         tag = f"jet_pt_{smeared_cut_prefix}_40_120"
-        jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= 40 && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < 120"
+        jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= {main_jet_pt_range.min} && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < {main_jet_pt_range.max}"
         df_selection = df_base.Filter(jet_pt_cut)
 
         hists.extend(
@@ -1002,6 +1020,7 @@ def run(  # noqa: C901
     prefixes: Sequence[str],
     grooming_method: str,
     jet_R: float,
+    main_jet_pt_range: helpers.JetPtRange,
     output_filename: Path,
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
@@ -1059,13 +1078,13 @@ def run(  # noqa: C901
         smeared_cut_prefix = "data"
 
     # For the substructure variables, we also apply a jet pt cut at the measured level (ie. data or hybrid).
-    jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= 40 && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < 120"
+    jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= {main_jet_pt_range.min} && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < {main_jet_pt_range.max}"
     df_measured_selections = df_original.Filter(jet_pt_cut)
 
     hists = []
     jet_pt_axis = (28, 0, 140)
     for measured_min_kt in [-1, 2, 3, 5]:
-        tag = f"_jet_pt_{smeared_cut_prefix}_40_120"
+        tag = f"_jet_pt_{smeared_cut_prefix}_{main_jet_pt_range.min}_{main_jet_pt_range.max}"
         # kt == -1 is the cause that includes the untagged. There, we don't want to include any kt tag.
         if measured_min_kt == -1:
             df = df_measured_selections
