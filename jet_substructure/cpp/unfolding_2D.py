@@ -364,9 +364,11 @@ def _collision_system_names(unfolding_for_pp: bool) -> Tuple[str, str]:
     return "PbPb", "embedPythia"
 
 
-def get_reweighted_ratio(
+def _get_reweighted_ratio(
     data_dataset_name: str,
     response_dataset_name: str,
+    smeared_substructure_variable_bins: np.ndarray,
+    smeared_jet_pt_bins: np.ndarray,
     grooming_method: str,
     unfolding_for_pp: bool,
     base_directory: Path = Path("output"),
@@ -389,7 +391,14 @@ def get_reweighted_ratio(
         / f"{response_dataset_name}_{grooming_method}_prefixes_{response_prefixes}_closure.root"
     )
     f_response = ROOT.TFile(str(response_filename), "READ")
-    h_response = f_response.Get(f"{grooming_method}_{response_prefix}_kt_jet_pt")
+    h_response = f_response.Get(
+        unfolding_base.hist_name_for_ratio_2D(
+            grooming_method=grooming_method,
+            prefix_for_ratio=response_prefix,
+            smeared_substructure_variable_bins=smeared_substructure_variable_bins,
+            smeared_jet_pt_bins=smeared_jet_pt_bins,
+        )
+    )
     # Retrieve data hist
     data_filename = (
         base_directory
@@ -398,7 +407,14 @@ def get_reweighted_ratio(
         / f"{data_dataset_name}_{grooming_method}_prefixes_data_closure.root"
     )
     f_data = ROOT.TFile(str(data_filename), "READ")
-    h_data = f_data.Get(f"{grooming_method}_data_kt_jet_pt")
+    h_data = f_data.Get(
+        unfolding_base.hist_name_for_ratio_2D(
+            grooming_method=grooming_method,
+            prefix_for_ratio="data",
+            smeared_substructure_variable_bins=smeared_substructure_variable_bins,
+            smeared_jet_pt_bins=smeared_jet_pt_bins,
+        )
+    )
 
     # Calculate the ratio and cleanup
     h_ratio = h_response.Clone("h_ratio")
@@ -424,9 +440,11 @@ def _get_reweighting_ratio(
             f"Must pass data and response dataset names. Passed data: {reweight_data_dataset_name}, response: {reweight_response_dataset_name}"
         )
 
-    h_reweighting_ratio = get_reweighted_ratio(
+    h_reweighting_ratio = _get_reweighted_ratio(
         data_dataset_name=reweight_data_dataset_name,
         response_dataset_name=reweight_response_dataset_name,
+        smeared_substructure_variable_bins=settings.substructure_variable.smeared_bins,
+        smeared_jet_pt_bins=settings.jet_pt.smeared_bins,
         grooming_method=settings.grooming_method,
         unfolding_for_pp=unfolding_for_pp,
     )
