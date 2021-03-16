@@ -15,15 +15,14 @@ Conventions:
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
-import attr
 import numpy as np
-import numpy.typing as npt
 import uproot
 from pachyderm import binned_data
 
 from jet_substructure.base import helpers, skim_analysis_objects
+from jet_substructure.base import unfolding as unfolding_base
 
 
 logger = logging.getLogger(__name__)
@@ -34,169 +33,6 @@ RooUnfoldErrorTreatment = Any
 RooUnfoldResponse = Any
 TH2D = Any
 TMatrixD = Any
-
-
-def _np_array_converter(value: Any, dtype: npt.DTypeLike = np.float64) -> np.ndarray:
-    """Convert the given value to a numpy array.
-
-    Normally, we would just use np.array directly as the converter function. However, mypy will complain if
-    the converter is untyped. So we add (trivial) typing here.  See: https://github.com/python/mypy/issues/6172.
-
-    Note:
-        To change the dtype for the converter, one would need to use `partial`.
-
-    Args:
-        value: Value to be converted to a numpy array.
-        dtype: Dtype to utilize. Default: np.float64.
-    Returns:
-        The converted numpy array.
-    """
-    return np.array(value, dtype=dtype)
-
-
-@attr.s
-class ParameterSettings:
-    """Parameter settings
-
-    Args:
-        true_bins: True bins.
-        smeared_bins: Smeared bins.
-    """
-
-    true_bins: np.ndarray = attr.ib(converter=_np_array_converter)
-    smeared_bins: np.ndarray = attr.ib(converter=_np_array_converter)
-
-
-@attr.s
-class SubstructureVariableSettings(ParameterSettings):
-    """Settings specific to the substructure variable.
-
-    Supports z, Rg, and kt.
-
-    Args:
-        name: Name of the substructure variable.
-        variable_name: Name of the substructure variable in the tree.
-        smeared_range: Smeared binning min and max. Values vary due to the location of the untagged bin.
-        untagged_bin: Untagged bin min and max.
-    """
-
-    name: str = attr.ib()
-    variable_name: str = attr.ib()
-    smeared_range: helpers.RangeSelector = attr.ib()
-    untagged_bin: helpers.RangeSelector = attr.ib()
-
-    @property
-    def untagged_value(self) -> float:
-        return (self.untagged_bin.max - self.untagged_bin.min) / 2 + self.untagged_bin.min
-
-    @property
-    def disable_untagged_bin(self) -> bool:
-        """If the untagged bin min and max are the same, we want to disable it."""
-        return self.untagged_bin.min == self.untagged_bin.max
-
-    @classmethod
-    def from_binning(
-        cls: Type["SubstructureVariableSettings"],
-        true_bins: np.ndarray,
-        smeared_bins: np.ndarray,
-        name: str,
-        variable_name: str,
-        untagged_bin_below_range: bool = True,
-    ) -> "SubstructureVariableSettings":
-        # Determine the appropriate range class.
-        # Either "Kt", "Rg", or "Zg"
-        range_class_name = variable_name
-        if variable_name != "kt" and "g" not in variable_name:
-            range_class_name += "g"
-        range_class_name = range_class_name.capitalize()
-        range_class_name += "Range"
-        range_class: Type[helpers.RangeSelector] = getattr(helpers, range_class_name)
-
-        # Determine the binning
-        if untagged_bin_below_range:
-            smeared_range = range_class(min=smeared_bins[1], max=smeared_bins[-1])
-            untagged_bin = range_class(min=smeared_bins[0], max=smeared_bins[1])
-        else:
-            smeared_range = range_class(min=smeared_bins[0], max=smeared_bins[-2])
-            untagged_bin = range_class(min=smeared_bins[-2], max=smeared_bins[-1])
-
-        # Account for disabled untagged bin.
-        # We indicate it by making the untagged bin edges identical, but then
-        # we need to drop that from the smeared_bins so we have valid binning.
-        smeared_bins_selection = slice(None, None)
-        if untagged_bin.min == untagged_bin.max:
-            if untagged_bin_below_range:
-                smeared_bins_selection = slice(1, None)
-            else:
-                smeared_bins_selection = slice(None, -1)
-
-        return cls(
-            true_bins=true_bins,
-            smeared_bins=smeared_bins[smeared_bins_selection],
-            name=name,
-            variable_name=variable_name,
-            smeared_range=smeared_range,
-            untagged_bin=untagged_bin,
-        )
-
-
-@attr.s
-class Settings:
-    grooming_method: str = attr.ib()
-    jet_pt: ParameterSettings = attr.ib()
-    substructure_variable: SubstructureVariableSettings = attr.ib()
-    suffix: str = attr.ib()
-    output_dir: Path = attr.ib()
-    label: str = attr.ib(default="")
-    use_pure_matches: bool = attr.ib(default=False)
-    filename_padding_factor: int = attr.ib(default=0)
-
-    @property
-    def output_tag(self) -> str:
-        # Start with the basic information
-        base_filename = f"unfolding_{self.substructure_variable.name}_grooming_method_{self.grooming_method}"
-        # Then add the binning information.
-        # First, the substructure edges.
-        base_filename += f"_smeared_{self.substructure_variable.smeared_range}"
-        # Then the untagged
-        base_filename += f"_untagged_{self.substructure_variable.untagged_bin}"
-        # Then the jet pt
-        smeared_jet_pt = helpers.JetPtRange(min=self.jet_pt.smeared_bins[0], max=self.jet_pt.smeared_bins[-1])
-        # base_filename += f"_smeared_{smeared_jet_pt.zero_padded_str(self.filename_padding_factor)}"
-        base_filename += f"_smeared_{smeared_jet_pt}"
-        base_filename += f"_{self.suffix}"
-        # Additional options
-        # Optional tag
-        if self.label:
-            base_filename += f"_{self.label}"
-        # Put other possible options after the tag so we can sort by tag if it exists.
-        if self.use_pure_matches:
-            base_filename += "_pure_matches"
-        return base_filename
-
-    @property
-    def output_filename(self) -> Path:
-        # NOTE: We can't use with_suffix here because the filename may contain ".", which will mess up
-        #       the detection of the suffix to replace.
-        return Path(f"{self.output_dir / self.output_tag}.root")
-
-
-@attr.s
-class InputFileSettings:
-    filenames: Sequence[Path] = attr.ib()
-    tree_name: str = attr.ib()
-
-
-@attr.s
-class DataSettings(InputFileSettings):
-    prefix: str = attr.ib()
-
-
-@attr.s
-class EmbeddedSettings(InputFileSettings):
-    hybrid_prefix: str = attr.ib()
-    true_prefix: str = attr.ib()
-    det_level_prefix: str = attr.ib()
 
 
 def _pass_filenames_to_ROOT(filenames: Sequence[Path]) -> List[str]:
@@ -429,7 +265,7 @@ def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path, additi
     f_out.Close()
 
 
-def _default_hists(settings: Settings) -> Dict[str, TH2D]:
+def _default_hists(settings: unfolding_base.Settings2D) -> Dict[str, TH2D]:
     import ROOT
 
     hists = {}
@@ -577,7 +413,10 @@ def get_reweighted_ratio(
 
 
 def _get_reweighting_ratio(
-    reweight_data_dataset_name: str, reweight_response_dataset_name: str, settings: Settings, unfolding_for_pp: bool
+    reweight_data_dataset_name: str,
+    reweight_response_dataset_name: str,
+    settings: unfolding_base.Settings2D,
+    unfolding_for_pp: bool,
 ) -> TH2D:
     # Validation
     if not reweight_data_dataset_name or not reweight_response_dataset_name:
@@ -634,7 +473,7 @@ def _create_branch_rename_shim(
 
 
 def run_unfolding(
-    settings: Settings,
+    settings: unfolding_base.Settings2D,
     data_filenames: Sequence[Path],
     data_tree_name: str,
     response_filenames: Sequence[Path],
@@ -734,7 +573,7 @@ def run_unfolding(
 
 
 def run_unfolding_closure_reweighting(
-    settings: Settings,
+    settings: unfolding_base.Settings2D,
     response_filenames: Sequence[Path],
     response_tree_name: str,
     closure_variation: str,
@@ -1235,13 +1074,13 @@ if __name__ == "__main__":
     # )
 
     grooming_method = "leading_kt"
-    default_settings = Settings(
+    default_settings = unfolding_base.Settings2D(
         grooming_method=grooming_method,
-        jet_pt=ParameterSettings(
+        jet_pt=unfolding_base.JetPtSettings2D(
             true_bins=np.array([0, 20, 40, 60, 80, 100, 160], dtype=np.float64),
             smeared_bins=np.array([20, 30, 40, 50, 60, 85], dtype=np.float64),
         ),
-        substructure_variable=SubstructureVariableSettings.from_binning(
+        substructure_variable=unfolding_base.SubstructureVariableSettings2D.from_binning(
             true_bins=np.array(
                 # NOTE: (-0.05, 0) is the untagged bin.
                 [-0.05, 0.0, 0.5, 1, 2, 4, 8, 15],

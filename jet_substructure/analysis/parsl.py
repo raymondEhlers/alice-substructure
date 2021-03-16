@@ -12,7 +12,7 @@ import functools
 import logging
 import math
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
 
 import attr
 import IPython
@@ -31,10 +31,7 @@ from parsl.monitoring.monitoring import MonitoringHub
 from parsl.providers import SlurmProvider
 
 from jet_substructure.base import helpers, skim_analysis_objects
-
-
-if TYPE_CHECKING:
-    from jet_substructure.cpp import unfolding_2D
+from jet_substructure.base import unfolding as unfolding_base
 
 
 logger = logging.getLogger(__name__)
@@ -1381,6 +1378,7 @@ def _root_data_frame_closure(
     n_cores: int,
     cross_check_task: bool,
     base_unfolding_config: Mapping[str, Any],
+    unfolding_settings: Mapping[str, Any],
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
 ) -> AppFuture:
@@ -1403,6 +1401,7 @@ def _root_data_frame_closure(
         main_jet_pt_range=main_jet_pt_range,
         output_filename=Path(outputs[0].filepath),
         base_unfolding_config=base_unfolding_config,
+        unfolding_settings=unfolding_settings,
         jet_pt_prefix_first=True,
         n_cores=n_cores,
         cross_check_task=cross_check_task,
@@ -1474,6 +1473,7 @@ def setup_root_data_frame(
     grooming_methods: Sequence[str],
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[AppFuture]] = None,
+    unfolding_settings: Optional[Mapping[str, Any]] = None,
 ) -> List[AppFuture]:
     # Validation
     # NOTE: I only compromised on specifying the function here because it loses the typing
@@ -1501,7 +1501,9 @@ def setup_root_data_frame(
         ),
     ]
     if processing_mode not in [p.name for p in _processing_modes]:
-        raise ValueError('Invalid processing mode "{processing_mode}"')
+        raise ValueError(f'Invalid processing mode "{processing_mode}"')
+    if processing_mode == "closure" and not unfolding_settings:
+        raise ValueError("Must pass unfolding setting with closure")
 
     # Setup
     mode = [p for p in _processing_modes if processing_mode == p.name][0]
@@ -1545,7 +1547,10 @@ def setup_root_data_frame(
     optional_kwargs = {}
     # We only want to pass the entire configuration for the closure.
     if processing_mode == "closure":
-        optional_kwargs = {"base_unfolding_config": base_unfolding_config}
+        optional_kwargs = {
+            "base_unfolding_config": base_unfolding_config,
+            "unfolding_settings": unfolding_settings,
+        }
 
     results = []
     for grooming_method in grooming_methods:
@@ -1610,7 +1615,7 @@ def embedded_pt_hard_scaling_cross_check(
 
 @python_app  # type: ignore
 def _unfolding_standard(
-    settings: "unfolding_2D.Settings",  # noqa: F821
+    settings: unfolding_base.Settings2D,
     unfolding_for_pp: bool,
     reweight_prior: bool,
     reweight_data_dataset_name: str,
@@ -1648,7 +1653,7 @@ def _unfolding_standard(
 
 @python_app  # type: ignore
 def _unfolding_closure(
-    settings: "unfolding_2D.Settings",  # noqa: F821
+    settings: unfolding_base.Settings2D,
     closure_variation: str,
     unfolding_for_pp: bool,
     reweight_data_dataset_name: str,
@@ -1687,7 +1692,6 @@ def _unfolding_closure(
 #    reweight_prior: bool = False,
 # ) -> List[AppFuture]:
 #    # Setup
-#    from jet_substructure.cpp import unfolding_2D
 #    import random
 #
 #    output_dir = Path("output") / "PbPb" / "unfolding" / "parsl"
@@ -1721,13 +1725,13 @@ def _unfolding_closure(
 #        settings = {}
 #
 #        # First, define the default settings.
-#        _default_settings = unfolding_2D.Settings(
+#        _default_settings = unfolding_base.Settings2D(
 #            grooming_method=grooming_method,
-#            jet_pt=unfolding_2D.ParameterSettings(
+#            jet_pt=unfolding_base.JetPtSettings2D(
 #                true_bins=np.array([0, 30, 40, 60, 80, 100, 120, 160], dtype=np.float64),
 #                smeared_bins=np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64),
 #            ),
-#            substructure_variable=unfolding_2D.SubstructureVariableSettings.from_binning(
+#            substructure_variable=unfolding_base.SubstructureVariableSettings2D.from_binning(
 #                true_bins=np.array(
 #                    # NOTE: (-0.05, 0) is the untagged bin.
 #                    [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],
@@ -1771,7 +1775,7 @@ def _unfolding_closure(
 #            # Replace the untagged value with our new untagged value, and then move it to the upper edge.
 #            _smeared_bins[0] = 20
 #            _smeared_bins = np.roll(_smeared_bins, -1)
-#            _temp_settings.substructure_variable = unfolding_2D.SubstructureVariableSettings.from_binning(
+#            _temp_settings.substructure_variable = unfolding_base.SubstructureVariableSettings2D.from_binning(
 #                true_bins=_temp_settings.substructure_variable.true_bins,
 #                smeared_bins=_smeared_bins,
 #                name=_temp_settings.substructure_variable.name,
@@ -1827,23 +1831,6 @@ def _unfolding_closure(
 #    return results
 
 
-def _get_binning(
-    unfolding_settings: Mapping[str, Any],
-    base_unfolding_config: Mapping[str, Any],
-    name: str,
-) -> np.ndarray:
-
-    binning = None
-    specialized_binning = unfolding_settings.get("binning", {})
-    if specialized_binning:
-        binning = specialized_binning.get(name, [])
-    # If not available in the specialized unfolding config, then grab it from the base config.
-    if not binning:
-        binning = base_unfolding_config["nominal_binning"][name]
-
-    return np.array(binning, dtype=np.float64)
-
-
 def setup_all_unfolding(  # noqa: C901
     data_collision_system: str,
     base_dataset_config: Mapping[str, Any],
@@ -1870,8 +1857,6 @@ def setup_all_unfolding(  # noqa: C901
         selected_unfolding_settings = list(base_dataset_config["unfolding"]["settings"].keys())
     logger.info(f"Unfolding settings: {selected_unfolding_settings}")
     # Setup
-    from jet_substructure.cpp import unfolding_2D
-
     base_unfolding_config = base_dataset_config["unfolding"]
     output_dir = Path("output") / data_collision_system / "unfolding" / "parsl"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1891,7 +1876,9 @@ def setup_all_unfolding(  # noqa: C901
         unfolding_settings = base_unfolding_config["settings"][unfolding_settings_name]
         datasets_name = unfolding_settings["datasets"]
         _get_bins = functools.partial(
-            _get_binning, base_unfolding_config=base_unfolding_config, unfolding_settings=unfolding_settings
+            unfolding_base.get_binning,
+            base_unfolding_config=base_unfolding_config,
+            unfolding_settings=unfolding_settings,
         )
 
         # Datasets config and input files.
@@ -1929,15 +1916,15 @@ def setup_all_unfolding(  # noqa: C901
             settings = {}
 
             # First, define the default settings.
-            _default_settings = unfolding_2D.Settings(
+            _default_settings = unfolding_base.Settings2D(
                 grooming_method=grooming_method,
-                jet_pt=unfolding_2D.ParameterSettings(
+                jet_pt=unfolding_base.JetPtSettings2D(
                     true_bins=_get_bins(name="true_jet_pt"),
                     smeared_bins=_get_bins(name="smeared_jet_pt"),
                     # true_bins=np.array([0, 40, 60, 80, 100, 120, 160], dtype=np.float64),
                     # smeared_bins=np.array([40, 50, 60, 80, 100, 120], dtype=np.float64),
                 ),
-                substructure_variable=unfolding_2D.SubstructureVariableSettings.from_binning(
+                substructure_variable=unfolding_base.SubstructureVariableSettings2D.from_binning(
                     true_bins=_get_bins(name="true_kt"),
                     smeared_bins=_get_bins(name="smeared_kt"),
                     # true_bins=np.array(
@@ -1970,7 +1957,7 @@ def setup_all_unfolding(  # noqa: C901
                 # Replace the untagged value with our new untagged value, and then move it to the upper edge.
                 _smeared_bins[0] = 20
                 _smeared_bins = np.roll(_smeared_bins, -1)
-                _temp_settings.substructure_variable = unfolding_2D.SubstructureVariableSettings.from_binning(
+                _temp_settings.substructure_variable = unfolding_base.SubstructureVariableSettings2D.from_binning(
                     true_bins=_temp_settings.substructure_variable.true_bins,
                     smeared_bins=_smeared_bins,
                     name=_temp_settings.substructure_variable.name,
@@ -1994,10 +1981,13 @@ def setup_all_unfolding(  # noqa: C901
                             processing_mode="closure",
                             collision_system=_collision_system,
                             n_cores_per_job=n_cores_per_job,
-                            # We always want the nominal dataset.
+                            # We always want the nominal dataset because we want to reweight by
+                            # the nominal data and response. However, we want the binning of the
+                            # particular case that we are considering.
                             dataset_config=base_dataset_config["datasets"]["nominal"][_collision_system],
                             grooming_methods=[grooming_method],
                             base_unfolding_config=base_unfolding_config,
+                            unfolding_settings=unfolding_settings,
                         )
                     )
             # Handle reweighted prior results.
@@ -2074,7 +2064,7 @@ def setup_all_unfolding(  # noqa: C901
 if __name__ == "__main__":  # noqa: C901
     # Settings
     # Base settings
-    # base_dataset_name = "PbPb_central_R02_pass1"
+    # base_dataset_name = "PbPb_semi_central_R02_pass3"
     base_dataset_name = "pp_R02"
     # dataset_type = "rmax_070"
     dataset_type = "nominal"
@@ -2093,7 +2083,7 @@ if __name__ == "__main__":  # noqa: C901
         "unfolding",
     ]
     nodes_to_allocate = 3
-    jobs_per_node = 5
+    jobs_per_node = 6
 
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
     grooming_methods = [
@@ -2107,7 +2097,7 @@ if __name__ == "__main__":  # noqa: C901
         "soft_drop_z_cut_02",
         "soft_drop_z_cut_04",
     ]
-    max_cores_to_use_per_node = 10
+    max_cores_to_use_per_node = 12
 
     # Basic setup for jobs
     _possible_jobs = [
@@ -2290,23 +2280,23 @@ if __name__ == "__main__":  # noqa: C901
                 grooming_methods=grooming_methods,
             )
         )
-    if "root_data_frame_closure" in jobs_to_execute:
-        # We'll always want both, so let's just do both.
-        temp_results = []
-        for _collision_system in ["PbPb", "embedPythia"]:
-            temp_results.extend(
-                setup_root_data_frame(
-                    processing_mode="closure",
-                    collision_system=_collision_system,
-                    n_cores_per_job=n_cores_per_job,
-                    dataset_config=dataset_config,
-                    base_unfolding_config=base_dataset_config["unfolding"],
-                    grooming_methods=grooming_methods,
-                    # selected_train_numbers=list(range(5977, 5978)),
-                    input_results=results if results else None,
-                )
-            )
-        results.extend(temp_results)
+    # if "root_data_frame_closure" in jobs_to_execute:
+    #     # We'll always want both, so let's just do both.
+    #     temp_results = []
+    #     for _collision_system in ["PbPb", "embedPythia"]:
+    #         temp_results.extend(
+    #             setup_root_data_frame(
+    #                 processing_mode="closure",
+    #                 collision_system=_collision_system,
+    #                 n_cores_per_job=n_cores_per_job,
+    #                 dataset_config=dataset_config,
+    #                 base_unfolding_config=base_dataset_config["unfolding"],
+    #                 grooming_methods=grooming_methods,
+    #                 # selected_train_numbers=list(range(5977, 5978)),
+    #                 input_results=results if results else None,
+    #             )
+    #         )
+    #     results.extend(temp_results)
     if "unfolding" in jobs_to_execute:
         # TODO: Run the original unfolding once to make sure that I haven't made a mistake...
         results = setup_all_unfolding(
@@ -2316,8 +2306,9 @@ if __name__ == "__main__":  # noqa: C901
             n_cores_per_job=n_cores_per_job,
             selected_unfolding_settings=[
                 "default",
-                "default_kt_1",
-                "default_kt_1.5",
+                # "default_kt_1",
+                # "default_kt_2",
+                # "default_kt_1.5",
                 # "default_no_untagged",
                 # "default_kt_1_no_untagged",
                 # "default_kt_1.5_no_untagged",

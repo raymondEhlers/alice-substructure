@@ -14,6 +14,7 @@ import uproot
 from pachyderm import binned_data
 
 from jet_substructure.base import helpers, skim_analysis_objects
+from jet_substructure.base import unfolding as unfolding_base
 
 
 logger = logging.getLogger(__name__)
@@ -518,21 +519,6 @@ def run_embedded_pt_hard_scaling(  # noqa: C901
     return (True, "Processed")
 
 
-def _encode_binning_in_str(array: np.ndarray) -> str:
-    """Encode numpy array in safe string for a histogram name.
-
-    Here, we put "_" between entries, leave "_" signs as is, and encode
-    decimal points as "p". This is ugly, but for our purposes, unambiguous.
-
-    Args:
-        array: Array to be encoded.
-
-    Returns:
-        Array encoded into a string.
-    """
-    return "_".join([f"{v:g}".replace(".", "p") for v in array])
-
-
 def run_create_closure_ratio(  # noqa: C901
     collision_system: str,
     input_filenames: Sequence[Path],
@@ -542,34 +528,80 @@ def run_create_closure_ratio(  # noqa: C901
     jet_R: float,  # Intentionally ignored, but kept for uniform interface.
     main_jet_pt_range: helpers.JetPtRange,  # Intentionally ignored, but kept for uniform interface.
     output_filename: Path,
-    # NOTE: This is the only argument which varies from the other run functions.
+    # NOTE: This unfolding config and settings arguments are the only arguments which varies from
+    #       the other run functions.
     base_unfolding_config: Mapping[str, Any],
+    unfolding_settings: Mapping[str, Any],
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
 ) -> Tuple[bool, str]:
-    # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
+    """Create the histogram necessary to create the closure ratio.
 
+    This histogram is binned in the (smeared substructure variable, smeared jet pt) and by creating the ratio, we
+    can reweight the response to match the data.
+
+    The idea here is that for some unfolding variation (say, the random binning systematic), we want to have binning
+    that matches that case, but we always want to use the nominal dataset data. The nominal dataset data must already
+    be passed to this function, but retrieving the correct binning must be done in this function.
+
+    Note:
+        We are supposed to run this once for each dataset. So I ratio will require at least two calls to this function.
+    """
     # Setup
     prefix_for_ratio = "hybrid" if collision_system == "embedPythia" else "data"
     # Parameters
     jet_pt_column_format = "{prefix}_jet_pt" if jet_pt_prefix_first else "jet_pt_{prefix}"
+    # Retrieve the binning
+    # We always want the binning that is relevant for this particular unfolding case so we don't have any mismatches.
+    # NOTE: The reweighting data itself will always come from the nominal dataset.
+    smeared_substructure_variable_bins = unfolding_base.get_binning(
+        base_unfolding_config=base_unfolding_config,
+        unfolding_settings=unfolding_settings,
+        name="smeared_kt",
+    )
+    smeared_jet_pt_bins = unfolding_base.get_binning(
+        base_unfolding_config=base_unfolding_config,
+        unfolding_settings=unfolding_settings,
+        name="smeared_jet_pt",
+    )
+    # Ratio hist name
+    # It encodes the binning so we can have multiple hists stored in a single file, which
+    # makes variations in binning easier (since we don't have to start from scratch).
+    # Since we use this in many places, it's better to define it immediately.
+    hist_name = unfolding_base.hist_name_for_ratio_2D(
+        grooming_method=grooming_method,
+        prefix_for_ratio=prefix_for_ratio,
+        smeared_substructure_variable_bins=smeared_substructure_variable_bins,
+        smeared_jet_pt_bins=smeared_jet_pt_bins,
+    )
 
     # Check for existing file. If it exists, check that the binning is the same.
     # We do this check early because it allows us to bail out it it already exists.
     if output_filename.exists():
         with uproot.open(output_filename) as f:
-            # TODO: Probably better to encoede the binning into the hist name.
-            #       Also included: UPDATE the file instead of recreate.
-            h_temp = binned_data.BinnedData.from_existing_data(f[f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt"])
+            # Check for an existing hist. Even if the binning is encoded in the name,
+            # we check the binning explicitly to ensure we have't overlooked anything.
+            h_uproot = f.get(hist_name, None)
+            if h_uproot:
+                h_temp = binned_data.BinnedData.from_existing_data(h_uproot)
 
-            tests_for_same_binning = [
-                np.allclose(h_temp.axes[0].bin_edges, base_unfolding_config["nominal_binning"]["smeared_kt"]),
-                np.allclose(h_temp.axes[1].bin_edges, base_unfolding_config["nominal_binning"]["smeared_jet_pt"]),
-            ]
-            # If output already exists, we can return immediately.
-            if all(tests_for_same_binning):
-                return (True, "Same binning. Returning early.")
+                # First, check that we can actually make the comparison.
+                tests_for_same_binning = [
+                    len(h_temp.axes[0].bin_edges) == len(smeared_substructure_variable_bins),
+                    len(h_temp.axes[1].bin_edges) == len(smeared_jet_pt_bins),
+                ]
+                # If the lengths agree, we can then proceed to comparing the binning. If not, we definitely need to recalculate.
+                if all(tests_for_same_binning):
+                    tests_for_same_binning = [
+                        np.allclose(h_temp.axes[0].bin_edges, smeared_substructure_variable_bins),
+                        np.allclose(h_temp.axes[1].bin_edges, smeared_jet_pt_bins),
+                    ]
+                    # If output already exists, we can return immediately.
+                    if all(tests_for_same_binning):
+                        return (True, "Same binning. Returning early.")
+            else:
+                logger.info(f"Could not find hist {hist_name}. Creating...")
 
     # Delay ROOT import so we don't explicitly rely on it.
     import ROOT
@@ -614,15 +646,6 @@ def run_create_closure_ratio(  # noqa: C901
         double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
         df_original = df_original.Filter(double_counting_cut)
 
-    # We always want the nominal binning for this unfolding configuration.
-    smeared_substructure_variable_bins = np.array(
-        base_unfolding_config["nominal_binning"]["smeared_kt"],
-        dtype=np.float64,
-    )
-    smeared_jet_pt_bins = np.array(
-        base_unfolding_config["nominal_binning"]["smeared_jet_pt"],
-        dtype=np.float64,
-    )
     hists = []
     hists.append(
         df_original.Histo2D(
@@ -647,6 +670,7 @@ def run_create_closure_ratio(  # noqa: C901
 
     logger.info(f"Creating ratio output file for {collision_system}, {grooming_method}, {prefixes}")
     logger.info(f"Writing to {output_filename}")
+    # TODO: Once working, change to "UPDATE"
     output = ROOT.TFile(str(output_filename), "RECREATE")
     output.cd()
     for h in hists:
