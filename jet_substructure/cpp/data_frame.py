@@ -283,6 +283,7 @@ def _substructure_hists(
     grooming_method: str,
     tag: str,
     jet_pt_prefix: Optional[str] = None,
+    include_stats_hist: Optional[bool] = False,
 ) -> List[RootHist]:
     # Validation
     if jet_pt_prefix is None:
@@ -301,6 +302,22 @@ def _substructure_hists(
         "scale_factor",
     )
     hists.append(kt)
+    if include_stats_hist:
+        # Determine the statistics that are avaialble by not scaling according to the scale factor.
+        # In data, this will be trivially the same, but for the response, this is quite helpful.
+        kt_stats = df.Histo2D(
+            (
+                f"{grooming_method}_{prefix}_kt_stats{tag}",
+                f"{grooming_method}_{prefix}_kt_stats{tag}",
+                *jet_pt_axis,
+                26,
+                -1,
+                25,
+            ),
+            jet_pt_column,
+            f"{grooming_method}_{prefix}_kt",
+        )
+        hists.append(kt_stats)
     # Use 0.02 for the bin width.
     n_bins_delta_R = round((jet_R + 0.02) / 0.02)
     delta_R = df.Histo2D(
@@ -1128,6 +1145,7 @@ def run(  # noqa: C901
                     grooming_method=grooming_method,
                     tag=tag,
                     jet_pt_prefix=prefix,
+                    include_stats_hist=True,
                 )
             )
 
