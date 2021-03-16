@@ -650,8 +650,8 @@ def run_create_closure_ratio(  # noqa: C901
     hists.append(
         df_original.Histo2D(
             (
-                f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt",
-                f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt",
+                hist_name,
+                hist_name,
                 len(smeared_substructure_variable_bins) - 1,
                 smeared_substructure_variable_bins,
                 len(smeared_jet_pt_bins) - 1,
