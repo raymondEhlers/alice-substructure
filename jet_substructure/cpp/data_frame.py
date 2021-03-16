@@ -670,8 +670,7 @@ def run_create_closure_ratio(  # noqa: C901
 
     logger.info(f"Creating ratio output file for {collision_system}, {grooming_method}, {prefixes}")
     logger.info(f"Writing to {output_filename}")
-    # TODO: Once working, change to "UPDATE"
-    output = ROOT.TFile(str(output_filename), "RECREATE")
+    output = ROOT.TFile(str(output_filename), "UPDATE")
     output.cd()
     for h in hists:
         h.SetDirectory(output)
