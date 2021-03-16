@@ -201,17 +201,17 @@ double GetScaleFactor(TFile* f)
  *
  * @param[in] matchingLeading Matching status for the leading subjet.
  * @param[in] matchingSubleading Matching status for the subleading subjet.
- * @param[in] hybridSubstructureVariableValue Substructure variable value.
+ * @param[in] responseSmearedSubstructureVariableValue Substructure variable value.
  * @param[in] smearedUntaggedBinValue Value that will be assigned to the untagged bin for checking if we have this
  * value.
  *
  * @returns True if we have a pure match.
  */
-inline bool isPureMatch(int matchingLeading, int matchingSubleading, double hybridSubstructureVariableValue,
+inline bool isPureMatch(int matchingLeading, int matchingSubleading, double responseSmearedSubstructureVariableValue,
             double smearedUntaggedBinValue)
 {
   return (((std::abs(matchingLeading - 1) < 0.001) && (std::abs(matchingSubleading - 1) < 0.001)) ||
-      (std::abs(hybridSubstructureVariableValue - smearedUntaggedBinValue) < 0.001));
+      (std::abs(responseSmearedSubstructureVariableValue - smearedUntaggedBinValue) < 0.001));
 }
 
 /**
@@ -349,14 +349,15 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
                  bool disableUntaggedBin,
                  double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
                  const std::vector<std::string>& dataFilenames,
-                 const std::vector<std::string>& embeddedFilenames, const bool usePureMatches = false,
+                 const std::vector<std::string>& responseFilenames, const bool usePureMatches = false,
+                 const bool unfoldingForPP = false,
                  TH2D* hReweightingResponse = nullptr,
                  const std::string& dataTreeName = "tree",
-                 const std::string& embeddedTreeName = "tree",
+                 const std::string& responseTreeName = "tree",
                  const std::string& dataPrefix = "data",
-                 const std::string& hybridPrefix = "hybrid",
-                 const std::string& truePrefix = "true",
-                 const std::string& detLevelPrefix = "det_level")
+                 const std::string& responseSmearedPrefix = "hybrid",
+                 const std::string& responseTruePrefix = "true",
+                 const std::string& responseDetLevelPrefix = "det_level")
 {
   // Print out the status.
   std::cout << "Binning and values:\n";
@@ -381,6 +382,10 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
   std::cout << std::boolalpha << "Disable untagged bin: " << disableUntaggedBin << "\n";
   std::cout << "Min smeared substructure variable: " << minSmearedSplittingVariable << "\n";
   std::cout << "Max smeared substructure variable: " << maxSmearedSplittingVariable << "\n";
+  std::cout << std::boolalpha << "Use pure matches: " << usePureMatches << "\n";
+  std::cout << std::boolalpha << "Unfolding for pp: " << unfoldingForPP << "\n";
+  // Add some space before the filename printouts.
+  std::cout << "\n";
 
   // General setup
   double untaggedBelowThisValue = 0.;
@@ -422,7 +427,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
     hists["h2_raw"]->Fill(dataSubstructureVariableValue, *dataJetPt);
   }
 
-  // Now, switch to embedded
+  // Now, switch to response (ie. embedded for PbPb)
   // First, setup the response
   // NOTE: We allocate a shared_ptr, but don't delete here because we want to return the response
   //       without copying. If we do copy, RooUnfold doesn't seem to behave identically. It may not make
@@ -433,18 +438,18 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
   responsenotrunc->Setup(hists["h2_smeared_no_cuts"], hists["h2_full_eff"]);
 
   // Next, we setup the Reader, the columns, and store the data in the appropriate hists.
-  TChain embeddedChain(embeddedTreeName.c_str());
+  TChain responseChain(responseTreeName.c_str());
   std::cout << "Embedded filenames:\n";
-  for (auto filename : embeddedFilenames) {
+  for (auto filename : responseFilenames) {
     std::cout << " - " << filename << "\n";
-    embeddedChain.Add(filename.c_str());
+    responseChain.Add(filename.c_str());
   }
   // NOTE: We have no more need for friend trees because we skim everything. But we'll
   //       keep the below code commented as an example if we need to revive it.
   // NOTE: If we were to use this, we would need to make it conditional, as it's most
   //       likely wouldn't always be appropriate.
-  /*TChain embeddedScaleFactors("tree");
-  for (const auto filename : embeddedFilenames) {
+  /*TChain responseScaleFactors("tree");
+  for (const auto filename : responseFilenames) {
       // This is supposed to be equivalent to python with:
       // friend_tree.Add(str(filename.parent.parent / "scale_factor" / filename.name))
       std::string temp = filename;
@@ -454,38 +459,48 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
       std::string name = temp.substr(temp.rfind("/") + 1);
       temp.erase(temp.rfind("/"));
       temp.erase(temp.rfind("/"));
-      embeddedScaleFactors.Add((temp + "/scale_factor/" + name).c_str());
+      responseScaleFactors.Add((temp + "/scale_factor/" + name).c_str());
   }
-  embeddedChain.AddFriend(&embeddedScaleFactors);*/
-  //embeddedChain.Print();
-  TTreeReader mcReader(&embeddedChain);
+  responseChain.AddFriend(&responseScaleFactors);*/
+  //responseChain.Print();
+  TTreeReader mcReader(&responseChain);
 
   // Values
   TTreeReaderValue<float> scaleFactor(mcReader, "scale_factor");
-  TTreeReaderValue<float> hybridJetPt(mcReader, (hybridPrefix + "_jet_pt").c_str());
-  TTreeReaderValue<float> hybridSubstructureVariable(
-   mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
-  TTreeReaderValue<float> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
+  TTreeReaderValue<float> responseSmearedJetPt(mcReader, (responseSmearedPrefix + "_jet_pt").c_str());
+  TTreeReaderValue<float> responseSmearedSubstructureVariable(
+   mcReader, (groomingMethod + "_" + responseSmearedPrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<float> trueJetPt(mcReader, (responseTruePrefix + "_jet_pt").c_str());
   TTreeReaderValue<float> trueSubstructureVariable(
-   mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
-  TTreeReaderValue<int16_t> matchingLeading(mcReader,
-                        (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
-  TTreeReaderValue<int16_t> matchingSubleading(mcReader,
-                          (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
+   mcReader, (groomingMethod + "_" + responseTruePrefix + "_" + substructureVariableName).c_str());
+  // These values are only conditionally defined (ie. they are for embedding, but not for pythia)
+  // It's kind of awkward to have a pointer to a TTreeReaderValue, but it's  the only way that I can
+  // see to conditionally define them. So I just suck it up.
+  std::unique_ptr<TTreeReaderValue<int16_t>> matchingLeading = nullptr;
+  std::unique_ptr<TTreeReaderValue<int16_t>> matchingSubleading = nullptr;
   // For the double counting cut.
-  TTreeReaderValue<float> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
-  TTreeReaderValue<float> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
+  std::unique_ptr<TTreeReaderValue<float>> responseSmearedUnsubLeadingTrackPt = nullptr;
+  std::unique_ptr<TTreeReaderValue<float>> detLevelLeadingTrackPt = nullptr;
+  if (!unfoldingForPP) {
+      matchingLeading = std::make_unique<TTreeReaderValue<int16_t>>(mcReader,
+                            (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
+      matchingSubleading = std::make_unique<TTreeReaderValue<int16_t>>(mcReader,
+                              (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
+      // For the double counting cut.
+      responseSmearedUnsubLeadingTrackPt = std::make_unique<TTreeReaderValue<float>>(mcReader, (responseSmearedPrefix + "_leading_track_pt").c_str());
+      detLevelLeadingTrackPt = std::make_unique<TTreeReaderValue<float>>(mcReader, (responseDetLevelPrefix + "_leading_track_pt").c_str());
+  }
 
   int treeNumber = -1;
   // double scaleFactor = 0;
   while (mcReader.Next()) {
     // Check if the file changed.
-    if (treeNumber < embeddedChain.GetTreeNumber()) {
+    if (treeNumber < responseChain.GetTreeNumber()) {
       // File changed. Update the scale factor.
-      // auto f = embeddedChain.GetFile();
+      // auto f = responseChain.GetFile();
       // scaleFactor = GetScaleFactor(f);
       // Update the tree number so we hold onto the scale factor until the next time we need to update.
-      treeNumber = embeddedChain.GetTreeNumber();
+      treeNumber = responseChain.GetTreeNumber();
     }
     // Ensure that we are in the right true pt and substructure variable range.
     if (*trueJetPt > trueJetPtBins.back()) {
@@ -498,7 +513,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
       continue;
     }
     // Double counting cut
-    if ((*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) && (*trueJetPt > 10)) {
+    if (!unfoldingForPP && (**responseSmearedUnsubLeadingTrackPt > **detLevelLeadingTrackPt) && (*trueJetPt > 10)) {
       continue;
     }
 
@@ -514,38 +529,38 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
 
     // Full efficiency hists (and response).
     hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * reweightFactor);
-    hists["h2_smeared_no_cuts"]->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor * reweightFactor);
-    responsenotrunc->Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt,
+    hists["h2_smeared_no_cuts"]->Fill(*responseSmearedSubstructureVariable, *responseSmearedJetPt, *scaleFactor * reweightFactor);
+    responsenotrunc->Fill(*responseSmearedSubstructureVariable, *responseSmearedJetPt, *trueSubstructureVariable, *trueJetPt,
                *scaleFactor * reweightFactor);
 
-    // Now start making cuts on the hybrid level.
+    // Now start making cuts on the response smeared level.
     // Jet pt
-    if (*hybridJetPt < smearedJetPtBins.front() || *hybridJetPt > smearedJetPtBins.back()) {
+    if (*responseSmearedJetPt < smearedJetPtBins.front() || *responseSmearedJetPt > smearedJetPtBins.back()) {
       continue;
     }
-    // Also cut on hybrid substructure variable.
-    double hybridSubstructureVariableValue = *hybridSubstructureVariable;
-    if (hybridSubstructureVariableValue < untaggedBelowThisValue) {
+    // Also cut on smeared substructure variable.
+    double responseSmearedSubstructureVariableValue = *responseSmearedSubstructureVariable;
+    if (responseSmearedSubstructureVariableValue < untaggedBelowThisValue) {
       // Assign to the untagged bin.
-      hybridSubstructureVariableValue = smearedUntaggedBinValue;
+      responseSmearedSubstructureVariableValue = smearedUntaggedBinValue;
     } else {
-      if (hybridSubstructureVariableValue < minSmearedSplittingVariable ||
-        hybridSubstructureVariableValue > maxSmearedSplittingVariable) {
+      if (responseSmearedSubstructureVariableValue < minSmearedSplittingVariable ||
+        responseSmearedSubstructureVariableValue > maxSmearedSplittingVariable) {
         continue;
       }
     }
     // Matching cuts: Requiring a pure match.
-    if (usePureMatches && !isPureMatch(*matchingLeading, *matchingSubleading, hybridSubstructureVariableValue,
+    if (!unfoldingForPP && usePureMatches && !isPureMatch(**matchingLeading, **matchingSubleading, responseSmearedSubstructureVariableValue,
                       smearedUntaggedBinValue)) {
       continue;
     }
 
     // At this point, we've passed all of our cuts, so we store the result.
-    hists["h2_smeared"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor * reweightFactor);
+    hists["h2_smeared"]->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, *scaleFactor * reweightFactor);
     hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * reweightFactor);
-    hists["h2_substructure_variable"]->Fill(hybridSubstructureVariableValue, *trueSubstructureVariable,
+    hists["h2_substructure_variable"]->Fill(responseSmearedSubstructureVariableValue, *trueSubstructureVariable,
                         *scaleFactor * reweightFactor);
-    response->Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt,
+    response->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, *trueSubstructureVariable, *trueJetPt,
             *scaleFactor * reweightFactor);
   }
 
@@ -567,10 +582,13 @@ ResponseResult create_closure_response_2D(
  std::vector<double> smearedJetPtBins, std::vector<double> trueJetPtBins,
  std::vector<double> smearedSplittingVariableBins, std::vector<double> trueSplittingVariableBins,
  double smearedUntaggedBinValue, bool disableUntaggedBin, double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
- const std::vector<std::string>& embeddedFilenames, const ClosureVariation_t closureVariation,
- const double fractionForResponse = 0.75, const bool usePureMatches = false, TH2D* hReweighting = nullptr,
- const std::string& embeddedTreeName = "tree", const std::string& truePrefix = "true",
- const std::string& hybridPrefix = "hybrid", const std::string& detLevelPrefix = "det_level")
+ const std::vector<std::string>& responseFilenames, const ClosureVariation_t closureVariation,
+ const double fractionForResponse = 0.75, const bool usePureMatches = false,
+ const bool unfoldingForPP = false,
+ TH2D* hReweighting = nullptr,
+ const std::string& responseTreeName = "tree",
+ const std::string& responseSmearedPrefix = "hybrid", const std::string& responseTruePrefix = "true",
+ const std::string& responseDetLevelPrefix = "det_level")
 {
   // NOTE: We rely on the user to validate that the binning matches the reweighting hist.
   // Setup
@@ -584,7 +602,7 @@ ResponseResult create_closure_response_2D(
       untaggedBelowThisValue = -1e5;
   }
 
-  // We don't have to deal with data for this closure test. It's all based around the embedded data.
+  // We don't have to deal with data for this closure test. It's all based around the response data.
   // So we go directly to the response.
   // First, setup the response
   // NOTE: We allocate a shared_ptr, but don't delete here because we want to return the response
@@ -596,38 +614,48 @@ ResponseResult create_closure_response_2D(
   responsenotrunc->Setup(hists["h2_smeared_no_cuts"], hists["h2_full_eff"]);
 
   // Next, we setup the Reader, the columns, and store the data in the appropriate hists.
-  TChain embeddedChain(embeddedTreeName.c_str());
-  for (auto filename : embeddedFilenames) {
-    embeddedChain.Add(filename.c_str());
+  TChain responseChain(responseTreeName.c_str());
+  for (auto filename : responseFilenames) {
+    responseChain.Add(filename.c_str());
   }
-  TTreeReader mcReader(&embeddedChain);
+  TTreeReader mcReader(&responseChain);
 
   // Values
   TTreeReaderValue<float> scaleFactor(mcReader, "scale_factor");
-  TTreeReaderValue<float> hybridJetPt(mcReader, (hybridPrefix + "_jet_pt").c_str());
-  TTreeReaderValue<float> hybridSubstructureVariable(
-   mcReader, (groomingMethod + "_" + hybridPrefix + "_" + substructureVariableName).c_str());
-  TTreeReaderValue<float> trueJetPt(mcReader, (truePrefix + "_jet_pt").c_str());
+  TTreeReaderValue<float> responseSmearedJetPt(mcReader, (responseSmearedPrefix + "_jet_pt").c_str());
+  TTreeReaderValue<float> responseSmearedSubstructureVariable(
+   mcReader, (groomingMethod + "_" + responseSmearedPrefix + "_" + substructureVariableName).c_str());
+  TTreeReaderValue<float> trueJetPt(mcReader, (responseTruePrefix + "_jet_pt").c_str());
   TTreeReaderValue<float> trueSubstructureVariable(
-   mcReader, (groomingMethod + "_" + truePrefix + "_" + substructureVariableName).c_str());
-  TTreeReaderValue<int16_t> matchingLeading(mcReader,
-                        (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
-  TTreeReaderValue<int16_t> matchingSubleading(mcReader,
-                          (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
+   mcReader, (groomingMethod + "_" + responseTruePrefix + "_" + substructureVariableName).c_str());
+  // These values are only conditionally defined (ie. they are for embedding, but not for pythia)
+  // It's kind of awkward to have a pointer to a TTreeReaderValue, but it's  the only way that I can
+  // see to conditionally define them. So I just suck it up.
+  std::unique_ptr<TTreeReaderValue<int16_t>> matchingLeading = nullptr;
+  std::unique_ptr<TTreeReaderValue<int16_t>> matchingSubleading = nullptr;
   // For the double counting cut.
-  TTreeReaderValue<float> hybridUnsubLeadingTrackPt(mcReader, (hybridPrefix + "_leading_track_pt").c_str());
-  TTreeReaderValue<float> detLevelLeadingTrackPt(mcReader, (detLevelPrefix + "_leading_track_pt").c_str());
+  std::unique_ptr<TTreeReaderValue<float>> responseSmearedUnsubLeadingTrackPt = nullptr;
+  std::unique_ptr<TTreeReaderValue<float>> detLevelLeadingTrackPt = nullptr;
+  if (!unfoldingForPP) {
+      matchingLeading = std::make_unique<TTreeReaderValue<int16_t>>(mcReader,
+                            (groomingMethod + "_hybrid_det_level_matching_leading").c_str());
+      matchingSubleading = std::make_unique<TTreeReaderValue<int16_t>>(mcReader,
+                              (groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
+      // For the double counting cut.
+      responseSmearedUnsubLeadingTrackPt = std::make_unique<TTreeReaderValue<float>>(mcReader, (responseSmearedPrefix + "_leading_track_pt").c_str());
+      detLevelLeadingTrackPt = std::make_unique<TTreeReaderValue<float>>(mcReader, (responseDetLevelPrefix + "_leading_track_pt").c_str());
+  }
 
   int treeNumber = -1;
   // double scaleFactor = 0;
   while (mcReader.Next()) {
     // Check if the file changed.
-    if (treeNumber < embeddedChain.GetTreeNumber()) {
+    if (treeNumber < responseChain.GetTreeNumber()) {
       // File changed. Update the scale factor.
-      // auto f = embeddedChain.GetFile();
+      // auto f = responseChain.GetFile();
       // scaleFactor = GetScaleFactor(f);
       // Update the tree number so we hold onto the scale factor until the next time we need to update.
-      treeNumber = embeddedChain.GetTreeNumber();
+      treeNumber = responseChain.GetTreeNumber();
     }
     // Ensure that we are in the right true pt and substructure variable range.
     if (*trueJetPt > trueJetPtBins.back()) {
@@ -640,29 +668,29 @@ ResponseResult create_closure_response_2D(
       continue;
     }
     // Double counting cut
-    if ((*hybridUnsubLeadingTrackPt > *detLevelLeadingTrackPt) && (*trueJetPt > 10)) {
+    if (!unfoldingForPP && (**responseSmearedUnsubLeadingTrackPt > **detLevelLeadingTrackPt) && (*trueJetPt > 10)) {
       continue;
     }
 
     // Full efficiency hists (and response).
     hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
-    hists["h2_smeared_no_cuts"]->Fill(*hybridSubstructureVariable, *hybridJetPt, *scaleFactor);
-    responsenotrunc->Fill(*hybridSubstructureVariable, *hybridJetPt, *trueSubstructureVariable, *trueJetPt,
+    hists["h2_smeared_no_cuts"]->Fill(*responseSmearedSubstructureVariable, *responseSmearedJetPt, *scaleFactor);
+    responsenotrunc->Fill(*responseSmearedSubstructureVariable, *responseSmearedJetPt, *trueSubstructureVariable, *trueJetPt,
                *scaleFactor);
 
     // Now start making cuts on the hybrid level.
     // Jet pt
-    if (*hybridJetPt < smearedJetPtBins.front() || *hybridJetPt > smearedJetPtBins.back()) {
+    if (*responseSmearedJetPt < smearedJetPtBins.front() || *responseSmearedJetPt > smearedJetPtBins.back()) {
       continue;
     }
     // Also cut on hybrid substructure variable.
-    double hybridSubstructureVariableValue = *hybridSubstructureVariable;
-    if (hybridSubstructureVariableValue < untaggedBelowThisValue) {
+    double responseSmearedSubstructureVariableValue = *responseSmearedSubstructureVariable;
+    if (responseSmearedSubstructureVariableValue < untaggedBelowThisValue) {
       // Assign to the untagged bin.
-      hybridSubstructureVariableValue = smearedUntaggedBinValue;
+      responseSmearedSubstructureVariableValue = smearedUntaggedBinValue;
     } else {
-      if (hybridSubstructureVariableValue < minSmearedSplittingVariable ||
-        hybridSubstructureVariableValue > maxSmearedSplittingVariable) {
+      if (responseSmearedSubstructureVariableValue < minSmearedSplittingVariable ||
+        responseSmearedSubstructureVariableValue > maxSmearedSplittingVariable) {
         continue;
       }
     }
@@ -683,13 +711,13 @@ ResponseResult create_closure_response_2D(
       // Variation 1 is where we reweight the pseudo-data.
       double pseudoReweightFactor =
        closureVariation == ClosureVariation_t::reweightPseudoData ? reweightFactor : 1;
-      hists["h2_pseudo_data"]->Fill(hybridSubstructureVariableValue, *hybridJetPt,
+      hists["h2_pseudo_data"]->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt,
                      *scaleFactor * pseudoReweightFactor);
       hists["h2_pseudo_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * pseudoReweightFactor);
     }
 
     // Matching cuts: Requiring a pure match.
-    if (usePureMatches && !isPureMatch(*matchingLeading, *matchingSubleading, hybridSubstructureVariableValue,
+    if (!unfoldingForPP && usePureMatches && !isPureMatch(**matchingLeading, **matchingSubleading, responseSmearedSubstructureVariableValue,
                       smearedUntaggedBinValue)) {
       continue;
     }
@@ -702,15 +730,15 @@ ResponseResult create_closure_response_2D(
     // These don't matter so terribly much for our closure test, but it's not a bad thing to have.
     // Note that they will always get the full stats and correspond to the response, as is the convention for the
     // others.
-    hists["h2_smeared"]->Fill(hybridSubstructureVariableValue, *hybridJetPt, *scaleFactor * responseReweightFactor);
+    hists["h2_smeared"]->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, *scaleFactor * responseReweightFactor);
     hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * responseReweightFactor);
-    hists["h2_substructure_variable"]->Fill(hybridSubstructureVariableValue, *trueSubstructureVariable,
+    hists["h2_substructure_variable"]->Fill(responseSmearedSubstructureVariableValue, *trueSubstructureVariable,
                         *scaleFactor * responseReweightFactor);
 
     // We've filled the pseudo data above (before the pure matches requirement), but we still
     // need to fill the response when appropriate.
     if (randomValue < fractionForResponse) {
-      response->Fill(hybridSubstructureVariableValue, *hybridJetPt, *trueSubstructureVariable, *trueJetPt,
+      response->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, *trueSubstructureVariable, *trueJetPt,
               *scaleFactor * responseReweightFactor);
     }
   }

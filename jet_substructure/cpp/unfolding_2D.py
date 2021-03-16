@@ -15,7 +15,7 @@ Conventions:
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Type, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Type, Union
 
 import attr
 import numpy as np
@@ -522,53 +522,74 @@ def _branch_name_shim_to_map_for_ROOT(branch_renames: Mapping[str, str]) -> Any:
     return map
 
 
+def _collision_system_names(unfolding_for_pp: bool) -> Tuple[str, str]:
+    if unfolding_for_pp:
+        return "pp", "pythia"
+    return "PbPb", "embedPythia"
+
+
 def get_reweighted_ratio(
-    embedded_dataset_name: str, data_dataset_name: str, grooming_method: str, base_directory: Path = Path("output")
+    data_dataset_name: str,
+    response_dataset_name: str,
+    grooming_method: str,
+    unfolding_for_pp: bool,
+    base_directory: Path = Path("output"),
 ) -> TH2D:
     # Delayed import to avoid direct dependence.
     import ROOT
 
-    # Retrieve embedded hist
-    embedded_filename = (
+    data_collision_system, response_collision_system = _collision_system_names(unfolding_for_pp=unfolding_for_pp)
+
+    # Retrieve response dataset hist
+    # NOTE: These are a little brittle, but it's not worth the effort of passing in all of
+    #       the additional info at the moment.
+    response_prefix = "hybrid" if not unfolding_for_pp else "data"
+    response_prefixes = "hybrid_true_det_level" if not unfolding_for_pp else "data_true"
+
+    response_filename = (
         base_directory
-        / "embedPythia"
+        / response_collision_system
         / "RDF"
-        / f"{embedded_dataset_name}_{grooming_method}_prefixes_hybrid_true_det_level_closure.root"
+        / f"{response_dataset_name}_{grooming_method}_prefixes_{response_prefixes}_closure.root"
     )
-    f_embedded = ROOT.TFile(str(embedded_filename), "READ")
-    h_embedded = f_embedded.Get(f"{grooming_method}_hybrid_kt_jet_pt")
+    f_response = ROOT.TFile(str(response_filename), "READ")
+    h_response = f_response.Get(f"{grooming_method}_{response_prefix}_kt_jet_pt")
     # Retrieve data hist
     data_filename = (
-        base_directory / "PbPb" / "RDF" / f"{data_dataset_name}_{grooming_method}_prefixes_data_closure.root"
+        base_directory
+        / data_collision_system
+        / "RDF"
+        / f"{data_dataset_name}_{grooming_method}_prefixes_data_closure.root"
     )
-    f_PbPb = ROOT.TFile(str(data_filename), "READ")
-    h_PbPb = f_PbPb.Get(f"{grooming_method}_data_kt_jet_pt")
+    f_data = ROOT.TFile(str(data_filename), "READ")
+    h_data = f_data.Get(f"{grooming_method}_data_kt_jet_pt")
 
     # Calculate the ratio and cleanup
-    h_ratio = h_embedded.Clone("h_ratio")
-    h_ratio.Divide(h_PbPb)
+    h_ratio = h_response.Clone("h_ratio")
+    h_ratio.Divide(h_data)
     h_ratio.SetDirectory(0)
 
     # Cleanup
-    f_embedded.Close()
-    f_PbPb.Close()
+    f_response.Close()
+    f_data.Close()
 
     return h_ratio
 
 
 def _get_reweighting_ratio(
-    reweight_data_dataset_name: str, reweight_embedded_dataset_name: str, settings: Settings
+    reweight_data_dataset_name: str, reweight_response_dataset_name: str, settings: Settings, unfolding_for_pp: bool
 ) -> TH2D:
     # Validation
-    if not reweight_data_dataset_name or not reweight_embedded_dataset_name:
+    if not reweight_data_dataset_name or not reweight_response_dataset_name:
         raise ValueError(
-            f"Must pass data and embedded dataset names. Passed data: {reweight_data_dataset_name}, embedded: {reweight_embedded_dataset_name}"
+            f"Must pass data and response dataset names. Passed data: {reweight_data_dataset_name}, response: {reweight_response_dataset_name}"
         )
 
     h_reweighting_ratio = get_reweighted_ratio(
         data_dataset_name=reweight_data_dataset_name,
-        embedded_dataset_name=reweight_embedded_dataset_name,
+        response_dataset_name=reweight_response_dataset_name,
         grooming_method=settings.grooming_method,
+        unfolding_for_pp=unfolding_for_pp,
     )
 
     # Validate the reweighting ratio
@@ -582,7 +603,7 @@ def _get_reweighting_ratio(
 
 
 def _create_branch_rename_shim(
-    embedded_filenames: Sequence[Path], embedded_tree_name: str, grooming_method: str
+    response_filenames: Sequence[Path], response_tree_name: str, grooming_method: str
 ) -> Dict[str, str]:
     """Create cross check task branch rename shim.
 
@@ -591,8 +612,8 @@ def _create_branch_rename_shim(
     just skimming the cross check task output.
 
     Args:
-        embedded_filenames: Embedded filenames.
-        embedded_tree_name: Embedded tree name.
+        response_filenames: response filenames.
+        response_tree_name: response tree name.
         grooming_method: Name of the grooming method stored in the cross check task.
 
     Returns:
@@ -601,8 +622,8 @@ def _create_branch_rename_shim(
     """
     # Need to do a quick read of the branch names. The branch names shouldn't vary by file, so we can
     # use the first one.
-    with uproot.open(embedded_filenames[0]) as f:
-        input_branches = list(f[embedded_tree_name].keys())
+    with uproot.open(response_filenames[0]) as f:
+        input_branches = list(f[response_tree_name].keys())
 
     branch_renames = skim_analysis_objects.cross_check_task_branch_name_shim(
         grooming_method=grooming_method,
@@ -616,11 +637,12 @@ def run_unfolding(
     settings: Settings,
     data_filenames: Sequence[Path],
     data_tree_name: str,
-    embedded_filenames: Sequence[Path],
-    embedded_tree_name: str,
+    response_filenames: Sequence[Path],
+    response_tree_name: str,
+    unfolding_for_pp: bool = False,
     reweight_prior: bool = False,
     reweight_data_dataset_name: str = "",
-    reweight_embedded_dataset_name: str = "",
+    reweight_response_dataset_name: str = "",
 ) -> bool:
     # Delayed import to avoid direct dependence.
     import ROOT
@@ -636,8 +658,9 @@ def run_unfolding(
     if reweight_prior:
         h_reweighting_response_ratio = _get_reweighting_ratio(
             reweight_data_dataset_name=reweight_data_dataset_name,
-            reweight_embedded_dataset_name=reweight_embedded_dataset_name,
+            reweight_response_dataset_name=reweight_response_dataset_name,
             settings=settings,
+            unfolding_for_pp=unfolding_for_pp,
         )
 
     # Create the responses. We assume some conventions about column names.
@@ -655,11 +678,14 @@ def run_unfolding(
         settings.substructure_variable.smeared_range.min,
         settings.substructure_variable.smeared_range.max,
         _array_to_ROOT(_pass_filenames_to_ROOT(data_filenames), "std::string"),
-        _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
+        _array_to_ROOT(_pass_filenames_to_ROOT(response_filenames), "std::string"),
         settings.use_pure_matches,
+        unfolding_for_pp,
         h_reweighting_response_ratio,
         data_tree_name,
-        embedded_tree_name,
+        response_tree_name,
+        "data",
+        "hybrid" if not unfolding_for_pp else "data",
     )
 
     logger.debug(responses)
@@ -709,12 +735,13 @@ def run_unfolding(
 
 def run_unfolding_closure_reweighting(
     settings: Settings,
-    embedded_filenames: Sequence[Path],
-    embedded_tree_name: str,
+    response_filenames: Sequence[Path],
+    response_tree_name: str,
     closure_variation: str,
+    unfolding_for_pp: bool = False,
     fraction_for_response: float = 0.75,
     reweight_data_dataset_name: str = "",
-    reweight_embedded_dataset_name: str = "",
+    reweight_response_dataset_name: str = "",
 ) -> bool:
     """Run unfolding closure with reweighting.
 
@@ -723,10 +750,10 @@ def run_unfolding_closure_reweighting(
 
     Args:
         settings: Unfolding settings.
-        embedded_filenames: Filenames for embedded data.
+        response_filenames: Filenames for response data.
         closure_variation: Name of the closure variation.
         fraction_for_response: Fraction of statistics for the response. Default: 0.75, as determined by
-            comparing error bars in data and embedded.
+            comparing error bars in data and response.
     Returns:
         True if successful.
     """
@@ -756,8 +783,9 @@ def run_unfolding_closure_reweighting(
     if variation != ROOT.ClosureVariation_t.splitMC:
         h_reweighting_ratio = _get_reweighting_ratio(
             reweight_data_dataset_name=reweight_data_dataset_name,
-            reweight_embedded_dataset_name=reweight_embedded_dataset_name,
+            reweight_response_dataset_name=reweight_response_dataset_name,
             settings=settings,
+            unfolding_for_pp=unfolding_for_pp,
         )
 
     # Create the responses. We assume some conventions about column names.
@@ -774,12 +802,14 @@ def run_unfolding_closure_reweighting(
         settings.substructure_variable.disable_untagged_bin,
         settings.substructure_variable.smeared_range.min,
         settings.substructure_variable.smeared_range.max,
-        _array_to_ROOT(_pass_filenames_to_ROOT(embedded_filenames), "std::string"),
+        _array_to_ROOT(_pass_filenames_to_ROOT(response_filenames), "std::string"),
         variation,
         fraction_for_response,
         settings.use_pure_matches,
+        unfolding_for_pp,
         h_reweighting_ratio,
-        embedded_tree_name,
+        response_tree_name,
+        "hybrid" if not unfolding_for_pp else "data",
     )
 
     # Perform the actual unfolding.
@@ -1208,22 +1238,22 @@ if __name__ == "__main__":
     default_settings = Settings(
         grooming_method=grooming_method,
         jet_pt=ParameterSettings(
-            true_bins=np.array([0, 30, 40, 60, 80, 100, 120, 160], dtype=np.float64),
-            smeared_bins=np.array([30, 40, 50, 60, 80, 100, 120], dtype=np.float64),
+            true_bins=np.array([0, 20, 40, 60, 80, 100, 160], dtype=np.float64),
+            smeared_bins=np.array([20, 30, 40, 50, 60, 85], dtype=np.float64),
         ),
         substructure_variable=SubstructureVariableSettings.from_binning(
             true_bins=np.array(
                 # NOTE: (-0.05, 0) is the untagged bin.
-                [-0.05, 0, 2, 3, 4, 5, 7, 10, 15, 100],
+                [-0.05, 0.0, 0.5, 1, 2, 4, 8, 15],
                 dtype=np.float64,
             ),
-            smeared_bins=np.array([1, 2, 3, 4, 5, 7, 10, 15], dtype=np.float64),
+            smeared_bins=np.array([0, 0.25, 0.5, 1.0, 1, 2, 4, 8], dtype=np.float64),
             name="kt",
             variable_name="kt",
             untagged_bin_below_range=True,
         ),
-        suffix="central",
-        output_dir=Path("output/PbPb/unfolding/test_2"),
+        suffix="pp_R02",
+        output_dir=Path("output/pp/unfolding/test"),
         use_pure_matches=False,
     )
 
@@ -1231,18 +1261,19 @@ if __name__ == "__main__":
     run_unfolding(
         settings=default_settings,
         # NOTE: TChain can only handle one "*" in the filename.
-        data_filenames=[Path("trains/PbPb/6672/skim/*.root")],
-        embedded_filenames=[
-            Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in list(range(6650, 6669)) + [6671]
+        data_filenames=[Path(f"trains/pp/{train_number}/skim/*.root") for train_number in range(1998, 2000)],
+        response_filenames=[
+            Path(f"trains/pythia/{train_number}/skim/*.root") for train_number in list(range(2461, 2462)) + []
         ],
         data_tree_name="tree",
-        embedded_tree_name="tree",
+        response_tree_name="tree",
+        unfolding_for_pp=True,
     )
 
     # run_unfolding_closure_reweighting(
     #    settings=setup("dynamical_kt"),
     #    # NOTE: TChain can only handle one "*" in the filename.
-    #    embedded_filenames=[
+    #    response_filenames=[
     #        Path(f"trains/embedPythia/{train_number}/skim/*.root") for train_number in range(5966, 5986)
     #    ],
     #    # closure_variation="reweight_pseudo_data",

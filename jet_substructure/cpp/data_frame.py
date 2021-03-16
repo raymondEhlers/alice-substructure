@@ -1222,6 +1222,7 @@ def embed_pythia_entry_point() -> None:
         prefixes=["hybrid"],
         grooming_method=args.groomingMethod,
         jet_R=0.4,
+        main_jet_pt_range=helpers.JetPtRange(40, 120),
     )
 
 
@@ -1241,6 +1242,7 @@ if __name__ == "__main__":
         prefixes=prefixes,
         grooming_method="leading_kt",
         jet_R=0.4,
+        main_jet_pt_range=helpers.JetPtRange(40, 120),
         n_cores=2,
         jet_pt_prefix_first=True,
         cross_check_task=True,

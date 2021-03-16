@@ -1611,11 +1611,12 @@ def embedded_pt_hard_scaling_cross_check(
 @python_app  # type: ignore
 def _unfolding_standard(
     settings: "unfolding_2D.Settings",  # noqa: F821
+    unfolding_for_pp: bool,
     reweight_prior: bool,
     reweight_data_dataset_name: str,
-    reweight_embedded_dataset_name: str,
+    reweight_response_dataset_name: str,
     data_tree_name: str,
-    embedded_tree_name: str,
+    response_tree_name: str,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> AppFuture:
@@ -1625,22 +1626,23 @@ def _unfolding_standard(
     from jet_substructure.cpp import unfolding_2D
 
     # Randomize the input list so we don't always hit the same files at the same time.
-    # 0 are the data filenames, 1 are the embedded filenames
+    # 0 are the data filenames, 1 are the response filenames
     # Note: It randomizes in place.
     data_filenames = [Path(f.filepath) for f in inputs[0]]
     random.shuffle(data_filenames)
-    embedded_filenames = [Path(f.filepath) for f in inputs[1]]
-    random.shuffle(embedded_filenames)
+    response_filenames = [Path(f.filepath) for f in inputs[1]]
+    random.shuffle(response_filenames)
 
     return unfolding_2D.run_unfolding(
         settings=settings,
         data_filenames=data_filenames,
         data_tree_name=data_tree_name,
-        embedded_filenames=embedded_filenames,
-        embedded_tree_name=embedded_tree_name,
+        response_filenames=response_filenames,
+        response_tree_name=response_tree_name,
+        unfolding_for_pp=unfolding_for_pp,
         reweight_prior=reweight_prior,
         reweight_data_dataset_name=reweight_data_dataset_name,
-        reweight_embedded_dataset_name=reweight_embedded_dataset_name,
+        reweight_response_dataset_name=reweight_response_dataset_name,
     )
 
 
@@ -1648,9 +1650,10 @@ def _unfolding_standard(
 def _unfolding_closure(
     settings: "unfolding_2D.Settings",  # noqa: F821
     closure_variation: str,
+    unfolding_for_pp: bool,
     reweight_data_dataset_name: str,
-    reweight_embedded_dataset_name: str,
-    embedded_tree_name: str,
+    reweight_response_dataset_name: str,
+    response_tree_name: str,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> AppFuture:
@@ -1660,18 +1663,19 @@ def _unfolding_closure(
     from jet_substructure.cpp import unfolding_2D
 
     # Randomize the input list so we don't always hit the same files at the same time.
-    # 0 are the data filenames, 1 are the embedded filenames
+    # 0 are the data filenames, 1 are the response filenames
     # Note: It randomizes in place.
-    embedded_filenames = [Path(f.filepath) for f in inputs[1]]
-    random.shuffle(embedded_filenames)
+    response_filenames = [Path(f.filepath) for f in inputs[1]]
+    random.shuffle(response_filenames)
 
     return unfolding_2D.run_unfolding_closure_reweighting(
         settings=settings,
-        embedded_filenames=embedded_filenames,
-        embedded_tree_name=embedded_tree_name,
+        response_filenames=response_filenames,
+        response_tree_name=response_tree_name,
         closure_variation=closure_variation,
+        unfolding_for_pp=unfolding_for_pp,
         reweight_data_dataset_name=reweight_data_dataset_name,
-        reweight_embedded_dataset_name=reweight_embedded_dataset_name,
+        reweight_response_dataset_name=reweight_response_dataset_name,
     )
 
 
@@ -1841,6 +1845,7 @@ def _get_binning(
 
 
 def setup_all_unfolding(  # noqa: C901
+    data_collision_system: str,
     base_dataset_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
     n_cores_per_job: int,
@@ -1849,13 +1854,18 @@ def setup_all_unfolding(  # noqa: C901
     """Setup unfolding jobs.
 
     Args:
+        data_collision_system: Name of the data collision system.
         base_dataset_config: Base dataset configuration.
         grooming_methods: Grooming methods to unfold.
+        n_cores_per_job: N cores to make available for ROOT. This is of limited utility for RooUnfold,
+            but annecdotally, it seems to still hope a bit with I/O.
         selected_unfolding_settings: Subset of unfolding settings to run. Default: all defined in the config.
     Returns:
         List of `AppFuture` created when defining the jobs.
     """
     # Validation
+    if data_collision_system not in ["pp", "PbPb"]:
+        raise ValueError(f"Collision must be either pp or PbPb for unfolding. Passed: {data_collision_system}")
     if selected_unfolding_settings is None:
         selected_unfolding_settings = list(base_dataset_config["unfolding"]["settings"].keys())
     logger.info(f"Unfolding settings: {selected_unfolding_settings}")
@@ -1863,8 +1873,17 @@ def setup_all_unfolding(  # noqa: C901
     from jet_substructure.cpp import unfolding_2D
 
     base_unfolding_config = base_dataset_config["unfolding"]
-    output_dir = Path("output") / "PbPb" / "unfolding" / "parsl"
+    output_dir = Path("output") / data_collision_system / "unfolding" / "parsl"
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Things are treatedly so different that it's better to be direct about the data collision system.
+    unfolding_for_pp = data_collision_system == "pp"
+    # Need the response collision system too.
+    data_to_response_collision_system_name = {
+        "pp": "pythia",
+        "PbPb": "embedPythia",
+    }
+    response_collision_system = data_to_response_collision_system_name[data_collision_system]
 
     results = []
     for unfolding_settings_name in selected_unfolding_settings:
@@ -1876,17 +1895,17 @@ def setup_all_unfolding(  # noqa: C901
         )
 
         # Datasets config and input files.
-        PbPb_dataset_config = base_dataset_config["datasets"][datasets_name]["PbPb"]
-        PbPb_train_directories = set([Path(filename).parent for filename in PbPb_dataset_config["files"]])
-        embedded_dataset_config = base_dataset_config["datasets"][datasets_name]["embedPythia"]
-        embedded_train_directories = set([Path(filename).parent for filename in embedded_dataset_config["files"]])
+        data_dataset_config = base_dataset_config["datasets"][datasets_name][data_collision_system]
+        data_train_directories = set([Path(filename).parent for filename in data_dataset_config["files"]])
+        response_dataset_config = base_dataset_config["datasets"][datasets_name][response_collision_system]
+        response_train_directories = set([Path(filename).parent for filename in response_dataset_config["files"]])
 
         # Determine filenames first since they don't depend on grooming methods
         data_files: List[File] = []
-        embedded_files: List[File] = []
+        response_files: List[File] = []
         for label, train_directories, files in [
-            ("PbPb", PbPb_train_directories, data_files),
-            ("embedded", embedded_train_directories, embedded_files),
+            (data_collision_system, data_train_directories, data_files),
+            (response_collision_system, response_train_directories, response_files),
         ]:
             for train_directory in sorted(train_directories):
                 logger.info(f"Processing {label} train number {train_directory.name}")
@@ -1895,8 +1914,15 @@ def setup_all_unfolding(  # noqa: C901
                 for filename in Path(f"{train_directory}/skim/").glob("*.root"):
                     files.append(File(str(filename)))
 
-        # For parsl to keep track of the embedded files
-        input_files = [data_files, embedded_files]
+        # For parsl to keep track of the data and response files
+        input_files = [data_files, response_files]
+
+        # Narrow grooming methods if necessary due to cross check task.
+        # NOTE: Could add more validation, but this is probably enough for now.
+        if data_dataset_config.get("cross_check_task", False):
+            grooming_methods = data_dataset_config["grooming_methods"]
+        if response_dataset_config.get("cross_check_task", False):
+            grooming_methods = response_dataset_config["grooming_methods"]
 
         # Then we determine the settings.
         for grooming_method in grooming_methods:
@@ -1962,7 +1988,7 @@ def setup_all_unfolding(  # noqa: C901
             if unfolding_settings["reweight_prior"] or unfolding_settings["closures"]:
                 # We enable for both the straightforward reweighting, as well as for the closures where we take
                 # advantage of the reweighting.
-                for _collision_system in ["PbPb", "embedPythia"]:
+                for _collision_system in [data_collision_system, response_collision_system]:
                     reweight_prior_results.extend(
                         setup_root_data_frame(
                             processing_mode="closure",
@@ -1996,17 +2022,20 @@ def setup_all_unfolding(  # noqa: C901
                 results.append(
                     _unfolding_standard(
                         settings=s,
+                        unfolding_for_pp=unfolding_for_pp,
                         reweight_prior=unfolding_settings["reweight_prior"],
                         # We always want to reweight with the nominal datasets.
-                        reweight_data_dataset_name=base_dataset_config["datasets"]["nominal"]["PbPb"]["name"],
-                        reweight_embedded_dataset_name=base_dataset_config["datasets"]["nominal"]["embedPythia"][
+                        reweight_data_dataset_name=base_dataset_config["datasets"]["nominal"][data_collision_system][
                             "name"
                         ],
+                        reweight_response_dataset_name=base_dataset_config["datasets"]["nominal"][
+                            response_collision_system
+                        ]["name"],
                         data_tree_name="tree",
                         # Since we skim everything now, we should have uniform input names here.
-                        embedded_tree_name="tree",
-                        # if not embedded_dataset_config.get("cross_check_task", False)
-                        # else embedded_dataset_config["tree_name"],
+                        response_tree_name="tree",
+                        # if not response_dataset_config.get("cross_check_task", False)
+                        # else response_dataset_config["tree_name"],
                         inputs=job_input_files,
                         outputs=[parsl_output_file],
                     )
@@ -2022,15 +2051,18 @@ def setup_all_unfolding(  # noqa: C901
                             _unfolding_closure(
                                 settings=s,
                                 closure_variation=closure_variation,
+                                unfolding_for_pp=unfolding_for_pp,
                                 # We always want to reweight with the nominal datasets.
-                                reweight_data_dataset_name=base_dataset_config["datasets"]["nominal"]["PbPb"]["name"],
-                                reweight_embedded_dataset_name=base_dataset_config["datasets"]["nominal"][
-                                    "embedPythia"
+                                reweight_data_dataset_name=base_dataset_config["datasets"]["nominal"][
+                                    data_collision_system
+                                ]["name"],
+                                reweight_response_dataset_name=base_dataset_config["datasets"]["nominal"][
+                                    response_collision_system
                                 ]["name"],
                                 # Since we skim everything now, we should have uniform input names here.
-                                embedded_tree_name="tree",
-                                # if not embedded_dataset_config.get("cross_check_task", False)
-                                # else embedded_dataset_config["tree_name"],
+                                response_tree_name="tree",
+                                # if not response_dataset_config.get("cross_check_task", False)
+                                # else response_dataset_config["tree_name"],
                                 inputs=job_input_files,
                                 outputs=[parsl_output_file],
                             )
@@ -2046,7 +2078,7 @@ if __name__ == "__main__":  # noqa: C901
     base_dataset_name = "pp_R02"
     # dataset_type = "rmax_070"
     dataset_type = "nominal"
-    collision_system = "pythia"
+    collision_system = "pp"
 
     # Job settings
     jobs_to_execute = [
@@ -2055,12 +2087,12 @@ if __name__ == "__main__":  # noqa: C901
         # "extract_scale_factors",
         # "calculate_embedding_skim",
         # "calculate_data_skim",
-        "root_data_frame",
+        # "root_data_frame",
         # "root_data_frame_embedded_pt_hard_scaling",
         # "root_data_frame_response",
-        # "unfolding",
+        "unfolding",
     ]
-    nodes_to_allocate = 2
+    nodes_to_allocate = 3
     jobs_per_node = 5
 
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
@@ -2278,6 +2310,7 @@ if __name__ == "__main__":  # noqa: C901
     if "unfolding" in jobs_to_execute:
         # TODO: Run the original unfolding once to make sure that I haven't made a mistake...
         results = setup_all_unfolding(
+            data_collision_system=collision_system,
             base_dataset_config=base_dataset_config,
             grooming_methods=grooming_methods,
             n_cores_per_job=n_cores_per_job,
