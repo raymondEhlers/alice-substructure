@@ -680,8 +680,6 @@ def run_unfolding_closure_reweighting(
         )
     )
 
-    # TODO: Do I want the trivial closure for the splitMC?
-
     # Store the output hists.
     _write_hists([hists, output_hists], settings.output_filename, additional_tag=f"closure_{closure_variation}")
 

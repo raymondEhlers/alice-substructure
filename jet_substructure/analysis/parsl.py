@@ -1656,6 +1656,7 @@ def _unfolding_closure(
     settings: unfolding_base.Settings2D,
     closure_variation: str,
     unfolding_for_pp: bool,
+    fraction_for_response: float,
     reweight_data_dataset_name: str,
     reweight_response_dataset_name: str,
     response_tree_name: str,
@@ -1679,6 +1680,7 @@ def _unfolding_closure(
         response_tree_name=response_tree_name,
         closure_variation=closure_variation,
         unfolding_for_pp=unfolding_for_pp,
+        fraction_for_response=fraction_for_response,
         reweight_data_dataset_name=reweight_data_dataset_name,
         reweight_response_dataset_name=reweight_response_dataset_name,
     )
@@ -1944,6 +1946,7 @@ def setup_all_unfolding(  # noqa: C901
             )
             settings[_default_settings.output_tag] = _default_settings
 
+            closure_specific_settings = unfolding_settings.get("closure_settings", {})
             if unfolding_settings["closures"]:
                 # And then add the variations.
                 # Pure matches
@@ -1955,7 +1958,7 @@ def setup_all_unfolding(  # noqa: C901
                 _temp_settings = copy.deepcopy(_default_settings)
                 _smeared_bins = _temp_settings.substructure_variable.smeared_bins
                 # Replace the untagged value with our new untagged value, and then move it to the upper edge.
-                _smeared_bins[0] = 20
+                _smeared_bins[0] = closure_specific_settings["max_untagged_bin"]
                 _smeared_bins = np.roll(_smeared_bins, -1)
                 _temp_settings.substructure_variable = unfolding_base.SubstructureVariableSettings2D.from_binning(
                     true_bins=_temp_settings.substructure_variable.true_bins,
@@ -2042,6 +2045,7 @@ def setup_all_unfolding(  # noqa: C901
                                 settings=s,
                                 closure_variation=closure_variation,
                                 unfolding_for_pp=unfolding_for_pp,
+                                fraction_for_response=closure_specific_settings["split_MC_fraction_for_response"],
                                 # We always want to reweight with the nominal datasets.
                                 reweight_data_dataset_name=base_dataset_config["datasets"]["nominal"][
                                     data_collision_system
