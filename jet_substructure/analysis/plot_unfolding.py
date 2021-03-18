@@ -216,7 +216,6 @@ class UnfoldingOutput:
     smeared_jet_pt_range: helpers.JetPtRange = attr.ib()
     collision_system: str = attr.ib()
     base_dir: Path = attr.ib(converter=Path)
-    smeared_input: bool = attr.ib(default=False)
     pure_matches: bool = attr.ib(default=False)
     suffix: str = attr.ib(default="")
     label: str = attr.ib(default="")
@@ -229,7 +228,8 @@ class UnfoldingOutput:
     def __attrs_post_init__(self) -> None:
         # Fully setup base dir.
         # NOTE: Added "parsl" for the newer output results.
-        self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "feb2021_test"
+        # self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "feb2021_test"
+        self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl"
 
         # Initialize the file if the histograms aren't specified.
         if not self.hists:
@@ -245,11 +245,10 @@ class UnfoldingOutput:
         name += f"_smeared_{self.smeared_jet_pt_range}"
         if self.suffix:
             name += f"_{self.suffix}"
-        if self.label:
-            name += f"_{self.label}"
-        # Put other possible options after the tag so we can sort by tag if it exists.
         if self.pure_matches:
             name += "_pure_matches"
+        if self.label:
+            name += f"_{self.label}"
         return name
 
     @property
@@ -930,9 +929,9 @@ def setup_unfolding_closures(
         base_dir=output_dir,
         n_iter_compare=n_iter_compare,
         pure_matches=pure_matches,
-        smeared_input=True,
         suffix=suffix,
         label="closure_trivial_hybrid_smeared_as_input",
+        raw_hist_name="smeared",
     )
 
     unfolding_outputs["closure_later_iter"] = UnfoldingOutput(
@@ -960,9 +959,10 @@ def setup_unfolding_closures(
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
             pure_matches=pure_matches,
-            smeared_input=True,
             suffix=suffix,
             label="closure_split_MC",
+            raw_hist_name="h2_pseudo_data",
+            true_hist_name="h2_pseudo_true",
         )
     except FileNotFoundError:
         logger.debug("Skipping split MC because the output file doesn't exist.")
@@ -980,6 +980,8 @@ def setup_unfolding_closures(
             pure_matches=pure_matches,
             suffix=suffix,
             label="closure_reweight_pseudo_data",
+            raw_hist_name="h2_pseudo_data",
+            true_hist_name="h2_pseudo_true",
         )
     except FileNotFoundError:
         logger.debug("Skipping reweighted pseudo data because the output file doesn't exist.")
@@ -997,6 +999,8 @@ def setup_unfolding_closures(
             pure_matches=pure_matches,
             suffix=suffix,
             label="closure_reweight_response",
+            raw_hist_name="h2_pseudo_data",
+            true_hist_name="h2_pseudo_true",
         )
     except FileNotFoundError:
         logger.debug("Skipping reweighted response because the output file doesn't exist.")
@@ -1465,6 +1469,16 @@ def plot_unfolded(
     ax_ratio_true.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
     # Label and layout
+    # First, tweak the label for the ratio
+    true_hist_name_to_ratio_label = {
+        "true": "true",
+        "h2_pseudo_true": "pseudo true",
+    }
+    plot_config.panels[2].axes[1].label = (
+        plot_config.panels[2]
+        .axes[1]
+        .label.format(true_label=true_hist_name_to_ratio_label[unfolding_output.true_hist_name])
+    )
     plot_config.apply(fig=fig, axes=[ax_upper, ax_ratio_iter, ax_ratio_true])
 
     figure_name = f"{plot_config.name}"
@@ -1524,7 +1538,8 @@ def plot_refolded(
         color="green",
     )
 
-    ratio_denominator = hist_smeared if unfolding_output.smeared_input else hist_raw
+    raw_is_smeared = unfolding_output.raw_hist_name == "smeared"
+    ratio_denominator = hist_smeared if raw_is_smeared else hist_raw
     for i, hist in refolded_hists.items():
         ax_upper.errorbar(
             hist.axes[0].bin_centers,
@@ -1549,7 +1564,7 @@ def plot_refolded(
         )
 
     # Add smeared ratio in the right circumstances.
-    if not unfolding_output.smeared_input:
+    if not raw_is_smeared:
         r = hist_smeared / ratio_denominator
         ax_lower.errorbar(
             r.axes[0].bin_centers,
@@ -1566,6 +1581,17 @@ def plot_refolded(
     ax_lower.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
     # Label and layout
+    # First, tweak the label for the ratio
+    raw_hist_name_to_ratio_label = {
+        "raw": "data",
+        "smeared": "smeared",
+        "h2_pseudo_data": "pseudo data",
+    }
+    plot_config.panels[1].axes[1].label = (
+        plot_config.panels[1]
+        .axes[1]
+        .label.format(refold_label=raw_hist_name_to_ratio_label[unfolding_output.raw_hist_name])
+    )
     plot_config.apply(fig=fig, axes=[ax_upper, ax_lower])
 
     figure_name = f"{plot_config.name}"
@@ -1872,8 +1898,8 @@ def plot_kt_unfolding(
             ),
             unfolded_hists={
                 n_iter: unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
-                # for n_iter in unfolding_output.n_iter_range_to_plot()
-                for n_iter in range(1, unfolding_output.n_iter_compare + 5)
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+                # for n_iter in range(1, unfolding_output.n_iter_compare + 5)
             },
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
@@ -1912,7 +1938,7 @@ def plot_kt_unfolding(
                             ),
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to true",
+                                label="Ratio to {true_label}",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -1974,7 +2000,7 @@ def plot_kt_unfolding(
                             ),
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to true",
+                                label="Ratio to {true_label}",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -1997,8 +2023,8 @@ def plot_kt_unfolding(
             ),
             unfolded_hists={
                 n_iter: unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
-                # for n_iter in unfolding_output.n_iter_range_to_plot()
-                for n_iter in range(1, unfolding_output.n_iter_compare + 5)
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+                # for n_iter in range(1, unfolding_output.n_iter_compare + 5)
             },
             plot_config=pb.PlotConfig(
                 name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
@@ -2036,7 +2062,7 @@ def plot_kt_unfolding(
                             ),
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to true",
+                                label="Ratio to {true_label}",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -2091,7 +2117,7 @@ def plot_kt_unfolding(
                             pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to true",
+                                label="Ratio to {true_label}",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -2146,7 +2172,7 @@ def plot_kt_unfolding(
                             pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to true",
+                                label="Ratio to {true_label}",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -2191,7 +2217,7 @@ def plot_kt_unfolding(
                             # y label is set in the function.
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to smeared" if unfolding_output.smeared_input else "Ratio to data",
+                                label="Ratio to {refold_label}",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -2237,9 +2263,7 @@ def plot_kt_unfolding(
                             # y label is set in the function.
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to smeared"
-                                if (unfolding_output.smeared_input or unfolding_output.suffix == "closure2")
-                                else "Ratio to data",
+                                label="Ratio to {refold_label}",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -2251,7 +2275,14 @@ def plot_kt_unfolding(
         )
 
         # Slice the refolded in jet pt just to get a sense of what they look like.
-        _small_jet_pt_bins = np.array([40, 60, 80, 100, 120])
+        if unfolding_output.smeared_jet_pt_range.min == 40:
+            # Effectively, a proxy for PbPb
+            _small_jet_pt_bins = np.array([30, 40, 60, 80, 100, 120])
+            # Drop the lowest bin, since it's outside of our smeared jet pt range.
+            _small_jet_pt_bins = _small_jet_pt_bins[1:]
+        else:
+            # Effectively, a proxy for pp
+            _small_jet_pt_bins = np.array([20, 30, 40, 50, 60, 85])
         for _low, _high in zip(_small_jet_pt_bins[:-1], _small_jet_pt_bins[1:]):
             _small_jet_pt_range = helpers.JetPtRange(_low, _high)
             text = f"${_small_jet_pt_range.display_str(label='data')}$"
@@ -2289,7 +2320,7 @@ def plot_kt_unfolding(
                                 # y label is set in the function.
                                 pb.AxisConfig(
                                     "y",
-                                    label="Ratio to smeared" if unfolding_output.smeared_input else "Ratio to data",
+                                    label="Ratio to {refold_label}",
                                     range=(0.5, 1.5),
                                 ),
                             ],
@@ -2780,7 +2811,7 @@ def run(collision_system: str) -> None:
             smeared_jet_pt_range=helpers.JetPtRange(40, 120),
             n_iter_compare=3,
             suffix="broadTrueBins",
-            smeared_input=True,
+            raw_hist_name="smeared",
             collision_system=collision_system,
             base_dir=base_dir,
         ),
@@ -2804,7 +2835,7 @@ def run(collision_system: str) -> None:
             smeared_jet_pt_range=helpers.JetPtRange(30, 120),
             n_iter_compare=3,
             suffix="broadTrueBins",
-            smeared_input=True,
+            raw_hist_name="smeared",
             collision_system=collision_system,
             base_dir=base_dir,
         ),
@@ -2829,7 +2860,7 @@ def run(collision_system: str) -> None:
             smeared_jet_pt_range=helpers.JetPtRange(40, 120),
             n_iter_compare=3,
             suffix="broadTrueBins",
-            smeared_input=True,
+            raw_hist_name="smeared",
             collision_system=collision_system,
             base_dir=base_dir,
         ),
@@ -2854,7 +2885,7 @@ def run(collision_system: str) -> None:
             smeared_jet_pt_range=helpers.JetPtRange(40, 120),
             n_iter_compare=3,
             suffix="broadTrueBins",
-            smeared_input=True,
+            raw_hist_name="smeared",
             collision_system=collision_system,
             base_dir=base_dir,
         ),
@@ -2910,7 +2941,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                             pb.AxisConfig("x", label=r"$\Delta R$"),
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to true",
+                                label="Ratio to {true_label}",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -2963,7 +2994,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                             pb.AxisConfig("x", label=r"$\Delta R$"),
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to true",
+                                label="Ratio to {true_label}",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -3014,7 +3045,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                             pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to true",
+                                label="Ratio to {true_label}",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -3056,7 +3087,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                             # y label is set in the function.
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to smeared" if unfolding_output.smeared_input else "Ratio to data",
+                                label="Ratio to {refold_label}",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -3101,7 +3132,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                             # y label is set in the function.
                             pb.AxisConfig(
                                 "y",
-                                label="Ratio to smeared" if unfolding_output.smeared_input else "Ratio to data",
+                                label="Ratio to {refold_label}",
                                 range=(0.5, 1.5),
                             ),
                         ],
@@ -3178,7 +3209,7 @@ def run_delta_R(collision_system: str) -> None:
             smeared_var_range=helpers.RgRange(0, 350),
             smeared_untagged_var=helpers.RgRange(-50, 0),
             smeared_jet_pt_range=helpers.JetPtRange(40, 120),
-            smeared_input=True,
+            raw_hist_name="smeared",
             collision_system=collision_system,
             base_dir=base_dir,
         ),

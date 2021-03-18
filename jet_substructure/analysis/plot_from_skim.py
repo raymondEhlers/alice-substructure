@@ -1463,16 +1463,18 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
 ) -> Path:
     logger.debug(f"Plotting kt vs jet pt for {grooming_method}.")
 
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(12, 9))
 
     # We want to plot the 2D hist, so no need for any projections.
     # However, first we need to rebin
     tag = f"_{jet_pt_bin.histogram_str(label=prefix)}" if rdf_plots else ""
-    bh_hist = hists[f"{grooming_method}_{prefix}_kt{tag}"]
+    bh_hist = hists[f"{grooming_method}_{prefix}_kt_stats{tag}"]
     # h = binned_data.BinnedData.from_existing_data(
     #    bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1 :: bh.rebin(2)]  # noqa: E203
     # )
-    h = binned_data.BinnedData.from_existing_data(bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1:15])  # noqa: E203
+    h = binned_data.BinnedData.from_existing_data(
+        bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.rebin(2), 1:15]  # noqa: E203
+    )
 
     # Plot
     # Normally, we transpose the data. However, we want the kt on the x axis and the pt on the y axis.
@@ -1505,7 +1507,7 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     plot_config.apply(fig=fig, ax=ax)
 
     # Store and cleanup
-    filename = f"{plot_config.name}_{jet_pt_bin}_iterative_splittings_{grooming_method}"
+    filename = f"{plot_config.name}_{jet_pt_bin}_iterative_splittings_{grooming_method}_stats"
     fig.savefig(output_dir / f"{filename}.pdf")
     if plot_png:
         output_dir_png = output_dir / "png"
@@ -1515,16 +1517,15 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     return Path(filename)
 
 
-def plot_kt_vs_jet_pt(
+def plot_kt_vs_jet_pt_stats(
     hists: Mapping[str, bh.Histogram],
     grooming_methods: Sequence[str],
     prefix: str,
+    jet_pt_bin: helpers.JetPtRange,
     rdf_plots: bool,
     output_dir: Path,
     plot_png: bool,
 ) -> List[Path]:
-    jet_pt_bin = helpers.JetPtRange(min=40, max=120)
-
     filenames = []
     for grooming_method in grooming_methods:
         text = "Iterative splittings"
@@ -1541,7 +1542,9 @@ def plot_kt_vs_jet_pt(
                     panels=Panel(
                         axes=[
                             AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0, 25)),
-                            AxisConfig("y", label=r"$p_{\text{T}}\:(\text{GeV}/c)$", range=(40, 120)),
+                            AxisConfig(
+                                "y", label=r"$p_{\text{T}}\:(\text{GeV}/c)$", range=(jet_pt_bin.min, jet_pt_bin.max)
+                            ),
                         ],
                         text=TextConfig(x=0.98, y=0.02, text=text),
                     ),
@@ -2311,6 +2314,7 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
     output_dir: Path,
     rdf_plots: bool = False,
     plot_png: bool = False,
+    jet_pt_bin: helpers.RangeSelector = helpers.RangeSelector(min=40, max=120),
 ) -> None:
     """Compare grooming methods for PbPb vs embedded.
 
@@ -2327,7 +2331,6 @@ def compare_grooming_methods_for_substructure_data_embed_prod(
     Returns:
         None.
     """
-    jet_pt_bin = helpers.RangeSelector(min=40, max=120)
     text = "Iterative splittings"
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     text_high_kt = text + "\n" + r"$k_{\text{T}} > 10\:\text{GeV}/c$"
