@@ -572,10 +572,17 @@ def run_create_closure_ratio(  # noqa: C901
     # Retrieve the binning
     # We always want the binning that is relevant for this particular unfolding case so we don't have any mismatches.
     # NOTE: The reweighting data itself will always come from the nominal dataset.
-    smeared_substructure_variable_bins = unfolding_base.get_binning(
-        base_unfolding_config=base_unfolding_config,
-        unfolding_settings=unfolding_settings,
-        name="smeared_kt",
+    # NOTE: The np.unique accounts for the case where we want to untagged bin. In that case,
+    #       we repeat the same bin edge. Usually, this is accounted for in the `SubstructureVariableSettings2D.from_binning(...)`
+    #       but we can't take advantage of that here because we need to pass just the config. Therefore, to have valid
+    #       binning, we need to only take unique values. unique sorts, but this is fine because they must be strictly
+    #       increasing anyway.
+    smeared_substructure_variable_bins = np.unique(
+        unfolding_base.get_binning(
+            base_unfolding_config=base_unfolding_config,
+            unfolding_settings=unfolding_settings,
+            name="smeared_kt",
+        )
     )
     smeared_jet_pt_bins = unfolding_base.get_binning(
         base_unfolding_config=base_unfolding_config,

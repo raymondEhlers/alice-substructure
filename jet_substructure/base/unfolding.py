@@ -189,6 +189,8 @@ def _encode_binning_in_str(array: np.ndarray) -> str:
     Returns:
         Array encoded into a string.
     """
+    # Handle the no untagged case. We don't want to repeat, as the histogram we'll compare to won't repeat.
+    array = np.unique(array)
     return "_".join([f"{v:g}".replace(".", "p") for v in array])
 
 
