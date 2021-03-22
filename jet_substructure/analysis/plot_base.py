@@ -39,6 +39,7 @@ label_to_display_string: Dict[str, Dict[str, str]] = {
     "collision_system": dict(
         PbPb=r"$\text{Pb--Pb}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
         embedPythia=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
+        pp_PbPb_5TeV=r"$\text{pp},\:\text{Pb--Pb}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
         pp_5TeV=r"$\text{pp}\;\sqrt{s} = 5.02$ TeV",
         pp_5TeV_NN=r"$\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
         pythia_5TeV=r"$\text{PYTHIA8}\;\sqrt{s} = 5.02$ TeV",

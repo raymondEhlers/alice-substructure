@@ -290,6 +290,11 @@ class UnfoldingOutput:
     def output_dir_png(self) -> Path:
         return self.output_dir / "png"
 
+    @property
+    def disabled_untagged_bin(self) -> bool:
+        """If the untagged bin min and max are the same, the untagged bin was disabled."""
+        return self.smeared_untagged_var.min == self.smeared_untagged_var.max
+
     def unfolded_substructure(self, n_iter: int, true_jet_pt_range: helpers.JetPtRange) -> binned_data.BinnedData:
         """ Helper to retrieve the unfolded substructure directly """
         return self.true_substructure(
@@ -451,59 +456,65 @@ def _plot_pp_PbPb_comparison(
     """
     logger.info("Plotting grooming method comparison for kt with systematics")
 
+    # Setup
+    event_activity_label_map = {
+        "pp": "pp",
+        "central": r"0-10\% $\text{Pb--Pb}$",
+        "semi_central": r"30-50\% $\text{Pb--Pb}$",
+    }
+
     # fig, ax = plt.subplots(figsize=(9, 10))
     # Size is specified to make it convenient to compare against Hard Probes plots.
     fig, ax = plt.subplots(figsize=(10, 8))
 
     # Collision system is a bit misleading because it's really just a high label, but good enough for a quick look.
-    for (collision_system, hist), color in zip(hists.items(), ["blue", "red"]):
-        # Axes: jet_pt, attr_name
-        h = hist.data
+    with sns.color_palette("Set2"):
+        for collision_system, hist in hists.items():
+            # Axes: jet_pt, attr_name
+            h = hist.data
 
-        # NOTE: Careful, this is hard coded! It's good enough for a hack...
-        if collision_system == "pp":
-            h = unfolding_base.select_hist_range(h, helpers.KtRange(0.5, 8))
-        elif collision_system == "semi_central":
-            h = unfolding_base.select_hist_range(h, helpers.KtRange(2, 15))
-        elif collision_system == "central":
-            h = unfolding_base.select_hist_range(h, helpers.KtRange(2, 8))
-        else:
-            logger.error("Collision system not recognized!")
+            # NOTE: Careful, this is hard coded! It's good enough for a hack...
+            if collision_system == "pp":
+                h = unfolding_base.select_hist_range(h, helpers.KtRange(0.5, 6))
+            elif collision_system == "semi_central":
+                h = unfolding_base.select_hist_range(h, helpers.KtRange(1, 8))
+            elif collision_system == "central":
+                h = unfolding_base.select_hist_range(h, helpers.KtRange(1.5, 8))
+            else:
+                logger.error("Collision system not recognized!")
 
-        # Set 0s to NaN (for example, in z_g where have a good portion of the range cut off).
-        if set_zero_to_nan:
-            h.errors[h.values == 0] = np.nan
-            h.values[h.values == 0] = np.nan
+            # Set 0s to NaN (for example, in z_g where have a good portion of the range cut off).
+            if set_zero_to_nan:
+                h.errors[h.values == 0] = np.nan
+                h.values[h.values == 0] = np.nan
 
-        # Main data points
-        ax.errorbar(
-            h.axes[0].bin_centers,
-            h.values,
-            yerr=h.errors,
-            xerr=h.axes[0].bin_widths / 2,
-            color=color,
-            linestyle="",
-            label=collision_system.replace("_", " "),
-        )
+            # Main data points
+            p = ax.errorbar(
+                h.axes[0].bin_centers,
+                h.values,
+                yerr=h.errors,
+                xerr=h.axes[0].bin_widths / 2,
+                linestyle="",
+                label=event_activity_label_map[collision_system],
+            )
 
-        # Systematic uncertainty
-        pachyderm.plot.error_boxes(
-            ax=ax,
-            x_data=h.axes[0].bin_centers,
-            y_data=h.values,
-            x_errors=h.axes[0].bin_widths / 2,
-            y_errors=np.array(
-                [
-                    h.metadata["y_systematic"]["quadrature"].low,
-                    h.metadata["y_systematic"]["quadrature"].high,
-                ]
-            ),
-            # y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
-            # color=style.color,
-            # color=p[0].get_color(),
-            color=color,
-            linewidth=0,
-        )
+            # Systematic uncertainty
+            pachyderm.plot.error_boxes(
+                ax=ax,
+                x_data=h.axes[0].bin_centers,
+                y_data=h.values,
+                x_errors=h.axes[0].bin_widths / 2,
+                y_errors=np.array(
+                    [
+                        h.metadata["y_systematic"]["quadrature"].low,
+                        h.metadata["y_systematic"]["quadrature"].high,
+                    ]
+                ),
+                # y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+                # color=style.color,
+                color=p[0].get_color(),
+                linewidth=0,
+            )
 
     # Labeling and presentation
     plot_config.apply(fig=fig, ax=ax)
@@ -519,25 +530,19 @@ def _plot_pp_PbPb_comparison(
 def plot_pp_PbPb_comparison(
     hists: Mapping[str, SingleResult],
     grooming_method: str,
-    event_activity: str,
     output_dir: Path,
     kt_range: Tuple[float, float] = (1.5, 15),
-    jet_R: str = "R04",
+    jet_R_str: str = "R04",
 ) -> None:
     """Plot PbPb unfolded results with systematics."""
     jet_pt_bin = next(iter(hists.values())).ranges[0]
-    event_activity_map = {
-        "central": r"0-10\%",
-        "semi_central": r"30-50\%",
-    }
     grooming_styling = pb.define_grooming_styles()
     style = grooming_styling[grooming_method]
 
     text = pb.label_to_display_string["ALICE"]["work_in_progress"]
-    text += "\n" + pb.label_to_display_string["collision_system"]["PbPb"] + f", {event_activity_map[event_activity]}"
-    text += "\n" + pb.label_to_display_string["collision_system"]["pp_5TeV_NN"]
+    text += "\n" + pb.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
-    text += "\n" + pb.label_to_display_string["jets"][jet_R]
+    text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     text += "\n" + fr"{style.label}"
     _plot_pp_PbPb_comparison(
@@ -545,7 +550,7 @@ def plot_pp_PbPb_comparison(
         grooming_method=grooming_method,
         set_zero_to_nan=False,
         plot_config=pb.PlotConfig(
-            name=f"unfolded_kt_PbPb_comparison_{event_activity}",
+            name=f"unfolded_kt_pp_PbPb_comparison_{jet_R_str}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -1116,24 +1121,29 @@ def setup_unfolding_outputs(  # noqa: C901
         logger.debug("Skipping random binning because the output file doesn't exist.")
 
     try:
-        if displaced_untagged_above_range:
-            displaced_untagged_var = helpers.KtRange(smeared_var_range.max, displaced_extremum)
-        else:
-            displaced_untagged_var = helpers.KtRange(displaced_extremum, smeared_var_range.min)
+        # If the untagged bin is disabled, then skip this
+        if not smeared_untagged_var.min == smeared_untagged_var.max:
+            if displaced_untagged_above_range:
+                displaced_untagged_var = helpers.KtRange(smeared_var_range.max, displaced_extremum)
+            else:
+                displaced_untagged_var = helpers.KtRange(displaced_extremum, smeared_var_range.min)
 
-        unfolding_outputs["untagged_bin"] = UnfoldingOutput(
-            substructure_variable=substructure_variable,
-            grooming_method=grooming_method,
-            smeared_var_range=smeared_var_range,
-            smeared_untagged_var=displaced_untagged_var,
-            smeared_jet_pt_range=smeared_jet_pt_range,
-            collision_system=collision_system,
-            base_dir=output_dir,
-            n_iter_compare=n_iter_compare,
-            pure_matches=False,
-            suffix=suffix,
-        )
-        print(f"untagged_bin: {unfolding_outputs['untagged_bin'].identifier}")
+            unfolding_outputs["untagged_bin"] = UnfoldingOutput(
+                substructure_variable=substructure_variable,
+                grooming_method=grooming_method,
+                smeared_var_range=smeared_var_range,
+                smeared_untagged_var=displaced_untagged_var,
+                smeared_jet_pt_range=smeared_jet_pt_range,
+                collision_system=collision_system,
+                base_dir=output_dir,
+                n_iter_compare=n_iter_compare,
+                pure_matches=False,
+                suffix=suffix,
+            )
+            logger.debug(f"untagged_bin: {unfolding_outputs['untagged_bin'].identifier}")
+        else:
+            logger.info("Skipping untagged bin outputs because it is disabled")
+
     except FileNotFoundError:
         logger.debug("Skipping untagged bin location because the output file doesn't exist.")
 
@@ -1173,6 +1183,166 @@ def setup_unfolding_outputs(  # noqa: C901
             logger.debug(f"Skipping background setting {background_setting} because the output file doesn't exist.")
 
     return unfolding_outputs
+
+
+def _load_unfolded_outputs(
+    grooming_method: str,
+    substructure_variable: str,
+    smeared_var_range: helpers.KtRange,
+    smeared_untagged_var: helpers.KtRange,
+    smeared_jet_pt_range: helpers.JetPtRange,
+    collision_system: str,
+    event_activity: str,
+    jet_R_str: str,
+    n_iter_compare: int,
+    truncation_shift: int,
+    displaced_extremum: float,
+    output_dir: Path,
+    tag_after_suffix: str = "",
+    displaced_untagged_above_range: bool = True,
+) -> Tuple[Dict[str, UnfoldingOutput], Dict[str, UnfoldingOutput], Dict[str, UnfoldingOutput]]:
+    # Validation
+    suffix = f"{event_activity}_{jet_R_str}"
+    if tag_after_suffix:
+        suffix += f"_{tag_after_suffix}"
+
+    unfolding_closure_outputs = setup_unfolding_closures(
+        substructure_variable=substructure_variable,
+        grooming_method=grooming_method,
+        smeared_var_range=smeared_var_range,
+        smeared_untagged_var=smeared_untagged_var,
+        smeared_jet_pt_range=smeared_jet_pt_range,
+        collision_system=collision_system,
+        n_iter_compare=n_iter_compare,
+        suffix=suffix,
+        output_dir=output_dir,
+    )
+    try:
+        unfolding_closure_pure_matches_outputs = setup_unfolding_closures(
+            substructure_variable=substructure_variable,
+            grooming_method=grooming_method,
+            smeared_var_range=smeared_var_range,
+            smeared_untagged_var=smeared_untagged_var,
+            smeared_jet_pt_range=smeared_jet_pt_range,
+            collision_system=collision_system,
+            n_iter_compare=n_iter_compare,
+            suffix=suffix,
+            output_dir=output_dir,
+            pure_matches=True,
+        )
+    except KeyError as e:
+        logger.warning(f"Could not find pure matches output '{e}'. Skipping")
+        unfolding_closure_pure_matches_outputs = {}
+
+    unfolding_systematics_outputs = setup_unfolding_outputs(
+        substructure_variable=substructure_variable,
+        grooming_method=grooming_method,
+        smeared_var_range=smeared_var_range,
+        smeared_untagged_var=smeared_untagged_var,
+        smeared_jet_pt_range=smeared_jet_pt_range,
+        collision_system=collision_system,
+        n_iter_compare=n_iter_compare,
+        suffix=suffix,
+        output_dir=output_dir,
+        truncation_shift=truncation_shift,
+        displaced_untagged_above_range=displaced_untagged_above_range,
+        displaced_extremum=displaced_extremum,
+    )
+
+    return unfolding_closure_outputs, unfolding_closure_pure_matches_outputs, unfolding_systematics_outputs
+
+
+def load_unfolded_outputs(
+    grooming_methods: Sequence[str],
+    substructure_variable: str,
+    smeared_var_range: helpers.KtRange,
+    smeared_untagged_var: helpers.KtRange,
+    smeared_jet_pt_range: helpers.JetPtRange,
+    collision_system: str,
+    event_activity: str,
+    jet_R_str: str,
+    n_iter_compare: int,
+    truncation_shift: int,
+    displaced_extremum: float,
+    output_dir: Path,
+    tag_after_suffix: str = "",
+    displaced_untagged_above_range: bool = True,
+) -> Tuple[
+    Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]]
+]:
+    unfolding_closure_outputs = {}
+    unfolding_closure_pure_matches_outputs = {}
+    unfolding_systematics_outputs = {}
+    for grooming_method in grooming_methods:
+        (
+            unfolding_closure_outputs[grooming_method],
+            unfolding_closure_pure_matches_outputs[grooming_method],
+            unfolding_systematics_outputs[grooming_method],
+        ) = _load_unfolded_outputs(
+            grooming_method=grooming_method,
+            substructure_variable=substructure_variable,
+            smeared_var_range=smeared_var_range,
+            smeared_untagged_var=smeared_untagged_var,
+            smeared_jet_pt_range=smeared_jet_pt_range,
+            collision_system=collision_system,
+            event_activity=event_activity,
+            jet_R_str=jet_R_str,
+            n_iter_compare=n_iter_compare,
+            truncation_shift=truncation_shift,
+            displaced_extremum=displaced_extremum,
+            output_dir=output_dir,
+            tag_after_suffix=tag_after_suffix,
+            displaced_untagged_above_range=displaced_untagged_above_range,
+        )
+
+    return (
+        unfolding_closure_outputs,
+        unfolding_closure_pure_matches_outputs,
+        unfolding_systematics_outputs,
+    )
+
+
+def _unfolded_outputs_with_systematics(
+    grooming_method: str,
+    unfolding_systematics_outputs: Dict[str, Dict[str, UnfoldingOutput]],
+    true_jet_pt_range: helpers.JetPtRange,
+) -> Tuple[SingleResult, binned_data.BinnedData]:
+    unfolded = unfolded_substructure_results(
+        unfolding_outputs=unfolding_systematics_outputs[grooming_method],
+        true_jet_pt_range=true_jet_pt_range,
+    )
+
+    unfolded_with_systematics = calculate_systematics(
+        unfolded=unfolded,
+        unfolding_outputs=unfolding_systematics_outputs[grooming_method],
+        true_jet_pt_range=true_jet_pt_range,
+    )
+
+    true_reference = unfolding_systematics_outputs[grooming_method]["default"].true_substructure(
+        unfolding_systematics_outputs[grooming_method]["default"].true_hist_name, true_jet_pt_range=true_jet_pt_range
+    )
+
+    return unfolded_with_systematics, true_reference
+
+
+def unfolded_outputs_with_systematics(
+    grooming_methods: Sequence[str],
+    unfolding_systematics_outputs: Dict[str, Dict[str, UnfoldingOutput]],
+    true_jet_pt_range: helpers.JetPtRange,
+) -> Tuple[Dict[str, SingleResult], Dict[str, binned_data.BinnedData]]:
+    unfolded_with_systematics = {}
+    true_reference = {}
+    for grooming_method in grooming_methods:
+        (
+            unfolded_with_systematics[grooming_method],
+            true_reference[grooming_method],
+        ) = _unfolded_outputs_with_systematics(
+            grooming_method=grooming_method,
+            unfolding_systematics_outputs=unfolding_systematics_outputs,
+            true_jet_pt_range=true_jet_pt_range,
+        )
+
+    return unfolded_with_systematics, true_reference
 
 
 def unfolded_substructure_results(
