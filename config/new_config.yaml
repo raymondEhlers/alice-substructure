@@ -1123,8 +1123,7 @@ analysis_configurations:
                 default:
                     label: ""
                     # NOTE: Untagged bin above is included in the closures!
-                    # TEMP: disabled for conveience.
-                    closures: false
+                    closures: true
                     closure_settings:
                         split_MC_fraction_for_response: 0.75
                         max_untagged_bin: 10
@@ -1132,24 +1131,57 @@ analysis_configurations:
                     datasets: "nominal"
                 default_kt_1:
                     label: ""
-                    closures: false
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
                     reweight_prior: false
                     datasets: "nominal"
                     binning:
                         true_kt: [-0.05, 0, 1, 2, 3, 4, 8, 100]
                         smeared_kt: [0, 1, 2, 3, 4, 8]
-                default_kt_1_var2:
-                    label: ""
+                default_kt_1_reweight_prior:
+                    label: "reweight_prior"
                     closures: false
+                    reweight_prior: true
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1, 2, 3, 4, 8, 100]
+                        smeared_kt: [0, 1, 2, 3, 4, 8]
+                default_kt_1_var2:
+                    label: "var2"
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
                     reweight_prior: false
                     datasets: "nominal"
                     binning:
                         true_kt: [-0.05, 0, 1, 2, 3, 4, 8, 100]
                         smeared_kt: [0, 1, 1.5, 2, 3, 4, 8]
-                default_kt_1_var3:
-                    label: ""
+                default_kt_1_var2_reweight_prior:
+                    label: "var2_reweight_prior"
                     closures: false
+                    reweight_prior: true
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1, 2, 3, 4, 8, 100]
+                        smeared_kt: [0, 1, 1.5, 2, 3, 4, 8]
+                default_kt_1_var3:
+                    label: "var3"
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
                     reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1, 1.5, 2, 3, 4, 8, 100]
+                        smeared_kt: [0, 1, 1.5, 2, 3, 4, 8]
+                default_kt_1_var3_reweight_prior:
+                    label: "var3_reweight_prior"
+                    closures: false
+                    reweight_prior: true
                     datasets: "nominal"
                     binning:
                         true_kt: [-0.05, 0, 1, 1.5, 2, 3, 4, 8, 100]
@@ -1162,6 +1194,11 @@ analysis_configurations:
                     binning:
                         true_kt: [-0.05, 0, 2, 3, 4, 8, 100]
                         smeared_kt: [1, 2, 3, 4, 8]
+                reweight_prior:
+                    label: "reweight_prior"
+                    closures: false
+                    reweight_prior: true
+                    datasets: "nominal"
 
     PbPb_central_R02_pass1:
         datasets:
@@ -1222,8 +1259,19 @@ analysis_configurations:
                         smeared_kt: [1, 1, 2, 3, 4, 8]
                 default_kt_1.5:
                     label: ""
-                    closures: false
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
                     reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 8, 100]
+                        smeared_kt: [0, 1.5, 2, 3, 4, 8]
+                default_kt_1.5_reweight_prior:
+                    label: "reweight_prior"
+                    closures: false
+                    reweight_prior: true
                     datasets: "nominal"
                     binning:
                         true_kt: [-0.05, 0, 1.5, 2, 3, 4, 8, 100]
@@ -1342,6 +1390,25 @@ analysis_configurations:
                     closures: false
                     reweight_prior: true
                     datasets: "nominal"
+                default_2_4_split:
+                    label: "2_4_split"
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [0., 0.5, 1, 2, 3, 4, 6, 10]
+                        smeared_kt: [0.25, 0.25, 0.5, 1., 2., 3, 4, 6]
+                default_2_4_split_reweight_prior:
+                    label: "2_4_split_reweight_prior"
+                    closures: false
+                    reweight_prior: true
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [0., 0.5, 1, 2, 3, 4, 6, 10]
+                        smeared_kt: [0.25, 0.25, 0.5, 1., 2., 3, 4, 6]
 
 execution:
     PbPb:
