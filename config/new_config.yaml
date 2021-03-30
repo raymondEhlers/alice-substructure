@@ -1205,8 +1205,8 @@ analysis_configurations:
                     binning:
                         true_kt: [-0.05, 0, 1, 1.5, 2, 3, 4, 6, 100]
                         smeared_kt: [0, 1, 1.5, 2, 3, 4, 6]
-                default_kt_1_6_var2:
-                    label: "var2"
+                default_kt_1_6_var4:
+                    label: "var4"
                     closures: true
                     closure_settings:
                         split_MC_fraction_for_response: 0.75
@@ -1217,8 +1217,8 @@ analysis_configurations:
                         true_kt: [-0.05, 0, 1, 1.5, 2, 3, 4, 6, 100]
                         # Try to boost in the kinematic eff, but not sure if this is reasonable...
                         smeared_kt: [0, 1, 1.5, 2, 3, 4, 6, 8]
-                default_kt_1_6_var2_reweight_prior:
-                    label: "var2_reweight_prior"
+                default_kt_1_6_var4_reweight_prior:
+                    label: "var4_reweight_prior"
                     closures: false
                     reweight_prior: true
                     datasets: "nominal"
@@ -1324,6 +1324,46 @@ analysis_configurations:
                     binning:
                         true_kt: [0, 1.5, 2, 3, 4, 8, 100]
                         smeared_kt: [1.5, 1.5, 2, 3, 4, 8]
+                default_kt_1.5_6:
+                    label: ""
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 6, 100]
+                        smeared_kt: [0, 1.5, 2, 3, 4, 6]
+                default_kt_1.5_6_reweight_prior:
+                    label: "reweight_prior"
+                    closures: false
+                    reweight_prior: true
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 6, 100]
+                        smeared_kt: [0, 1.5, 2, 3, 4, 6]
+                default_kt_1.5_6_var2:
+                    label: "var2"
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 6, 100]
+                        # Try to boost in the kinematic eff, but not sure if this is reasonable...
+                        smeared_kt: [0, 1.5, 2, 3, 4, 6, 8]
+                default_kt_1.5_6_var2_reweight_prior:
+                    label: "var2_reweight_prior"
+                    closures: false
+                    reweight_prior: true
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 1.5, 2, 3, 4, 6, 100]
+                        # Try to boost in the kinematic eff, but not sure if this is reasonable...
+                        smeared_kt: [0, 1.5, 2, 3, 4, 6, 8]
                 default_kt_2_6:
                     label: ""
                     closures: false
