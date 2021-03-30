@@ -605,7 +605,7 @@ def run_create_closure_ratio(  # noqa: C901
     if output_filename.exists():
         with uproot.open(output_filename) as f:
             # Check for an existing hist. Even if the binning is encoded in the name,
-            # we check the binning explicitly to ensure we have't overlooked anything.
+            # we check the binning explicitly to ensure we haven't overlooked anything.
             h_uproot = f.get(hist_name, None)
             if h_uproot:
                 h_temp = binned_data.BinnedData.from_existing_data(h_uproot)
@@ -623,7 +623,7 @@ def run_create_closure_ratio(  # noqa: C901
                     ]
                     # If output already exists, we can return immediately.
                     if all(tests_for_same_binning):
-                        return (True, "Same binning. Returning early.")
+                        return (True, f"Same binning. Returning early. Name: {hist_name}")
             else:
                 logger.info(f"Could not find hist {hist_name}. Creating...")
 
@@ -706,7 +706,7 @@ def run_create_closure_ratio(  # noqa: C901
 
     logger.info("Done!")
 
-    return (True, "Processed")
+    return (True, f"Processed, name: {hist_name}")
 
 
 def run_response(  # noqa: C901

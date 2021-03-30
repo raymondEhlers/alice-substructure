@@ -391,14 +391,13 @@ def _get_reweighted_ratio(
         / f"{response_dataset_name}_{grooming_method}_prefixes_{response_prefixes}_closure.root"
     )
     f_response = ROOT.TFile(str(response_filename), "READ")
-    h_response = f_response.Get(
-        unfolding_base.hist_name_for_ratio_2D(
-            grooming_method=grooming_method,
-            prefix_for_ratio=response_prefix,
-            smeared_substructure_variable_bins=smeared_substructure_variable_bins,
-            smeared_jet_pt_bins=smeared_jet_pt_bins,
-        )
+    h_response_name = unfolding_base.hist_name_for_ratio_2D(
+        grooming_method=grooming_method,
+        prefix_for_ratio=response_prefix,
+        smeared_substructure_variable_bins=smeared_substructure_variable_bins,
+        smeared_jet_pt_bins=smeared_jet_pt_bins,
     )
+    h_response = f_response.Get(h_response_name)
     # Retrieve data hist
     data_filename = (
         base_directory
@@ -407,19 +406,28 @@ def _get_reweighted_ratio(
         / f"{data_dataset_name}_{grooming_method}_prefixes_data_closure.root"
     )
     f_data = ROOT.TFile(str(data_filename), "READ")
-    h_data = f_data.Get(
-        unfolding_base.hist_name_for_ratio_2D(
-            grooming_method=grooming_method,
-            prefix_for_ratio="data",
-            smeared_substructure_variable_bins=smeared_substructure_variable_bins,
-            smeared_jet_pt_bins=smeared_jet_pt_bins,
-        )
+    h_data_name = unfolding_base.hist_name_for_ratio_2D(
+        grooming_method=grooming_method,
+        prefix_for_ratio="data",
+        smeared_substructure_variable_bins=smeared_substructure_variable_bins,
+        smeared_jet_pt_bins=smeared_jet_pt_bins,
     )
+    h_data = f_data.Get(h_data_name)
 
     # Calculate the ratio and cleanup
-    h_ratio = h_response.Clone("h_ratio")
-    h_ratio.Divide(h_data)
-    h_ratio.SetDirectory(0)
+    # NOTE: There seems to be some race condition here, but I can't seem to isolate it.
+    #       It occurs as a reference error, meaning that somehow we can't access the
+    #       histogram. In that case, I want to see all of the variables so I can better
+    #       understand what is causing the issue.
+    local_vars = locals()
+    try:
+        h_ratio = h_response.Clone("h_ratio")
+        h_ratio.Divide(h_data)
+        h_ratio.SetDirectory(0)
+    except (TypeError, ReferenceError) as e:
+        import pprint
+
+        raise RuntimeError(f"Ref error {e}. Variables: {pprint.pformat(local_vars)}") from e
 
     # Cleanup
     f_response.Close()
