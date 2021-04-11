@@ -708,7 +708,45 @@ available_datasets:
         files:
             - "trains/PbPb/6765/AnalysisResults.*.repaired.root"
     # LHC20g4 embedded into LHC18qr semi-central R = 0.2 for pass3 AOD
-    LHC20g4_embedded_into_LHC18qr_semi_central_R02_6798_6817: &LHC18qr_semi_central_R02_embedded
+    LHC20g4_embedded_into_LHC18qr_semi_central_R02_6932_6951: &LHC18qr_semi_central_R02_embedded
+        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_6932_6951"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "data"
+            "true": "matched"
+            det_level: "detLevel"
+        # Branches which don't exist for all prefixes
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/embedPythia/6932/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6933/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6934/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6935/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6936/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6937/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6938/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6939/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6940/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6941/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6942/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6943/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6944/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6945/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6946/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6947/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6948/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6949/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6950/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6951/AnalysisResults.*.repaired.root"
+    # Systematics: Tracking efficiency
+    # LHC20g4 embedded into LHC18qr semi-central R = 0.2 for pass3 AOD
+    LHC20g4_embedded_into_LHC18qr_semi_central_R02_6798_6817: &LHC18qr_semi_central_R02_embedded_tracking_efficiency
         name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_6798_6817"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
@@ -844,6 +882,48 @@ available_datasets:
             - "trains/embedPythia/6473/AnalysisResults.*.root"
             - "trains/embedPythia/6474/AnalysisResults.*.root"
             - "trains/embedPythia/6475/AnalysisResults.*.root"
+    # Central R = 0.2 Embedding for dynamical core for pass1 AOD
+    LHC19f4_embedded_into_LHC18qr_central_R02_6982_7001:
+        name: "LHC19f4_embedded_into_LHC18qr_central_R02_6982_7001"
+        # Important to note that this is a cross check task output!
+        cross_check_task: true
+        grooming_methods:
+            - "dynamical_kt"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "data"
+            "true": "matched"
+            det_level: "det_level"
+        # Branches which don't exist for all prefixes
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        # Since this is a cross check task, we don't need to repair the trees, nor
+        # skim them to flat.
+        files:
+            - "trains/embedPythia/6982/AnalysisResults.*.root"
+            - "trains/embedPythia/6983/AnalysisResults.*.root"
+            - "trains/embedPythia/6984/AnalysisResults.*.root"
+            - "trains/embedPythia/6985/AnalysisResults.*.root"
+            - "trains/embedPythia/6986/AnalysisResults.*.root"
+            - "trains/embedPythia/6987/AnalysisResults.*.root"
+            - "trains/embedPythia/6988/AnalysisResults.*.root"
+            - "trains/embedPythia/6989/AnalysisResults.*.root"
+            - "trains/embedPythia/6990/AnalysisResults.*.root"
+            - "trains/embedPythia/6991/AnalysisResults.*.root"
+            - "trains/embedPythia/6992/AnalysisResults.*.root"
+            - "trains/embedPythia/6993/AnalysisResults.*.root"
+            - "trains/embedPythia/6994/AnalysisResults.*.root"
+            - "trains/embedPythia/6995/AnalysisResults.*.root"
+            - "trains/embedPythia/6996/AnalysisResults.*.root"
+            - "trains/embedPythia/6997/AnalysisResults.*.root"
+            - "trains/embedPythia/6998/AnalysisResults.*.root"
+            - "trains/embedPythia/6999/AnalysisResults.*.root"
+            - "trains/embedPythia/7000/AnalysisResults.*.root"
+            - "trains/embedPythia/7001/AnalysisResults.*.root"
 
 analysis_configurations:
     PbPb_semi_central_R04_pass1:
@@ -1105,7 +1185,7 @@ analysis_configurations:
                 embedPythia: *LHC18qr_semi_central_R02_embedded
             tracking_efficiency:
                 PbPb: *LHC18qr_semi_central_R02
-                embedPythia: null  #*LHC18qr_semi_central_R02_embedded_tracking_efficiency
+                embedPythia: *LHC18qr_semi_central_R02_embedded_tracking_efficiency
             rmax_005:
                 PbPb: null  #*LHC18qr_semi_central_R02_Rmax005
                 embedPythia: null  #*LHC18qr_semi_central_R02_embedded_Rmax005
