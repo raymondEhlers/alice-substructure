@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 _possible_merging_stages = ["merged", "manual", "single_run_manual", "Stage_1", "Stage_2", "Stage_5"]
 
 
-def year_from_datatset(dataset: str) -> int:
+def year_from_dataset(dataset: str) -> int:
     """Extract the year from the dataset.
 
     Args:
@@ -166,7 +166,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
 
                     # Back to (somewhat) LHC18{q,r} specific.
                     manual_dir: Path = (
-                        Path(f"/alice/{data_or_sim_str}/{year_from_datatset(dataset_name)}/")
+                        Path(f"/alice/{data_or_sim_str}/{year_from_dataset(dataset_name)}/")
                         / dataset_name
                         / f"{run_prefix}{run_number}"
                         / pass_value
@@ -189,7 +189,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                             additional_label=str(run_number),
                         )
                         output.update(result)
-                    else:
+                    elif manual_stage_to_download == "single_run_manual":
                         logger.info(f"Processing manual single run {run_number} for child {child_label}")
                         # Didn't even get to a stage of the merging. Take whatever is there...
                         _directories_with_output_files = alice_utils.list_alien_dir(manual_dir)
