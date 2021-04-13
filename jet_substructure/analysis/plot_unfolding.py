@@ -463,23 +463,28 @@ def _plot_pp_PbPb_comparison(
         "semi_central": r"30-50\% $\text{Pb--Pb}$",
     }
 
-    # fig, ax = plt.subplots(figsize=(9, 10))
-    # Size is specified to make it convenient to compare against Hard Probes plots.
-    fig, ax = plt.subplots(figsize=(10, 8))
-
-    # Collision system is a bit misleading because it's really just a high label, but good enough for a quick look.
     with sns.color_palette("Set2"):
+        # fig, ax = plt.subplots(figsize=(9, 10))
+        # Size is specified to make it convenient to compare against Hard Probes plots.
+        fig, ax = plt.subplots(figsize=(10, 8))
+
+        # Collision system is a bit misleading because it's really just a high label, but good enough for a quick look.
         for collision_system, hist in hists.items():
             # Axes: jet_pt, attr_name
             h = hist.data
 
             # NOTE: Careful, this is hard coded! It's good enough for a hack...
             if collision_system == "pp":
+                # Based on kinematic eff and unfolding ranges
                 h = unfolding_base.select_hist_range(h, helpers.KtRange(0.5, 6))
             elif collision_system == "semi_central":
-                h = unfolding_base.select_hist_range(h, helpers.KtRange(1, 8))
+                # h = unfolding_base.select_hist_range(h, helpers.KtRange(1, 8))
+                # Based on kinematic eff and unfolding ranges
+                h = unfolding_base.select_hist_range(h, helpers.KtRange(3, 6))
             elif collision_system == "central":
-                h = unfolding_base.select_hist_range(h, helpers.KtRange(1.5, 8))
+                # h = unfolding_base.select_hist_range(h, helpers.KtRange(1.5, 8))
+                # Based on kinematic eff and unfolding ranges
+                h = unfolding_base.select_hist_range(h, helpers.KtRange(3, 6))
             else:
                 logger.error("Collision system not recognized!")
 
@@ -494,7 +499,10 @@ def _plot_pp_PbPb_comparison(
                 h.values,
                 yerr=h.errors,
                 xerr=h.axes[0].bin_widths / 2,
+                marker="o",
+                markersize=11,
                 linestyle="",
+                linewidth=3,
                 label=event_activity_label_map[collision_system],
             )
 
@@ -560,7 +568,7 @@ def plot_pp_PbPb_comparison(
                             "y",
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
-                            range=(1e-3, 1),
+                            range=(5e-3, 1),
                         ),
                     ],
                     text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
