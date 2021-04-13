@@ -165,7 +165,9 @@ def setup_parsl_587(
     ]
     if use_root:
         # pc059 to avoid causing problems on the login node when using 8 cores for root data frame.
-        machines_to_exclude.append("pc059")
+        # machines_to_exclude.append("pc059")
+        # Seems to be resolved as of April 2021.
+        ...
 
     b587_executor = Config(
         executors=[
@@ -190,7 +192,7 @@ def setup_parsl_587(
                     cores_per_node=jobs_per_node,
                     # Ensures that the jobs are spread out. Also means that we need to be careful
                     # when others are running to avoid running out of memory.
-                    # exclusive=True,
+                    exclusive=False,
                     # Format: HH:MM:SS
                     walltime="02:00:00",
                     # walltime="00:21:00",
@@ -2091,11 +2093,12 @@ def setup_all_unfolding(  # noqa: C901
 if __name__ == "__main__":  # noqa: C901
     # Settings
     # Base settings
-    # base_dataset_name = "PbPb_semi_central_R02_pass3"
-    base_dataset_name = "pp_R02"
+    # base_dataset_name = "PbPb_central_R02_pass1"
+    base_dataset_name = "PbPb_semi_central_R02_pass3"
+    # base_dataset_name = "pp_R02"
     # dataset_type = "rmax_070"
     dataset_type = "nominal"
-    collision_system = "pp"
+    collision_system = "PbPb"
 
     # Job settings
     jobs_to_execute = [
@@ -2109,7 +2112,7 @@ if __name__ == "__main__":  # noqa: C901
         # "root_data_frame_response",
         "unfolding",
     ]
-    nodes_to_allocate = 3
+    nodes_to_allocate = 8
     jobs_per_node = 6
 
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
@@ -2332,15 +2335,30 @@ if __name__ == "__main__":  # noqa: C901
             grooming_methods=grooming_methods,
             n_cores_per_job=n_cores_per_job,
             selected_unfolding_settings=[
-                "default",
-                # "default_kt_1",
-                # "default_kt_2",
+                # "default",
+                # "reweight_prior",
+                # "default_2_4_split",
+                # "default_2_4_split_reweight_prior",
                 # "default_kt_1.5",
-                # "default_no_untagged",
-                # "default_kt_1_no_untagged",
-                # "default_kt_1.5_no_untagged",
-                # "default_kt_2_6",
+                # "default_kt_1.5_reweight_prior",
+                # "default_kt_1",
+                # "default_kt_1_reweight_prior",
+                # Semi-central
+                # "default_kt_1_var2",
+                # "default_kt_1_var2_reweight_prior",
+                # "default_kt_1_var3",
+                # "default_kt_1_var3_reweight_prior",
+                # "default_kt_1_6",
+                # "default_kt_1_6_reweight_prior",
+                # "default_kt_1_6_var4",
+                # "default_kt_1_6_var4_reweight_prior",
+                # Central
+                # "default_kt_1.5_6",
+                # "default_kt_1.5_6_reweight_prior",
+                # "default_kt_1.5_6_var2",
+                # "default_kt_1.5_6_var2_reweight_prior",
                 # *[f"var_{i}" for i in range(1, 17) if i < 7 or i > 10] + ["default"],
+                "tracking_efficiency",
             ],
         )
         # results = setup_unfolding(
