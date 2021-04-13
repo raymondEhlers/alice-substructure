@@ -2017,6 +2017,10 @@ def setup_all_unfolding(  # noqa: C901
                             base_unfolding_config=base_unfolding_config,
                             unfolding_settings=unfolding_settings,
                         )
+                        # And add to final outputs
+                        # We only want to add here - otherwise it can show up multiple times, which is
+                        # confusing.
+                        results.extend(_reweight_prior_results[_reweight_hist_name])
 
                     # Need to make explicit dependencies for this task, so we add the results into
                     # reweight_prior_results. It will be either from adding the task now, or from
@@ -2024,8 +2028,6 @@ def setup_all_unfolding(  # noqa: C901
                     logger.info(f"Using reweighting {_reweight_hist_name}")
                     reweight_prior_results.extend(_reweight_prior_results[_reweight_hist_name])
             # Handle reweighted prior results.
-            # And add to final outputs
-            results.extend(reweight_prior_results)
             # Add as job inputs to make them dependencies.
             job_input_files = list(input_files)
             # Apparently if we take the outputs it complete messes up the dependency because one of the
