@@ -2340,8 +2340,7 @@ if __name__ == "__main__":  # noqa: C901
             grooming_methods=grooming_methods,
             n_cores_per_job=n_cores_per_job,
             selected_unfolding_settings=[
-                # "default",
-                # "reweight_prior",
+                "default",
                 # "default_2_4_split",
                 # "default_2_4_split_reweight_prior",
                 # "default_kt_1.5",
@@ -2363,7 +2362,18 @@ if __name__ == "__main__":  # noqa: C901
                 # "default_kt_1.5_6_var2",
                 # "default_kt_1.5_6_var2_reweight_prior",
                 # *[f"var_{i}" for i in range(1, 17) if i < 7 or i > 10] + ["default"],
-                "tracking_efficiency",
+                # Systematics
+                # Unfolding
+                "truncation_low",
+                "truncation_high",
+                "random_binning",
+                # Unfolding PbPb
+                "reweight_prior",
+                # Tracking efficiency
+                # "tracking_efficiency",
+                # PbPb background
+                # "background_low",
+                # "background_high",
             ],
         )
         # results = setup_unfolding(
