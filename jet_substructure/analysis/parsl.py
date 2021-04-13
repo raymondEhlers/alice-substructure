@@ -1878,6 +1878,8 @@ def setup_all_unfolding(  # noqa: C901
     response_collision_system = data_to_response_collision_system_name[data_collision_system]
 
     results = []
+    # Maps from the reweight hist name to the task.
+    _reweight_prior_results = {}
     for unfolding_settings_name in selected_unfolding_settings:
         # Setup
         unfolding_settings = base_unfolding_config["settings"][unfolding_settings_name]
@@ -1984,8 +1986,20 @@ def setup_all_unfolding(  # noqa: C901
                 # We enable for both the straightforward reweighting, as well as for the closures where we take
                 # advantage of the reweighting.
                 for _collision_system in [data_collision_system, response_collision_system]:
-                    reweight_prior_results.extend(
-                        setup_root_data_frame(
+                    # Get unfolding name, and check if we already have the jobs setup. If so, grab, just use
+                    # the existing task and output files. Otherwise, set up the task, and then store the output.
+                    # This avoids duplicate jobs, which could potentially overwriting outputs from each other.
+                    _reweight_hist_name = unfolding_base.hist_name_for_ratio_2D(
+                        grooming_method=grooming_method,
+                        prefix_for_ratio="hybrid" if _collision_system == "embedPythia" else "data",
+                        smeared_substructure_variable_bins=_default_settings.substructure_variable.smeared_bins,
+                        smeared_jet_pt_bins=_default_settings.jet_pt.smeared_bins,
+                    )
+                    if _reweight_hist_name not in _reweight_prior_results:
+                        # NOTE: We can use this name directly without adding an additional level of indirection for
+                        #       the grooming method because the grooming method (as well as binning) is encoded in
+                        #       the hist name.
+                        _reweight_prior_results[_reweight_hist_name] = setup_root_data_frame(
                             processing_mode="closure",
                             collision_system=_collision_system,
                             n_cores_per_job=n_cores_per_job,
@@ -1997,7 +2011,11 @@ def setup_all_unfolding(  # noqa: C901
                             base_unfolding_config=base_unfolding_config,
                             unfolding_settings=unfolding_settings,
                         )
-                    )
+
+                    # Need to make explicit dependencies for this task, so we add the results into
+                    # reweight_prior_results. It will be either from adding the task now, or from
+                    # using an existing one stored in the dict.
+                    reweight_prior_results.extend(_reweight_prior_results[_reweight_hist_name])
             # Handle reweighted prior results.
             # And add to final outputs
             results.extend(reweight_prior_results)
