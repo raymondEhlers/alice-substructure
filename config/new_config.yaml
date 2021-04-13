@@ -746,8 +746,9 @@ available_datasets:
             - "trains/embedPythia/6951/AnalysisResults.*.repaired.root"
     # Systematics: Tracking efficiency
     # LHC20g4 embedded into LHC18qr semi-central R = 0.2 for pass3 AOD
-    LHC20g4_embedded_into_LHC18qr_semi_central_R02_6798_6817: &LHC18qr_semi_central_R02_embedded_tracking_efficiency
-        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_6798_6817"
+    # yamllint disable-line rule:line-length
+    LHC20g4_embedded_into_LHC18qr_semi_central_R02_tracking_efficiency_6798_6817: &LHC18qr_semi_central_R02_embedded_tracking_efficiency
+        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_tracking_efficiency_6798_6817"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
         # Map for the uniform prefix name to the analysis task prefix.
@@ -1319,6 +1320,17 @@ analysis_configurations:
                     closures: false
                     reweight_prior: true
                     datasets: "nominal"
+                tracking_efficiency:
+                    # Using "default_kt_1_6_var4"
+                    label: "tracking_efficiency"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "tracking_efficiency"
+                    binning:
+                        true_kt: [-0.05, 0, 1, 1.5, 2, 3, 4, 6, 100]
+                        # Try to boost in the kinematic eff, but not sure if this is reasonable...
+                        smeared_kt: [0, 1, 1.5, 2, 3, 4, 6, 8]
+
 
     PbPb_central_R02_pass1:
         datasets:
