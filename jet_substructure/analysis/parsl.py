@@ -229,12 +229,17 @@ def _repair_root_files(
 
     from jet_substructure.base import helpers
 
-    res = helpers.split_tree(
-        filenames=[Path(inputs[0].filepath)],
-        tree_name=tree_name,
-        number_of_chunks=1,
-        n_cores=n_cores,
-    )
+    try:
+        res = helpers.split_tree(
+            filenames=[Path(inputs[0].filepath)],
+            tree_name=tree_name,
+            number_of_chunks=1,
+            n_cores=n_cores,
+        )
+    except SystemError as e:
+        # ROOT fails this way sometimes. No clear reason, and it's too bad, but so it goes.
+        res = {Path(inputs[0].filepath): f"Failed due to ROOT internal issue...: {e}. Basically nothing to be done."}  # type: ignore
+        logger.warning(res)
     return res
 
 
