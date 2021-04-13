@@ -21,7 +21,7 @@ from jet_substructure.base import helpers
 logger = logging.getLogger(__name__)
 
 
-_possible_merging_stages = ["merged", "manual", "single_run_manual", "Stage_1", "Stage_2", "Stage_5"]
+_possible_merging_stages = ["merged", "manual", "single_run_manual", "run_by_run", "Stage_1", "Stage_2", "Stage_5"]
 
 
 def year_from_dataset(dataset: str) -> int:
@@ -212,6 +212,77 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                             local_file = local_train_dir / f"AnalysisResults.{child_label}.{label}.root"
                             logger.debug(f"Adding alien://{alien_file} : {local_file}")
                             output[str(alien_file)] = str(local_file)
+                    else:
+                        raise ValueError(
+                            f"Invalid manual stage to download {manual_stage_to_download} for run number {run_number}"
+                        )
+
+            elif stage_to_download == "run_by_run":
+                # Setup
+                local_run_by_run_dir = local_train_dir / "run_by_run" / child_label
+                # To start, we need to figure out the dataset.
+                # Dataset agnostic
+                # NOTE: May be run2 specific
+                pass_value = Path(f"pass{config['pass']}")
+                aod_value = config.get("AOD", None)
+                if aod_value:
+                    pass_value /= f"AOD{aod_value}"
+                dataset_name = f"LHC{child_label}"
+                is_data = alice_dl.does_period_contain_data(dataset_name)
+                run_prefix = "000" if is_data else ""
+                data_or_sim_str = "data" if is_data else "sim"
+
+                # We need to get all runs possible runs to check for outputs of interest.
+                dataset_path = Path(f"/alice/{data_or_sim_str}/{year_from_dataset(dataset_name)}/") / dataset_name
+                # NOTE: run_numbers contain the run_prefix by default because we're actually querying alien.
+                run_numbers = [r for r in alice_utils.list_alien_dir(str(dataset_path)) if r.isdigit()]
+
+                for run_number in run_numbers:
+                    # If train output exists for this run number, we expect it to be at this path.
+                    # Example dir: "/alice/data/2018/LHC18q/000296934/pass3/AOD252/PWGJE/Jets_EMC_PbPb/6989_..."
+                    _possible_train_output_dir_for_run = (
+                        dataset_path / run_number / pass_value / PWG / train_name / likely_child_directory
+                    )
+
+                    _directories_with_data = [
+                        d for d in alice_utils.list_alien_dir(_possible_train_output_dir_for_run) if d.isdigit()
+                    ]
+                    if _directories_with_data:
+                        logger.info(f"Found output for run_number: {run_number}")
+                        logger.debug(f"run_number: {run_number}, _directories_with_data: {_directories_with_data}")
+                        for _directory_with_data in _directories_with_data:
+                            # Setup
+                            _directory_with_data_full_path = _possible_train_output_dir_for_run / _directory_with_data
+
+                            # Check for AnalysisResults.root
+                            # Skip this check for the sake of efficiency. It seems quite rare for the directory to be created,
+                            # but not to contain AnalysisResults.root . Perhaps it practically never happens.
+                            if False:
+                                _dir_contents = alice_utils.list_alien_dir(_directory_with_data_full_path)
+                                if "AnalysisResults.root" not in _dir_contents:
+                                    logger.debug(
+                                        f"Run number: {run_number}, directory {_directory_with_data} doesn't contain an AnalysisResults.root. Skipping..."
+                                    )
+                                    continue
+
+                            # Add to the queue
+                            alien_file = _directory_with_data_full_path / "AnalysisResults.root"
+                            # Local filename
+                            # We use the integer defined in grabbing the train contents.
+                            # NOTE: These numbers don't have to be continuous, especially if there was a low success rate for the train.
+                            i = int(_directory_with_data_full_path.name)
+                            # label = f"{int(run_number)}.{i:03}"
+                            label = f"{i:03}"
+                            # We use a different directory structure than standard because we're most likely to merge these afterwards.
+                            local_file = (
+                                local_run_by_run_dir
+                                / str(int(run_number))
+                                / f"AnalysisResults.{child_label}.{label}.root"
+                            )
+                            logger.debug(f"Adding alien://{alien_file} : {local_file}")
+                            output[str(alien_file)] = str(local_file)
+                    else:
+                        logger.debug(f"No train output found for run {run_number}")
 
             else:
                 alien_xml_file = alien_dir / f"{stage_to_download}.xml"
