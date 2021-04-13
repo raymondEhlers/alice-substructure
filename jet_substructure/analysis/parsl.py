@@ -1997,10 +1997,14 @@ def setup_all_unfolding(  # noqa: C901
                         smeared_substructure_variable_bins=_default_settings.substructure_variable.smeared_bins,
                         smeared_jet_pt_bins=_default_settings.jet_pt.smeared_bins,
                     )
+                    # Add collision system to make it 100% unique (it already is for PbPb due to the prefix_for_ratio,
+                    # but it's not for pp).
+                    _reweight_hist_name = f"{_collision_system}_{_reweight_hist_name}"
                     if _reweight_hist_name not in _reweight_prior_results:
                         # NOTE: We can use this name directly without adding an additional level of indirection for
                         #       the grooming method because the grooming method (as well as binning) is encoded in
                         #       the hist name.
+                        logger.info(f"Adding reweighting {_reweight_hist_name}")
                         _reweight_prior_results[_reweight_hist_name] = setup_root_data_frame(
                             processing_mode="closure",
                             collision_system=_collision_system,
@@ -2017,6 +2021,7 @@ def setup_all_unfolding(  # noqa: C901
                     # Need to make explicit dependencies for this task, so we add the results into
                     # reweight_prior_results. It will be either from adding the task now, or from
                     # using an existing one stored in the dict.
+                    logger.info(f"Using reweighting {_reweight_hist_name}")
                     reweight_prior_results.extend(_reweight_prior_results[_reweight_hist_name])
             # Handle reweighted prior results.
             # And add to final outputs
