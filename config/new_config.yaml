@@ -1538,7 +1538,7 @@ analysis_configurations:
                         # Out[3]: array([0.96710106, 1.03207718, 1.03157575, 1.02829135])
                         # In [4]: np.round(r * [2, 3, 4, 6,], 2)
                         # Out[4]: array([1.93, 3.1 , 4.13, 6.17])
-                        smeared_kt: [1.5, 1.93, 3.1, 4.13, 6.17, 8]
+                        smeared_kt: [0, 1.5, 1.93, 3.1, 4.13, 6.17, 8]
                 reweight_prior:
                     label: "reweight_prior"
                     closures: false
