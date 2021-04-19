@@ -450,10 +450,7 @@ def _plot_pp_PbPb_comparison(
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
-    """Plot PbPb with systematics compared to pp with systematics for a set of grooming methods.
-
-    As of Dec 2020, pass on the ratio because the binning doesn't align.
-    """
+    """Plot PbPb with systematics compared to pp with systematics for a set of grooming methods."""
     logger.info("Plotting grooming method comparison for kt with systematics")
 
     # Setup
@@ -466,7 +463,16 @@ def _plot_pp_PbPb_comparison(
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
         # Size is specified to make it convenient to compare against Hard Probes plots.
-        fig, ax = plt.subplots(figsize=(10, 8))
+        fig, (ax, ax_ratio) = plt.subplots(
+            2,
+            1,
+            figsize=(10, 8),
+            gridspec_kw={"height_ratios": [3, 1]},
+            sharex=True,
+        )
+
+        # Use pp as reference, but only in the range where the others are measured.
+        ratio_reference_hist = unfolding_base.select_hist_range(hists["pp"].data, helpers.KtRange(3, 6))
 
         # Collision system is a bit misleading because it's really just a high label, but good enough for a quick look.
         for collision_system, hist in hists.items():
@@ -488,7 +494,7 @@ def _plot_pp_PbPb_comparison(
             else:
                 logger.error("Collision system not recognized!")
 
-            # Set 0s to NaN (for example, in z_g where have a good portion of the range cut off).
+            # Set 0s to NaN
             if set_zero_to_nan:
                 h.errors[h.values == 0] = np.nan
                 h.values[h.values == 0] = np.nan
@@ -524,8 +530,69 @@ def _plot_pp_PbPb_comparison(
                 linewidth=0,
             )
 
+            # Ratio
+            # Skip pp because it's not meaningful.
+            if collision_system == "pp":
+                continue
+
+            ratio = h / ratio_reference_hist
+            # Ratio + statistical error bars
+            ax_ratio.errorbar(
+                ratio.axes[0].bin_centers,
+                ratio.values,
+                yerr=ratio.errors,
+                xerr=ratio.axes[0].bin_widths / 2,
+                color=p[0].get_color(),
+                marker="o",
+                markersize=11,
+                linestyle="",
+                linewidth=3,
+            )
+            # Systematic errors.
+            y_relative_error_low = unfolding_base.relative_error(
+                unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
+                unfolding_base.ErrorInput(
+                    value=ratio_reference_hist.values,
+                    error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].low,
+                ),
+            )
+            y_relative_error_high = unfolding_base.relative_error(
+                unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
+                unfolding_base.ErrorInput(
+                    value=ratio_reference_hist.values,
+                    error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].high,
+                ),
+            )
+            # Sanity check
+            # TODO: If this passes once, delete it. I've checked this a lot now...
+            test_relative_y_error_low = np.sqrt(
+                (h.metadata["y_systematic"]["quadrature"].low / h.values) ** 2
+                + (ratio_reference_hist.metadata["y_systematic"]["quadrature"].low / ratio_reference_hist.values) ** 2
+            )
+            test_relative_y_error_high = np.sqrt(
+                (h.metadata["y_systematic"]["quadrature"].high / h.values) ** 2
+                + (ratio_reference_hist.metadata["y_systematic"]["quadrature"].high / ratio_reference_hist.values) ** 2
+            )
+            np.testing.assert_allclose(y_relative_error_low, test_relative_y_error_low)
+            np.testing.assert_allclose(y_relative_error_high, test_relative_y_error_high)
+            # Store the systematic.
+            ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
+                low=y_relative_error_low * ratio.values,
+                high=y_relative_error_high * ratio.values,
+            )
+            y_systematic = ratio.metadata["y_systematic"]["quadrature"]
+            pachyderm.plot.error_boxes(
+                ax=ax_ratio,
+                x_data=ratio.axes[0].bin_centers,
+                y_data=ratio.values,
+                x_errors=ratio.axes[0].bin_widths / 2,
+                y_errors=np.array([y_systematic.low, y_systematic.high]),
+                color=p[0].get_color(),
+                linewidth=0,
+            )
+
     # Labeling and presentation
-    plot_config.apply(fig=fig, ax=ax)
+    plot_config.apply(fig=fig, axes=[ax, ax_ratio])
     # A few additional tweaks.
     ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
     # ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=0.2))
@@ -563,16 +630,22 @@ def plot_pp_PbPb_comparison(
                 # Main panel
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=kt_range),
                         pb.AxisConfig(
                             "y",
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
                             range=(5e-3, 1),
+                            font_size=22,
                         ),
                     ],
                     text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
                     legend=pb.LegendConfig(location="lower left", font_size=22),
+                ),
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=kt_range, font_size=22),
+                        pb.AxisConfig("y", label=r"$\frac{\text{Pb-Pb}}{\text{pp}}$", range=(0.45, 1.55), font_size=22),
+                    ],
                 ),
             ],
             figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.08)),
@@ -1493,6 +1566,27 @@ def calculate_systematics(  # noqa: C901
         )
     else:
         logger.debug("Skipping background subtraction systematic because no values are available")
+
+    # Non-closure
+    # This is treated as a symmetric uncertainty.
+    # However, we store it as asymmetric errors objects for consistency with everything else.
+    try:
+        # NOTE: Unlike the others, we take the abs and set the values here directly because
+        #       we want them to be symmetric.
+        # NOTE: The reference needs to be to the PseudoTrue, so we need to retrieve it here.
+        non_closure_sym = np.abs(
+            unfolded["non_closure"].data.values -
+            unfolding_outputs["non_closure"].unfolded_substructure(
+                n_iter=unfolding_outputs["default"].n_iter_compare, true_jet_pt_range=true_jet_pt_range
+            ).values
+        )
+        unfolded["default"].data.metadata["y_systematic"][
+            "non_closure"
+        ] = unfolding_base.AsymmetricErrors(
+            non_closure_sym, non_closure_sym,
+        )
+    except KeyError as e:
+        logger.debug(f"Skipping non closure systematic because of {e}")
 
     # Cross check to make sure that I haven't copied and pasted incorrectly.
     assert not any(
