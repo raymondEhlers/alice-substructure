@@ -229,7 +229,7 @@ class UnfoldingOutput:
         # Fully setup base dir.
         # NOTE: Added "parsl" for the newer output results.
         # self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "feb2021_test"
-        self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl"
+        self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2021-04"
 
         # Initialize the file if the histograms aren't specified.
         if not self.hists:
@@ -459,6 +459,13 @@ def _plot_pp_PbPb_comparison(
         "central": r"0-10\% $\text{Pb--Pb}$",
         "semi_central": r"30-50\% $\text{Pb--Pb}$",
     }
+    # NOTE: Probably should make this configurable at some point.
+    # Based on kinematic eff and unfolding ranges
+    event_activity_to_range = {
+        "pp": helpers.KtRange(0.5, 6),
+        "semi_central": helpers.KtRange(2, 6),
+        "central": helpers.KtRange(3, 6),
+    }
 
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
@@ -472,27 +479,15 @@ def _plot_pp_PbPb_comparison(
         )
 
         # Use pp as reference, but only in the range where the others are measured.
-        ratio_reference_hist = unfolding_base.select_hist_range(hists["pp"].data, helpers.KtRange(3, 6))
+        ratio_reference_hist_unselected = hists["pp"].data
 
         # Collision system is a bit misleading because it's really just a high label, but good enough for a quick look.
         for collision_system, hist in hists.items():
             # Axes: jet_pt, attr_name
             h = hist.data
 
-            # NOTE: Careful, this is hard coded! It's good enough for a hack...
-            if collision_system == "pp":
-                # Based on kinematic eff and unfolding ranges
-                h = unfolding_base.select_hist_range(h, helpers.KtRange(0.5, 6))
-            elif collision_system == "semi_central":
-                # h = unfolding_base.select_hist_range(h, helpers.KtRange(1, 8))
-                # Based on kinematic eff and unfolding ranges
-                h = unfolding_base.select_hist_range(h, helpers.KtRange(3, 6))
-            elif collision_system == "central":
-                # h = unfolding_base.select_hist_range(h, helpers.KtRange(1.5, 8))
-                # Based on kinematic eff and unfolding ranges
-                h = unfolding_base.select_hist_range(h, helpers.KtRange(3, 6))
-            else:
-                logger.error("Collision system not recognized!")
+            # Select range to display.
+            h = unfolding_base.select_hist_range(h, event_activity_to_range[collision_system])
 
             # Set 0s to NaN
             if set_zero_to_nan:
@@ -535,6 +530,10 @@ def _plot_pp_PbPb_comparison(
             if collision_system == "pp":
                 continue
 
+            # Ensure the ratio is defined over the same range.
+            ratio_reference_hist = unfolding_base.select_hist_range(
+                ratio_reference_hist_unselected, event_activity_to_range[collision_system]
+            )
             ratio = h / ratio_reference_hist
             # Ratio + statistical error bars
             ax_ratio.errorbar(
@@ -1574,16 +1573,23 @@ def calculate_systematics(  # noqa: C901
         # NOTE: Unlike the others, we take the abs and set the values here directly because
         #       we want them to be symmetric.
         # NOTE: The reference needs to be to the PseudoTrue, so we need to retrieve it here.
-        non_closure_sym = np.abs(
-            unfolded["non_closure"].data.values -
-            unfolding_outputs["non_closure"].unfolded_substructure(
-                n_iter=unfolding_outputs["default"].n_iter_compare, true_jet_pt_range=true_jet_pt_range
-            ).values
+        # NOTE: We calculate this as a relative error because the scales could be (quite) different.
+        #       We then scale the default values by this relative error to determine the non-closure.
+        pseudo_true = unfolding_outputs["non_closure"].true_substructure(
+            unfolding_outputs["non_closure"].true_hist_name, true_jet_pt_range=true_jet_pt_range
         )
-        unfolded["default"].data.metadata["y_systematic"][
-            "non_closure"
-        ] = unfolding_base.AsymmetricErrors(
-            non_closure_sym, non_closure_sym,
+        logger.info(f"true name: {unfolding_outputs['non_closure'].true_hist_name}")
+        non_closure_sym_relative = np.abs(unfolded["non_closure"].data.values - pseudo_true.values) / pseudo_true.values
+        logger.info(f"non_closure values: {unfolded['non_closure'].data.values}")
+        logger.info(f"pseudo true: {pseudo_true.values}")
+        # non_closure_sym = (1 - non_closure_sym_relative) * unfolded["default"].data.values
+        logger.info(f"non_closure_sym_relative: {non_closure_sym_relative}")
+        logger.info(f"non_closure bin edges: {unfolded['non_closure'].data.axes[0].bin_edges}")
+        logger.info(f"pseudo_true bin edges: {pseudo_true.axes[0].bin_edges}")
+
+        unfolded["default"].data.metadata["y_systematic"]["non_closure"] = unfolding_base.AsymmetricErrors(
+            non_closure_sym_relative * unfolded["default"].data.values,
+            non_closure_sym_relative * unfolded["default"].data.values,
         )
     except KeyError as e:
         logger.debug(f"Skipping non closure systematic because of {e}")
@@ -2555,7 +2561,7 @@ def plot_kt_unfolding(
                 _small_jet_pt_bins = _small_jet_pt_bins[1:]
                 # Set the lowest bin lower edge to the smallest smeared value. This way,
                 # it will work for tuncation systematics.
-                #_small_jet_pt_bins[0] = unfolding_output.smeared_jet_pt_range.min
+                # _small_jet_pt_bins[0] = unfolding_output.smeared_jet_pt_range.min
         else:
             # Effectively, a proxy for pp
             _small_jet_pt_bins = np.array([20, 30, 40, 50, 60, 85])
