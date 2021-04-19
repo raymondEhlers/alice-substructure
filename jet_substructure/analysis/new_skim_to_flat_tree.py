@@ -1188,7 +1188,7 @@ def skim_cross_check_task_to_uniform_output(
             grooming_method=grooming_method,
             input_branches=ak.fields(array),
         )
-        # This shouldn't cause a copy (hoepfully...)
+        # This shouldn't cause a copy (hopefully...)
         for k, v in renames.items():
             array[k] = array[v]
 
@@ -1202,7 +1202,9 @@ def skim_cross_check_task_to_uniform_output(
         # For extra safety
         output_filename.parent.mkdir(parents=True, exist_ok=True)
         # Remap from "00" -> "index number" (may still be "00")
-        _output_filename = Path(str(output_filename).replace("00", f"{i:02d}"))
+        # NOTE: It's super important that we include the punctuation. Otherwise, it may pick
+        #       up other instances of "00", such as in a train number!
+        _output_filename = Path(str(output_filename).replace(".00_", f".{i:02d}_"))
 
         # Setup outputs and write the tree.
         outputs = {}
