@@ -2547,11 +2547,15 @@ def plot_kt_unfolding(
         )
 
         # Slice the refolded in jet pt just to get a sense of what they look like.
-        if unfolding_output.smeared_jet_pt_range.min == 40:
+        if unfolding_output.smeared_jet_pt_range.min > 20:
             # Effectively, a proxy for PbPb
             _small_jet_pt_bins = np.array([30, 40, 60, 80, 100, 120])
-            # Drop the lowest bin, since it's outside of our smeared jet pt range.
-            _small_jet_pt_bins = _small_jet_pt_bins[1:]
+            if unfolding_output.smeared_jet_pt_range.min > 30:
+                # Drop the lowest bin, since it's outside of our smeared jet pt range.
+                _small_jet_pt_bins = _small_jet_pt_bins[1:]
+                # Set the lowest bin lower edge to the smallest smeared value. This way,
+                # it will work for tuncation systematics.
+                #_small_jet_pt_bins[0] = unfolding_output.smeared_jet_pt_range.min
         else:
             # Effectively, a proxy for pp
             _small_jet_pt_bins = np.array([20, 30, 40, 50, 60, 85])
