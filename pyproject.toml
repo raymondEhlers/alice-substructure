@@ -50,12 +50,12 @@ pre-commit = "^2.0.1"
 yamllint = "^1.20.0"
 isort = {extras = ["toml"], version = "^5.6"}
 IPython = "^7.19"
-jupyterlab = "^3.0.3"
 jupyter_nbextensions_configurator = "^0.4.1"
 # Not explictily enabled because it needs graphviz to be install separately via apt, brew, etc.
 #pygraphviz = "^1.5"
 networkx = "^2.4"
 jupyterlab-widgets = "^1.0.0"
+jupyterlab = "^3.0.12"
 
 [tool.isort]
 line_length = 120
