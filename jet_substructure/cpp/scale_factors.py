@@ -65,7 +65,9 @@ def scale_factor_ROOT(filenames: Sequence[Path]) -> Tuple[int, int, Any, Any]:
             else:
                 hists = f.Get(task_hists_name[0])
                 if not hists:
-                    raise RuntimeError(f"Cannot find a task output list. Tried: {task_hists_name[0]}. Keys: {list(f.GetListOfKeys())}")
+                    raise RuntimeError(
+                        f"Cannot find a task output list. Tried: {task_hists_name[0]}. Keys: {list(f.GetListOfKeys())}"
+                    )
 
         cross_section_hists.append(hists.FindObject("fHistXsection"))
         cross_section_hists[-1].SetDirectory(0)
@@ -176,7 +178,9 @@ def create_scale_factor_tree_for_cross_check_task_output(
     # Get number of entries in the tree to determine
     with uproot.open(filename) as f:
         # This should usually get us the tree name, regardless of what task actually generated it.
-        tree_name = [k for k in f.keys() if "RawTree" in k][0]
+        # NOTE: Adding a suffix will yield "Raw{grooming_method}Tree", so instead we search for "tree"
+        #       and one of the task names.
+        tree_name = [k for k in f.keys() if "RawTree" in k and ("HardestKt" in k or "DynamicalGrooming" in k)][0]
         n_entries = f[tree_name].num_entries
         logger.debug(f"n entries: {n_entries}")
 
@@ -223,17 +227,15 @@ def pt_hard_spectra_from_hists(
                 hists = f.get("AliAnalysisTaskEmcalEmbeddingHelper_histos", None)
                 if not hists:
                     # If not the embedding helper, look for the analysis task output.
-                    task_hists_name = [
-                        k
-                        for k in f.keys()
-                        if "DynamicalGrooming" in k and "Tree" not in k
-                    ]
+                    task_hists_name = [k for k in f.keys() if "DynamicalGrooming" in k and "Tree" not in k]
                     if len(task_hists_name) != 1:
                         raise RuntimeError(f"Cannot find unique task name. Names: {task_hists_name}. Skipping!")
                     else:
                         hists = f.get(task_hists_name[0], None)
                         if not hists:
-                            raise RuntimeError(f"Cannot find a task output list. Tried: {task_hists_name[0]}. Keys: {list(f.GetListOfKeys())}")
+                            raise RuntimeError(
+                                f"Cannot find a task output list. Tried: {task_hists_name[0]}. Keys: {list(f.GetListOfKeys())}"
+                            )
 
                 if not isinstance(hists, uproot.models.TList.Model_TList):
                     # Grab the underlying TList rather than the AliEmcalList...
