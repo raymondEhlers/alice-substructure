@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Mapping, Sequence, Tuple
+from typing import List, Mapping, Optional, Sequence, Tuple
 
 import attr
 import boost_histogram as bh
@@ -81,6 +81,7 @@ def _plot_subjet_matching(
     grooming_method: str,
     matching_types: Sequence[str],
     matching_level: str,
+    matching_jet_pt_prefix: str,
     hist_suffix: str,
     hybrid_jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
@@ -105,7 +106,7 @@ def _plot_subjet_matching(
 
     if rdf_plots:
         # hist_name = f"{grooming_method}_{matching_level}_matching_all"
-        hist_name = f"{grooming_method}_matching_{matching_level}_type_all_jet_pt_axis_det_level"
+        hist_name = f"{grooming_method}_matching_{matching_level}_type_all_jet_pt_axis_{matching_jet_pt_prefix}"
         if hist_suffix:
             hist_name += f"_{hist_suffix}"
         # logger.debug(hist_name)
@@ -128,7 +129,9 @@ def _plot_subjet_matching(
         )
         if rdf_plots:
             # hist_name = f"{grooming_method}_{matching_level}_matching_{matching_type}"
-            hist_name = f"{grooming_method}_matching_{matching_level}_type_{matching_type}_jet_pt_axis_det_level"
+            hist_name = (
+                f"{grooming_method}_matching_{matching_level}_type_{matching_type}_jet_pt_axis_{matching_jet_pt_prefix}"
+            )
             if hist_suffix:
                 hist_name += f"_{hist_suffix}"
             # h = binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5), :: bh.sum])
@@ -157,7 +160,7 @@ def _plot_subjet_matching(
 
     # Presentation and labeling
     # Axis labels
-    x_axis_label = fr"${axis_parameter[0]}" + r"_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$"
+    x_axis_label = fr"${axis_parameter[0]}" + r"_{\text{T}}^{\text{" + matching_jet_pt_prefix + r"}}\:(\text{GeV}/c)$"
     ax.set_xlabel(x_axis_label)
     # Apply the PlotConfig
     plot_config.apply(fig=fig, axes=[ax])
@@ -188,17 +191,21 @@ def plot_prong_matching(
     output_dir: Path,
     rdf_plots: bool,
     plot_png: bool = False,
+    min_kt_hybrid_values: Optional[Sequence[float]] = None,
 ) -> None:
+    # Validation
+    if min_kt_hybrid_values is None:
+        min_kt_hybrid_values = [-1, 1, 2, 3, 5]
     # Setup
     hybrid_jet_pt_bin = helpers.JetPtRange(min=40, max=120)
     # Just for labeling
     grooming_styling = define_grooming_styles()
 
-    for matching_level, n_split_prefix, n_split_label in [
-        ("hybrid_det_level", "det_level", "det"),
-        ("det_level_true", "matched", "true"),
+    for matching_level, n_split_prefix, n_split_label, matching_jet_pt_prefix in [
+        ("hybrid_det_level", "det_level", "det", "det_level"),
+        ("det_level_true", "matched", "true", "true"),
     ]:
-        for min_kt_hybrid in [-1, 1, 2, 3, 5]:
+        for min_kt_hybrid in min_kt_hybrid_values:
             for grooming_method in grooming_methods:
                 text = "Iterative splittings"
                 text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
@@ -213,6 +220,7 @@ def plot_prong_matching(
                         grooming_method=grooming_method,
                         matching_types=matching_types,
                         matching_level=matching_level,
+                        matching_jet_pt_prefix=matching_jet_pt_prefix,
                         hist_suffix=hist_suffix,
                         hybrid_jet_pt_bin=hybrid_jet_pt_bin,
                         min_kt_hybrid=min_kt_hybrid,
@@ -229,7 +237,7 @@ def plot_prong_matching(
                         rdf_plots=rdf_plots,
                         plot_png=plot_png,
                     )
-                except ValueError as e:
+                except (KeyError, ValueError) as e:
                     # The hist wasn't available, so note it and continue.
                     logger.warning(f"Probably missing hist for {min_kt_hybrid}. Full ValueError {e}")
 
@@ -246,6 +254,7 @@ def plot_prong_matching(
                     grooming_method=grooming_method,
                     matching_types=matching_types,
                     matching_level=matching_level,
+                    matching_jet_pt_prefix=matching_jet_pt_prefix,
                     hist_suffix=f"{n_split_prefix}_n_to_split_less_than_3",
                     hybrid_jet_pt_bin=hybrid_jet_pt_bin,
                     plot_config=PlotConfig(
@@ -270,6 +279,7 @@ def plot_prong_matching(
                     grooming_method=grooming_method,
                     matching_types=matching_types,
                     matching_level=matching_level,
+                    matching_jet_pt_prefix=matching_jet_pt_prefix,
                     hist_suffix=f"{n_split_prefix}_n_to_split_greater_than_4",
                     hybrid_jet_pt_bin=hybrid_jet_pt_bin,
                     plot_config=PlotConfig(
@@ -291,6 +301,7 @@ def _plot_subjet_matching_purity(  # noqa: C901
     hists: Mapping[str, bh.Histogram],
     grooming_methods: Sequence[str],
     matching_level: str,
+    matching_jet_pt_prefix: str,
     subjet_for_purity: str,
     hist_suffix: str,
     hybrid_jet_pt_bin: helpers.RangeSelector,
@@ -317,7 +328,7 @@ def _plot_subjet_matching_purity(  # noqa: C901
 
     for grooming_method in grooming_methods:
         # hist_name = f"{grooming_method}_{matching_level}_matching_all"
-        hist_name = f"{grooming_method}_matching_{matching_level}_type_all_jet_pt_axis_det_level"
+        hist_name = f"{grooming_method}_matching_{matching_level}_type_all_jet_pt_axis_{matching_jet_pt_prefix}"
         if hist_suffix:
             hist_name += f"_{hist_suffix}"
         # logger.debug(hist_name)
@@ -325,7 +336,9 @@ def _plot_subjet_matching_purity(  # noqa: C901
         # binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5), :: bh.sum])
 
         matching_type = "pure"
-        hist_name = f"{grooming_method}_matching_{matching_level}_type_{matching_type}_jet_pt_axis_det_level"
+        hist_name = (
+            f"{grooming_method}_matching_{matching_level}_type_{matching_type}_jet_pt_axis_{matching_jet_pt_prefix}"
+        )
         if hist_suffix:
             hist_name += f"_{hist_suffix}"
         # First, we take the pure manually
@@ -336,7 +349,7 @@ def _plot_subjet_matching_purity(  # noqa: C901
                 subjet_for_purity == "subleading" and f"{subjet_for_purity}_correct" in matching_type
             ):
                 logger.debug(f"{grooming_method}: Adding matching {matching_type}")
-                hist_name = f"{grooming_method}_matching_{matching_level}_type_{matching_type}_jet_pt_axis_det_level"
+                hist_name = f"{grooming_method}_matching_{matching_level}_type_{matching_type}_jet_pt_axis_{matching_jet_pt_prefix}"
                 if hist_suffix:
                     hist_name += f"_{hist_suffix}"
                 temp_hist = _project_matching_RDF(hists[hist_name], min_kt_hybrid=min_kt_hybrid)
@@ -371,7 +384,7 @@ def _plot_subjet_matching_purity(  # noqa: C901
 
     # Presentation and labeling
     # Axis labels
-    x_axis_label = r"$p_{\text{T}}^{\text{det}}\:(\text{GeV}/c)$"
+    x_axis_label = r"$p_{\text{T}}^{\text{" + matching_jet_pt_prefix + r"}}\:(\text{GeV}/c)$"
     ax.set_xlabel(x_axis_label)
     # Apply the PlotConfig
     plot_config.apply(fig=fig, axes=[ax])
@@ -400,16 +413,20 @@ def plot_prong_matching_purity(
     grooming_methods: Sequence[str],
     output_dir: Path,
     plot_png: bool = False,
+    min_kt_hybrid_values: Optional[Sequence[float]] = None,
 ) -> None:
+    # Validation
+    if min_kt_hybrid_values is None:
+        min_kt_hybrid_values = [-1, 1, 2, 3, 5]
     # Setup
     hybrid_jet_pt_bin = helpers.JetPtRange(min=40, max=120)
 
-    for matching_level, n_split_prefix, n_split_label in [
-        ("hybrid_det_level", "det_level", "det"),
+    for matching_level, n_split_prefix, n_split_label, matching_jet_pt_prefix in [
+        ("hybrid_det_level", "det_level", "det", "det_level"),
         # TODO: Re-enable!
-        # ("det_level_true", "matched", "true"),
+        # ("det_level_true", "matched", "true", "true"),
     ]:
-        for min_kt_hybrid in [-1, 2, 3, 5]:
+        for min_kt_hybrid in min_kt_hybrid_values:
             for subjet_for_purity in ["leading", "subleading"]:
                 text = "Iterative splittings"
                 text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
@@ -421,6 +438,7 @@ def plot_prong_matching_purity(
                     hists=hists,
                     grooming_methods=grooming_methods,
                     matching_level=matching_level,
+                    matching_jet_pt_prefix=matching_jet_pt_prefix,
                     subjet_for_purity=subjet_for_purity,
                     hist_suffix=hist_suffix,
                     hybrid_jet_pt_bin=hybrid_jet_pt_bin,
@@ -936,6 +954,7 @@ def _plot_response_by_matching_type(
     plot_config: PlotConfig,
     output_dir: Path,
     rdf_plots: bool = False,
+    plot_png: bool = False,
 ) -> None:
     for matching_type in matching_types:
         logger.debug(
@@ -1007,6 +1026,10 @@ def _plot_response_by_matching_type(
         if hist_suffix:
             filename += f"_{hist_suffix}"
         fig.savefig(output_dir / f"{filename}.pdf")
+        if plot_png:
+            output_dir_png = output_dir / "png"
+            output_dir_png.mkdir(parents=True, exist_ok=True)
+            fig.savefig(output_dir_png / f"{filename}.png")
         plt.close(fig)
 
 
@@ -1017,6 +1040,7 @@ def plot_response_by_matching_type(
     matching_types: Sequence[str],
     output_dir: Path,
     rdf_plots: bool = True,
+    plot_png: bool = True,
 ) -> None:
     # Setup
     hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
@@ -1066,7 +1090,10 @@ def plot_response_by_matching_type(
                     ),
                     output_dir=output_dir,
                     rdf_plots=rdf_plots,
+                    plot_png=plot_png,
                 )
+
+                continue
 
                 if matching_level == "hybrid_det_level" and response_type.generator_like == "det_level":
                     for subjet_name in ["leading", "subleading"]:
@@ -1114,6 +1141,7 @@ def plot_response_by_matching_type(
                                 ),
                                 output_dir=output_dir,
                                 rdf_plots=rdf_plots,
+                                plot_png=plot_png,
                             )
 
                 # Skip for RDF plots because they're (temporarily) removed
@@ -1153,6 +1181,7 @@ def plot_response_by_matching_type(
                     ),
                     output_dir=output_dir,
                     rdf_plots=rdf_plots,
+                    plot_png=plot_png,
                 )
                 # n_to_split > 4
                 text_n_to_split_greater_than_4 = text
@@ -1190,6 +1219,7 @@ def plot_response_by_matching_type(
                     ),
                     output_dir=output_dir,
                     rdf_plots=rdf_plots,
+                    plot_png=plot_png,
                 )
                 # Skip for RDF plots because they don't contain the delta_R response.
                 if rdf_plots:
@@ -1219,6 +1249,7 @@ def plot_response_by_matching_type(
                         figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
                     ),
                     output_dir=output_dir,
+                    plot_png=plot_png,
                 )
 
 
