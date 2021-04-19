@@ -842,7 +842,7 @@ available_datasets:
             - "trains/embedPythia/6356/AnalysisResults.*.root"
             - "trains/embedPythia/6357/AnalysisResults.*.root"
     # Central R = 0.2 Embedding for dynamical core for pass1 AOD
-    LHC19f4_embedded_into_LHC18qr_central_R02_6456_6475: &LHC18qr_central_R02_embedded
+    LHC19f4_embedded_into_LHC18qr_central_R02_6456_6475: &LHC18qr_central_R02_dynamical_core_embedded
         name: "LHC19f4_embedded_into_LHC18qr_central_R02_6456_6475"
         # Important to note that this is a cross check task output!
         cross_check_task: true
@@ -883,15 +883,30 @@ available_datasets:
             - "trains/embedPythia/6473/AnalysisResults.*.root"
             - "trains/embedPythia/6474/AnalysisResults.*.root"
             - "trains/embedPythia/6475/AnalysisResults.*.root"
-    # Central R = 0.2 Embedding for dynamical core for pass1 AOD
-    LHC19f4_embedded_into_LHC18qr_central_R02_6982_7001:
-        name: "LHC19f4_embedded_into_LHC18qr_central_R02_6982_7001"
+    # Central R = 0.2 Embedding for dynamical kt for pass3 AOD
+    # This output is complicated. Due to train issues, it's split between the full substructure
+    # task in the first 5 trains, and then the cross check task from there. Careful!
+    LHC20g4_embedded_into_LHC18qr_central_R02_6982_7001: &LHC18qr_central_R02_dynamical_kt_embedded
+        name: "LHC20g4_embedded_into_LHC18qr_central_R02_6982_7001"
         # Important to note that this is a cross check task output!
         cross_check_task: true
         grooming_methods:
             - "dynamical_kt"
+        #
+        # For 6982-6986
+        #
         # yamllint disable-line rule:line-length
-        tree_name: "AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        #tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
+        ## Map for the uniform prefix name to the analysis task prefix.
+        #prefixes:
+        #    hybrid: "data"
+        #    "true": "matched"
+        #    det_level: "detLevel"
+        #
+        # For 6986-7001
+        #
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawDynamicalKtTree_EventSub_Incl"
         # Map for the uniform prefix name to the analysis task prefix.
         prefixes:
             hybrid: "data"
@@ -904,12 +919,13 @@ available_datasets:
         jet_R: 0.2
         # Since this is a cross check task, we don't need to repair the trees, nor
         # skim them to flat.
+        entries_per_job: 1.5e5
         files:
-            - "trains/embedPythia/6982/AnalysisResults.*.root"
-            - "trains/embedPythia/6983/AnalysisResults.*.root"
-            - "trains/embedPythia/6984/AnalysisResults.*.root"
-            - "trains/embedPythia/6985/AnalysisResults.*.root"
-            - "trains/embedPythia/6986/AnalysisResults.*.root"
+            - "trains/embedPythia/6982/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6983/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6984/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6985/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/6986/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/6987/AnalysisResults.*.root"
             - "trains/embedPythia/6988/AnalysisResults.*.root"
             - "trains/embedPythia/6989/AnalysisResults.*.root"
@@ -1374,7 +1390,8 @@ analysis_configurations:
         datasets:
             nominal:
                 PbPb: *LHC18qr_central_R02
-                embedPythia: *LHC18qr_central_R02_embedded
+                # NOTE: Careful, this defines the grooming methods that are available!
+                embedPythia: *LHC18qr_central_R02_dynamical_core_embedded
             tracking_efficiency:
                 PbPb: *LHC18qr_central_R02
                 embedPythia: null  #*LHC18qr_central_R02_embedded_tracking_efficiency
@@ -1554,6 +1571,85 @@ analysis_configurations:
                     closures: false
                     reweight_prior: false
                     datasets: "rmax_070"
+    PbPb_central_R02_pass3:
+        datasets:
+            nominal:
+                PbPb: *LHC18qr_central_R02
+                embedPythia: *LHC18qr_central_R02_dynamical_kt_embedded
+            tracking_efficiency:
+                PbPb: *LHC18qr_central_R02
+                embedPythia: null  #*LHC18qr_central_R02_embedded_tracking_efficiency
+            rmax_005:
+                PbPb: null  #*LHC18qr_central_R02_Rmax005
+                embedPythia: null  #*LHC18qr_central_R02_embedded_Rmax005
+            rmax_070:
+                PbPb: null  #*LHC18qr_central_R02_Rmax070
+                embedPythia: null  #*LHC18qr_central_R02_embedded_Rmax070
+        unfolding:
+            suffix: "central_R02_pass3"
+            nominal_binning:
+                true_jet_pt: [0, 40, 60, 80, 100, 120, 160]
+                smeared_jet_pt: [40, 50, 60, 80, 100, 120]
+                true_kt: [-0.05, 0, 1.5, 2, 3, 4, 6, 100]
+                smeared_kt: [0, 1.5, 2, 3, 4, 6, 8]
+            settings:
+                default:
+                    label: ""
+                    # NOTE: Untagged bin above is included in the closures!
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
+                    reweight_prior: false
+                    datasets: "nominal"
+                # Systematics
+                tracking_efficiency:
+                    label: "tracking_efficiency"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "tracking_efficiency"
+                truncation_low:
+                    label: "truncation"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        smeared_jet_pt: [35, 50, 60, 80, 100, 120]
+                truncation_high:
+                    label: "truncation"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        smeared_jet_pt: [45, 50, 60, 80, 100, 120]
+                random_binning:
+                    label: "random_binning"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        # In [2]: r = np.random.random_sample(4) / 10 + 0.95
+                        # In [3]: r
+                        # Out[3]: array([0.96710106, 1.03207718, 1.03157575, 1.02829135])
+                        # In [4]: np.round(r * [2, 3, 4, 6,], 2)
+                        # Out[4]: array([1.93, 3.1 , 4.13, 6.17])
+                        smeared_kt: [0, 1.5, 1.93, 3.1, 4.13, 6.17, 8]
+                reweight_prior:
+                    label: "reweight_prior"
+                    closures: false
+                    reweight_prior: true
+                    datasets: "nominal"
+                background_low:
+                    label: "Rmax005"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "rmax_005"
+                background_high:
+                    label: "Rmax070"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "rmax_070"
+
     pp_R04:
         datasets:
             nominal:
@@ -1580,6 +1676,7 @@ analysis_configurations:
                         max_untagged_bin: 20
                     reweight_prior: false
                     datasets: "nominal"
+
     pp_R02:
         datasets:
             nominal:
