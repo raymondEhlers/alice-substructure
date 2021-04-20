@@ -2937,7 +2937,7 @@ def plot_kt_unfolding(
             panels=pb.Panel(
                 axes=[
                     pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", log=True),
-                    pb.AxisConfig("y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
+                    pb.AxisConfig("y", label="Efficiency"),
                 ],
                 legend=pb.LegendConfig(location="lower left"),
                 # text=pb.TextConfig(text, 0.97, 0.97),
@@ -2959,7 +2959,7 @@ def plot_kt_unfolding(
             panels=pb.Panel(
                 axes=[
                     pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=unfolding_kt_display_range),
-                    pb.AxisConfig("y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
+                    pb.AxisConfig("y", label="Efficiency"),
                 ],
                 legend=pb.LegendConfig(location="lower left"),
                 # text=pb.TextConfig(text, 0.97, 0.97),
@@ -2984,7 +2984,7 @@ def plot_kt_unfolding(
             panels=pb.Panel(
                 axes=[
                     pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
-                    pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
+                    pb.AxisConfig("y", label="Efficiency"),
                 ],
                 legend=pb.LegendConfig(location="lower right"),
                 # text=pb.TextConfig(text, 0.97, 0.97),
