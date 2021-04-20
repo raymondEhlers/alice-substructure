@@ -6,7 +6,7 @@
 import itertools
 import logging
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
 
 import attr
 import boost_histogram as bh
@@ -443,6 +443,221 @@ def plot_relative_individual_systematics(
     plt.close(fig)
 
 
+def _plot_single_system_comparison(
+    hists: Mapping[str, SingleResult],
+    grooming_methods: Sequence[str],
+    reference_grooming_method: str,
+    collision_system: str,
+    set_zero_to_nan: bool,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+) -> None:
+    grooming_styling = pb.define_grooming_styles()
+
+    # NOTE: Probably should make this configurable at some point.
+    # Based on kinematic eff and unfolding ranges
+    event_activity_to_range = {
+        "pp": helpers.KtRange(0.5, 6),
+        "semi_central": helpers.KtRange(2, 6),
+        "central": helpers.KtRange(3, 6),
+    }
+
+    with sns.color_palette("Set2"):
+        # fig, ax = plt.subplots(figsize=(9, 10))
+        # Size is specified to make it convenient to compare against Hard Probes plots.
+        fig, (ax, ax_ratio) = plt.subplots(
+            2,
+            1,
+            figsize=(10, 10),
+            gridspec_kw={"height_ratios": [3, 1]},
+            sharex=True,
+        )
+
+        # Use selected grooming method as a reference, but only in the range where the others are measured.
+        ratio_reference_hist_unselected = hists[reference_grooming_method].data
+
+        for grooming_method in grooming_methods:
+            # Axes: jet_pt, attr_name
+            h = hists[grooming_method].data
+
+            # Select range to display.
+            h = unfolding_base.select_hist_range(h, event_activity_to_range[collision_system])
+
+            # Set 0s to NaN
+            if set_zero_to_nan:
+                h.errors[h.values == 0] = np.nan
+                h.values[h.values == 0] = np.nan
+
+            # Main data points
+            p = ax.errorbar(
+                h.axes[0].bin_centers,
+                h.values,
+                yerr=h.errors,
+                xerr=h.axes[0].bin_widths / 2,
+                marker="o",
+                markersize=11,
+                linestyle="",
+                linewidth=3,
+                label=grooming_styling[grooming_method].label,
+            )
+
+            # Systematic uncertainty
+            pachyderm.plot.error_boxes(
+                ax=ax,
+                x_data=h.axes[0].bin_centers,
+                y_data=h.values,
+                x_errors=h.axes[0].bin_widths / 2,
+                y_errors=np.array(
+                    [
+                        h.metadata["y_systematic"]["quadrature"].low,
+                        h.metadata["y_systematic"]["quadrature"].high,
+                    ]
+                ),
+                # y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+                # color=style.color,
+                color=p[0].get_color(),
+                linewidth=0,
+            )
+
+            # Ratio
+            # Skip pp because it's not meaningful.
+            if grooming_method == reference_grooming_method:
+                continue
+
+            # Ensure the ratio is defined over the same range.
+            ratio_reference_hist = unfolding_base.select_hist_range(
+                ratio_reference_hist_unselected, event_activity_to_range[collision_system]
+            )
+            ratio = h / ratio_reference_hist
+            # Ratio + statistical error bars
+            ax_ratio.errorbar(
+                ratio.axes[0].bin_centers,
+                ratio.values,
+                yerr=ratio.errors,
+                xerr=ratio.axes[0].bin_widths / 2,
+                color=p[0].get_color(),
+                marker="o",
+                markersize=11,
+                linestyle="",
+                linewidth=3,
+            )
+            # Systematic errors.
+            y_relative_error_low = unfolding_base.relative_error(
+                unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
+                unfolding_base.ErrorInput(
+                    value=ratio_reference_hist.values,
+                    error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].low,
+                ),
+            )
+            y_relative_error_high = unfolding_base.relative_error(
+                unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
+                unfolding_base.ErrorInput(
+                    value=ratio_reference_hist.values,
+                    error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].high,
+                ),
+            )
+            # Sanity check
+            # TODO: If this passes once, delete it. I've checked this a lot now...
+            test_relative_y_error_low = np.sqrt(
+                (h.metadata["y_systematic"]["quadrature"].low / h.values) ** 2
+                + (ratio_reference_hist.metadata["y_systematic"]["quadrature"].low / ratio_reference_hist.values) ** 2
+            )
+            test_relative_y_error_high = np.sqrt(
+                (h.metadata["y_systematic"]["quadrature"].high / h.values) ** 2
+                + (ratio_reference_hist.metadata["y_systematic"]["quadrature"].high / ratio_reference_hist.values) ** 2
+            )
+            np.testing.assert_allclose(y_relative_error_low, test_relative_y_error_low)
+            np.testing.assert_allclose(y_relative_error_high, test_relative_y_error_high)
+            # Store the systematic.
+            ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
+                low=y_relative_error_low * ratio.values,
+                high=y_relative_error_high * ratio.values,
+            )
+            y_systematic = ratio.metadata["y_systematic"]["quadrature"]
+            pachyderm.plot.error_boxes(
+                ax=ax_ratio,
+                x_data=ratio.axes[0].bin_centers,
+                y_data=ratio.values,
+                x_errors=ratio.axes[0].bin_widths / 2,
+                y_errors=np.array([y_systematic.low, y_systematic.high]),
+                color=p[0].get_color(),
+                linewidth=0,
+            )
+
+    # Labeling and presentation
+    plot_config.apply(fig=fig, axes=[ax, ax_ratio])
+    # A few additional tweaks.
+    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
+    # ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=0.2))
+
+    filename = f"{plot_config.name}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def plot_grooming_comparisons_for_single_system(
+    hists: Mapping[str, SingleResult],
+    grooming_methods: Sequence[str],
+    reference_grooming_method: str,
+    collision_system: str,
+    collision_system_key: str,
+    output_dir: Path,
+    kt_range: Tuple[float, float] = (1.5, 15),
+    jet_R_str: str = "R04",
+) -> None:
+    """Plot comparison of grooming methods for a single system."""
+
+    grooming_styling = pb.define_grooming_styles()
+    jet_pt_bin = next(iter(hists.values())).ranges[0]
+
+    text = pb.label_to_display_string["ALICE"]["work_in_progress"]
+    text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
+    text += "\n" + pb.label_to_display_string["jets"]["general"]
+    text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    _plot_single_system_comparison(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        reference_grooming_method=reference_grooming_method,
+        collision_system=collision_system,
+        set_zero_to_nan=False,
+        plot_config=pb.PlotConfig(
+            name=f"unfolded_kt_{collision_system}_comparison_{jet_R_str}",
+            panels=[
+                # Main panel
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                            log=True,
+                            range=(5e-3, 1),
+                            font_size=22,
+                        ),
+                    ],
+                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
+                    legend=pb.LegendConfig(location="lower left", font_size=22),
+                ),
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=kt_range, font_size=22),
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$\frac{\text{Method}}{\text{"
+                            + grooming_styling[reference_grooming_method].label
+                            + "}}$",
+                            range=(0.45, 1.55),
+                            font_size=22,
+                        ),
+                    ],
+                ),
+            ],
+            figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.08)),
+        ),
+        output_dir=output_dir,
+    )
+
+
 def _plot_pp_PbPb_comparison(
     hists: Mapping[str, SingleResult],
     grooming_method: str,
@@ -473,7 +688,7 @@ def _plot_pp_PbPb_comparison(
         fig, (ax, ax_ratio) = plt.subplots(
             2,
             1,
-            figsize=(10, 8),
+            figsize=(10, 10),
             gridspec_kw={"height_ratios": [3, 1]},
             sharex=True,
         )
@@ -1341,7 +1556,7 @@ def load_unfolded_outputs(
     collision_system: str,
     event_activity: str,
     jet_R_str: str,
-    n_iter_compare: int,
+    n_iter_compare: Union[int, Mapping[str, int]],
     truncation_shift: int,
     displaced_extremum: float,
     output_dir: Path,
@@ -1350,6 +1565,9 @@ def load_unfolded_outputs(
 ) -> Tuple[
     Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]]
 ]:
+    if isinstance(n_iter_compare, int):
+        # Copy for every grooming method
+        n_iter_compare = {grooming_method: n_iter_compare for grooming_method in grooming_methods}
     unfolding_closure_outputs = {}
     unfolding_closure_pure_matches_outputs = {}
     unfolding_systematics_outputs = {}
@@ -1367,7 +1585,7 @@ def load_unfolded_outputs(
             collision_system=collision_system,
             event_activity=event_activity,
             jet_R_str=jet_R_str,
-            n_iter_compare=n_iter_compare,
+            n_iter_compare=n_iter_compare[grooming_method],
             truncation_shift=truncation_shift,
             displaced_extremum=displaced_extremum,
             output_dir=output_dir,
@@ -2158,8 +2376,13 @@ def plot_select_iteration(
 
 
 def plot_kt_unfolding(
-    unfolding_output: UnfoldingOutput, plot_png: bool = False, reweighted_prior_output: Optional[UnfoldingOutput] = None
+    unfolding_output: UnfoldingOutput,
+    plot_png: bool = False,
+    reweighted_prior_output: Optional[UnfoldingOutput] = None,
+    unfolding_kt_display_range: Optional[Tuple[float, float]] = None,
 ) -> Path:
+    if unfolding_kt_display_range is None:
+        unfolding_kt_display_range = (-0.5, unfolding_output.smeared_var_range.max)
     logger.info(f"Plotting {unfolding_output.identifier}")
     # with sns.color_palette("GnBu_d", n_colors=11):
     with sns.color_palette("Paired", n_colors=unfolding_output.max_n_iter):
@@ -2212,7 +2435,7 @@ def plot_kt_unfolding(
                             pb.AxisConfig(
                                 "x",
                                 label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-                                range=(-0.5, unfolding_output.smeared_var_range.max),
+                                range=unfolding_kt_display_range,
                             ),
                             pb.AxisConfig(
                                 "y",
@@ -2274,7 +2497,7 @@ def plot_kt_unfolding(
                             pb.AxisConfig(
                                 "x",
                                 label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-                                range=(-0.5, unfolding_output.smeared_var_range.max),
+                                range=unfolding_kt_display_range,
                             ),
                             pb.AxisConfig(
                                 "y",
@@ -2336,7 +2559,7 @@ def plot_kt_unfolding(
                             pb.AxisConfig(
                                 "x",
                                 label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-                                range=(-0.5, unfolding_output.smeared_var_range.max),
+                                range=unfolding_kt_display_range,
                             ),
                             pb.AxisConfig(
                                 "y",
@@ -2406,6 +2629,7 @@ def plot_kt_unfolding(
             plot_png=plot_png,
         )
         # Since our smeared and true kt ranges usually match, we'll restrict it here.
+        # NOTE: Careful here, this doesn't actually apply for the main semi-central and central ranges...
         true_substructure_variable_range = unfolding_output.smeared_var_range  # type: ignore
         text = f"${true_substructure_variable_range.display_str(label='true')}$"
         plot_unfolded(
@@ -2713,6 +2937,28 @@ def plot_kt_unfolding(
             panels=pb.Panel(
                 axes=[
                     pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", log=True),
+                    pb.AxisConfig("y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
+                ],
+                legend=pb.LegendConfig(location="lower left"),
+                # text=pb.TextConfig(text, 0.97, 0.97),
+            ),
+        ),
+        output_dir=unfolding_output.output_dir,
+        plot_png=plot_png,
+    )
+    # Cleaned up kt efficiency, focused on the ranges that we will measure.
+    plot_efficiency(
+        hists=unfolding_output.hists,
+        efficiency_func=_efficiency_substructure_variable,
+        true_bins=[
+            helpers.JetPtRange(60, 80),
+        ],
+        true_bin_label="p",
+        plot_config=pb.PlotConfig(
+            name=f"efficiency_{unfolding_output.substructure_variable}_true_pt_60_80",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=unfolding_kt_display_range),
                     pb.AxisConfig("y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$"),
                 ],
                 legend=pb.LegendConfig(location="lower left"),
