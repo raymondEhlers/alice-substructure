@@ -41,6 +41,9 @@ def new_matching_hists(
     hist_suffix: str,
     matching_index: MatchingIndex,
     jet_pt_column_format: str,
+    kt_axis: np.ndarray,
+    jet_pt_axis: np.ndarray,
+    kt_selection_axis: np.ndarray,
     matching_jet_pt_prefix: Optional[str] = None,
     create_generator_subjet_in_measured_jet_hists: bool = False,
 ) -> List[RootHist]:
@@ -52,10 +55,6 @@ def new_matching_hists(
 
     # Setup
     hists = []
-
-    kt_axis = np.arange(-1, 26, dtype=np.float64)
-    jet_pt_axis = np.arange(0, 151, dtype=np.float64)
-    kt_selection_axis = np.array([-1, 1, 2, 3, 5, 25], dtype=np.float64)
 
     # Matching
     name = f"{grooming_method}_matching_{matching_index.matching_level}_type_{matching_index.matching_type}_jet_pt_axis_{matching_jet_pt_prefix}{hist_suffix}"
@@ -295,24 +294,35 @@ def _substructure_hists(
     # Apply no additional pt cuts beyond those applied outside, but plot against the relevant jet pt.
     jet_pt_column = jet_pt_column_format.format(prefix=jet_pt_prefix)
 
+    # kt binning should vary with jet R because the kt kinematic limits vary with jet_R
+    kt_axis = np.linspace(-1, 25, 26 + 1, dtype=np.float64)
+    if jet_R == 0.2:
+        # NOTE: Lower edge varies to ensure that we only have below 0.
+        kt_axis = np.linspace(-0.5, 12, 25 + 1, dtype=np.float64)
+
     kt = df.Histo2D(
-        (f"{grooming_method}_{prefix}_kt{tag}", f"{grooming_method}_{prefix}_kt{tag}", *jet_pt_axis, 26, -1, 25),
+        (
+            f"{grooming_method}_{prefix}_kt{tag}",
+            f"{grooming_method}_{prefix}_kt{tag}",
+            *jet_pt_axis,
+            len(kt_axis) - 1,
+            kt_axis,
+        ),
         jet_pt_column,
         f"{grooming_method}_{prefix}_kt",
         "scale_factor",
     )
     hists.append(kt)
     if include_stats_hist:
-        # Determine the statistics that are avaialble by not scaling according to the scale factor.
+        # Determine the statistics that are available by not scaling according to the scale factor.
         # In data, this will be trivially the same, but for the response, this is quite helpful.
         kt_stats = df.Histo2D(
             (
                 f"{grooming_method}_{prefix}_kt_stats{tag}",
                 f"{grooming_method}_{prefix}_kt_stats{tag}",
                 *jet_pt_axis,
-                26,
-                -1,
-                25,
+                len(kt_axis) - 1,
+                kt_axis,
             ),
             jet_pt_column,
             f"{grooming_method}_{prefix}_kt",
@@ -784,8 +794,13 @@ def run_response(  # noqa: C901
     jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= {main_jet_pt_range.min} && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < {main_jet_pt_range.max}"
     df_measured_selections = df_original.Filter(jet_pt_cut)
 
+    # kt binning should vary with jet R because the kt kinematic limits vary with jet_R
+    kt_axis = np.linspace(-1, 25, 26 + 1, dtype=np.float64)
+    if jet_R == 0.2:
+        # NOTE: Lower edge varies to ensure that we only have below 0.
+        kt_axis = np.linspace(-0.5, 12, 25 + 1, dtype=np.float64)
+
     hists = []
-    jet_pt_axis = (28, 0, 140)
     # Responses
     # General responses.
     # Hybrid-det level
@@ -793,12 +808,10 @@ def run_response(  # noqa: C901
         (
             f"{grooming_method}_hybrid_det_level_kt_response_jet_pt_{smeared_cut_prefix}_40_120",
             f"{grooming_method}_hybrid_det_level_kt_response_jet_pt_{smeared_cut_prefix}_40_120",
-            26,
-            -1,
-            25,
-            26,
-            -1,
-            25,
+            len(kt_axis) - 1,
+            kt_axis,
+            len(kt_axis) - 1,
+            kt_axis,
         ),
         f"{grooming_method}_hybrid_kt",
         f"{grooming_method}_det_level_kt",
@@ -810,12 +823,10 @@ def run_response(  # noqa: C901
         (
             f"{grooming_method}_hybrid_true_kt_response_jet_pt_{smeared_cut_prefix}_40_120",
             f"{grooming_method}_hybrid_true_kt_response_jet_pt_{smeared_cut_prefix}_40_120",
-            26,
-            -1,
-            25,
-            26,
-            -1,
-            25,
+            len(kt_axis) - 1,
+            kt_axis,
+            len(kt_axis) - 1,
+            kt_axis,
         ),
         f"{grooming_method}_hybrid_kt",
         f"{grooming_method}_true_kt",
@@ -827,12 +838,10 @@ def run_response(  # noqa: C901
         (
             f"{grooming_method}_det_level_true_kt_response_jet_pt_{smeared_cut_prefix}_40_120",
             f"{grooming_method}_det_level_true_kt_response_jet_pt_{smeared_cut_prefix}_40_120",
-            26,
-            -1,
-            25,
-            26,
-            -1,
-            25,
+            len(kt_axis) - 1,
+            kt_axis,
+            len(kt_axis) - 1,
+            kt_axis,
         ),
         f"{grooming_method}_det_level_kt",
         f"{grooming_method}_true_kt",
@@ -916,9 +925,10 @@ def run_response(  # noqa: C901
 
         # We want to match without the hybrid jet pt cut as a function of hybrid jet pt. So do that first before we cut.
         # Matching
-        # TODO: Refactor axis and matching hist creation at some point so we don't doubly define variables?
         jet_pt_axis = np.arange(0, 151, dtype=np.float64)
         kt_selection_axis = np.array([-1, 2, 3, 5, 25], dtype=np.float64)
+        if jet_R == 0.2:
+            kt_selection_axis = np.array([-1, 0.5, 1, 1.5, 2, 12], dtype=np.float64)
         name = f"{grooming_method}_matching_{matching_index.matching_level}_type_{matching_index.matching_type}_jet_pt_axis_hybrid"
         h_matching_hybrid_jet_pt = df_base.Histo2D(
             (name, name, len(jet_pt_axis) - 1, jet_pt_axis, len(kt_selection_axis) - 1, kt_selection_axis),
@@ -941,6 +951,9 @@ def run_response(  # noqa: C901
                 hist_suffix=tag,
                 matching_index=matching_index,
                 jet_pt_column_format=jet_pt_column_format,
+                kt_axis=kt_axis,
+                jet_pt_axis=jet_pt_axis,
+                kt_selection_axis=kt_selection_axis,
                 create_generator_subjet_in_measured_jet_hists=create_generator_subjet_in_measured_jet_hists,
             )
         )
@@ -1130,7 +1143,11 @@ def run(  # noqa: C901
 
     hists = []
     jet_pt_axis = (28, 0, 140)
-    for measured_min_kt in [-1, 2, 3, 5]:
+    _measured_min_kt_values: List[float] = [-1, 2, 3, 5]
+    if jet_R == 0.2:
+        _measured_min_kt_values = [-1, 0.5, 1, 1.5, 2]
+
+    for measured_min_kt in _measured_min_kt_values:
         tag = f"_jet_pt_{smeared_cut_prefix}_{main_jet_pt_range.min}_{main_jet_pt_range.max}"
         # kt == -1 is the cause that includes the untagged. There, we don't want to include any kt tag.
         if measured_min_kt == -1:
