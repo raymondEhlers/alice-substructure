@@ -18,14 +18,14 @@ processEmbeddingSkim = "jet_substructure.analysis.data_frame:process_embedding_s
 processEmbeddingSkimCpp = "jet_substructure.cpp.data_frame:embed_pythia_entry_point"
 
 [tool.poetry.dependencies]
-python = ">=3.7.1,<4.0"
+python = ">=3.7.1,<3.10"
 numpy = "^1.20"
 uproot3 = "^3"
 uproot = "^4"
 pandas = "^1.2"
-attrs = "^20.3.0"
+attrs = "^21.2.0"
 matplotlib = "^3.1.3"
-boost_histogram = "^0.13"
+boost-histogram = "^1.0.2"
 pachyderm = {path = "external/pachyderm", develop = true}
 h5py = "^3.1"
 coloredlogs = "^15.0"
@@ -36,16 +36,16 @@ seaborn = "^0.11"
 awkward0 = "^0"
 awkward = "^1.2.0rc2"
 pyarrow = "^3.0"
-numba = {version = "^0.52.0", python = ">=3.7,<3.9"}
+numba = "^0.53.1"
 parsl = {git = "https://github.com/Parsl/parsl.git", rev = "9eca2a949471520f161a82cc046397a1d69d939c", extras = ["monitoring"]}
-mplhep = "^0.2"
+mplhep = "^0.3.4"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.812"
 pytest = "^6.1"
 flake8 = "^3.7.9"
 flake8-colors = "^0.1.6"
-black = "^20.8b1"
+black = "^21.5b0"
 pre-commit = "^2.0.1"
 yamllint = "^1.20.0"
 isort = {extras = ["toml"], version = "^5.6"}
@@ -74,5 +74,5 @@ line-length = 120
 target-version = ["py37"]
 
 [build-system]
-requires = ["poetry_core>=1.0.0"]
+requires = ["poetry_core>=1.0.3"]
 build-backend = "poetry.core.masonry.api"
