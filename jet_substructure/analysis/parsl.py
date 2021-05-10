@@ -810,7 +810,7 @@ def setup_write_scale_factors(
     dataset_config: Mapping[str, Any],
     scale_factors: Mapping[int, AppFuture],
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> Tuple[AppFuture, List[AppFuture]]:
+) -> AppFuture:
     """Write scale factors to YAML and to trees if necessary."""
     # First, we write to YAML.
     # We want to do this regardless of potentially writing the scale factor trees.
@@ -831,33 +831,9 @@ def setup_write_scale_factors(
         logger.info(
             f"Dataset {dataset_config['name']} is not a cross check task, so skipping writing the scale factor tree."
         )
-        return yaml_result, []
+        return yaml_result
 
-    # TODO: We can remove this...
-    logger.info("Determining input files for writing scale factor trees.")
-    input_files_per_pt_hard_bin = _determine_embedding_input_files_per_pt_hard_bin(
-        dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
-    )
-    # Must read the scale factors from file to get the properly scaled values.
-    # We need to wait until the scale_factors are written, so we block on the result here.
-    _ = yaml_result.result()
-    read_scale_factors = read_extracted_scale_factors(
-        collision_system=collision_system, dataset_name=dataset_config["name"]
-    )
-
-    tree_results = []
-    for pt_hard_bin, input_files in input_files_per_pt_hard_bin.items():
-        for input_file in input_files:
-            # Flatten the results so we don't have to do so later.
-            # tree_results[f"{pt_hard_bin}_{input_file}"] = _write_cross_check_task_scale_factor_trees(
-            tree_results.append(
-                _write_cross_check_task_scale_factor_trees(
-                    scale_factor=read_scale_factors[pt_hard_bin],
-                    inputs=[File(str(input_file)), yaml_result.outputs[0]],
-                )
-            )
-
-    return yaml_result, tree_results
+    return yaml_result
 
 
 @python_app  # type: ignore
@@ -2238,14 +2214,13 @@ if __name__ == "__main__":  # noqa: C901
         )
 
         all_results.extend(list(scale_factors.values()))
-        yaml_result, tree_results = setup_write_scale_factors(
+        yaml_result = setup_write_scale_factors(
             collision_system=collision_system,
             dataset_config=dataset_config,
             scale_factors=scale_factors,
             # selected_train_numbers=list(range(6316, 6318)),
         )
         all_results.append(yaml_result)
-        all_results.extend(tree_results)
         results = setup_extract_embedding_pt_hard_spectra(
             collision_system=collision_system,
             dataset_config=dataset_config,

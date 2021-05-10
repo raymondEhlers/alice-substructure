@@ -174,7 +174,10 @@ def create_scale_factor_tree_for_cross_check_task_output(
     filename: Path,
     scale_factor: float,
 ) -> bool:
-    """Create scale factor for a single embedded output."""
+    """Create scale factor for a single embedded output for the cross check task.
+
+    As of May 2021, this is deprecated, but we keep it around as an example
+    """
     # Get number of entries in the tree to determine
     with uproot.open(filename) as f:
         # This should usually get us the tree name, regardless of what task actually generated it.
