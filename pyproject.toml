@@ -37,7 +37,7 @@ awkward0 = "^0"
 awkward = "^1.2.0rc2"
 pyarrow = "^3.0"
 numba = {version = "^0.52.0", python = ">=3.7,<3.9"}
-parsl = {extras = ["monitoring"], version = "1.1.0a0"}
+parsl = {git = "https://github.com/Parsl/parsl.git", rev = "9eca2a949471520f161a82cc046397a1d69d939c", extras = ["monitoring"]}
 mplhep = "^0.2"
 
 [tool.poetry.dev-dependencies]
