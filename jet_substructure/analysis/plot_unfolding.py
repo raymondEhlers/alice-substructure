@@ -443,6 +443,272 @@ def plot_relative_individual_systematics(
     plt.close(fig)
 
 
+def load_jetscape_data(filename: Path) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+    """Load jetscape predictions for all jet R.
+
+    Include DyG core, kt, and time, as well as SD z > 0.2.
+    """
+    _dyg_values = {
+        "005": "dynamical_core",
+        "010": "dynamical_kt",
+        "020": "dynamical_time",
+    }
+    output: Dict[str, binned_data.BinnedData] = {}
+    with uproot.open(filename) as f:
+        for jet_R in ["02", "04", "05"]:
+            output[f"R{jet_R}"] = {}
+            for val, grooming_method in _dyg_values.items():
+                output[f"R{jet_R}"][grooming_method] = binned_data.BinnedData.from_existing_data(
+                    f[f"h_chjet_ktg_dyg_a_{val}_alice_R{jet_R}_pt0.0Scaled"]
+                )
+            # Soft Drop
+            output[f"R{jet_R}"]["soft_drop_z_cut_02"] = binned_data.BinnedData.from_existing_data(
+                f[f"h_chjet_ktg_soft_drop_z_cut_02_alice_R{jet_R}_pt0.0Scaled"]
+            )
+
+    return output
+
+
+def calculate_jetscape_ratio(
+    pp: Dict[str, Dict[str, binned_data.BinnedData]], PbPb: Dict[str, Dict[str, binned_data.BinnedData]]
+) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+    """ Calculate jetscape predictions from the pp and PbPb kt spectra. """
+    output: Dict[str, Dict[str, binned_data.BinnedData]] = {}
+    for jet_R, pp_R in pp.items():
+        output[jet_R] = {}
+        # Retrieve by hand just in case they're not in the same order...
+        PbPb_R = PbPb[jet_R]
+        for grooming_method, pp_hist in pp_R.items():
+            # Retrieve by hand just in case they're not in the same order...
+            PbPb_hist = PbPb_R[grooming_method]
+            ratio = PbPb_hist / pp_R
+            # Then normalize
+            ratio /= np.sum(ratio.values)
+            ratio /= ratio.axes[0].bin_widths
+            output[jet_R][grooming_method] = PbPb_hist / pp_R
+
+    return output
+
+
+def _plot_data_model_comparison_for_single_system(
+    hists: Mapping[str, SingleResult],
+    models: Mapping[str, binned_data.BinnedData],
+    model_name: str,
+    grooming_methods: Sequence[str],
+    collision_system: str,
+    set_zero_to_nan: bool,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+) -> None:
+    grooming_styling = pb.define_grooming_styles()
+
+    # NOTE: Probably should make this configurable at some point.
+    # Based on kinematic eff and unfolding ranges
+    event_activity_to_range = {
+        "pp": helpers.KtRange(0.5, 6),
+        "semi_central": helpers.KtRange(2, 6),
+        "central": helpers.KtRange(3, 6),
+    }
+
+    with sns.color_palette("Set2"):
+        # fig, ax = plt.subplots(figsize=(9, 10))
+        # Size is specified to make it convenient to compare against Hard Probes plots.
+        fig, (ax, ax_ratio) = plt.subplots(
+            2,
+            1,
+            figsize=(10, 10),
+            gridspec_kw={"height_ratios": [3, 1]},
+            sharex=True,
+        )
+        for grooming_method in grooming_methods:
+            plotting_last_method = grooming_method == grooming_methods[-1]
+
+            # First, the data
+            h = hists[grooming_method].data
+
+            # Select range to display.
+            h = unfolding_base.select_hist_range(h, event_activity_to_range[collision_system])
+
+            # Set 0s to NaN
+            if set_zero_to_nan:
+                h.errors[h.values == 0] = np.nan
+                h.values[h.values == 0] = np.nan
+
+            # Main data points
+            p = ax.errorbar(
+                h.axes[0].bin_centers,
+                h.values,
+                yerr=h.errors,
+                xerr=h.axes[0].bin_widths / 2,
+                marker="o",
+                markersize=11,
+                linestyle="",
+                linewidth=3,
+                label=grooming_styling[grooming_method].label,
+            )
+
+            # Systematic uncertainty
+            pachyderm.plot.error_boxes(
+                ax=ax,
+                x_data=h.axes[0].bin_centers,
+                y_data=h.values,
+                x_errors=h.axes[0].bin_widths / 2,
+                y_errors=np.array(
+                    [
+                        h.metadata["y_systematic"]["quadrature"].low,
+                        h.metadata["y_systematic"]["quadrature"].high,
+                    ]
+                ),
+                # y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+                # color=style.color,
+                color=p[0].get_color(),
+                linewidth=0,
+            )
+
+            # Then, plot the model
+            model_style = grooming_styling[f"{grooming_method}_compare"]
+            # Get the model for the reference.
+            model = binned_data.BinnedData.from_existing_data(models[grooming_method])
+            # Then normalize
+            model /= np.sum(model.values)
+            model /= model.axes[0].bin_widths
+            # And select the same range.
+            # TEMP: Moved down below to see the whole range out of curiosity.
+            # model = unfolding_base.select_hist_range(model, event_activity_to_range[collision_system])
+
+            # And plot
+            ax.errorbar(
+                model.axes[0].bin_centers,
+                model.values,
+                # yerr=model.errors,
+                # xerr=model.axes[0].bin_widths / 2,
+                color=grooming_styling[grooming_method].color,
+                # marker=style.marker,
+                fillstyle=grooming_styling[grooming_method].fillstyle,
+                # linestyle="",
+                linewidth=3,
+                label=model_name if plotting_last_method else None,
+                zorder=model_style.zorder,
+                alpha=0.7,
+            )
+
+            # Ratio
+            model = unfolding_base.select_hist_range(model, event_activity_to_range[collision_system])
+            ratio = model / h
+
+            # Ratio + statistical error bars
+            ax_ratio.errorbar(
+                ratio.axes[0].bin_centers,
+                ratio.values,
+                yerr=ratio.errors,
+                xerr=ratio.axes[0].bin_widths / 2,
+                color=p[0].get_color(),
+                marker="o",
+                markersize=11,
+                linestyle="",
+                linewidth=3,
+            )
+            # Systematic errors.
+            y_relative_error_low = unfolding_base.relative_error(
+                unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
+            )
+            y_relative_error_high = unfolding_base.relative_error(
+                unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
+            )
+            # From error prop, pythia has no systematic error, so we just convert the relative errors.
+            ratio.metadata["y_systematic"] = {}
+            ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
+                low=y_relative_error_low * ratio.values,
+                high=y_relative_error_high * ratio.values,
+            )
+            y_systematic = ratio.metadata["y_systematic"]["quadrature"]
+            pachyderm.plot.error_boxes(
+                ax=ax_ratio,
+                x_data=ratio.axes[0].bin_centers,
+                y_data=ratio.values,
+                x_errors=ratio.axes[0].bin_widths / 2,
+                y_errors=np.array([y_systematic.low, y_systematic.high]),
+                color=p[0].get_color(),
+                linewidth=0,
+            )
+
+        # Reference value for ratio
+        ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+
+    # Labeling and presentation
+    plot_config.apply(fig=fig, axes=[ax, ax_ratio])
+    # A few additional tweaks.
+    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
+    # ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=0.2))
+
+    filename = f"{plot_config.name}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def plot_grooming_model_comparisons_for_single_system(
+    hists: Mapping[str, SingleResult],
+    models: Mapping[str, binned_data.BinnedData],
+    model_name: str,
+    grooming_methods: Sequence[str],
+    collision_system: str,
+    collision_system_key: str,
+    output_dir: Path,
+    kt_range: Tuple[float, float] = (1.5, 15),
+    jet_R_str: str = "R04",
+) -> None:
+    """Plot comparison of grooming methods for a single system."""
+
+    # grooming_styling = pb.define_grooming_styles()
+    jet_pt_bin = next(iter(hists.values())).ranges[0]
+
+    text = pb.label_to_display_string["ALICE"]["work_in_progress"]
+    text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
+    text += "\n" + pb.label_to_display_string["jets"]["general"]
+    text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    _plot_data_model_comparison_for_single_system(
+        hists=hists,
+        models=models,
+        grooming_methods=grooming_methods,
+        model_name=model_name,
+        collision_system=collision_system,
+        set_zero_to_nan=False,
+        plot_config=pb.PlotConfig(
+            name=f"unfolded_kt_{collision_system}_model_comparison_{jet_R_str}",
+            panels=[
+                # Main panel
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                            log=True,
+                            range=(5e-3, 1),
+                            font_size=22,
+                        ),
+                    ],
+                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
+                    legend=pb.LegendConfig(location="lower left", font_size=22),
+                ),
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=kt_range, font_size=22),
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$\frac{\text{Model}}{\text{Data}}$",
+                            range=(0.45, 1.55),
+                            font_size=22,
+                        ),
+                    ],
+                ),
+            ],
+            figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.08)),
+        ),
+        output_dir=output_dir,
+    )
+
+
 def _plot_single_system_comparison(
     hists: Mapping[str, SingleResult],
     grooming_methods: Sequence[str],
