@@ -1384,6 +1384,70 @@ analysis_configurations:
                     closures: false
                     reweight_prior: false
                     datasets: "rmax_070"
+                # Soft Drop z = 0.2 variations
+                # Starting at 0.5
+                default_z_cut_02_kt_0.5:
+                    label: "z_cut_02_kt_0.5"
+                    # NOTE: Untagged bin above is included in the closures!
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 0.5, 1, 1.5, 2, 3, 4, 6, 100]
+                        smeared_kt: [0, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
+                default_z_cut_02_kt_0.5_reweight_prior:
+                    label: "z_cut_02_kt_0.5_reweight_prior"
+                    closures: false
+                    reweight_prior: true
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 0.5, 1, 1.5, 2, 3, 4, 6, 100]
+                        smeared_kt: [0, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
+                # Going down to 0.25
+                default_z_cut_02_kt_0.25:
+                    label: "z_cut_02_kt_0.25"
+                    # NOTE: Untagged bin above is included in the closures!
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 100]
+                        smeared_kt: [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
+                default_z_cut_02_kt_0.25_reweight_prior:
+                    label: "z_cut_02_kt_0.25_reweight_prior"
+                    closures: false
+                    reweight_prior: true
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 100]
+                        smeared_kt: [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
+                # Going down to 0 (probably won't work...)
+                default_z_cut_02_kt_0:
+                    label: "z_cut_02_kt_0"
+                    # NOTE: Untagged bin above is included in the closures!
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 100]
+                        smeared_kt: [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
+                default_z_cut_02_kt_0_reweight_prior:
+                    label: "z_cut_02_kt_0_reweight_prior"
+                    closures: false
+                    reweight_prior: true
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 100]
+                        smeared_kt: [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
 
 
     PbPb_central_R02_pass1:
@@ -1747,6 +1811,28 @@ analysis_configurations:
                         # In [4]: np.round(r * [0.5, 1., 2., 3, 4], 2)
                         # Out[4]: array([0.49, 0.97, 2.  , 3.02, 3.97])
                         smeared_kt: [0.25, 0.25, 0.49, 0.97, 2.0, 3.02, 3.97, 6]
+                # Soft Drop z = 0.2 variations
+                # Going down to 0.25
+                default_z_cut_02_kt_0.25:
+                    label: "z_cut_02_kt_0.25"
+                    # NOTE: Untagged bin above is included in the closures!
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0., 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 10]
+                        smeared_kt: [0, 0.25, 0.5, 1., 1.5, 2., 3, 4, 6]
+                default_z_cut_02_kt_0.25_reweight_prior:
+                    label: "z_cut_02_kt_0.25_reweight_prior"
+                    closures: false
+                    reweight_prior: true
+                    datasets: "nominal"
+                    binning:
+                        true_kt: [-0.05, 0., 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 10]
+                        smeared_kt: [0, 0.25, 0.5, 1., 1.5, 2., 3, 4, 6]
 
 execution:
     PbPb:
