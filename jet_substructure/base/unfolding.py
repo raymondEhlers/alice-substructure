@@ -207,6 +207,7 @@ def get_binning(
     unfolding_settings: Mapping[str, Any],
     base_unfolding_config: Mapping[str, Any],
     name: str,
+    grooming_method: str,
 ) -> np.ndarray:
     """Get unfolding binning for a particular axis name.
 
@@ -216,6 +217,8 @@ def get_binning(
         unfolding_settings: Unfolding settings for a particular case.
         base_unfolding_config: Base unfolding config for the system.
         name: Name of the axis to retrieve such as "smeared_jet_pt", etc.
+        grooming_method: Name of the grooming method to allow for specialization
+            of the binning based on the grooming method.
     Returns:
         Binning for that axis.
     """
@@ -223,9 +226,14 @@ def get_binning(
     binning = None
     specialized_binning = unfolding_settings.get("binning", {})
     if specialized_binning:
-        binning = specialized_binning.get(name, [])
+        binning = specialized_binning.get(grooming_method, {}).get(name, [])
+        if not binning:
+            binning = specialized_binning.get("default", {}).get(name, [])
     # If not available in the specialized unfolding config, then grab it from the base config.
     if not binning:
-        binning = base_unfolding_config["nominal_binning"][name]
+        nominal_binning = base_unfolding_config["nominal_binning"]
+        binning = nominal_binning.get(grooming_method, {}).get(name, [])
+        if not binning:
+            binning = nominal_binning["default"][name]
 
     return np.array(binning, dtype=np.float64)

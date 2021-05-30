@@ -592,12 +592,14 @@ def run_create_closure_ratio(  # noqa: C901
             base_unfolding_config=base_unfolding_config,
             unfolding_settings=unfolding_settings,
             name="smeared_kt",
+            grooming_method=grooming_method,
         )
     )
     smeared_jet_pt_bins = unfolding_base.get_binning(
         base_unfolding_config=base_unfolding_config,
         unfolding_settings=unfolding_settings,
         name="smeared_jet_pt",
+        grooming_method=grooming_method,
     )
     # Ratio hist name
     # It encodes the binning so we can have multiple hists stored in a single file, which

@@ -1759,14 +1759,14 @@ def setup_all_unfolding(  # noqa: C901
             _default_settings = unfolding_base.Settings2D(
                 grooming_method=grooming_method,
                 jet_pt=unfolding_base.JetPtSettings2D(
-                    true_bins=_get_bins(name="true_jet_pt"),
-                    smeared_bins=_get_bins(name="smeared_jet_pt"),
+                    true_bins=_get_bins(name="true_jet_pt", grooming_method=grooming_method),
+                    smeared_bins=_get_bins(name="smeared_jet_pt", grooming_method=grooming_method),
                     # true_bins=np.array([0, 40, 60, 80, 100, 120, 160], dtype=np.float64),
                     # smeared_bins=np.array([40, 50, 60, 80, 100, 120], dtype=np.float64),
                 ),
                 substructure_variable=unfolding_base.SubstructureVariableSettings2D.from_binning(
-                    true_bins=_get_bins(name="true_kt"),
-                    smeared_bins=_get_bins(name="smeared_kt"),
+                    true_bins=_get_bins(name="true_kt", grooming_method=grooming_method),
+                    smeared_bins=_get_bins(name="smeared_kt", grooming_method=grooming_method),
                     # true_bins=np.array(
                     #    # NOTE: (-0.05, 0) is the untagged bin.
                     #    [-0.05, 0, 2, 3, 4, 8, 100],
