@@ -453,7 +453,7 @@ def load_jetscape_data(filename: Path) -> Dict[str, Dict[str, binned_data.Binned
         "010": "dynamical_kt",
         "020": "dynamical_time",
     }
-    output: Dict[str, binned_data.BinnedData] = {}
+    output: Dict[str, Dict[str, binned_data.BinnedData]] = {}
     with uproot.open(filename) as f:
         for jet_R in ["02", "04", "05"]:
             output[f"R{jet_R}"] = {}
@@ -481,11 +481,11 @@ def calculate_jetscape_ratio(
         for grooming_method, pp_hist in pp_R.items():
             # Retrieve by hand just in case they're not in the same order...
             PbPb_hist = PbPb_R[grooming_method]
-            ratio = PbPb_hist / pp_R
+            ratio = PbPb_hist / pp_hist
             # Then normalize
             ratio /= np.sum(ratio.values)
             ratio /= ratio.axes[0].bin_widths
-            output[jet_R][grooming_method] = PbPb_hist / pp_R
+            output[jet_R][grooming_method] = ratio
 
     return output
 
@@ -713,20 +713,12 @@ def _plot_single_system_comparison(
     hists: Mapping[str, SingleResult],
     grooming_methods: Sequence[str],
     reference_grooming_method: str,
-    collision_system: str,
     set_zero_to_nan: bool,
+    kt_range: Mapping[str, helpers.KtRange],
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
     grooming_styling = pb.define_grooming_styles()
-
-    # NOTE: Probably should make this configurable at some point.
-    # Based on kinematic eff and unfolding ranges
-    event_activity_to_range = {
-        "pp": helpers.KtRange(0.5, 6),
-        "semi_central": helpers.KtRange(2, 6),
-        "central": helpers.KtRange(3, 6),
-    }
 
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
@@ -747,7 +739,7 @@ def _plot_single_system_comparison(
             h = hists[grooming_method].data
 
             # Select range to display.
-            h = unfolding_base.select_hist_range(h, event_activity_to_range[collision_system])
+            h = unfolding_base.select_hist_range(h, kt_range[grooming_method])
 
             # Set 0s to NaN
             if set_zero_to_nan:
@@ -792,7 +784,7 @@ def _plot_single_system_comparison(
 
             # Ensure the ratio is defined over the same range.
             ratio_reference_hist = unfolding_base.select_hist_range(
-                ratio_reference_hist_unselected, event_activity_to_range[collision_system]
+                ratio_reference_hist_unselected, kt_range[grooming_method]
             )
             ratio = h / ratio_reference_hist
             # Ratio + statistical error bars
@@ -868,10 +860,15 @@ def plot_grooming_comparisons_for_single_system(
     collision_system: str,
     collision_system_key: str,
     output_dir: Path,
-    kt_range: Tuple[float, float] = (1.5, 15),
+    kt_range: Union[helpers.KtRange, Mapping[str, helpers.KtRange]],
+    figure_kt_range: helpers.KtRange = helpers.KtRange(1.5, 15),
     jet_R_str: str = "R04",
 ) -> None:
     """Plot comparison of grooming methods for a single system."""
+
+    # Validation
+    if isinstance(kt_range, helpers.KtRange):
+        kt_range = {grooming_method: kt_range for grooming_method in grooming_methods}
 
     grooming_styling = pb.define_grooming_styles()
     jet_pt_bin = next(iter(hists.values())).ranges[0]
@@ -885,8 +882,8 @@ def plot_grooming_comparisons_for_single_system(
         hists=hists,
         grooming_methods=grooming_methods,
         reference_grooming_method=reference_grooming_method,
-        collision_system=collision_system,
         set_zero_to_nan=False,
+        kt_range=kt_range,
         plot_config=pb.PlotConfig(
             name=f"unfolded_kt_{collision_system}_comparison_{jet_R_str}",
             panels=[
@@ -906,7 +903,7 @@ def plot_grooming_comparisons_for_single_system(
                 ),
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=kt_range, font_size=22),
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
                         pb.AxisConfig(
                             "y",
                             label=r"$\frac{\text{Method}}{\text{"

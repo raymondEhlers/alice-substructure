@@ -302,6 +302,10 @@ class RangeSelector:
     def display_str(self, label: str = "") -> str:
         return fr"{self.min} < {self._display_name}^{{\text{{{label}}}}} < {self.max}"
 
+    def __iter__(self) -> Iterable[float]:
+        yield self.min
+        yield self.max
+
 
 @attr.s(frozen=True)
 class JetPtRange(RangeSelector):
