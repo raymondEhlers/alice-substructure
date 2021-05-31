@@ -1584,6 +1584,7 @@ def setup_unfolding_outputs(  # noqa: C901
     truncation_shift: float = 5,
     displaced_untagged_above_range: bool = True,
     displaced_extremum: Optional[float] = None,
+    skip_reweighted_prior_in_systematics: bool = False,
 ) -> Dict[str, UnfoldingOutput]:
     # Validation
     # Keep the truncation positive so we know how we've shifted.
@@ -1608,7 +1609,7 @@ def setup_unfolding_outputs(  # noqa: C901
         pure_matches=False,
         suffix=suffix,
     )
-    print(f"default: {unfolding_outputs['default'].identifier}")
+    logger.info(f"default: {unfolding_outputs['default'].identifier}")
 
     try:
         unfolding_outputs["tracking_efficiency"] = UnfoldingOutput(
@@ -1705,22 +1706,27 @@ def setup_unfolding_outputs(  # noqa: C901
     except FileNotFoundError:
         logger.debug("Skipping untagged bin location because the output file doesn't exist.")
 
-    try:
-        unfolding_outputs["reweight_prior"] = UnfoldingOutput(
-            substructure_variable=substructure_variable,
-            grooming_method=grooming_method,
-            smeared_var_range=smeared_var_range,
-            smeared_untagged_var=smeared_untagged_var,
-            smeared_jet_pt_range=smeared_jet_pt_range,
-            collision_system=collision_system,
-            base_dir=output_dir,
-            n_iter_compare=n_iter_compare,
-            pure_matches=False,
-            suffix=suffix,
-            label="reweight_prior",
+    if not skip_reweighted_prior_in_systematics:
+        try:
+            unfolding_outputs["reweight_prior"] = UnfoldingOutput(
+                substructure_variable=substructure_variable,
+                grooming_method=grooming_method,
+                smeared_var_range=smeared_var_range,
+                smeared_untagged_var=smeared_untagged_var,
+                smeared_jet_pt_range=smeared_jet_pt_range,
+                collision_system=collision_system,
+                base_dir=output_dir,
+                n_iter_compare=n_iter_compare,
+                pure_matches=False,
+                suffix=suffix,
+                label="reweight_prior",
+            )
+        except FileNotFoundError:
+            logger.debug("Skipping reweighted prior because the output file doesn't exist.")
+    else:
+        logger.debug(
+            "Skipping reweighted prior because it was requested (probably for pp, where we take a model dependence instead)."
         )
-    except FileNotFoundError:
-        logger.debug("Skipping reweighted prior because the output file doesn't exist.")
 
     for background_setting in ["Rmax060", "Rmax005"]:
         try:
@@ -1758,6 +1764,7 @@ def _load_unfolded_outputs(
     output_dir: Path,
     tag_after_suffix: str = "",
     displaced_untagged_above_range: bool = True,
+    skip_reweighted_prior_in_systematics: bool = False,
 ) -> Tuple[Dict[str, UnfoldingOutput], Dict[str, UnfoldingOutput], Dict[str, UnfoldingOutput]]:
     # Validation
     suffix = f"{event_activity}_{jet_R_str}"
@@ -1805,6 +1812,7 @@ def _load_unfolded_outputs(
         truncation_shift=truncation_shift,
         displaced_untagged_above_range=displaced_untagged_above_range,
         displaced_extremum=displaced_extremum,
+        skip_reweighted_prior_in_systematics=skip_reweighted_prior_in_systematics,
     )
 
     return unfolding_closure_outputs, unfolding_closure_pure_matches_outputs, unfolding_systematics_outputs
@@ -1813,8 +1821,8 @@ def _load_unfolded_outputs(
 def load_unfolded_outputs(
     grooming_methods: Sequence[str],
     substructure_variable: str,
-    smeared_var_range: helpers.KtRange,
-    smeared_untagged_var: helpers.KtRange,
+    smeared_var_range: Union[helpers.KtRange, Mapping[str, helpers.KtRange]],
+    smeared_untagged_var: Union[helpers.KtRange, Mapping[str, helpers.KtRange]],
     smeared_jet_pt_range: helpers.JetPtRange,
     collision_system: str,
     event_activity: str,
@@ -1823,14 +1831,25 @@ def load_unfolded_outputs(
     truncation_shift: int,
     displaced_extremum: float,
     output_dir: Path,
-    tag_after_suffix: str = "",
+    tag_after_suffix: Union[str, Mapping[str, str]] = "",
     displaced_untagged_above_range: bool = True,
+    skip_reweighted_prior_in_systematics: bool = False,
 ) -> Tuple[
     Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]]
 ]:
+    # Validation
+    if isinstance(smeared_var_range, helpers.KtRange):
+        # Copy for every grooming method
+        smeared_var_range = {grooming_method: smeared_var_range for grooming_method in grooming_methods}
+    if isinstance(smeared_untagged_var, helpers.KtRange):
+        # Copy for every grooming method
+        smeared_untagged_var = {grooming_method: smeared_untagged_var for grooming_method in grooming_methods}
     if isinstance(n_iter_compare, int):
         # Copy for every grooming method
         n_iter_compare = {grooming_method: n_iter_compare for grooming_method in grooming_methods}
+    if isinstance(tag_after_suffix, str):
+        # Copy for every grooming method
+        tag_after_suffix = {grooming_method: tag_after_suffix for grooming_method in grooming_methods}
     unfolding_closure_outputs = {}
     unfolding_closure_pure_matches_outputs = {}
     unfolding_systematics_outputs = {}
@@ -1842,8 +1861,8 @@ def load_unfolded_outputs(
         ) = _load_unfolded_outputs(
             grooming_method=grooming_method,
             substructure_variable=substructure_variable,
-            smeared_var_range=smeared_var_range,
-            smeared_untagged_var=smeared_untagged_var,
+            smeared_var_range=smeared_var_range[grooming_method],
+            smeared_untagged_var=smeared_untagged_var[grooming_method],
             smeared_jet_pt_range=smeared_jet_pt_range,
             collision_system=collision_system,
             event_activity=event_activity,
@@ -1852,8 +1871,9 @@ def load_unfolded_outputs(
             truncation_shift=truncation_shift,
             displaced_extremum=displaced_extremum,
             output_dir=output_dir,
-            tag_after_suffix=tag_after_suffix,
+            tag_after_suffix=tag_after_suffix[grooming_method],
             displaced_untagged_above_range=displaced_untagged_above_range,
+            skip_reweighted_prior_in_systematics=skip_reweighted_prior_in_systematics,
         )
 
     return (
@@ -1868,6 +1888,7 @@ def _unfolded_outputs_with_systematics(
     unfolding_systematics_outputs: Dict[str, Dict[str, UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
 ) -> Tuple[SingleResult, binned_data.BinnedData]:
+    logger.info(f"Calculating systematics for {grooming_method}")
     unfolded = unfolded_substructure_results(
         unfolding_outputs=unfolding_systematics_outputs[grooming_method],
         true_jet_pt_range=true_jet_pt_range,
