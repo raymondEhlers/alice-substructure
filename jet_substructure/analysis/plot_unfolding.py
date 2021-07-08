@@ -1,4 +1,4 @@
-""" Plot unfolding.
+""" Functionality related to preparing unfolding outputs and plotting.
 
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
@@ -443,6 +443,47 @@ def plot_relative_individual_systematics(
     plt.close(fig)
 
 
+def _load_analytical_calculations(filename: Path, bin_edges: np.ndarray) -> binned_data.BinnedData:
+    """Load analytical calcuations for a given jet R, as determined by the filename."""
+    # May not be terribly efficient, but it works automatically and it's a small amount of data, so it's good enough.
+    arr = np.loadtxt(filename)
+    central_values = arr[:, 0]
+    lower_bounds = arr[:, 1]
+    upper_bounds = arr[:, 2]
+
+    h = binned_data.BinnedData(
+        axes=bin_edges,
+        values=central_values,
+        variances=np.zeros(len(central_values)),
+    )
+    h.metadata["y_systematic"] = {
+        "quadrature": unfolding_base.AsymmetricErrors(
+            low=lower_bounds,
+            high=upper_bounds,
+        )
+    }
+    return h
+
+
+def load_analytical_calculations(
+    path_to_calculations: Path, bin_edges: Dict[str, np.ndarray]
+) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+    """Load analytical calcuations for a collection of jet R, as determined by the bin edges dict."""
+    _grooming_methods_to_files = {
+        "dynamical_kt": "1",
+        "dynamical_time": "2",
+    }
+    output: Dict[str, Dict[str, binned_data.BinnedData]] = {}
+
+    for jet_R_str, edges in bin_edges.items():
+        output[jet_R_str] = {}
+        for grooming_method, label in _grooming_methods_to_files.items():
+            output[jet_R_str][grooming_method] = _load_analytical_calculations(
+                filename=path_to_calculations / jet_R_str / f"ktg_a{label}.dat", bin_edges=edges
+            )
+    return output
+
+
 def load_jetscape_data(filename: Path) -> Dict[str, Dict[str, binned_data.BinnedData]]:
     """Load jetscape predictions for all jet R.
 
@@ -488,6 +529,63 @@ def calculate_jetscape_ratio(
             output[jet_R][grooming_method] = ratio
 
     return output
+
+
+def load_sherpa_predictions(
+    filename: Path, jet_R_values: Union[float, Sequence[float]]
+) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+    """Load sherpa predictions for a given jet R.
+
+    Include DyG core, kt, and time, as well as SD z > 0.2.
+    """
+    if isinstance(jet_R_values, float):
+        jet_R_values = [jet_R_values]
+    _name_map = {
+        "k0": "dynamical_core",
+        "k1": "dynamical_kt",
+        "k2": "dynamical_time",
+        "ksd": "soft_drop_z_cut_02",
+    }
+    output: Dict[str, Dict[str, binned_data.BinnedData]] = {}
+    with uproot.open(filename) as f:
+        for jet_R in jet_R_values:
+            jet_R_str = f"R{round(jet_R * 10):02}"
+            output[jet_R_str] = {}
+            for tag, grooming_method in _name_map.items():
+                output[jet_R_str][grooming_method] = binned_data.BinnedData.from_existing_data(f[f"histo{tag}"])
+
+    return output
+
+
+_models_styles = {
+    "jetscape": dict(
+        label="JETSCAPE PP19",
+        linewidth=3,
+        linestyle="--",
+    ),
+    "pythia": dict(
+        label="PYTHIA8 Monash 2013",
+        linewidth=3,
+        linestyle="-",
+    ),
+    "analytical": dict(
+        label="Caucal at al.",
+        linewidth=3,
+        linestyle="-.",
+    ),
+    "sherpa_lund": dict(
+        label="SHERPA (Lund)",
+        # NOTE: This will overlap with jetscape, but we currently (8 July 2021) can't compare them, so it's fine.
+        #       To be resolved when the plotting plans are a bit clearer.
+        linewidth=3,
+        linestyle="--",
+    ),
+    "sherpa_ahadic": dict(
+        label="SHERPA (AHADIC)",
+        linewidth=3,
+        linestyle=":",
+    ),
+}
 
 
 def _plot_data_model_comparison_for_single_system(
@@ -559,7 +657,9 @@ def _plot_data_model_comparison_for_single_system(
             for model_name, model_with_all_grooming_methods in models.items():
                 model = model_with_all_grooming_methods.get(grooming_method, None)
                 if not model:
-                    logger.ddebug(f"Skipping model {model_name}, grooming method: {grooming_method} because predictions aren't available")
+                    logger.debug(
+                        f"Skipping model {model_name}, grooming method: {grooming_method} because predictions aren't available"
+                    )
                     continue
 
                 # Then, plot the model
@@ -572,7 +672,7 @@ def _plot_data_model_comparison_for_single_system(
                 model /= np.sum(model.values)
                 model /= model.axes[0].bin_widths
                 # And select the same range.
-                #model = unfolding_base.select_hist_range(model, kt_range[grooming_method])
+                # model = unfolding_base.select_hist_range(model, kt_range[grooming_method])
 
                 # And plot
                 # Make sure we copy the settings so we can modify them
@@ -587,10 +687,10 @@ def _plot_data_model_comparison_for_single_system(
                     # marker=style.marker,
                     # fillstyle=grooming_styling[grooming_method].fillstyle,
                     # linestyle="",
-                    #label=_models_styles[model_name]["label"] if plotting_last_method else None,
+                    # label=_models_styles[model_name]["label"] if plotting_last_method else None,
                     zorder=model_style.zorder,
                     alpha=0.7,
-                    **temp_kwargs
+                    **temp_kwargs,
                 )
 
                 # Ratio
