@@ -5,15 +5,12 @@ so it's worth the effort.
 
 Note:
     In this case, we only have the unfolded outputs. This means that we're
-    be creating an incomplete unfolding output object. But it's the best we can do.
+    be creating an imcomplete unfolding output object. But it's the best we can do.
 
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
 from pathlib import Path
-
-import uproot
-from pachyderm import binned_data
 
 from jet_substructure.analysis import plot_unfolding
 from jet_substructure.base import helpers
@@ -22,14 +19,6 @@ from jet_substructure.base import helpers
 def convert_file(input_path: Path, jet_R: str, grooming_method: str, n_iter: int, unfolding_output: plot_unfolding.UnfoldingOutput) -> bool:
     # Delay import to avoid explicit dependence.
     import ROOT
-
-    # First, get the nominal values. We'll use those to create the relative uncertainties
-    nominal_input_path = Path(str(unfolding_output.input_filename).replace("_model_dependence", ""))
-    unfolded_name = f"bayesian_unfolded_iter_{n_iter}"
-    with uproot.open(nominal_input_path) as f:
-        nominal_values = binned_data.BinnedData.from_existing_data(
-            f[unfolded_name]
-        )
 
     # Map to Leticia's filenames.
     # The unfolding outputs.
@@ -62,12 +51,11 @@ def convert_file(input_path: Path, jet_R: str, grooming_method: str, n_iter: int
     # print(f"hist_name: {hist_name}")
     f.cd()
     h_temp = f.Get(grooming_method_to_histogram_name[grooming_method])
-
-    # Modify the histogram so that it stores as expected. Just give meaningless errors.
+    new_name = f"bayesian_unfolded_iter_{n_iter}"
 
     f_out.cd()
-    h_temp.SetName(unfolded_name)
-    h_temp.Write(unfolded_name)
+    h_temp.SetName(new_name)
+    h_temp.Write(new_name)
 
     return True
 
