@@ -492,23 +492,14 @@ def calculate_jetscape_ratio(
 
 def _plot_data_model_comparison_for_single_system(
     hists: Mapping[str, SingleResult],
-    models: Mapping[str, binned_data.BinnedData],
-    model_name: str,
+    models: Mapping[str, Mapping[str, binned_data.BinnedData]],
     grooming_methods: Sequence[str],
-    collision_system: str,
     set_zero_to_nan: bool,
+    kt_range: Mapping[str, helpers.KtRange],
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
     grooming_styling = pb.define_grooming_styles()
-
-    # NOTE: Probably should make this configurable at some point.
-    # Based on kinematic eff and unfolding ranges
-    event_activity_to_range = {
-        "pp": helpers.KtRange(0.5, 6),
-        "semi_central": helpers.KtRange(2, 6),
-        "central": helpers.KtRange(3, 6),
-    }
 
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
@@ -527,7 +518,7 @@ def _plot_data_model_comparison_for_single_system(
             h = hists[grooming_method].data
 
             # Select range to display.
-            h = unfolding_base.select_hist_range(h, event_activity_to_range[collision_system])
+            h = unfolding_base.select_hist_range(h, kt_range[grooming_method])
 
             # Set 0s to NaN
             if set_zero_to_nan:
@@ -565,74 +556,85 @@ def _plot_data_model_comparison_for_single_system(
                 linewidth=0,
             )
 
-            # Then, plot the model
-            model_style = grooming_styling[f"{grooming_method}_compare"]
-            # Get the model for the reference.
-            model = binned_data.BinnedData.from_existing_data(models[grooming_method])
-            # Then normalize
-            model /= np.sum(model.values)
-            model /= model.axes[0].bin_widths
-            # And select the same range.
-            # TEMP: Moved down below to see the whole range out of curiosity.
-            # model = unfolding_base.select_hist_range(model, event_activity_to_range[collision_system])
+            for model_name, model_with_all_grooming_methods in models.items():
+                model = model_with_all_grooming_methods.get(grooming_method, None)
+                if not model:
+                    logger.ddebug(f"Skipping model {model_name}, grooming method: {grooming_method} because predictions aren't available")
+                    continue
 
-            # And plot
-            ax.errorbar(
-                model.axes[0].bin_centers,
-                model.values,
-                # yerr=model.errors,
-                # xerr=model.axes[0].bin_widths / 2,
-                color=grooming_styling[grooming_method].color,
-                # marker=style.marker,
-                fillstyle=grooming_styling[grooming_method].fillstyle,
-                # linestyle="",
-                linewidth=3,
-                label=model_name if plotting_last_method else None,
-                zorder=model_style.zorder,
-                alpha=0.7,
-            )
+                # Then, plot the model
+                model_style = grooming_styling[f"{grooming_method}_compare"]
+                # Get the model for the reference.
+                model = binned_data.BinnedData.from_existing_data(model)
+                # TODO: Careful, pythia is already normalized, but jetscape wasn't. So we need to resolve this...
+                #       Probably best to have some kind of "prepare model" function, which we can decide to use or not.
+                # Then normalize
+                model /= np.sum(model.values)
+                model /= model.axes[0].bin_widths
+                # And select the same range.
+                #model = unfolding_base.select_hist_range(model, kt_range[grooming_method])
 
-            # Ratio
-            model = unfolding_base.select_hist_range(model, event_activity_to_range[collision_system])
-            ratio = model / h
+                # And plot
+                # Make sure we copy the settings so we can modify them
+                temp_kwargs = dict(_models_styles[model_name])
+                temp_kwargs["label"] = temp_kwargs["label"] if plotting_last_method else None
+                ax.errorbar(
+                    model.axes[0].bin_centers,
+                    model.values,
+                    # yerr=model.errors,
+                    # xerr=model.axes[0].bin_widths / 2,
+                    color=grooming_styling[grooming_method].color,
+                    # marker=style.marker,
+                    # fillstyle=grooming_styling[grooming_method].fillstyle,
+                    # linestyle="",
+                    #label=_models_styles[model_name]["label"] if plotting_last_method else None,
+                    zorder=model_style.zorder,
+                    alpha=0.7,
+                    **temp_kwargs
+                )
 
-            # Ratio + statistical error bars
-            ax_ratio.errorbar(
-                ratio.axes[0].bin_centers,
-                ratio.values,
-                yerr=ratio.errors,
-                xerr=ratio.axes[0].bin_widths / 2,
-                color=p[0].get_color(),
-                marker="o",
-                markersize=11,
-                linestyle="",
-                linewidth=3,
-            )
-            # Systematic errors.
-            y_relative_error_low = unfolding_base.relative_error(
-                unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
-            )
-            y_relative_error_high = unfolding_base.relative_error(
-                unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
-            )
-            # From error prop, pythia has no systematic error, so we just convert the relative errors.
-            ratio.metadata["y_systematic"] = {}
-            ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
-                low=y_relative_error_low * ratio.values,
-                high=y_relative_error_high * ratio.values,
-            )
-            y_systematic = ratio.metadata["y_systematic"]["quadrature"]
-            pachyderm.plot.error_boxes(
-                ax=ax_ratio,
-                x_data=ratio.axes[0].bin_centers,
-                y_data=ratio.values,
-                x_errors=ratio.axes[0].bin_widths / 2,
-                y_errors=np.array([y_systematic.low, y_systematic.high]),
-                color=p[0].get_color(),
-                linewidth=0,
-            )
+                # Ratio
+                # Could move down here if you want to see the entire range
+                model = unfolding_base.select_hist_range(model, kt_range[grooming_method])
+                ratio = model / h
 
-        # Reference value for ratio
+                # Ratio + statistical error bars
+                ax_ratio.errorbar(
+                    ratio.axes[0].bin_centers,
+                    ratio.values,
+                    yerr=ratio.errors,
+                    xerr=ratio.axes[0].bin_widths / 2,
+                    color=p[0].get_color(),
+                    marker="o",
+                    markersize=11,
+                    linestyle="",
+                    linewidth=3,
+                )
+                # Systematic errors.
+                y_relative_error_low = unfolding_base.relative_error(
+                    unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
+                )
+                y_relative_error_high = unfolding_base.relative_error(
+                    unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
+                )
+                # From error prop, pythia has no systematic error, so we just convert the relative errors.
+                ratio.metadata["y_systematic"] = {}
+                ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
+                    low=y_relative_error_low * ratio.values,
+                    high=y_relative_error_high * ratio.values,
+                )
+                y_systematic = ratio.metadata["y_systematic"]["quadrature"]
+                pachyderm.plot.error_boxes(
+                    ax=ax_ratio,
+                    x_data=ratio.axes[0].bin_centers,
+                    y_data=ratio.values,
+                    x_errors=ratio.axes[0].bin_widths / 2,
+                    y_errors=np.array([y_systematic.low, y_systematic.high]),
+                    color=p[0].get_color(),
+                    linewidth=0,
+                )
+
+        # reference value for ratio
         ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
     # Labeling and presentation
@@ -648,16 +650,20 @@ def _plot_data_model_comparison_for_single_system(
 
 def plot_grooming_model_comparisons_for_single_system(
     hists: Mapping[str, SingleResult],
-    models: Mapping[str, binned_data.BinnedData],
-    model_name: str,
+    models: Mapping[str, Mapping[str, binned_data.BinnedData]],
     grooming_methods: Sequence[str],
     collision_system: str,
     collision_system_key: str,
     output_dir: Path,
-    kt_range: Tuple[float, float] = (1.5, 15),
+    kt_range: Union[helpers.KtRange, Mapping[str, helpers.KtRange]],
+    figure_kt_range: helpers.KtRange = helpers.KtRange(1.5, 15),
     jet_R_str: str = "R04",
 ) -> None:
     """Plot comparison of grooming methods for a single system."""
+
+    # Validation
+    if isinstance(kt_range, helpers.KtRange):
+        kt_range = {grooming_method: kt_range for grooming_method in grooming_methods}
 
     # grooming_styling = pb.define_grooming_styles()
     jet_pt_bin = next(iter(hists.values())).ranges[0]
@@ -671,9 +677,8 @@ def plot_grooming_model_comparisons_for_single_system(
         hists=hists,
         models=models,
         grooming_methods=grooming_methods,
-        model_name=model_name,
-        collision_system=collision_system,
         set_zero_to_nan=False,
+        kt_range=kt_range,
         plot_config=pb.PlotConfig(
             name=f"unfolded_kt_{collision_system}_model_comparison_{jet_R_str}",
             panels=[
@@ -693,7 +698,7 @@ def plot_grooming_model_comparisons_for_single_system(
                 ),
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=kt_range, font_size=22),
+                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
                         pb.AxisConfig(
                             "y",
                             label=r"$\frac{\text{Model}}{\text{Data}}$",
@@ -736,10 +741,10 @@ def _plot_single_system_comparison(
 
         for grooming_method in grooming_methods:
             # Axes: jet_pt, attr_name
-            h = hists[grooming_method].data
+            h_input = hists[grooming_method].data
 
             # Select range to display.
-            h = unfolding_base.select_hist_range(h, kt_range[grooming_method])
+            h = unfolding_base.select_hist_range(h_input, kt_range[grooming_method])
 
             # Set 0s to NaN
             if set_zero_to_nan:
