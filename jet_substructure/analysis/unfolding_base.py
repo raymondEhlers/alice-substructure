@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from functools import reduce
-from typing import Any, Optional, Type
+from typing import Any, Dict, Optional, Type
 
 import attr
 import numpy as np
@@ -142,7 +142,7 @@ def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelect
         last_bin_edge = None
 
     # Handle metadata
-    metadata = {}
+    metadata: Dict[str, Any] = {}
     for k, v in hist.metadata.items():
         if k == "y_systematic":
             y_systematic = {}
@@ -155,7 +155,7 @@ def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelect
             metadata["y_systematic"] = y_systematic
         else:
             if isinstance(v, AsymmetricErrors):
-                y_systematic[k] = AsymmetricErrors(
+                metadata[k] = AsymmetricErrors(
                     low=v.low[bin_center_mask],
                     high=v.high[bin_center_mask],
                 )
