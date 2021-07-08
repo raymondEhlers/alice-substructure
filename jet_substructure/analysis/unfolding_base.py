@@ -135,6 +135,11 @@ def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelect
     bin_center_mask = (hist.axes[0].bin_centers >= x_range.min) & (hist.axes[0].bin_centers <= x_range.max)
     first_bin_edge = np.where(bin_center_mask)[0][0]
     last_bin_edge = -1 * np.where(bin_center_mask[::-1])[0][0]
+    # If everything is in range, then we'll get 0 for the last bin edge. However, this would translate to no
+    # range included. In that case, we want to include everything on the upper edge, and so we need to set
+    # it to None.
+    if last_bin_edge == 0:
+        last_bin_edge = None
 
     # Handle metadata
     metadata = {}
