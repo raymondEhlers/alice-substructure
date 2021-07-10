@@ -888,8 +888,23 @@ def _plot_single_system_comparison(
                 continue
 
             # Ensure the ratio is defined over the same range.
+            # TODO: Refactor when more awake...
+            kt_range_for_current_grooming_method = kt_range[grooming_method]
+            kt_range_for_reference = kt_range[reference_grooming_method]
+            kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)
+            if kt_range_min < kt_range_for_reference.min:
+                kt_range_min = kt_range_for_reference.min
+            if kt_range_max > kt_range_for_reference.max:
+                kt_range_max = kt_range_for_reference.max
+            kt_range_for_comparison = helpers.KtRange(kt_range_min, kt_range_max)
+            logger.info(f"kt_range_for_comparison: {kt_range_for_comparison}")
             ratio_reference_hist = unfolding_base.select_hist_range(
-                ratio_reference_hist_unselected, kt_range[grooming_method]
+                ratio_reference_hist_unselected,
+                kt_range_for_comparison,
+            )
+            h = unfolding_base.select_hist_range(
+                h_input,
+                kt_range_for_comparison,
             )
             ratio = h / ratio_reference_hist
             # Ratio + statistical error bars
@@ -1045,7 +1060,10 @@ def _plot_pp_PbPb_comparison(
     # NOTE: Probably should make this configurable at some point.
     # Based on kinematic eff and unfolding ranges
     event_activity_to_range = {
-        "pp": helpers.KtRange(0.5, 6),
+        # TEMP: Make this configurable...
+        "pp": helpers.KtRange(0.25, 6),
+        # "semi_central": helpers.KtRange(0.25, 6),
+        # "pp": helpers.KtRange(0.5, 6),
         "semi_central": helpers.KtRange(2, 6),
         "central": helpers.KtRange(3, 6),
     }
