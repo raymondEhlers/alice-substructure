@@ -412,7 +412,7 @@ def plot_relative_individual_systematics(
         hep.histplot(
             H=np.ones_like(unfolded.data.values) - (systematic.low / unfolded.data.values),
             bins=unfolded.data.axes[0].bin_edges,
-            color=p[0].step.get_color(),
+            color=p[0].stairs.get_edgecolor(),
             alpha=0.8,
             **extra_args,
         )
