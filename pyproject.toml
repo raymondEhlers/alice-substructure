@@ -19,22 +19,22 @@ processEmbeddingSkimCpp = "jet_substructure.cpp.data_frame:embed_pythia_entry_po
 
 [tool.poetry.dependencies]
 python = ">=3.7.1,<3.10"
-numpy = "^1.20"
+numpy = "^1.21.0"
 uproot3 = "^3"
-uproot = "^4"
-pandas = "^1.2"
+uproot = "^4.0.11"
+pandas = "^1.3.0"
 attrs = "^21.2.0"
-matplotlib = "^3.1.3"
+matplotlib = "^3.4.2"
 boost-histogram = "^1.0.2"
 pachyderm = {path = "external/pachyderm", develop = true}
 h5py = "^3.1"
-coloredlogs = "^15.0"
+coloredlogs = "^15.0.1"
 dask = {version = "^2021.1.0", extras = ["dataframe"]}
 enlighten = "^1.4.0"
 pathos = "^0.2.5"
-seaborn = "^0.11"
+seaborn = "^0.11.1"
 awkward0 = "^0"
-awkward = "^1.2.3"
+awkward = "^1.4.0"
 pyarrow = "^4.0.0"
 numba = "^0.53.1"
 parsl = {git = "https://github.com/Parsl/parsl.git", rev = "9eca2a949471520f161a82cc046397a1d69d939c", extras = ["monitoring"]}
