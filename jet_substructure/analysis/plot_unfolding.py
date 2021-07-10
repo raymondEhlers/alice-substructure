@@ -891,7 +891,7 @@ def _plot_single_system_comparison(
             # TODO: Refactor when more awake...
             kt_range_for_current_grooming_method = kt_range[grooming_method]
             kt_range_for_reference = kt_range[reference_grooming_method]
-            kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)
+            kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)  # type: ignore
             if kt_range_min < kt_range_for_reference.min:
                 kt_range_min = kt_range_for_reference.min
             if kt_range_max > kt_range_for_reference.max:
@@ -2756,12 +2756,14 @@ def plot_select_iteration(
         )
         hist_reg.values[i] = regularization_value
         # Calculate and store stat error
+        # Skip the untagged since it tends to blow up the stat error in a way that's not meaningful
+        lower_edge = None if unfolding_output.disabled_untagged_bin else 1
         stat_value = np.sum(
             np.divide(
-                current_iter_hist.errors,
-                current_iter_hist.values,
-                out=np.zeros_like(current_iter_hist.values),
-                where=current_iter_hist.values != 0,
+                current_iter_hist.errors[lower_edge:],
+                current_iter_hist.values[lower_edge:],
+                out=np.zeros_like(current_iter_hist.values[lower_edge:]),
+                where=current_iter_hist.values[lower_edge:] != 0,
             )
         )
         hist_stat.values[i] = stat_value
