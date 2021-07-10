@@ -1117,6 +1117,8 @@ def _plot_pp_PbPb_comparison(
             ratio_reference_hist = unfolding_base.select_hist_range(
                 ratio_reference_hist_unselected, event_activity_to_range[collision_system]
             )
+            logger.debug(f"h: {h.axes[0].bin_edges}")
+            logger.debug(f"ratio_reference_hist: {ratio_reference_hist.axes[0].bin_edges}")
             ratio = h / ratio_reference_hist
             # Ratio + statistical error bars
             ax_ratio.errorbar(
@@ -1833,6 +1835,26 @@ def setup_unfolding_outputs(  # noqa: C901
             "Skipping reweighted prior because it was requested (probably for pp, where we take a model dependence instead)."
         )
 
+    # Model dependence
+    try:
+        # Careful here: the outputs in pp are not in the standard format. But this is a convenient fiction.
+        unfolding_outputs["model_dependence"] = UnfoldingOutput(
+            substructure_variable=substructure_variable,
+            grooming_method=grooming_method,
+            smeared_var_range=smeared_var_range,
+            smeared_untagged_var=smeared_untagged_var,
+            smeared_jet_pt_range=smeared_jet_pt_range,
+            collision_system=collision_system,
+            base_dir=output_dir,
+            n_iter_compare=n_iter_compare,
+            pure_matches=False,
+            suffix=suffix,
+            label="model_dependence",
+        )
+    except FileNotFoundError:
+        logger.debug("Skipping model dependence because the output file doesn't exist.")
+
+    # Background subtraction
     for background_setting in ["Rmax060", "Rmax005"]:
         try:
             unfolding_outputs[background_setting] = UnfoldingOutput(
@@ -2050,6 +2072,9 @@ def unfolded_substructure_results(
     """
     unfolded = {}
     for k, v in unfolding_outputs.items():
+        if k == "model_dependence":
+            # We have to handle this manually. See the systematics calculation.
+            continue
         unfolded[k] = SingleResult(
             # NOTE: We want to match the iter of the default case.
             data=v.unfolded_substructure(
@@ -2200,6 +2225,33 @@ def calculate_systematics(  # noqa: C901
         )
     except KeyError as e:
         logger.debug(f"Skipping non closure systematic because of {e}")
+
+    # Model dependence.
+    # The output should include _either_ the model dependence or the non-closure
+    if "model_dependence" in unfolding_outputs:
+        # First, extract the model dependence graph
+        # NOTE: This output is quite different, so we just need to handle the graph (not hist!) directly.
+        graph = unfolding_outputs["model_dependence"].hists[
+            f'bayesian_unfolded_iter_{unfolding_outputs["model_dependence"].n_iter_compare}'
+        ]
+
+        # Then use the information
+        relative_errors_on_model_dependence_low = graph.metadata["y_errors"]["low"] / graph.values
+        relative_errors_on_model_dependence_high = graph.metadata["y_errors"]["high"] / graph.values
+
+        logger.info(
+            f"\nmodel_dependence bin_edges: {graph.axes[0].bin_edges}"
+            f"\nnominal bin_edges: {unfolded['default'].data.axes[0].bin_edges}"
+        )
+        unfolded["default"].data.metadata["y_systematic"]["model_dependence"] = unfolding_base.AsymmetricErrors(
+            relative_errors_on_model_dependence_low * unfolded["default"].data.values,
+            relative_errors_on_model_dependence_high * unfolded["default"].data.values,
+        )
+        logger.info(
+            f"\n\tlow: {relative_errors_on_model_dependence_low}"
+            f"\n\thigh: {relative_errors_on_model_dependence_high}"
+            f'\n\tmodel_dependence errors: {unfolded["default"].data.metadata["y_systematic"]["model_dependence"]}'
+        )
 
     # Cross check to make sure that I haven't copied and pasted incorrectly.
     assert not any(
