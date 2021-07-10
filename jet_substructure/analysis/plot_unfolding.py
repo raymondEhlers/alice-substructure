@@ -569,7 +569,7 @@ _models_styles = {
         linestyle="-",
     ),
     "analytical": dict(
-        label="Caucal at al.",
+        label="Caucal et al.",
         linewidth=3,
         linestyle="-.",
     ),
