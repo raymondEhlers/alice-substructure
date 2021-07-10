@@ -55,7 +55,7 @@ jupyter_nbextensions_configurator = "^0.4.1"
 #pygraphviz = "^1.5"
 networkx = "^2.4"
 jupyterlab-widgets = "^1.0.0"
-jupyterlab = "^3.0.12"
+jupyterlab = "^3.0.16"
 
 [tool.isort]
 line_length = 120
