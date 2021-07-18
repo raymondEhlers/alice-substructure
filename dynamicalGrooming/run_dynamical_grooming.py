@@ -247,7 +247,15 @@ def run_dynamical_grooming(  # noqa: C901
     # Basic setup (analysis manager and input handler).
     analysis_manager = ROOT.AliAnalysisManager(task_name)
     if data_type == DataType.AOD:
+        # Standard
         ROOT.AliAnalysisTaskEmcal.AddAODHandler()
+        # Reduced
+        # handler = _run_add_task_macro(
+        #    "$ALICE_PHYSICS/PWG/EMCAL/macros/AddAODReducedBranchesInputHandler.C", "PWG::EMCAL::AliAODReducedBranchesInputHandler",
+        # )
+        # handler = ROOT.PWG.EMCAL.AliAODReducedBranchesInputHandler.AddAODReducedBranchesHandler()
+        # handler.SetInactiveBranches("*")
+        # handler.SetActiveBranches("header tracks vertices emcalCells MultSelection")
     else:
         ROOT.AliAnalysisTaskEmcal.AddESDHandler()
 
@@ -260,6 +268,7 @@ def run_dynamical_grooming(  # noqa: C901
     ################
     # Debug settings
     ################
+    # ROOT.AliLog.SetClassDebugLevel("PWG::EMCAL::AliAODReducedBranchesInputHandler", ROOT.AliLog.kDebug-1)
     # ROOT.AliLog.SetClassDebugLevel("AliEmcalCorrectionComponent", AliLog::kDebug+3)
     # ROOT.AliLog.SetClassDebugLevel("AliAnalysisTaskEmcalJetHCorrelations", AliLog::kDebug+1)
     # ROOT.AliLog.SetClassDebugLevel("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming", ROOT.AliLog.kDebug-1)
@@ -1225,7 +1234,7 @@ def run_embedding(
 
 
 if __name__ == "__main__":
-    analysis_mode = AnalysisMode.embedPythia
+    analysis_mode = AnalysisMode.PbPb
     if analysis_mode == AnalysisMode.PbPb:
         run(
             analysis_mode=analysis_mode,
@@ -1235,14 +1244,14 @@ if __name__ == "__main__":
             #       doesn't matter.
             physics_selection=ROOT.AliVEvent.kSemiCentral,
             input_files=[
-                Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/001/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/002/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/003/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/004/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/001/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/002/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/003/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/004/AliAOD.root"),
+                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/001/AliAOD.root"),
+                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/002/AliAOD.root"),
+                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/003/AliAOD.root"),
+                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/004/AliAOD.root"),
+                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/001/AliAOD.root"),
+                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/002/AliAOD.root"),
+                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/003/AliAOD.root"),
+                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/004/AliAOD.root"),
             ],
         )
     if analysis_mode == AnalysisMode.pp:
