@@ -213,7 +213,12 @@ def _add_mult_selection(is_run2_data: bool, physics_selection: int) -> Optional[
 
 
 def run_dynamical_grooming(  # noqa: C901
-    task_name: str, analysis_mode: AnalysisMode, period: str, physics_selection: int, data_type: DataType
+    task_name: str,
+    analysis_mode: AnalysisMode,
+    period: str,
+    physics_selection: int,
+    data_type: DataType,
+    enable_track_skim: bool = False,
 ) -> ROOT.AliAnalysisManager:
     """Run the event extractor.
 
@@ -223,6 +228,7 @@ def run_dynamical_grooming(  # noqa: C901
         period: Run period.
         physics_selection: Physics selection to apply to the analysis.
         data_type: ALICE data type over which the analysis will run.
+        add_track_skim: Enable track skimming classes.
 
     Returns:
         The analysis manager.
@@ -273,6 +279,114 @@ def run_dynamical_grooming(  # noqa: C901
     # ROOT.AliLog.SetClassDebugLevel("AliAnalysisTaskEmcalJetHCorrelations", AliLog::kDebug+1)
     # ROOT.AliLog.SetClassDebugLevel("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming", ROOT.AliLog.kDebug-1)
     # ROOT.AliLog.SetClassDebugLevel("AliJetContainer", AliLog::kDebug+7)
+
+    if enable_track_skim:
+        # PID eesponse is a dependency
+        pid_response = _run_add_task_macro(
+            "$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C",
+            "AliAnalysisTaskPIDResponse",
+            is_MC,
+        )
+        if is_MC:
+            # Disabled for testing, since the version of AliRoot doesn't yet contain this function.
+            # As along as everything is consistent, it should be fine, I think.
+            # pid_response.ResetTuneOnDataTOF()
+            ...
+        pid_response.SelectCollisionCandidates(physics_selection)
+
+        # And then the skimming task itself
+        # Apparently we have to explicitly call for the connection to AliEn...
+        ROOT.TGrid.Connect("alien://")
+        if analysis_mode == AnalysisMode.pp:
+            # From LEGO train wagon: TreeCreatorHF_Tracks_pp
+            skim_task = _run_add_task_macro(
+                "$ALICE_PHYSICS/PWGHF/treeHF/macros/AddTaskHFTreeCreator.C",
+                "AliAnalysisTaskSEHFTreeCreator",
+                False,
+                0,
+                "HFTreeCreator_pp",
+                "alien://///alice/cern.ch/user/l/lvermunt/cuts_tree_creator/25-03-2020/pp/D0DsDplusDstarLcBplusBsLbCuts_pp.root",
+                0,
+                False,
+                False,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                CppEnum("AliHFTreeHandler::kNsigmaPID"),
+                CppEnum("AliHFTreeHandler::kRedSingleTrackVars"),
+                True,
+            )
+            skim_task.SelectCollisionCandidates(physics_selection)
+            skim_task.AddTrackContainer("tracks")
+        elif analysis_mode == AnalysisMode.pythia:
+            # From LEGO train wagon: TreeCreatorHF_Tracks_pp_MC
+            skim_task = _run_add_task_macro(
+                "$ALICE_PHYSICS/PWGHF/treeHF/macros/AddTaskHFTreeCreator.C",
+                "AliAnalysisTaskSEHFTreeCreator",
+                True,
+                0,
+                "HFTreeCreator_pp_5TeV",
+                "alien://///alice/cern.ch/user/l/lvermunt/cuts_tree_creator/25-03-2020/pp/D0DsDplusDstarLcBplusBsLbCuts_pp.root",
+                0,
+                False,
+                True,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                CppEnum("AliHFTreeHandler::kNsigmaPID"),
+                CppEnum("AliHFTreeHandler::kRedSingleTrackVars"),
+                True,
+            )
+            skim_task.SelectCollisionCandidates(physics_selection)
+
+            skim_task.AddTrackContainer("tracks")
+
+            contMC = skim_task.AddMCParticleContainer("mcparticles")
+            status_acc = 1 << 16
+            contMC.SetMCFlag(ROOT.AliAODMCParticle.kPhysicalPrim | status_acc)
+            contMC.SetCharge(ROOT.AliParticleContainer.kCharged)
+        elif analysis_mode == AnalysisMode.PbPb:
+            # From LEGO train wagon: TreeCreatorHF_Tracks_5TeV_PbPb
+            skim_task = _run_add_task_macro(
+                "$ALICE_PHYSICS/PWGHF/treeHF/macros/AddTaskHFTreeCreator.C",
+                "AliAnalysisTaskSEHFTreeCreator",
+                False,
+                1,
+                "HFTreeCreator_PbPb_5TeV",
+                "alien://///alice/cern.ch/user/j/jmulliga/cutfile/20200428_D0DsDplusDstarLcBplusBsLbCuts_PbPb2018_Central.root",
+                0,
+                False,
+                False,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                CppEnum("AliHFTreeHandler::kNsigmaPID"),
+                CppEnum("AliHFTreeHandler::kRedSingleTrackVars"),
+                True,
+            )
+            skim_task.SelectCollisionCandidates(physics_selection)
+
+            skim_task.AddTrackContainer("tracks")
+        else:
+            raise ValueError("Skimming task config not available for analysis mode")
 
     # Shared jet finding settings
     ghost_area = 0.005
@@ -554,6 +668,8 @@ def run_dynamical_grooming(  # noqa: C901
     cont.SetJetPtCut(0)
 
     print(f"beam_type: {beam_type}")
+    # It only matters for embedding, but in any case, always disable double counting.
+    dynamical_grooming.SetCutDoubleCounts(False)
     if beam_type == BeamType.PbPb:
         dynamical_grooming.SetCentralitySelectionOn(True)
         dynamical_grooming.SetUseNewCentralityEstimation(True)
@@ -576,6 +692,140 @@ def run_dynamical_grooming(  # noqa: C901
         dynamical_grooming.SetIsPythia(True)
 
     dynamical_grooming.Initialize()
+
+    # Hardest kt cross check task
+    if analysis_mode == AnalysisMode.PbPb:
+        # task = _run_add_task_macro(
+        #    "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskJetHardestKt.C", "PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt",
+        #    "Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
+        #    "Jet_AKTChargedR040_tracks_pT0150_E_scheme", "", "", 0.4, "Rho",
+        #    "tracksSubR02", "tracks", "", "", "", "TPC", "V0M", physics_selection,
+        #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt::kData"),
+        #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt::kConstSub"),
+        #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt::kInclusive"),
+        #    0, 0, 0.6,
+        #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt::kSecondOrder"),
+        #    "Raw"
+        # )
+        hardest_kt = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.AddTaskJetHardestKt(
+            "Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
+            "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
+            "",
+            "",
+            0.4,
+            "Rho",
+            "tracksSubR02",
+            "tracks",
+            "",
+            "",
+            "",
+            "TPC",
+            "V0M",
+            physics_selection,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kData,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kConstSub,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kInclusive,
+            0,
+            0,
+            0.6,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kSecondOrder,
+            "Raw",
+        )
+    elif analysis_mode == AnalysisMode.pp:
+        # hardest_kt = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.AddTaskJetHardestKt(
+        #    "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
+        #    "", "", "", 0.4, "",
+        #    "tracks", "", "", "", "", "TPC", "V0M", physics_selection,
+        #    ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kData,
+        #    ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kNoSub,
+        #    ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kInclusive,
+        #    0, 0, 0.6,
+        #    ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kSecondOrder,
+        #    "Raw"
+        # )
+        hardest_kt = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.AddTaskJetHardestKt(
+            "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
+            "",
+            "",
+            "",
+            0.4,
+            "",
+            "tracks",
+            "",
+            "",
+            "",
+            "",
+            "TPC",
+            "V0M",
+            physics_selection,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kData,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kNoSub,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kInclusive,
+            0,
+            0,
+            0.6,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kSecondOrder,
+            "Raw",
+        )
+    elif analysis_mode == AnalysisMode.pythia:
+        hardest_kt = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.AddTaskJetHardestKt(
+            "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
+            "",
+            "Jet_AKTChargedR040_mcparticles_pT0000_E_scheme",
+            "",
+            0.4,
+            "tracks",
+            "",
+            "",
+            "mcparticles",
+            "",
+            "",
+            "TPC",
+            "V0M",
+            physics_selection,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kPythiaDef,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kNoSub,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kInclusive,
+        )
+    hardest_kt.SelectCollisionCandidates(physics_selection)
+    if analysis_mode in [AnalysisMode.pythia, AnalysisMode.embedPythia]:
+        hardest_kt.SetNumberOfPtHardBins(len(pt_hard_binning) - 1)
+        hardest_kt.SetUserPtHardBinning(pt_hard_binning_root)
+    cont = hardest_kt.GetJetContainer(0)
+    if beam_type == BeamType.PbPb:
+        cont.SetRhoName("Rho")
+        cont.SetRhoMassName("RhoMass")
+    cont.SetJetRadius(0.4)
+    cont.SetJetAcceptanceType(ROOT.AliJetContainer.kTPCfid)
+    cont.SetMaxTrackPt(100)
+    cont.SetJetPtCut(0)
+
+    print(f"beam_type: {beam_type}")
+    # It only matters for embedding, but in any case, always disable double counting.
+    hardest_kt.SetCutDoubleCounts(False)
+    if beam_type == BeamType.PbPb:
+        hardest_kt.SetCentralitySelectionOn(True)
+        hardest_kt.SetUseNewCentralityEstimation(True)
+        hardest_kt.SetMinCentrality(30)
+        hardest_kt.SetMaxCentrality(50)
+    else:
+        # Need to disable here because it's on by default!!
+        hardest_kt.SetCentralitySelectionOn(False)
+
+    hardest_kt.SetJetPtThreshold(20)
+    hardest_kt.SetNeedEmcalGeom(False)
+    # hardest_kt.SetZvertexDiffValue(0.1)
+
+    # hardest_kt.SetDoTwoTrack(kTRUE)
+    # The hard cutoff isn't meaningful when storing all splittings.
+    # hardest_kt.SetHardCutoff(0.1)
+
+    if is_MC:
+        hardest_kt.SetIsPythia(True)
+
+    # Finally, set the grooming method
+    hardest_kt.SetGroomingMethod(ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kDynamicalKt)
+    hardest_kt.Initialize()
 
     tasks = analysis_manager.GetTasks()
     for i in range(tasks.GetEntries()):
@@ -1015,8 +1265,8 @@ def run_dynamical_grooming_embedding(
     partLevelJetCont.SetMaxTrackPt(1000)
     dynamical_grooming.SetUseNewCentralityEstimation(True)
     dynamical_grooming.SetJetPtThreshold(20)
-    dynamical_grooming.SetCutDoubleCounts(True)
-    dynamical_grooming.SetCheckResolution(True)
+    dynamical_grooming.SetCutDoubleCounts(False)
+    dynamical_grooming.SetCheckResolution(False)
     dynamical_grooming.SelectCollisionCandidates(physics_selection)
     dynamical_grooming.SetNeedEmcalGeom(False)
     dynamical_grooming.SetMinCentrality(30)
@@ -1065,8 +1315,8 @@ def run_dynamical_grooming_embedding(
     partLevelJetCont.SetMaxTrackPt(1000)
     hardest_kt.SetUseNewCentralityEstimation(True)
     hardest_kt.SetJetPtThreshold(20)
-    hardest_kt.SetCutDoubleCounts(True)
-    hardest_kt.SetCheckResolution(True)
+    hardest_kt.SetCutDoubleCounts(False)
+    hardest_kt.SetCheckResolution(False)
     hardest_kt.SelectCollisionCandidates(physics_selection)
     hardest_kt.SetNeedEmcalGeom(False)
     hardest_kt.SetMinCentrality(30)
@@ -1118,7 +1368,7 @@ def run_dynamical_grooming_embedding(
     partLevelJetCont.SetMaxTrackPt(1000)
     ll_substructure.SetUseNewCentralityEstimation(True)
     ll_substructure.SetJetPtThreshold(20)
-    ll_substructure.SetCutDoubleCounts(True)
+    ll_substructure.SetCutDoubleCounts(False)
     ll_substructure.SetCheckResolution(True)
     ll_substructure.SelectCollisionCandidates(physics_selection)
     ll_substructure.SetNeedEmcalGeom(True)
@@ -1185,6 +1435,15 @@ def start_analysis_manager(
         for filename in input_files:
             chain.AddFile(str(filename))
 
+        friend_tree = ROOT.TChain("aodTree", "AliAOD.VertexingHF.root")
+        for filename in input_files:
+            # Add HF vertexing for skimming. Needs aod_archive.zip or root_archive.zip
+            temp_filename = Path(str(Path(filename)).replace("AliAOD.root", "AliAOD.VertexingHF.root"))
+            print(f"temp_filename: {temp_filename}")
+            friend_tree.AddFile(str(temp_filename))
+        # Add friends with scale factors
+        chain.AddFriend(friend_tree)
+
         # ROOT.AliLog.SetClassDebugLevel("AliAnalysisTaskEmcalEmbeddingHelper", ROOT.AliLog.kDebug+4)
         # ROOT.AliLog.SetClassDebugLevel("AliAnalysisTaskEmcal", 10)
         # ROOT.AliLog.SetClassDebugLevel("AliAnalysisTaskEmcal", ROOT.AliLog.kDebug+10)
@@ -1208,6 +1467,7 @@ def run(analysis_mode: AnalysisMode, period_name: str, physics_selection: int, i
         period=period,
         physics_selection=physics_selection,
         data_type=data_type,
+        enable_track_skim=True,
     )
 
     start_analysis_manager(analysis_manager=analysis_manager, mode="local", n_events=1000, input_files=input_files)
@@ -1244,14 +1504,22 @@ if __name__ == "__main__":
             #       doesn't matter.
             physics_selection=ROOT.AliVEvent.kSemiCentral,
             input_files=[
-                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/001/AliAOD.root"),
-                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/002/AliAOD.root"),
-                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/003/AliAOD.root"),
-                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/004/AliAOD.root"),
-                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/001/AliAOD.root"),
-                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/002/AliAOD.root"),
-                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/003/AliAOD.root"),
-                Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/004/AliAOD.root"),
+                Path(
+                    "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
+                ),
+                Path(
+                    "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
+                ),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/003/aod_archive.zip#AliAOD.root"),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/004/aod_archive.zip#AliAOD.root"),
+                Path(
+                    "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
+                ),
+                Path(
+                    "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
+                ),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass3/AOD252/AOD/003/aod_archive.zip#AliAOD.root"),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass3/AOD252/AOD/004/aod_archive.zip#AliAOD.root"),
             ],
         )
     if analysis_mode == AnalysisMode.pp:
@@ -1260,30 +1528,40 @@ if __name__ == "__main__":
             period_name="LHC17q",
             physics_selection=ROOT.AliVEvent.kAnyINT,
             input_files=[
-                Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/001/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/002/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/003/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/004/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/005/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/006/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/007/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD/008/AliAOD.root"),
+                Path(
+                    "/opt/scott/data/rehlers/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD234/0001/root_archive.zip#AliAOD.root"
+                ),
+                Path(
+                    "/opt/scott/data/rehlers/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD234/0002/root_archive.zip#AliAOD.root"
+                ),
+                Path(
+                    "/opt/scott/data/rehlers/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD234/0003/root_archive.zip#AliAOD.root"
+                ),
             ],
         )
     if analysis_mode == AnalysisMode.pythia:
         run(
             analysis_mode=analysis_mode,
-            period_name="LHC16j5",
+            period_name="LHC20g4",
             physics_selection=0,
             input_files=[
-                Path("/opt/scott/data/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0003/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0002/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0001/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2016/LHC16j5/5/246945/AOD200/0003/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2016/LHC16j5/5/246945/AOD200/0005/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2016/LHC16j5/5/246945/AOD200/0002/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2016/LHC16j5/5/246945/AOD200/0001/AliAOD.root"),
-                Path("/opt/scott/data/alice/datasets/data/2016/LHC16j5/5/246945/AOD200/0006/AliAOD.root"),
+                Path(
+                    "/opt/scott/data/rehlers/alice/datasets/sim/2020/LHC20g4/12/296191/AOD/001/aod_archive.zip#AliAOD.root"
+                ),
+                Path(
+                    "/opt/scott/data/rehlers/alice/datasets/sim/2020/LHC20g4/12/296191/AOD/002/aod_archive.zip#AliAOD.root"
+                ),
+                Path(
+                    "/opt/scott/data/rehlers/alice/datasets/sim/2020/LHC20g4/12/296191/AOD/003/aod_archive.zip#AliAOD.root"
+                ),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0003/AliAOD.root"),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0002/AliAOD.root"),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0001/AliAOD.root"),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/5/246945/AOD200/0003/AliAOD.root"),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/5/246945/AOD200/0005/AliAOD.root"),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/5/246945/AOD200/0002/AliAOD.root"),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/5/246945/AOD200/0001/AliAOD.root"),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/5/246945/AOD200/0006/AliAOD.root"),
                 # Path("/Users/re239/code/alice/data/LHC16j5/4/246945/AOD200/0003/AliAOD.root"),
                 # Path("/Users/re239/code/alice/data/LHC16j5/4/246945/AOD200/0002/AliAOD.root"),
                 # Path("/Users/re239/code/alice/data/LHC16j5/4/246945/AOD200/0001/AliAOD.root"),
@@ -1304,17 +1582,17 @@ if __name__ == "__main__":
             #       doesn't matter.
             physics_selection=ROOT.AliVEvent.kSemiCentral,
             input_files=[
-                Path("/Volumes/Elements/alice/data/data/2018/LHC18q/000296550/pass1/AOD/001/AliAOD.root"),
-                Path("/Volumes/Elements/alice/data/data/2018/LHC18q/000296550/pass1/AOD/002/AliAOD.root"),
-                Path("/Volumes/Elements/alice/data/data/2018/LHC18q/000296550/pass1/AOD/003/AliAOD.root"),
-                Path("/Volumes/Elements/alice/data/data/2018/LHC18q/000296550/pass1/AOD/004/AliAOD.root"),
-                # Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/001/AliAOD.root"),
-                # Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/002/AliAOD.root"),
-                # Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/003/AliAOD.root"),
-                # Path("/opt/scott/data/alice/datasets/data/2018/LHC18q/000296550/pass1/AOD/004/AliAOD.root"),
-                # Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/001/AliAOD.root"),
-                # Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/002/AliAOD.root"),
-                # Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/003/AliAOD.root"),
-                # Path("/opt/scott/data/alice/datasets/data/2018/LHC18r/000297595/pass1/AOD/004/AliAOD.root"),
+                Path(
+                    "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
+                ),
+                Path(
+                    "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
+                ),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/003/aod_archive.zip#AliAOD.root"),
+                # Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/004/aod_archive.zip#AliAOD.root"),
+                # Path("/Volumes/Elements/alice/data/data/2018/LHC18q/000296550/pass1/AOD/001/AliAOD.root"),
+                # Path("/Volumes/Elements/alice/data/data/2018/LHC18q/000296550/pass1/AOD/002/AliAOD.root"),
+                # Path("/Volumes/Elements/alice/data/data/2018/LHC18q/000296550/pass1/AOD/003/AliAOD.root"),
+                # Path("/Volumes/Elements/alice/data/data/2018/LHC18q/000296550/pass1/AOD/004/AliAOD.root"),
             ],
         )
