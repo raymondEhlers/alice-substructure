@@ -27,6 +27,7 @@ attrs = "^21.2.0"
 matplotlib = "^3.4.2"
 boost-histogram = "^1.0.2"
 pachyderm = {path = "external/pachyderm", develop = true}
+mammoth = {path = "external/mammoth", develop = true}
 h5py = "^3.1"
 coloredlogs = "^15.0.1"
 dask = {version = "^2021.1.0", extras = ["dataframe"]}
