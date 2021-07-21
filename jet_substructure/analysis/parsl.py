@@ -1523,7 +1523,8 @@ def setup_root_data_frame(
     # Determine the broad smeared jet pt range. We basically want this to cover our
     # entire range of interest. Since this will usually correspond with our unfolding
     # nominal smeared jet pt binning, we just advantage of those values.
-    _nominal_smeared_jet_pt_bins = base_unfolding_config["nominal_binning"]["smeared_jet_pt"]
+    # NOTE: We're okay using the default here because the smeared jet pt bins won't vary
+    _nominal_smeared_jet_pt_bins = base_unfolding_config["nominal_binning"]["default"]["smeared_jet_pt"]
     main_jet_pt_range = helpers.JetPtRange(_nominal_smeared_jet_pt_bins[0], _nominal_smeared_jet_pt_bins[-1])
 
     # Setup optional args
