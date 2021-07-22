@@ -22,6 +22,7 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import uproot
+import vector
 
 from jet_substructure.base.helpers import ArrayOrScalar, UprootArray
 
@@ -162,7 +163,7 @@ class JetConstituentCommon:
     ID: ArrayOrScalar[int]
 
     def delta_R(self: _T_JetConstituent, other: _T_JetConstituent) -> ArrayOrScalar[float]:
-        """ Separation between jet constituents. """
+        """Separation between jet constituents."""
         return cast(ArrayOrScalar[float], np.sqrt((self.phi - other.phi) ** 2 + (self.eta - other.eta) ** 2))  # type: ignore
 
 
@@ -182,8 +183,7 @@ class JetConstituent(ak.Record, JetConstituentCommon):  # type: ignore
     id: int
 
     def four_vector(self, mass_hypothesis: float = 0.139) -> None:
-        # return uproot_methods.TLorentzVector(self.pt, self.eta, self.phi, mass_hypothesis,)
-        raise NotImplementedError("Vector isn't ready yet. You'll have to do the operations by hand...")
+        return vector.obj(pt=self.pt, eta=self.eta, phi=self.phi, m=mass_hypothesis)
 
 
 class JetConstituentArray(ak.Array, JetConstituentCommon):  # type: ignore
@@ -203,13 +203,11 @@ class JetConstituentArray(ak.Array, JetConstituentCommon):  # type: ignore
 
     @property
     def max_pt(self) -> ArrayOrScalar[float]:
-        """ Maximum pt of the stored constituent. """
+        """Maximum pt of the stored constituent."""
         return cast(ArrayOrScalar[float], ak.max(self.pt, axis=-1))
 
-    def four_vectors(self, mass_hypothesis: float = 0.139) -> None:
-        # mass_hypothesis_array = self.pt * 0 + mass_hypothesis
-        # return uproot_methods.TLorentzVectorArray.from_ptetaphim(self.pt, self.eta, self.phi, mass_hypothesis_array,)
-        raise NotImplementedError("Vector isn't ready yet. You'll have to do the operations by hand...")
+    def four_vectors(self, mass_hypothesis: float = 0.139) -> ak.Array:
+        return vector.Array(pt=self.pt, eta=self.eta, phi=self.phi, m=self.pt * 0 + mass_hypothesis)
 
 
 # Register behavior
@@ -218,7 +216,7 @@ ak.behavior["*", "JetConstituent"] = JetConstituentArray
 
 
 class SubjetCommon:
-    """ Common subjet related methods. """
+    """Common subjet related methods."""
 
     part_of_iterative_splitting: ArrayOrScalar[bool]
     parent_splitting_index: ArrayOrScalar[int]
@@ -244,7 +242,7 @@ class SubjetCommon:
 
 
 class Subjet(ak.Record, SubjetCommon):  # type: ignore
-    """ Single subjet. """
+    """Single subjet."""
 
     part_of_iterative_splitting: bool
     parent_splitting_index: int
@@ -252,7 +250,7 @@ class Subjet(ak.Record, SubjetCommon):  # type: ignore
 
 
 class SubjetArray(ak.Array, SubjetCommon):  # type: ignore
-    """ Array of subjets. """
+    """Array of subjets."""
 
     part_of_iterative_splitting: UprootArray[bool]
     parent_splitting_index: UprootArray[int]
@@ -260,7 +258,7 @@ class SubjetArray(ak.Array, SubjetCommon):  # type: ignore
 
     @property
     def iterative_splitting_index(self) -> UprootArray[int]:
-        """ Indices of splittings which were part of the iterative splitting chain. """
+        """Indices of splittings which were part of the iterative splitting chain."""
         return self.parent_splitting_index[self.part_of_iterative_splitting]
 
 
@@ -270,7 +268,7 @@ ak.behavior["*", "Subjet"] = SubjetArray
 
 
 class JetSplittingCommon:
-    """ Common jet splitting related methods. """
+    """Common jet splitting related methods."""
 
     kt: ArrayOrScalar[float]
     delta_R: ArrayOrScalar[float]
@@ -307,7 +305,7 @@ class JetSplittingCommon:
 
 
 class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
-    """ Single jet splitting. """
+    """Single jet splitting."""
 
     kt: float
     delta_R: float
@@ -380,7 +378,7 @@ class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
 
 
 class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
-    """ Array of jet splittings. """
+    """Array of jet splittings."""
 
     kt: UprootArray[float]
     delta_R: UprootArray[float]
