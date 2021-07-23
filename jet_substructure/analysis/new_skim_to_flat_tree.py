@@ -62,13 +62,13 @@ class Calculation:
 
     @property
     def n_jets(self) -> int:
-        """ Number of jets. """
+        """Number of jets."""
         # We flatten the splittings because there may be jets (and consequently splittings) which aren't selected
         # at all due to the grooming (such as a z cut). Thus, we use the selected splittings directly.
         return len(self.splittings.flatten())
 
     def __getitem__(self, mask: np.ndarray) -> Calculation:
-        """ Mask the stored values, returning a new object. """
+        """Mask the stored values, returning a new object."""
         # Validation
         if len(self.input_jets) != len(mask):
             raise ValueError(
@@ -934,7 +934,8 @@ def calculate_embedding_skim(  # noqa: C901
     return True, output_filename, "processed"
 
 
-def calculate_data_skim(  # noqa: C901
+def calculate_data_skim_impl(  # noqa: C901
+    all_jets: ak.Array,
     input_filename: Path,
     collision_system: str,
     iterative_splittings: bool,
@@ -947,21 +948,10 @@ def calculate_data_skim(  # noqa: C901
     write_feather: bool = False,
     write_parquet: bool = False,
 ) -> Tuple[bool, Path, str]:
-    # Validation
-    if scale_factors is None and collision_system == "pythia":
-        raise ValueError("Need scale factors for pythia to be provided externally.")
-    # Bail out early if the file already exists.
-    if output_filename.exists():
-        return True, output_filename, "already exists"
-
     # Setup
     # Output consistent types.
     float_type = np.float32
     to_float = functools.partial(ak.values_astype, to=np.float32)
-    # Jets setup
-    logger.info(f"Skimming tree from file {input_filename}")
-    # Careful, this can return general columns, not just jets in prefixes (for example, the pt_hard in pythia)
-    all_jets = new_methods.parquet_to_substructure_analysis(filename=input_filename, prefixes=prefixes)
 
     # Dataset wide masks
     # Select everything by default. We know that there must be at least one set of jets, so we're safe to select on 0.
@@ -969,7 +959,7 @@ def calculate_data_skim(  # noqa: C901
     # Special selections for pythia.
     # Apparently I can get pt hard < 5. Which is bizarre, at least according to the binning...
     # Filter these out when applicable.
-    if collision_system == "pythia":
+    if collision_system == "pythia" and "pt_hard" in all_jets:
         # The jets object will contain the pt hard bin if it's available.
         mask = mask & (all_jets["pt_hard"] >= 5.0)
 
@@ -1006,10 +996,10 @@ def calculate_data_skim(  # noqa: C901
             leading_track_name = f"{prefix}_leading_track_pt"
             # NOTE: We would include embedPythia here, but we don't run the embedding through this function, so we can ignore it.
             if prefix == "data" and collision_system == "PbPb":
-                # First, store the unsubstracted (which we use for the double counting cut).
+                # First, store the unsubtracted (which we use for the double counting cut).
                 if "leading_track_pt" in ak.fields(input_jets.jets):
                     grooming_results[leading_track_name] = to_float(input_jets.jets["leading_track_pt"])
-                # Then update the name for the substracted constituents in data.
+                # Then update the name for the subtracted constituents in data.
                 leading_track_name = f"{prefix}_leading_track_pt_sub"
             grooming_results[leading_track_name] = to_float(ak.max(input_jets.jets.jet_constituents.pt, axis=1))
 
@@ -1080,13 +1070,14 @@ def calculate_data_skim(  # noqa: C901
             # Need to mask because we didn't when masking the original jets.
             pt_hard_bins = np.array(all_jets["pt_hard_bin"][mask], dtype=np.int16)
             logger.debug(f"Pt hard bins contained in the file: {np.unique(pt_hard_bins)}")
-            grooming_results.update(
-                {
-                    "scale_factor": np.array([output_scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
-                    "pt_hard_bin": pt_hard_bins,
-                    "pt_hard": to_float(all_jets["pt_hard"][mask]),
-                }
-            )
+            pythia_specific_columns = {
+                "scale_factor": np.array([output_scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
+                "pt_hard_bin": pt_hard_bins,
+            }
+            # The track skim doesn't have this info available, so we might have to skip it.
+            if "pt_hard" in all_jets:
+                pythia_specific_columns["pt_hard"] = to_float(all_jets["pt_hard"][mask])
+            grooming_results.update(pythia_specific_columns)
 
     # For extra safety
     output_filename.parent.mkdir(parents=True, exist_ok=True)
@@ -1113,6 +1104,47 @@ def calculate_data_skim(  # noqa: C901
 
     logger.info(f"Finished processing tree from file {input_filename}")
     return True, output_filename, "processed"
+
+
+def calculate_data_skim(  # noqa: C901
+    input_filename: Path,
+    collision_system: str,
+    iterative_splittings: bool,
+    prefixes: Mapping[str, str],
+    jet_R: float,
+    output_filename: Path,
+    output_tree_name: str = "tree",
+    create_friend_tree: bool = False,
+    scale_factors: Optional[Mapping[int, float]] = None,
+    write_feather: bool = False,
+    write_parquet: bool = False,
+) -> Tuple[bool, Path, str]:
+    # Validation
+    if scale_factors is None and collision_system == "pythia":
+        raise ValueError("Need scale factors for pythia to be provided externally.")
+    # Bail out early if the file already exists.
+    if output_filename.exists():
+        return True, output_filename, "already exists"
+
+    # Jets setup
+    logger.info(f"Skimming tree from file {input_filename}")
+    # Careful, this can return general columns, not just jets in prefixes (for example, the pt_hard in pythia)
+    all_jets = new_methods.parquet_to_substructure_analysis(filename=input_filename, prefixes=prefixes)
+
+    return calculate_data_skim_impl(
+        all_jets=all_jets,
+        input_filename=input_filename,
+        collision_system=collision_system,
+        iterative_splittings=iterative_splittings,
+        prefixes=prefixes,
+        jet_R=jet_R,
+        output_filename=output_filename,
+        output_tree_name=output_tree_name,
+        create_friend_tree=create_friend_tree,
+        scale_factors=scale_factors,
+        write_feather=write_feather,
+        write_parquet=write_parquet,
+    )
 
 
 def cross_check_task_names_to_export(
