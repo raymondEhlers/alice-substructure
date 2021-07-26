@@ -176,6 +176,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 )
 
             # Next, the model comparison
+            _temp_i = 0
             for model_name, model_with_all_grooming_methods in models.items():
                 model = model_with_all_grooming_methods.get(grooming_method, None)
                 if not model:
@@ -188,6 +189,20 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 model_style = grooming_styling[f"{grooming_method}_compare"]
                 # Get the model hist
                 model = binned_data.BinnedData.from_existing_data(model)
+                # TEMP: Try to undo normalization, then normalize
+                if "sherpa" in model_name:
+                    model *= model.axes[0].bin_widths
+                    logger.warning(f"normalization for sherpa: {np.sum(model.values)}")
+
+                    # Normalize over the kt range for plotting.
+                    _temp_range = kt_ranges_for_models[model_name]
+                    model_for_normalization = unfolding_base.select_hist_range(model, _temp_range)
+                    _normalization_value = np.sum(model_for_normalization.values)
+                    logger.warning(f"Restricted range normalization value: {_normalization_value}")
+                    #model /= _normalization_value
+                    #model /= model.axes[0].bin_widths
+                # ENDTEMP
+
                 # Then normalize as appropriate
                 # TODO: Careful, pythia is already normalized, but jetscape wasn't. So we only want to normalize in some cases
                 if model_name in models_to_normalize:
@@ -221,11 +236,14 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                     temp_kwargs["label"] if grooming_method == name_of_grooming_method_to_draw_models else None
                 )
                 ax.errorbar(
-                    model_kt_range_selected.axes[0].bin_centers,
+                    model_kt_range_selected.axes[0].bin_centers + (0.1 * _temp_i),
                     model_kt_range_selected.values,
-                    # yerr=model.errors,
+                    # TODO: TEMP, show errors
+                    yerr=model_kt_range_selected.errors,
+                    # ENDTEMP
                     # xerr=model.axes[0].bin_widths / 2,
-                    color=grooming_styling[grooming_method].color,
+                    #color=grooming_styling[grooming_method].color,
+                    color=p[0].get_color(),
                     # marker=style.marker,
                     # fillstyle=grooming_styling[grooming_method].fillstyle,
                     # linestyle="",
@@ -234,6 +252,8 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                     alpha=0.7,
                     **temp_kwargs,
                 )
+
+                _temp_i += 1
 
                 model_for_ratio = unfolding_base.select_hist_range(
                     model,
