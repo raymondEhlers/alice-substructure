@@ -457,9 +457,10 @@ def _load_analytical_calculations(filename: Path, bin_edges: np.ndarray) -> binn
         variances=np.zeros(len(central_values)),
     )
     h.metadata["y_systematic"] = {
+        # The asymmetric errors are expected to be differences
         "quadrature": unfolding_base.AsymmetricErrors(
-            low=lower_bounds,
-            high=upper_bounds,
+            low=central_values-lower_bounds,
+            high=upper_bounds-central_values,
         )
     }
     return h
