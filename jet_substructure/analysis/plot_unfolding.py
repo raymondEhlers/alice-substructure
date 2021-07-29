@@ -558,21 +558,23 @@ def load_sherpa_predictions(
     return output
 
 
+#_model_palette = sns.color_palette("husl", n_colors=6)
+_model_palette = sns.color_palette("Set2", n_colors=6)
+
 _models_styles = {
-    "jetscape": dict(
-        label="JETSCAPE PP19",
-        linewidth=3,
-        linestyle="--",
-    ),
     "pythia": dict(
         label="PYTHIA8 Monash 2013",
         linewidth=3,
         linestyle="-",
+        marker="s",
+        color=_model_palette[0],
     ),
     "analytical": dict(
         label="Caucal et al.",
         linewidth=3,
         linestyle="-.",
+        marker="P",
+        color=_model_palette[1],
     ),
     "sherpa_lund": dict(
         label="SHERPA (Lund)",
@@ -580,11 +582,22 @@ _models_styles = {
         #       To be resolved when the plotting plans are a bit clearer.
         linewidth=3,
         linestyle="--",
+        marker="*",
+        color=_model_palette[2],
     ),
     "sherpa_ahadic": dict(
         label="SHERPA (AHADIC)",
         linewidth=3,
         linestyle=":",
+        marker="X",
+        color=_model_palette[3],
+    ),
+    "jetscape": dict(
+        label="JETSCAPE PP19",
+        linewidth=3,
+        linestyle="--",
+        marker="D",
+        color=_model_palette[4],
     ),
 }
 
