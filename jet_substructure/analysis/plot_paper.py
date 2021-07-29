@@ -53,18 +53,18 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
         # Size is specified to make it convenient to compare against Hard Probes plots.
-        fig, (ax, ax_ratio_data, ax_ratio_models) = plt.subplots(
-            3,
+        fig, (ax, ax_ratio_data, *ax_grooming_methods) = plt.subplots(
+            1 + 1 + len(grooming_methods),
             1,
-            figsize=(9, 12),
-            gridspec_kw={"height_ratios": [4, 1, 1]},
+            figsize=(9, 14),
+            gridspec_kw={"height_ratios": [4, 1] + [1] * len(grooming_methods)},
             sharex=True,
         )
 
         # Use selected grooming method as a reference, but only in the range where the others are measured.
         ratio_reference_hist_unselected = hists[reference_grooming_method].data
 
-        for grooming_method in grooming_methods:
+        for i_grooming_method, grooming_method in enumerate(grooming_methods):
             # plotting_last_method = grooming_method == grooming_methods[-1]
 
             # Axes: jet_pt, attr_name
@@ -176,8 +176,9 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 )
 
             # Next, the model comparison
-            _temp_i = 0
-            for model_name, model_with_all_grooming_methods in models.items():
+            ax_ratio_models = ax_grooming_methods[i_grooming_method]
+            #_temp_i = 0
+            for i_model, (model_name, model_with_all_grooming_methods) in enumerate(models.items()):
                 model = model_with_all_grooming_methods.get(grooming_method, None)
                 if not model:
                     logger.debug(
@@ -231,29 +232,30 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
 
                 # And plot
                 # Make sure we copy the settings so we can modify them
-                temp_kwargs = dict(plot_unfolding._models_styles[model_name])
-                temp_kwargs["label"] = (
-                    temp_kwargs["label"] if grooming_method == name_of_grooming_method_to_draw_models else None
-                )
-                ax.errorbar(
-                    model_kt_range_selected.axes[0].bin_centers + (0.1 * _temp_i),
-                    model_kt_range_selected.values,
-                    # TODO: TEMP, show errors
-                    yerr=model_kt_range_selected.errors,
-                    # ENDTEMP
-                    # xerr=model.axes[0].bin_widths / 2,
-                    #color=grooming_styling[grooming_method].color,
-                    color=p[0].get_color(),
-                    # marker=style.marker,
-                    # fillstyle=grooming_styling[grooming_method].fillstyle,
-                    # linestyle="",
-                    # label=_models_styles[model_name]["label"] if plotting_last_method else None,
-                    zorder=model_style.zorder,
-                    alpha=0.7,
-                    **temp_kwargs,
-                )
+                # temp_kwargs = dict(plot_unfolding._models_styles[model_name])
+                # temp_kwargs["label"] = (
+                #     temp_kwargs["label"] if grooming_method == name_of_grooming_method_to_draw_models else None
+                # )
+                # For now, skip the models on the main plot so that it doesn't get too busy
+                # ax.errorbar(
+                #     model_kt_range_selected.axes[0].bin_centers + (0.1 * _temp_i),
+                #     model_kt_range_selected.values,
+                #     # TODO: TEMP, show errors
+                #     yerr=model_kt_range_selected.errors,
+                #     # ENDTEMP
+                #     # xerr=model.axes[0].bin_widths / 2,
+                #     #color=grooming_styling[grooming_method].color,
+                #     color=p[0].get_color(),
+                #     # marker=style.marker,
+                #     # fillstyle=grooming_styling[grooming_method].fillstyle,
+                #     # linestyle="",
+                #     # label=_models_styles[model_name]["label"] if plotting_last_method else None,
+                #     zorder=model_style.zorder,
+                #     alpha=0.7,
+                #     **temp_kwargs,
+                # )
 
-                _temp_i += 1
+                # _temp_i += 1
 
                 model_for_ratio = unfolding_base.select_hist_range(
                     model,
@@ -268,18 +270,24 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 ratio = model_for_ratio / h_for_model_ratio
 
                 # Ratio + statistical error bars
+                temp_kwargs = dict(plot_unfolding._models_styles[model_name])
+                temp_kwargs["label"] = (
+                    temp_kwargs["label"] if grooming_method == name_of_grooming_method_to_draw_models else None
+                )
                 ax_ratio_models.errorbar(
                     ratio.axes[0].bin_centers,
                     ratio.values,
                     yerr=ratio.errors,
-                    xerr=ratio.axes[0].bin_widths / 2,
+                    #xerr=ratio.axes[0].bin_widths / 2,
                     color=p[0].get_color(),
-                    marker="o",
-                    markersize=11,
-                    linestyle="",
-                    linewidth=3,
+                    #marker="o",
+                    #markersize=11,
+                    #linestyle="",
+                    #linewidth=3,
+                    **temp_kwargs,
                 )
                 # Systematic errors.
+                # We'll plot the data systematics at 1.
                 y_relative_error_low = unfolding_base.relative_error(
                     unfolding_base.ErrorInput(
                         value=h_for_model_ratio.values,
@@ -293,28 +301,40 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                     ),
                 )
                 # From error prop, pythia has no systematic error, so we just convert the relative errors.
-                ratio.metadata["y_systematic"] = {}
-                ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
-                    low=y_relative_error_low * ratio.values,
-                    high=y_relative_error_high * ratio.values,
-                )
-                y_systematic = ratio.metadata["y_systematic"]["quadrature"]
-                pachyderm.plot.error_boxes(
-                    ax=ax_ratio_models,
-                    x_data=ratio.axes[0].bin_centers,
-                    y_data=ratio.values,
-                    x_errors=ratio.axes[0].bin_widths / 2,
-                    y_errors=np.array([y_systematic.low, y_systematic.high]),
-                    color=p[0].get_color(),
-                    linewidth=0,
-                )
+                #ratio.metadata["y_systematic"] = {}
+                #ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
+                #    low=y_relative_error_low * ratio.values,
+                #    high=y_relative_error_high * ratio.values,
+                #)
+                #y_systematic = ratio.metadata["y_systematic"]["quadrature"]
+                if i_model == 0:
+                    pachyderm.plot.error_boxes(
+                        ax=ax_ratio_models,
+                        x_data=ratio.axes[0].bin_centers,
+                        y_data=np.ones_like(ratio.values),
+                        x_errors=ratio.axes[0].bin_widths / 2,
+                        #y_errors=np.array(
+                        #    [y_systematic.low, y_systematic.high]
+                        #),
+                        #color=p[0].get_color(),
+                        # NOTE: This will implicitly be relative to 1.
+                        y_errors=np.array(
+                            [y_relative_error_low, y_relative_error_high]
+                        ),
+                        color="grey",
+                        linewidth=0,
+                    )
+
+                # TODO: If the model has systematic errors, then plot them here next.
+
+            # Add a line at 1 for reference.
+            ax_ratio_models.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
     # reference value for data and model ratios
     ax_ratio_data.axhline(y=1, color="black", linestyle="dashed", zorder=1)
-    ax_ratio_models.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
     # Labeling and presentation
-    plot_config.apply(fig=fig, axes=[ax, ax_ratio_data, ax_ratio_models])
+    plot_config.apply(fig=fig, axes=[ax, ax_ratio_data, *ax_grooming_methods])
     # A few additional tweaks.
     ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
 
@@ -345,6 +365,54 @@ def plot_pp_grooming_comparison_with_models(
 
     grooming_styling = pb.define_grooming_styles()
     jet_pt_bin = next(iter(hists.values())).ranges[0]
+
+    # Grooming method panels
+    grooming_method_panels = [
+        pb.Panel(
+            axes=[
+                #pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
+                pb.AxisConfig(
+                    "y",
+                    label=r"$\frac{\text{Model}}{\text{DyG}\;a=0.5}$",
+                    range=(0.05, 1.95),
+                    font_size=22,
+                ),
+            ],
+        ),
+        pb.Panel(
+            axes=[
+                #pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
+                pb.AxisConfig(
+                    "y",
+                    label=r"$\frac{\text{Model}}{\text{DyG}\;a=1}$",
+                    range=(0.05, 1.95),
+                    font_size=22,
+                ),
+            ],
+        ),
+        pb.Panel(
+            axes=[
+                #pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
+                pb.AxisConfig(
+                    "y",
+                    label=r"$\frac{\text{Model}}{\text{DyG}\;a=2}$",
+                    range=(0.05, 1.95),
+                    font_size=22,
+                ),
+            ],
+        ),
+        pb.Panel(
+            axes=[
+                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
+                pb.AxisConfig(
+                    "y",
+                    label=r"$\frac{\text{Model}}{\text{SD}\;z>0.2}$",
+                    range=(0.05, 1.95),
+                    font_size=22,
+                ),
+            ],
+        ),
+    ]
 
     text = pb.label_to_display_string["ALICE"]["work_in_progress"]
     text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
@@ -385,23 +453,13 @@ def plot_pp_grooming_comparison_with_models(
                             label=r"$\frac{\text{Method}}{\text{"
                             + grooming_styling[reference_grooming_method].label
                             + "}}$",
-                            range=(0.45, 1.55),
+                            range=(0.3, 1.7),
                             font_size=22,
                         ),
                     ],
                 ),
-                # Model ratio
-                pb.Panel(
-                    axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
-                        pb.AxisConfig(
-                            "y",
-                            label=r"$\frac{\text{Model}}{\text{Data}}$",
-                            range=(0.45, 1.55),
-                            font_size=22,
-                        ),
-                    ],
-                ),
+                # Grooming method specific panels
+                *grooming_method_panels
             ],
             figure=pb.Figure(edge_padding=dict(left=0.13, bottom=0.08)),
         ),
