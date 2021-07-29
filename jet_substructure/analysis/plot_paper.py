@@ -41,13 +41,12 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
     name_of_grooming_method_to_draw_models = ""
     for grooming_method in grooming_methods:
         res = [grooming_method in model_predictions for model_predictions in models.values()]
-        print(f"grooming_method: {grooming_method}, res: {res}")
         all_models_contain_grooming_method = all(
             [grooming_method in model_predictions for model_predictions in models.values()]
         )
         if all_models_contain_grooming_method:
-            print("Setting...")
             name_of_grooming_method_to_draw_models = grooming_method
+            break
     logger.info(f"name of name_of_grooming_method_to_draw_models: {name_of_grooming_method_to_draw_models}")
 
     with sns.color_palette("Set2"):
@@ -97,7 +96,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 x_data=h.axes[0].bin_centers,
                 y_data=h.values,
                 x_errors=h.axes[0].bin_widths / 2,
-                y_errors=np.array(
+                y_errors=np.stack(
                     [
                         h.metadata["y_systematic"]["quadrature"].low,
                         h.metadata["y_systematic"]["quadrature"].high,
@@ -127,11 +126,11 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                     ratio_reference_hist_unselected,
                     kt_range_for_comparison,
                 )
-                h = unfolding_base.select_hist_range(
+                h_for_ratio = unfolding_base.select_hist_range(
                     h_input,
                     kt_range_for_comparison,
                 )
-                ratio = h / ratio_reference_hist
+                ratio = h_for_ratio / ratio_reference_hist
                 # Ratio + statistical error bars
                 ax_ratio_data.errorbar(
                     ratio.axes[0].bin_centers,
@@ -146,14 +145,14 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 )
                 # Systematic errors.
                 y_relative_error_low = unfolding_base.relative_error(
-                    unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
+                    unfolding_base.ErrorInput(value=h_for_ratio.values, error=h_for_ratio.metadata["y_systematic"]["quadrature"].low),
                     unfolding_base.ErrorInput(
                         value=ratio_reference_hist.values,
                         error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].low,
                     ),
                 )
                 y_relative_error_high = unfolding_base.relative_error(
-                    unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
+                    unfolding_base.ErrorInput(value=h_for_ratio.values, error=h_for_ratio.metadata["y_systematic"]["quadrature"].high),
                     unfolding_base.ErrorInput(
                         value=ratio_reference_hist.values,
                         error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].high,
@@ -170,13 +169,44 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                     x_data=ratio.axes[0].bin_centers,
                     y_data=ratio.values,
                     x_errors=ratio.axes[0].bin_widths / 2,
-                    y_errors=np.array([y_systematic.low, y_systematic.high]),
+                    y_errors=np.stack([y_systematic.low, y_systematic.high]),
                     color=p[0].get_color(),
                     linewidth=0,
                 )
 
             # Next, the model comparison
             ax_ratio_models = ax_grooming_methods[i_grooming_method]
+
+            # Add a line at 1 for reference.
+            ax_ratio_models.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+
+            # First, plot the data systematics at 1. We only want to do this once.
+            # To do so, we need the relative systematic errors.
+            y_relative_error_low = unfolding_base.relative_error(
+                unfolding_base.ErrorInput(
+                    value=h.values,
+                    error=h.metadata["y_systematic"]["quadrature"].low,
+                ),
+            )
+            y_relative_error_high = unfolding_base.relative_error(
+                unfolding_base.ErrorInput(
+                    value=h.values,
+                    error=h.metadata["y_systematic"]["quadrature"].high,
+                ),
+            )
+            pachyderm.plot.error_boxes(
+                ax=ax_ratio_models,
+                x_data=h.axes[0].bin_centers,
+                y_data=np.ones_like(h.values),
+                x_errors=h.axes[0].bin_widths / 2,
+                # NOTE: This will implicitly be relative to 1.
+                y_errors=np.stack(
+                    [y_relative_error_low, y_relative_error_high]
+                ),
+                color="grey",
+                linewidth=0,
+            )
+
             #_temp_i = 0
             for i_model, (model_name, model_with_all_grooming_methods) in enumerate(models.items()):
                 model = model_with_all_grooming_methods.get(grooming_method, None)
@@ -228,8 +258,6 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 # And select the same range.
                 model_kt_range_selected = unfolding_base.select_hist_range(model, kt_range_for_model)
 
-                # NOTE: For analytical, we need to plot a fill_between to account for the systematics...
-
                 # And plot
                 # Make sure we copy the settings so we can modify them
                 # temp_kwargs = dict(plot_unfolding._models_styles[model_name])
@@ -272,63 +300,61 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 # Ratio + statistical error bars
                 temp_kwargs = dict(plot_unfolding._models_styles[model_name])
                 temp_kwargs["label"] = (
-                    temp_kwargs["label"] if grooming_method == name_of_grooming_method_to_draw_models else None
+                    #temp_kwargs["label"] if grooming_method == name_of_grooming_method_to_draw_models else None
+                    # TODO: Generalize if this looks okay...
+                    #temp_kwargs["label"] if (model_name in ["pythia", "sherpa_ahadic", "sherpa_lund"] and grooming_method == "dynamical_core") or (model_name in ["analytical", "jetscape"] and grooming_method == "dynamical_kt") else None
+                    temp_kwargs["label"] if (model_name == list(models)[i_grooming_method]) else None
                 )
                 ax_ratio_models.errorbar(
                     ratio.axes[0].bin_centers,
                     ratio.values,
                     yerr=ratio.errors,
                     #xerr=ratio.axes[0].bin_widths / 2,
-                    color=p[0].get_color(),
+                    #color=p[0].get_color(),
                     #marker="o",
-                    #markersize=11,
+                    markersize=11,
                     #linestyle="",
                     #linewidth=3,
                     **temp_kwargs,
                 )
-                # Systematic errors.
-                # We'll plot the data systematics at 1.
-                y_relative_error_low = unfolding_base.relative_error(
-                    unfolding_base.ErrorInput(
-                        value=h_for_model_ratio.values,
-                        error=h_for_model_ratio.metadata["y_systematic"]["quadrature"].low,
-                    ),
-                )
-                y_relative_error_high = unfolding_base.relative_error(
-                    unfolding_base.ErrorInput(
-                        value=h_for_model_ratio.values,
-                        error=h_for_model_ratio.metadata["y_systematic"]["quadrature"].high,
-                    ),
-                )
-                # From error prop, pythia has no systematic error, so we just convert the relative errors.
-                #ratio.metadata["y_systematic"] = {}
-                #ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
-                #    low=y_relative_error_low * ratio.values,
-                #    high=y_relative_error_high * ratio.values,
-                #)
-                #y_systematic = ratio.metadata["y_systematic"]["quadrature"]
-                if i_model == 0:
+
+                # For theory curves with systematic uncertainties, such as the analytical calculations,
+                # we need to propagate the systematics. It's a bit awkawrd since the systematic bar is already
+                # plotted, but I don't see an obviously better way forward
+                if "y_systematic" in model_for_ratio.metadata:
+                    y_relative_error_low = unfolding_base.relative_error(
+                        unfolding_base.ErrorInput(value=h_for_model_ratio.values, error=h_for_model_ratio.metadata["y_systematic"]["quadrature"].low),
+                        unfolding_base.ErrorInput(
+                            value=model_for_ratio.values,
+                            error=model_for_ratio.metadata["y_systematic"]["quadrature"].low,
+                        ),
+                    )
+                    y_relative_error_high = unfolding_base.relative_error(
+                        unfolding_base.ErrorInput(value=h_for_model_ratio.values, error=h_for_model_ratio.metadata["y_systematic"]["quadrature"].high),
+                        unfolding_base.ErrorInput(
+                            value=model_for_ratio.values,
+                            error=model_for_ratio.metadata["y_systematic"]["quadrature"].high,
+                        ),
+                    )
+                    # Store the systematic.
+                    print(f"{y_relative_error_low=}, {y_relative_error_high=}")
+                    model_systematic = unfolding_base.AsymmetricErrors(
+                        low=y_relative_error_low * ratio.values,
+                        high=y_relative_error_high * ratio.values,
+                    )
+
                     pachyderm.plot.error_boxes(
                         ax=ax_ratio_models,
                         x_data=ratio.axes[0].bin_centers,
-                        y_data=np.ones_like(ratio.values),
+                        y_data=ratio.values,
                         x_errors=ratio.axes[0].bin_widths / 2,
-                        #y_errors=np.array(
-                        #    [y_systematic.low, y_systematic.high]
-                        #),
-                        #color=p[0].get_color(),
-                        # NOTE: This will implicitly be relative to 1.
-                        y_errors=np.array(
-                            [y_relative_error_low, y_relative_error_high]
+                        y_errors=np.stack(
+                            [model_systematic.low, model_systematic.high]
                         ),
-                        color="grey",
                         linewidth=0,
+                        color=temp_kwargs["color"],
                     )
 
-                # TODO: If the model has systematic errors, then plot them here next.
-
-            # Add a line at 1 for reference.
-            ax_ratio_models.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
     # reference value for data and model ratios
     ax_ratio_data.axhline(y=1, color="black", linestyle="dashed", zorder=1)
@@ -378,6 +404,7 @@ def plot_pp_grooming_comparison_with_models(
                     font_size=22,
                 ),
             ],
+            legend=pb.LegendConfig(location="upper center", font_size=20, anchor=(0.5, 0.90)),
         ),
         pb.Panel(
             axes=[
@@ -389,6 +416,7 @@ def plot_pp_grooming_comparison_with_models(
                     font_size=22,
                 ),
             ],
+            legend=pb.LegendConfig(location="upper center", font_size=20, anchor=(0.5, 0.90)),
         ),
         pb.Panel(
             axes=[
@@ -400,6 +428,7 @@ def plot_pp_grooming_comparison_with_models(
                     font_size=22,
                 ),
             ],
+            legend=pb.LegendConfig(location="upper center", font_size=20, anchor=(0.5, 0.90)),
         ),
         pb.Panel(
             axes=[
@@ -411,6 +440,7 @@ def plot_pp_grooming_comparison_with_models(
                     font_size=22,
                 ),
             ],
+            legend=pb.LegendConfig(location="upper center", font_size=20, anchor=(0.5, 0.90)),
         ),
     ]
 
@@ -461,7 +491,7 @@ def plot_pp_grooming_comparison_with_models(
                 # Grooming method specific panels
                 *grooming_method_panels
             ],
-            figure=pb.Figure(edge_padding=dict(left=0.13, bottom=0.08)),
+            figure=pb.Figure(edge_padding=dict(left=0.13, bottom=0.06)),
         ),
         output_dir=output_dir,
     )
