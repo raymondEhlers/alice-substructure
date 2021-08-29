@@ -211,6 +211,8 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
             )
 
             #_temp_i = 0
+            colors = ["Blues_r", "Oranges_r", "Greens_r", "Reds_r"]
+            colors_for_models = sns.color_palette(colors[i_grooming_method], n_colors = 6)
             for i_model, (model_name, model_with_all_grooming_methods) in enumerate(models.items()):
                 model = model_with_all_grooming_methods.get(grooming_method, None)
                 if not model:
@@ -310,6 +312,8 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                     # For one label per axis
                     #temp_kwargs["label"] if (model_name == list(models)[i_grooming_method]) else None
                 )
+                #temp_kwargs["color"] = colors_for_models[4 - i_model]
+                temp_kwargs["color"] = colors_for_models[i_model]
                 ax_ratio_models.errorbar(
                     ratio.axes[0].bin_centers,
                     ratio.values,
