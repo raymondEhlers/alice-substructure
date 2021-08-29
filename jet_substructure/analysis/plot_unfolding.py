@@ -559,7 +559,29 @@ def load_sherpa_predictions(
 
 
 #_model_palette = sns.color_palette("husl", n_colors=6)
-_model_palette = sns.color_palette("Set2", n_colors=6)
+#_model_palette = sns.color_palette("Accent", n_colors=10)
+#_model_palette = sns.color_palette("colorblind", n_colors=10)
+#_model_palette = sns.color_palette("dark", n_colors=6)
+
+_model_palette = [
+    (53, 73, 222),
+    (170, 52, 222),
+    (223, 82, 87),
+    (225, 220, 103),
+    (90, 224, 102),
+    (57, 225, 215),
+    (137, 185, 224),
+    (89, 147, 223),
+    (223, 34, 219),
+    (216, 142, 224),
+    (223, 124, 53),
+    (108, 223, 41),
+]
+_model_palette = [
+    (color[0] / 254, color[1] / 254, color[2] / 254)
+    for color in _model_palette
+]
+_model_palette = _model_palette[1:] + [_model_palette[0]]
 
 _models_styles = {
     "pythia": dict(
@@ -567,14 +589,22 @@ _models_styles = {
         linewidth=3,
         linestyle="-",
         marker="s",
-        color=_model_palette[0],
+        #color=_model_palette[0],
+        color=_model_palette[7],
+        markerfacecolor="none",
+        #markerfacecolor="white",
+        markeredgewidth=3,
     ),
     "analytical": dict(
         label="Caucal et al.",
         linewidth=3,
         linestyle="-.",
         marker="P",
-        color=_model_palette[1],
+        #color=_model_palette[1],
+        #color=_model_palette[5],
+        #color=_model_palette[8],
+        #color=_model_palette[4],
+        color=_model_palette[3],
     ),
     "sherpa_lund": dict(
         label="SHERPA (Lund)",
@@ -583,21 +613,31 @@ _models_styles = {
         linewidth=3,
         linestyle="--",
         marker="*",
-        color=_model_palette[2],
+        #color=_model_palette[2],
+        color=_model_palette[1],
+        #color=_model_palette[5],
+        #color=_model_palette[2],
     ),
     "sherpa_ahadic": dict(
         label="SHERPA (AHADIC)",
         linewidth=3,
         linestyle=":",
         marker="X",
-        color=_model_palette[3],
+        #color=_model_palette[3],
+        #color=_model_palette[7],
+        #color=_model_palette[6],
+        #color=_model_palette[3],
+        color=_model_palette[6],
     ),
     "jetscape": dict(
         label="JETSCAPE PP19",
         linewidth=3,
         linestyle="--",
         marker="D",
-        color=_model_palette[4],
+        #color=_model_palette[4],
+        #color=_model_palette[8],
+        #color=_model_palette[4],
+        color=_model_palette[3],
     ),
 }
 

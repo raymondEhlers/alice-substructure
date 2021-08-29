@@ -49,7 +49,8 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
             break
     logger.info(f"name of name_of_grooming_method_to_draw_models: {name_of_grooming_method_to_draw_models}")
 
-    with sns.color_palette("Set2"):
+    with sns.color_palette("colorblind"):
+    #with sns.color_palette("Accent"):
         # fig, ax = plt.subplots(figsize=(9, 10))
         # Size is specified to make it convenient to compare against Hard Probes plots.
         fig, (ax, ax_ratio_data, *ax_grooming_methods) = plt.subplots(
@@ -82,7 +83,8 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 h.axes[0].bin_centers,
                 h.values,
                 yerr=h.errors,
-                xerr=h.axes[0].bin_widths / 2,
+                #xerr=h.axes[0].bin_widths / 2,
+                xerr=np.zeros_like(h.axes[0].bin_widths),
                 marker="o",
                 markersize=11,
                 linestyle="",
@@ -136,7 +138,8 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                     ratio.axes[0].bin_centers,
                     ratio.values,
                     yerr=ratio.errors,
-                    xerr=ratio.axes[0].bin_widths / 2,
+                    #xerr=ratio.axes[0].bin_widths / 2,
+                    xerr=np.zeros_like(ratio.axes[0].bin_widths),
                     color=p[0].get_color(),
                     marker="o",
                     markersize=11,
@@ -300,10 +303,12 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 # Ratio + statistical error bars
                 temp_kwargs = dict(plot_unfolding._models_styles[model_name])
                 temp_kwargs["label"] = (
-                    #temp_kwargs["label"] if grooming_method == name_of_grooming_method_to_draw_models else None
+                    # For all in one panel
+                    temp_kwargs["label"] if grooming_method == name_of_grooming_method_to_draw_models else None
                     # TODO: Generalize if this looks okay...
                     #temp_kwargs["label"] if (model_name in ["pythia", "sherpa_ahadic", "sherpa_lund"] and grooming_method == "dynamical_core") or (model_name in ["analytical", "jetscape"] and grooming_method == "dynamical_kt") else None
-                    temp_kwargs["label"] if (model_name == list(models)[i_grooming_method]) else None
+                    # For one label per axis
+                    #temp_kwargs["label"] if (model_name == list(models)[i_grooming_method]) else None
                 )
                 ax_ratio_models.errorbar(
                     ratio.axes[0].bin_centers,
@@ -336,8 +341,6 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                             error=model_for_ratio.metadata["y_systematic"]["quadrature"].high,
                         ),
                     )
-                    # Store the systematic.
-                    print(f"{y_relative_error_low=}, {y_relative_error_high=}")
                     model_systematic = unfolding_base.AsymmetricErrors(
                         low=y_relative_error_low * ratio.values,
                         high=y_relative_error_high * ratio.values,
@@ -355,6 +358,17 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                         color=temp_kwargs["color"],
                     )
 
+    # Add legend for model. We're doing some tricks here, so we need to do it by hand.
+    ax_ratio_models = ax_grooming_methods[grooming_methods.index(name_of_grooming_method_to_draw_models)]
+    models_legend = ax_ratio_models.legend(frameon=False, loc="lower left", fontsize=22)
+    handles, labels = ax_ratio_models.get_legend_handles_labels()
+    print(f"models_legend handles: {ax_ratio_models.get_legend_handles_labels()}")
+    #ax_ratio_models.legend().set_visible(False)
+    # Remove from the existing axis.
+    models_legend.remove()
+    print(f"models_legend: {models_legend}")
+    # Make the legend on the main axis.
+    models_legend = ax.legend(handles=handles, labels=labels, frameon=False, loc="lower left", fontsize=22)
 
     # reference value for data and model ratios
     ax_ratio_data.axhline(y=1, color="black", linestyle="dashed", zorder=1)
@@ -363,6 +377,8 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
     plot_config.apply(fig=fig, axes=[ax, ax_ratio_data, *ax_grooming_methods])
     # A few additional tweaks.
     ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
+    # Add the second legend
+    ax.add_artist(models_legend)
 
     filename = f"{plot_config.name}"
     fig.savefig(output_dir / f"{filename}.pdf")
@@ -400,11 +416,11 @@ def plot_pp_grooming_comparison_with_models(
                 pb.AxisConfig(
                     "y",
                     label=r"$\frac{\text{Model}}{\text{DyG}\;a=0.5}$",
-                    range=(0.05, 1.95),
+                    range=(0.05, 2.95),
                     font_size=22,
                 ),
             ],
-            legend=pb.LegendConfig(location="upper center", font_size=20, anchor=(0.5, 0.90)),
+            #legend=pb.LegendConfig(location="upper center", font_size=20, anchor=(0.5, 0.90)),
         ),
         pb.Panel(
             axes=[
@@ -412,11 +428,11 @@ def plot_pp_grooming_comparison_with_models(
                 pb.AxisConfig(
                     "y",
                     label=r"$\frac{\text{Model}}{\text{DyG}\;a=1}$",
-                    range=(0.05, 1.95),
+                    range=(0.05, 2.95),
                     font_size=22,
                 ),
             ],
-            legend=pb.LegendConfig(location="upper center", font_size=20, anchor=(0.5, 0.90)),
+            #legend=pb.LegendConfig(location="upper center", font_size=20, anchor=(0.5, 0.90)),
         ),
         pb.Panel(
             axes=[
@@ -428,7 +444,7 @@ def plot_pp_grooming_comparison_with_models(
                     font_size=22,
                 ),
             ],
-            legend=pb.LegendConfig(location="upper center", font_size=20, anchor=(0.5, 0.90)),
+            #legend=pb.LegendConfig(location="upper center", font_size=20, anchor=(0.5, 0.90)),
         ),
         pb.Panel(
             axes=[
@@ -440,7 +456,7 @@ def plot_pp_grooming_comparison_with_models(
                     font_size=22,
                 ),
             ],
-            legend=pb.LegendConfig(location="upper center", font_size=20, anchor=(0.5, 0.90)),
+            #legend=pb.LegendConfig(location="upper center", font_size=20, anchor=(0.5, 0.90)),
         ),
     ]
 
@@ -468,12 +484,13 @@ def plot_pp_grooming_comparison_with_models(
                             "y",
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
-                            range=(5e-3, 1),
+                            #range=(5e-3, 1),
+                            range=(9e-3, 1),
                             font_size=22,
                         ),
                     ],
                     text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
-                    legend=pb.LegendConfig(location="lower left", font_size=22),
+                    legend=pb.LegendConfig(location="center right", anchor=(0.985, 0.52), font_size=22),
                 ),
                 # Data ratio
                 pb.Panel(
@@ -483,7 +500,8 @@ def plot_pp_grooming_comparison_with_models(
                             label=r"$\frac{\text{Method}}{\text{"
                             + grooming_styling[reference_grooming_method].label
                             + "}}$",
-                            range=(0.3, 1.7),
+                            #range=(0.3, 1.7),
+                            range=(0.3, 1.9),
                             font_size=22,
                         ),
                     ],
