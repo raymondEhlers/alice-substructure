@@ -75,10 +75,14 @@ def plot(output_dir: Path,
         "PbPb_30_50": r"30-50\% Pb-Pb",
     }
 
+    RAA_hists = {
+        "PbPb_00_10": {},
+        "PbPb_30_50": {},
+    }
+
     with sns.color_palette("Set2"):
         for jet_R in jet_R_values:
             for jet_type in jet_types:
-                # First, plot spectra
                 fig, ax = plt.subplots(figsize=(10, 8))
                 fig_scaled, ax_scaled = plt.subplots(figsize=(10, 8))
                 fig_RAA, ax_RAA = plt.subplots(figsize=(10, 8))
@@ -187,20 +191,6 @@ def plot(output_dir: Path,
 
                 # Calculate 0-10%
                 h_PbPb_00_10_jet_pt = combine_spectra_in_cent_bins(hists=hists, jet_type=jet_type, jet_R=jet_R, a="00_05", b="05_10")
-                #name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
-                #h_PbPb_00_05_n_events = hists["PbPb_00_05"][name]
-                #name = f"{jet_type}_jetR{format_R(jet_R)}_jet_pt"
-                #h_PbPb_00_05_jet_pt = hists["PbPb_00_05"][name]
-
-                #name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
-                #h_PbPb_05_10_n_events = hists["PbPb_05_10"][name]
-                #name = f"{jet_type}_jetR{format_R(jet_R)}_jet_pt"
-                #h_PbPb_05_10_jet_pt = hists["PbPb_05_10"][name]
-
-                #h_PbPb_00_10_spectra = ((h_PbPb_00_05_jet_pt / h_PbPb_00_05_n_events.counts()[0]) + (h_PbPb_05_10_jet_pt / h_PbPb_05_10_n_events.counts()[0])) / 2
-                #h_PbPb_00_10_spectra = (h_PbPb_00_05_jet_pt + h_PbPb_05_10_jet_pt) / 2
-                # Combine via a weight sum. However, since the scaled hists would be scaled down by the number of events
-                #h_PbPb_00_10_spectra = (h_PbPb_00_05_jet_pt + h_PbPb_05_10_jet_pt) / (h_PbPb_00_05_n_events.counts()[0] + h_PbPb_05_10_n_events.counts()[0])
                 (h_PbPb_00_10_jet_pt[::hist.rebin(5)] / 5).plot(ax=ax_scaled, label=labels["PbPb_00_10"], linewidth=2)
 
                 # Calculate 30-50%
@@ -212,9 +202,10 @@ def plot(output_dir: Path,
                 #h_RAA = h_pp_ref_jet_pt / h_PbPb_00_10_jet_pt
                 #(h_RAA[::hist.rebin(5)] / 5).plot(ax=ax_RAA, label=labels["PbPb_00_10"], linewidth=2)
                 h_RAA = (
-                    binned_data.BinnedData.from_existing_data((h_PbPb_00_10_jet_pt[::hist.rebin(5)] / 5))
-                    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[::hist.rebin(5)] / 5))
+                    binned_data.BinnedData.from_existing_data((h_PbPb_00_10_jet_pt[::hist.rebin(10)] / 10))
+                    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[::hist.rebin(10)] / 10))
                 )
+                RAA_hists["PbPb_00_10"][f"{jet_type}_R{format_R(jet_R)}"] = h_RAA
                 ax_RAA.errorbar(
                     h_RAA.axes[0].bin_centers,
                     h_RAA.values,
@@ -226,9 +217,10 @@ def plot(output_dir: Path,
                 #h_RAA = h_pp_ref_jet_pt / h_PbPb_30_50_jet_pt
                 #(h_RAA[::hist.rebin(5)] / 5).plot(ax=ax_RAA, label=labels["PbPb_30_50"], linewidth=2)
                 h_RAA = (
-                    binned_data.BinnedData.from_existing_data((h_PbPb_30_50_jet_pt[::hist.rebin(5)] / 5))
-                    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[::hist.rebin(5)] / 5))
+                    binned_data.BinnedData.from_existing_data((h_PbPb_30_50_jet_pt[::hist.rebin(10)] / 10))
+                    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[::hist.rebin(10)] / 10))
                 )
+                RAA_hists["PbPb_30_50"][f"{jet_type}_R{format_R(jet_R)}"] = h_RAA
                 ax_RAA.errorbar(
                     h_RAA.axes[0].bin_centers,
                     h_RAA.values,
@@ -251,6 +243,54 @@ def plot(output_dir: Path,
                 filename = f"{plot_config_RAA.name}"
                 fig_RAA.savefig(output_dir / f"{filename}.pdf")
                 plt.close(fig_RAA)
+
+    # Plot RAA as a function of R
+    with sns.color_palette("Set2"):
+        for jet_type in jet_types:
+            for system in ["PbPb_00_10", "PbPb_30_50"]:
+                fig, ax = plt.subplots(figsize=(10, 8))
+
+                text = fr"{labels[system]}, {jet_type.capitalize()} jets"
+                # Just for some user feedback
+                print(text)
+
+                # Finish labeling
+                text += "\n" + r"JETSCAPE MATTER + LBT"
+                text += "\n" + r"$\alpha_{s} = 0.3$, $Q_{\text{switch}} = 2$ GeV"
+
+                plot_config = pb.PlotConfig(
+                    name=f"jet_RAA_R_{jet_type}_{system}",
+                    panels=[
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y",
+                                    label=r"$R_{\text{AA}}$",
+                                    range=(0.0, 1.4),
+                                    font_size=22,
+                                ),
+                                pb.AxisConfig("x", label=r"$p_{\text{T,jet}}\:(\text{GeV}/c)$", font_size=22),
+                            ],
+                            text=pb.TextConfig(x=0.97, y=0.03, text=text, font_size=22),
+                            legend=pb.LegendConfig(location="upper right", font_size=22),
+                        ),
+                    ],
+                    figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.08)),
+                )
+                for jet_R in jet_R_values:
+                    h_RAA = RAA_hists[system][f"{jet_type}_R{format_R(jet_R)}"]
+                    ax.errorbar(
+                        h_RAA.axes[0].bin_centers,
+                        h_RAA.values,
+                        xerr=h_RAA.axes[0].bin_widths / 2,
+                        yerr=h_RAA.errors,
+                        label=fr"$R$ = {jet_R}",
+                    )
+
+                plot_config.apply(fig=fig, ax=ax)
+                filename = f"{plot_config.name}"
+                fig.savefig(output_dir / f"{filename}.pdf")
+                plt.close(fig)
 
 
 if __name__ == "__main__":
