@@ -5,9 +5,10 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Mapping, Sequence
 
 import IPython
+from attr.setters import convert
 from mammoth import helpers, job_utils
 from parsl.app.app import python_app
 from parsl.data_provider.files import File
@@ -22,9 +23,13 @@ logger = logging.getLogger(__name__)
 def run_analyze_data(
     collision_system: str,
     jet_R: float,
-    iterative_splittings: bool,
     min_jet_pt: float,
-    event_activity: str = "",
+    iterative_splittings: bool,
+    loading_data_rename_prefix: Mapping[str, str],
+    convert_data_format_prefixes: Mapping[str, str],
+    event_activity: str,
+    scale_factors: Mapping[int, float],
+    pt_hat_bin: int,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> AppFuture:
@@ -35,12 +40,16 @@ def run_analyze_data(
 
     try:
         track_skim_adapter.hardest_kt_data(
+            input_filename=Path(inputs[0].filepath),
             collision_system=collision_system,
             event_activity=event_activity,
-            input_filename=Path(inputs[0].filepath),
             jet_R=jet_R,
-            iterative_splittings=iterative_splittings,
             min_jet_pt=min_jet_pt,
+            iterative_splittings=iterative_splittings,
+            loading_data_rename_prefix=loading_data_rename_prefix,
+            convert_data_format_prefixes=convert_data_format_prefixes,
+            scale_factors=scale_factors,
+            pt_hat_bin=pt_hat_bin,
             output_filename=Path(outputs[0].filepath),
         )
         result = True, f"success for {collision_system}, R={jet_R}, {inputs[0].filepath}"
@@ -57,8 +66,11 @@ def setup_calculate_data_skim(
     min_jet_pt: float,
     jet_R_values: Sequence[float],
     iterative_splittings: bool,
+    loading_data_rename_prefix: Mapping[str, str],
+    convert_data_format_prefixes: Mapping[str, str],
     input_path: Path,
     event_activity: str = "",
+    scale_factors_dataset: str = ""
 ) -> List[AppFuture]:
     """Analyze hardest kt data"""
     input_files = sorted(input_path.glob("*/*/*.root"))
@@ -69,6 +81,14 @@ def setup_calculate_data_skim(
 
     logger.info(input_files)
 
+    scale_factors = None
+    if scale_factors_dataset:
+        import jet_substructure.analysis.parsl
+        scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
+            # TODO: Unclear if this should be hard coded
+            collision_system="pythia", dataset_name=scale_factors_dataset,
+        )
+
     results = []
     for input_filename in input_files:
         logger.info(f"Adding {input_filename} for analysis")
@@ -78,6 +98,10 @@ def setup_calculate_data_skim(
         train_directory = input_filename.parent.parent.parent.parent
         run_dir = input_filename.parent.name
         iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
+
+        # TODO: Extract pt hat bin somehow...
+        pt_hat_bin = -1
+
         for jet_R in jet_R_values:
             # Setup file I/O
             output_dir = train_directory / "skim" / f"R{round(jet_R * 10):02}" / run_dir
@@ -91,17 +115,26 @@ def setup_calculate_data_skim(
                     jet_R=jet_R,
                     min_jet_pt=min_jet_pt,
                     iterative_splittings=iterative_splittings,
+                    loading_data_rename_prefix=loading_data_rename_prefix,
+                    convert_data_format_prefixes=convert_data_format_prefixes,
                     inputs=[File(str(input_filename))],
                     outputs=[File(str(output_filename))],
+                    pt_hat_bin=pt_hat_bin,
+                    scale_factors=scale_factors,
                 )
             )
 
     return results
 
 
+def setup_calculate_embedding_skim() -> List[AppFuture]:
+    ...
+
+
 def run() -> None:
     # Basic setup
     iterative_splittings = True
+    dataset_name = "LHC18qr_central_642"
     jet_R_values = [0.4]
     min_jet_pt = {
         "pp": 5,
@@ -109,10 +142,26 @@ def run() -> None:
         "embedPythia": 20,
         "PbPb": 20,
     }
+    # NOTE: Need to glob in the task
     input_paths = {
-        # Need to glob in the task
         "PbPb": Path("trains/PbPb/642/run_by_run/"),
     }
+    loading_data_rename_prefix = {
+        "pp": {"data": "data"},
+        # It has a separate function, so this isn't super meaningful.
+        # However, it could be if we just wanted to look at one prefix, since we could
+        # use the data loading function.
+        #"pythia": {"data": "det_level", "true": "part_level"},
+        "PbPb": {"data": "data"},
+    }
+    convert_data_format_prefixes = {
+        "pp": {"data": "data"},
+        # The loading data rename prefix won't apply any mapping for pythia,
+        # so we have to handle it here.
+        "pythia": {"det_level": "data", "part_level": "true"},
+        "PbPb": {"data": "data"},
+    }
+
     collision_systems_to_process = ["PbPb"]
     event_activity = "central"
 
@@ -173,6 +222,8 @@ def run() -> None:
                     min_jet_pt=min_jet_pt[collision_system],
                     jet_R_values=jet_R_values,
                     iterative_splittings=iterative_splittings,
+                    loading_data_rename_prefix=loading_data_rename_prefix[collision_system],
+                    convert_data_format_prefixes=convert_data_format_prefixes[collision_system],
                     input_path=input_paths[collision_system],
                 )
             )

@@ -5,6 +5,7 @@
 
 import logging
 from pathlib import Path
+from typing import Mapping, Optional, Union
 
 import awkward as ak
 import numpy as np
@@ -92,32 +93,25 @@ def hardest_kt_MC(
     )
 
 
-def hardest_kt_data(
+def hardest_kt_data_skim(
+    jets: ak.Array,
     input_filename: Path,
     collision_system: str,
     jet_R: float,
     iterative_splittings: bool,
+    convert_data_format_prefixes: Mapping[str, str],
     output_filename: Path,
-    min_jet_pt: float = 20,
-    event_activity: str = "",
+    scale_factors: Optional[Mapping[int, float]] = None,
+    pt_hat_bin: Optional[int] = -1,
 ) -> None:
-    jets = analysis_alice.analysis_data(
-        collision_system=collision_system,
-        arrays=analysis_alice.load_data(
-            filename=input_filename,
-            collision_system=collision_system if not event_activity else f"{collision_system}_{event_activity}",
-            rename_prefix={"data": "data"} if collision_system != "pythia" else {"data": "det_level"},
-        ),
-        jet_R=jet_R,
-        min_jet_pt=min_jet_pt,
-    )
-
+    """Implementation of the hardest kt data skim.
+    
+    Supports pp, pythia, PbPb, and embedded pythia. The data and jet finding needs to be
+    handled in a separate function.
+    """
     # Now, adapt into the expected format.
-    _rename_map = {
-        "data": "data",
-    }
     all_jets = {
-        _rename_map[k]: ak.zip(
+        convert_data_format_prefixes[k]: ak.zip(
             {
                 "jet_pt": jets[k].pt,
                 "jet_constituents": ak.zip(
@@ -149,28 +143,80 @@ def hardest_kt_data(
             },
             depth_limit=1,
         )
-        for k in _rename_map
+        for k in convert_data_format_prefixes
     }
-    # TODO: Will need to provide the pt hard bin externally because the files
-    #       are segmented by pt hard bin
-    # all_jets["pt_hard_bin"] = np.ones(ak.count(all_jets["data"]["jet_pt"])) * 12
 
-    # scale_factors = parsl.read_extracted_scale_factors(
-    #    collision_system="pythia", dataset_name="LHC18b8_pythia_R04_2520"
-    # )
+    scale_factors = None
+    prefixes = {"data": "data"}
+    if collision_system == "pythia":
+        # Store externally provided pt hard bin
+        all_jets["pt_hard_bin"] = np.ones(len(all_jets["data"]["jet_pt"])) * pt_hat_bin
+        # Add the second prefix for true jets
+        prefixes["true"] = "true"
 
     new_skim_to_flat_tree.calculate_data_skim_impl(
         all_jets=all_jets,
         input_filename=input_filename,
         collision_system=collision_system,
         iterative_splittings=iterative_splittings,
-        prefixes={
-            "data": "data",
-        },
+        prefixes=prefixes,
         jet_R=jet_R,
         output_filename=output_filename,
-        # output_filename=input_filename.parent / "skim" / "skim_output.root",
-        # scale_factors=scale_factors,
+        scale_factors=scale_factors,
+    )
+
+
+def hardest_kt_data(
+    input_filename: Path,
+    collision_system: str,
+    jet_R: float,
+    min_jet_pt: Union[float, Mapping[str, float]],
+    iterative_splittings: bool,
+    output_filename: Path,
+    convert_data_format_prefixes: Mapping[str, str],
+    event_activity: str = "",
+    # Data specific
+    loading_data_rename_prefix: Optional[Mapping[str, str]] = None,
+    # Pythia specific
+    pt_hat_bin: Optional[int] = -1,
+    scale_factors: Optional[Mapping[int, float]] = None,
+) -> None:
+    if loading_data_rename_prefix is None:
+        loading_data_rename_prefix = {"data": "data"}
+
+    if len(convert_data_format_prefixes) == 1:
+        assert not isinstance(min_jet_pt, dict)  # help out mypy
+
+        jets = analysis_alice.analysis_data(
+            collision_system=collision_system,
+            arrays=analysis_alice.load_data(
+                filename=input_filename,
+                collision_system=collision_system if not event_activity else f"{collision_system}_{event_activity}",
+                rename_prefix=loading_data_rename_prefix,
+            ),
+            jet_R=jet_R,
+            min_jet_pt=min_jet_pt,
+        )
+    elif collision_system == "pythia":
+        assert isinstance(min_jet_pt, dict)  # help out mypy
+        jets = analysis_alice.analysis_MC(
+            arrays=analysis_alice.load_MC(filename=input_filename, collision_system=collision_system),
+            jet_R=jet_R,
+            min_jet_pt=min_jet_pt,
+        )
+    else:
+        raise NotImplementedError(f"Not yet implemented for {collision_system}...")
+
+    hardest_kt_data_skim(
+        jets=jets,
+        input_filename=input_filename,
+        collision_system=collision_system,
+        jet_R=jet_R,
+        iterative_splittings=iterative_splittings,
+        convert_data_format_prefixes=convert_data_format_prefixes,
+        output_filename=output_filename,
+        pt_hat_bin=pt_hat_bin,
+        scale_factors=scale_factors,
     )
 
 
@@ -182,12 +228,13 @@ if __name__ == "__main__":
     if True:
         base_path = Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}")
         hardest_kt_data(
-            collision_system=collision_system,
             input_filename=base_path / "AnalysisResults_track_skim.parquet",
-            output_filename=base_path / "skim" / "skim_output.root",
+            collision_system=collision_system,
             jet_R=0.4,
-            iterative_splittings=True,
             min_jet_pt=5 if collision_system == "pp" else 20,
+            iterative_splittings=True,
+            convert_data_format_prefixes={"data": "data"},
+            output_filename=base_path / "skim" / "skim_output.root",
         )
     else:
         hardest_kt_MC(
