@@ -10,6 +10,7 @@ from typing import Dict, Mapping, Optional, Sequence
 
 import hist
 import matplotlib.pyplot as plt
+import numpy as np
 import pachyderm.plot
 import seaborn as sns
 import uproot
@@ -34,7 +35,8 @@ def get_hists(filename: Path) -> Dict[str, hist.Hist]:
 
 
 def combine_spectra_in_cent_bins(hists: Mapping[str, hist.Hist], jet_type: str, jet_R: float, a: str, b: str) -> hist.Hist:
-    name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
+    #name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
+    name = "n_events"
 
     a_n_events = hists[f"PbPb_{a}"][name]
     b_n_events = hists[f"PbPb_{b}"][name]
@@ -42,7 +44,8 @@ def combine_spectra_in_cent_bins(hists: Mapping[str, hist.Hist], jet_type: str, 
     a_jet_pt = hists[f"PbPb_{a}"][name]
     b_jet_pt = hists[f"PbPb_{b}"][name]
 
-    return ((a_jet_pt / a_n_events.counts()[0]) + (b_jet_pt / b_n_events.counts()[0])) / 2
+    return ((a_jet_pt / a_n_events.values()[0]) + (b_jet_pt / b_n_events.values()[0])) / 2
+    #return ((a_jet_pt / np.sum(a_jet_pt.values())) + (b_jet_pt / np.sum(b_jet_pt.values()))) / 2
 
 
 def plot(output_dir: Path,
@@ -154,21 +157,25 @@ def plot(output_dir: Path,
                 )
 
                 # Get scaled pp ref for RAA
-                name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
+                #name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
+                name = "n_events"
                 h_pp_ref_n_events = hists["pp"][name]
                 name = f"{jet_type}_jetR{format_R(jet_R)}_jet_pt"
                 # Scale immediately, since we're going to do it anyway
-                h_pp_ref_jet_pt = hists["pp"][name] / h_pp_ref_n_events.counts()[0]
+                h_pp_ref_jet_pt = hists["pp"][name] / h_pp_ref_n_events.values()[0]
+                #h_pp_ref_jet_pt = hists["pp"][name] / np.sum(hists["pp"][name].values())
 
                 for system, v in hists.items():
-                    name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
+                    #name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
+                    name = "n_events"
                     h_n_events = v[name]
                     name = f"{jet_type}_jetR{format_R(jet_R)}_jet_pt"
                     h_jet_pt = v[name]
 
                     (h_jet_pt[::hist.rebin(5)] / 5).plot(ax=ax, label=labels[system], linewidth=2)
 
-                    h_jet_pt_scaled = h_jet_pt / h_n_events.counts()[0]
+                    h_jet_pt_scaled = h_jet_pt / h_n_events.values()[0]
+                    #h_jet_pt_scaled = h_jet_pt / np.sum(h_jet_pt.values())
                     (h_jet_pt_scaled[::hist.rebin(5)] / 5).plot(ax=ax_scaled, label=labels[system], linewidth=2)
 
                     # Skip for now just to reduce the number of curves
@@ -211,6 +218,8 @@ def plot(output_dir: Path,
                     h_RAA.values,
                     xerr=h_RAA.axes[0].bin_widths / 2,
                     yerr=h_RAA.errors,
+                    linestyle="",
+                    linewidth=2,
                     label=labels["PbPb_00_10"],
                 )
                 # 30-50%
@@ -226,6 +235,8 @@ def plot(output_dir: Path,
                     h_RAA.values,
                     xerr=h_RAA.axes[0].bin_widths / 2,
                     yerr=h_RAA.errors,
+                    linestyle="",
+                    linewidth=2,
                     label=labels["PbPb_30_50"],
                 )
 
