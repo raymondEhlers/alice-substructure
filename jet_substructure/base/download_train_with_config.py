@@ -244,19 +244,32 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
             elif stage_to_download == "run_by_run":
                 # Setup
                 dataset_name = f"LHC{child_label}"
-                local_run_by_run_dir = local_train_dir / "run_by_run" / dataset_name
                 # To start, we need to figure out the dataset.
                 # Dataset agnostic
                 # NOTE: May be run2 specific
-                pass_value = Path(config.get("pass", ""))
-                if pass_value != Path(""):
-                    pass_value = Path(f"pass{str(pass_value)}")
+                # First, look at a possible child specific pass
+                # This potentially lets us hijack the value to add in more info, such as the partition (eg. "FAST")
+                _pass_value = child_info.get("pass", None)
+                if _pass_value is None:
+                    _pass_value = str(config.get("pass", ""))
+                    # Add "pass" to the front of the name. Only if it's a general dataset pass
+                    if _pass_value != "":
+                        _pass_value = f"pass{str(pass_value)}"
+                if _pass_value is None:
+                    _pass_value = ""
+                pass_value = Path(_pass_value)
                 aod_value = config.get("AOD", None)
                 if aod_value:
                     pass_value /= f"AOD{aod_value}"
                 is_data = alice_dl.does_period_contain_data(dataset_name)
                 run_prefix = "000" if is_data else ""
                 data_or_sim_str = "data" if is_data else "sim"
+
+                # Determine the local run_by_run dir
+                # If the pass value is "" or "pass1", nothing is added. But if there is more,
+                # such as "pass1_CENT_woSDD", the _last_identifier will be (for example) "LHC17p_CENT_woSDD"
+                _last_identifier = "_".join([dataset_name, *_pass_value.split("_")[1:]])
+                local_run_by_run_dir = local_train_dir / "run_by_run" / _last_identifier
 
                 # We need to get all runs possible runs to check for outputs of interest.
                 base_dataset_path = Path(f"/alice/{data_or_sim_str}/{year_from_dataset(dataset_name)}/") / dataset_name
