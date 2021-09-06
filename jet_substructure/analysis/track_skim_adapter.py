@@ -8,7 +8,7 @@ from pathlib import Path
 
 import awkward as ak
 import numpy as np
-from mammoth.framework.analysis import hardest_kt
+from mammoth.hardest_kt import analysis_alice
 
 from jet_substructure.analysis import new_skim_to_flat_tree, parsl
 from jet_substructure.base import helpers
@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 def hardest_kt_MC(
     input_filename: Path = Path("/software/rehlers/dev/mammoth/projects/framework/pythia/AnalysisResults.parquet"),
-    jet_R=0.4,
+    jet_R: float = 0.4,
 ) -> None:
-    jets = hardest_kt.analysis_MC(
-        arrays=hardest_kt.load_MC(filename=input_filename),
+    jets = analysis_alice.analysis_MC(
+        arrays=analysis_alice.load_MC(filename=input_filename),
         jet_R=jet_R,
         min_jet_pt={
             "det_level": 20,
@@ -93,19 +93,23 @@ def hardest_kt_MC(
 
 
 def hardest_kt_data(
-    collision_system: str,
     input_filename: Path,
-    jet_R=0.4,
+    collision_system: str,
+    jet_R: float,
+    iterative_splittings: bool,
+    output_filename: Path,
+    min_jet_pt: float = 20,
+    event_activity: str = "",
 ) -> None:
-    jets = hardest_kt.analysis_data(
+    jets = analysis_alice.analysis_data(
         collision_system=collision_system,
-        arrays=hardest_kt.load_data(
+        arrays=analysis_alice.load_data(
             filename=input_filename,
-            # rename_prefix={"data": "det_level"},
-            rename_prefix={"data": "data"},
+            collision_system=collision_system if not event_activity else f"{collision_system}_{event_activity}",
+            rename_prefix={"data": "data"} if collision_system != "pythia" else {"data": "det_level"},
         ),
         jet_R=jet_R,
-        min_jet_pt=20,
+        min_jet_pt=min_jet_pt,
     )
 
     # Now, adapt into the expected format.
@@ -147,31 +151,48 @@ def hardest_kt_data(
         )
         for k in _rename_map
     }
-    import IPython
+    # TODO: Will need to provide the pt hard bin externally because the files
+    #       are segmented by pt hard bin
+    # all_jets["pt_hard_bin"] = np.ones(ak.count(all_jets["data"]["jet_pt"])) * 12
 
-    IPython.embed()
+    # scale_factors = parsl.read_extracted_scale_factors(
+    #    collision_system="pythia", dataset_name="LHC18b8_pythia_R04_2520"
+    # )
+
     new_skim_to_flat_tree.calculate_data_skim_impl(
         all_jets=all_jets,
         input_filename=input_filename,
         collision_system=collision_system,
-        iterative_splittings=True,
+        iterative_splittings=iterative_splittings,
         prefixes={
             "data": "data",
         },
         jet_R=jet_R,
-        output_filename=input_filename.parent / "skim" / "skim_output.root",
+        output_filename=output_filename,
+        # output_filename=input_filename.parent / "skim" / "skim_output.root",
+        # scale_factors=scale_factors,
     )
 
 
 if __name__ == "__main__":
     helpers.setup_logging(logging.INFO)
-    # hardest_kt_MC()
 
     collision_system = "PbPb"
-    hardest_kt_data(
-        collision_system=collision_system,
-        input_filename=Path(
-            f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}/AnalysisResults.parquet"
-        ),
-        jet_R=0.4,
-    )
+    # if collision_system != "pythia":
+    if True:
+        base_path = Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}")
+        hardest_kt_data(
+            collision_system=collision_system,
+            input_filename=base_path / "AnalysisResults_track_skim.parquet",
+            output_filename=base_path / "skim" / "skim_output.root",
+            jet_R=0.4,
+            iterative_splittings=True,
+            min_jet_pt=5 if collision_system == "pp" else 20,
+        )
+    else:
+        hardest_kt_MC(
+            input_filename=Path(
+                f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}/AnalysisResults_track_skim.parquet"
+            ),
+            jet_R=0.4,
+        )
