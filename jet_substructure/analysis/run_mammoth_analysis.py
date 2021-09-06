@@ -5,10 +5,9 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Sequence
+from typing import Any, Dict, List, Mapping, Sequence, Union
 
 import IPython
-from attr.setters import convert
 from mammoth import helpers, job_utils
 from parsl.app.app import python_app
 from parsl.data_provider.files import File
@@ -39,7 +38,7 @@ def run_analyze_data(
     from jet_substructure.analysis import track_skim_adapter
 
     try:
-        track_skim_adapter.hardest_kt_data(
+        track_skim_adapter.hardest_kt_data_skim(
             input_filename=Path(inputs[0].filepath),
             collision_system=collision_system,
             event_activity=event_activity,
@@ -63,14 +62,14 @@ def run_analyze_data(
 
 def setup_calculate_data_skim(
     collision_system: str,
-    min_jet_pt: float,
+    min_jet_pt: Union[float, Mapping[str, float]],
     jet_R_values: Sequence[float],
     iterative_splittings: bool,
     loading_data_rename_prefix: Mapping[str, str],
     convert_data_format_prefixes: Mapping[str, str],
     input_path: Path,
     event_activity: str = "",
-    scale_factors_dataset: str = ""
+    scale_factors_dataset: str = "",
 ) -> List[AppFuture]:
     """Analyze hardest kt data"""
     input_files = sorted(input_path.glob("*/*/*.root"))
@@ -84,9 +83,11 @@ def setup_calculate_data_skim(
     scale_factors = None
     if scale_factors_dataset:
         import jet_substructure.analysis.parsl
+
         scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
             # TODO: Unclear if this should be hard coded
-            collision_system="pythia", dataset_name=scale_factors_dataset,
+            collision_system="pythia",
+            dataset_name=scale_factors_dataset,
         )
 
     results = []
@@ -134,16 +135,20 @@ def setup_calculate_embedding_skim() -> List[AppFuture]:
 def run() -> None:
     # Basic setup
     iterative_splittings = True
-    dataset_name = "LHC18qr_central_642"
     jet_R_values = [0.4]
     min_jet_pt = {
         "pp": 5,
-        "pythia": 5,
+        "pythia": {"det_level": 5},
         "embedPythia": 20,
         "PbPb": 20,
     }
+    collision_systems_to_process = ["PbPb"]
+    dataset_name = "LHC18qr_central_642"
+    event_activity = "central"
+
     # NOTE: Need to glob in the task
     input_paths = {
+        "pythia": Path("trains/pythia/2619/run_by_run/LHC18b8_fast/"),
         "PbPb": Path("trains/PbPb/642/run_by_run/"),
     }
     loading_data_rename_prefix = {
@@ -151,7 +156,7 @@ def run() -> None:
         # It has a separate function, so this isn't super meaningful.
         # However, it could be if we just wanted to look at one prefix, since we could
         # use the data loading function.
-        #"pythia": {"data": "det_level", "true": "part_level"},
+        # "pythia": {"data": "det_level", "true": "part_level"},
         "PbPb": {"data": "data"},
     }
     convert_data_format_prefixes = {
@@ -161,9 +166,6 @@ def run() -> None:
         "pythia": {"det_level": "data", "part_level": "true"},
         "PbPb": {"data": "data"},
     }
-
-    collision_systems_to_process = ["PbPb"]
-    event_activity = "central"
 
     # Job execution parameters
     task_name = "hardest_kt_mammoth"
@@ -176,7 +178,6 @@ def run() -> None:
     # Job execution configuration
     task_config = job_utils.TaskConfig(name=task_name, n_cores_per_task=1)
     # n_cores_to_allocate = 64
-    # n_cores_to_allocate = 21
     n_cores_to_allocate = 2
     walltime = "24:00:00"
 
@@ -212,6 +213,9 @@ def run() -> None:
 
     all_results = []
     for collision_system in collision_systems_to_process:
+        # Collision system dependent
+        scale_factors_dataset = "LHC18b8_pythia_R04_2520" if collision_system == "pythia" else ""
+
         # Setup tasks
         system_results = []
         if "calculate_data_skim" in tasks_to_execute:
@@ -219,11 +223,12 @@ def run() -> None:
                 setup_calculate_data_skim(
                     collision_system=collision_system,
                     event_activity=event_activity,
-                    min_jet_pt=min_jet_pt[collision_system],
+                    min_jet_pt=min_jet_pt[collision_system],  # type: ignore
                     jet_R_values=jet_R_values,
                     iterative_splittings=iterative_splittings,
-                    loading_data_rename_prefix=loading_data_rename_prefix[collision_system],
+                    loading_data_rename_prefix=loading_data_rename_prefix.get(collision_system, {}),
                     convert_data_format_prefixes=convert_data_format_prefixes[collision_system],
+                    scale_factors_dataset=scale_factors_dataset,
                     input_path=input_paths[collision_system],
                 )
             )
