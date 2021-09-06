@@ -33,6 +33,7 @@ def plot_attribute_compare(
     other: Input,
     mine: Input,
     output_name: str,
+    output_dir: Path,
     axis: bh.axis.Regular = bh.axis.Regular(30, 0, 150),
     log_y: bool = False,
     normalize: bool = False,
@@ -98,25 +99,32 @@ def plot_attribute_compare(
         right=0.98,
         top=0.98,
     )
-    fig.savefig(Path("comparison/trackSkim") / f"{output_name}.pdf")
+    fig.savefig(output_dir / f"{output_name}.pdf")
     plt.close(fig)
 
 
-def compare(standard_filename: Path, track_skim_filename: Path) -> None:
-    standard = uproot.open(standard_filename)[
-        "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
-    ].arrays()
+def compare(collision_system: str, standard_filename: Path, track_skim_filename: Path) -> None:
+    standard_tree_name = "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
+    if collision_system == "pp":
+        standard_tree_name = "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_scheme_RawTree_Data_NoSub_Incl"
+    if collision_system == "pythia":
+        standard_tree_name = "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeTree_PythiaDef_NoSub_Incl"
+    standard = uproot.open(standard_filename)[standard_tree_name].arrays()
     track_skim = uproot.open(track_skim_filename)["tree"].arrays()
     print(f"standard.type: {standard.type}")
     print(f"track_skim.type: {track_skim.type}")
+
+    output_dir = Path("comparison") / "trackSkim" / collision_system
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     plot_attribute_compare(
         other=Input(arrays=standard, attribute="data_jet_pt", name="Standard"),
         mine=Input(arrays=track_skim, attribute="data_jet_pt", name="Track skim"),
         output_name="jet_pt",
         log_y=True,
-        # normalize=True,
-        axis=bh.axis.Regular(100, 0, 100),
+        normalize=True,
+        axis=bh.axis.Regular(50, 0, 100),
+        output_dir=output_dir,
     )
 
     plot_attribute_compare(
@@ -126,6 +134,7 @@ def compare(standard_filename: Path, track_skim_filename: Path) -> None:
         log_y=True,
         normalize=True,
         axis=bh.axis.Regular(20, 0, 10),
+        output_dir=output_dir,
     )
 
     plot_attribute_compare(
@@ -134,6 +143,7 @@ def compare(standard_filename: Path, track_skim_filename: Path) -> None:
         output_name="dyg_kt_data_delta_R",
         normalize=True,
         axis=bh.axis.Regular(20, 0, 0.6),
+        output_dir=output_dir,
     )
 
     plot_attribute_compare(
@@ -142,12 +152,15 @@ def compare(standard_filename: Path, track_skim_filename: Path) -> None:
         output_name="dyg_kt_data_z",
         normalize=True,
         axis=bh.axis.Regular(20, 0, 0.5),
+        output_dir=output_dir,
     )
 
 
 if __name__ == "__main__":
+    collision_system = "pythia"
     compare(
+        collision_system=collision_system,
         # TODO: Do the proper skim for comparison...
-        standard_filename=Path("/software/rehlers/dev/mammoth/projects/framework/PbPb/AnalysisResults.root"),
-        track_skim_filename=Path("/software/rehlers/dev/mammoth/projects/framework/PbPb/skim/skim_output.root"),
+        standard_filename=Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}/AnalysisResults.root"),
+        track_skim_filename=Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}/skim/skim_output.root"),
     )
