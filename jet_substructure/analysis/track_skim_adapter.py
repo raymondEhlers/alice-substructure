@@ -5,7 +5,7 @@
 
 import logging
 from pathlib import Path
-from typing import Mapping, Optional, Union
+from typing import Mapping, Optional, Tuple, Union
 
 import awkward as ak
 import numpy as np
@@ -105,9 +105,23 @@ def hardest_kt_data_skim(
     # Pythia specific
     pt_hat_bin: Optional[int] = -1,
     scale_factors: Optional[Mapping[int, float]] = None,
-) -> None:
+) -> Tuple[bool, str]:
     if loading_data_rename_prefix is None:
         loading_data_rename_prefix = {"data": "data"}
+
+    # Try to bail out early to avoid reprocessing if possible.
+    if output_filename.exists():
+        import uproot
+
+        try:
+            with uproot.open(output_filename) as f:
+                # If the tree exists, can be read, and has more than 0 entries, we should be good
+                if f["tree"].num_entries > 0:
+                    # Return immediately to indicate that we're done.
+                    return (True, f"already processed for {collision_system}, R={jet_R}, {input_filename}")
+        except Exception:
+            # If it fails for some reason, give up - we want to try again
+            pass
 
     if len(convert_data_format_prefixes) == 1:
         assert not isinstance(min_jet_pt, dict)  # help out mypy
@@ -143,6 +157,9 @@ def hardest_kt_data_skim(
         pt_hat_bin=pt_hat_bin,
         scale_factors=scale_factors,
     )
+
+    return (True, f"success for {collision_system}, R={jet_R}, {input_filename}")
+
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @python_app  # type: ignore
-def run_analyze_data(
+def run_data_skim(
     collision_system: str,
     jet_R: float,
     min_jet_pt: float,
@@ -38,7 +38,7 @@ def run_analyze_data(
     from jet_substructure.analysis import track_skim_adapter
 
     try:
-        track_skim_adapter.hardest_kt_data_skim(
+        result = track_skim_adapter.hardest_kt_data_skim(
             input_filename=Path(inputs[0].filepath),
             collision_system=collision_system,
             event_activity=event_activity,
@@ -51,7 +51,6 @@ def run_analyze_data(
             pt_hat_bin=pt_hat_bin,
             output_filename=Path(outputs[0].filepath),
         )
-        result = True, f"success for {collision_system}, R={jet_R}, {inputs[0].filepath}"
     except Exception:
         result = (
             False,
@@ -75,10 +74,8 @@ def setup_calculate_data_skim(
     input_files = sorted(input_path.glob("*/*/*.root"))
 
     # TEMP for testing
-    input_files = input_files[:2]
+    # input_files = input_files[:4]
     # ENDTEMP
-
-    logger.info(input_files)
 
     scale_factors = None
     if scale_factors_dataset:
@@ -91,17 +88,28 @@ def setup_calculate_data_skim(
         )
 
     results = []
-    for input_filename in input_files:
-        logger.info(f"Adding {input_filename} for analysis")
+    for i, input_filename in enumerate(input_files):
+        if i % 500 == 0:
+            logger.info(f"Adding {input_filename} for analysis")
 
         # The input_file is in trains/collision_system/train_number/run_by_run/period/run_number/filename.root
         # So to get the train directory, we need to take the parent 4 times.
         train_directory = input_filename.parent.parent.parent.parent
         run_dir = input_filename.parent.name
-        iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
-
-        # TODO: Extract pt hat bin somehow...
         pt_hat_bin = -1
+        # However, if we're looking at pythia, we also need to account for the pt hard bin
+        if collision_system == "pythia":
+            # In this case, the input_file is in trains/collision_system/train_number/run_by_run/period/run_number/pt_hard_bin/filename.root
+            # At least for LHC20g4 and LHC18b8
+            # Thus, to get the train directory, we need to take the parent 5 times
+            train_directory = input_filename.parent.parent.parent.parent.parent
+            # And the run dir is two parents up. Here, we want to include the period to differentiate it
+            run_dir = str(Path(input_filename.parent.parent.parent.name) / input_filename.parent.parent.name)
+            # And the pt hard bin is the parent dir
+            pt_hat_bin = int(str(input_filename.parent.name))
+
+        # Further setup
+        iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
 
         for jet_R in jet_R_values:
             # Setup file I/O
@@ -110,7 +118,7 @@ def setup_calculate_data_skim(
                 output_dir.mkdir(parents=True, exist_ok=True)
             output_filename = output_dir / f"{input_filename.stem}_{iterative_splittings_label}_splittings.root"
             results.append(
-                run_analyze_data(
+                run_data_skim(
                     collision_system=collision_system,
                     event_activity=event_activity,
                     jet_R=jet_R,
@@ -128,14 +136,127 @@ def setup_calculate_data_skim(
     return results
 
 
-def setup_calculate_embedding_skim() -> List[AppFuture]:
-    ...
+@python_app  # type: ignore
+def run_embedding_skim(
+    collision_system: str,
+    jet_R: float,
+    min_jet_pt: float,
+    iterative_splittings: bool,
+    loading_data_rename_prefix: Mapping[str, str],
+    convert_data_format_prefixes: Mapping[str, str],
+    event_activity: str,
+    scale_factors: Mapping[int, float],
+    pt_hat_bin: int,
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+) -> AppFuture:
+    import traceback
+    from pathlib import Path
+
+    from jet_substructure.analysis import track_skim_adapter
+
+    try:
+        result = track_skim_adapter.hardest_kt_data_skim(
+            input_filename=Path(inputs[0].filepath),
+            collision_system=collision_system,
+            event_activity=event_activity,
+            jet_R=jet_R,
+            min_jet_pt=min_jet_pt,
+            iterative_splittings=iterative_splittings,
+            loading_data_rename_prefix=loading_data_rename_prefix,
+            convert_data_format_prefixes=convert_data_format_prefixes,
+            scale_factors=scale_factors,
+            pt_hat_bin=pt_hat_bin,
+            output_filename=Path(outputs[0].filepath),
+        )
+    except Exception:
+        result = (
+            False,
+            f"failure for {collision_system}, R={jet_R}, {inputs[0].filepath} with: \n{traceback.format_exc()}",
+        )
+    return result
+
+def setup_calculate_thermal_model_skim(
+    probe_collision_system: str,
+    min_jet_pt: Union[float, Mapping[str, float]],
+    jet_R_values: Sequence[float],
+    iterative_splittings: bool,
+    loading_data_rename_prefix: Mapping[str, str],
+    convert_data_format_prefixes: Mapping[str, str],
+    input_path: Path,
+    event_activity: str = "",
+    scale_factors_dataset: str = "",
+) -> List[AppFuture]:
+    """Analyze hardest kt data"""
+    input_files = sorted(input_path.glob("*/*/*.root"))
+
+    # TEMP for testing
+    # input_files = input_files[:4]
+    # ENDTEMP
+
+    scale_factors = None
+    if scale_factors_dataset:
+        import jet_substructure.analysis.parsl
+
+        scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
+            # TODO: Unclear if this should be hard coded
+            collision_system="pythia",
+            dataset_name=scale_factors_dataset,
+        )
+
+    results = []
+    for i, input_filename in enumerate(input_files):
+        if i % 500 == 0:
+            logger.info(f"Adding {input_filename} for analysis")
+
+        # The input_file is in trains/collision_system/train_number/run_by_run/period/run_number/filename.root
+        # So to get the train directory, we need to take the parent 4 times.
+        train_directory = input_filename.parent.parent.parent.parent
+        run_dir = input_filename.parent.name
+        pt_hat_bin = -1
+        # However, if we're looking at pythia, we also need to account for the pt hard bin
+        if collision_system == "pythia":
+            # In this case, the input_file is in trains/collision_system/train_number/run_by_run/period/run_number/pt_hard_bin/filename.root
+            # At least for LHC20g4 and LHC18b8
+            # Thus, to get the train directory, we need to take the parent 5 times
+            train_directory = input_filename.parent.parent.parent.parent.parent
+            # And the run dir is two parents up. Here, we want to include the period to differentiate it
+            run_dir = str(Path(input_filename.parent.parent.parent.name) / input_filename.parent.parent.name)
+            # And the pt hard bin is the parent dir
+            pt_hat_bin = int(str(input_filename.parent.name))
+
+        # Further setup
+        iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
+
+        for jet_R in jet_R_values:
+            # Setup file I/O
+            output_dir = train_directory / "skim" / f"R{round(jet_R * 10):02}" / run_dir
+            if not output_dir.exists():
+                output_dir.mkdir(parents=True, exist_ok=True)
+            output_filename = output_dir / f"{input_filename.stem}_{iterative_splittings_label}_splittings.root"
+            results.append(
+                run_embedding_skim(
+                    collision_system=collision_system,
+                    event_activity=event_activity,
+                    jet_R=jet_R,
+                    min_jet_pt=min_jet_pt,
+                    iterative_splittings=iterative_splittings,
+                    loading_data_rename_prefix=loading_data_rename_prefix,
+                    convert_data_format_prefixes=convert_data_format_prefixes,
+                    inputs=[File(str(input_filename))],
+                    outputs=[File(str(output_filename))],
+                    pt_hat_bin=pt_hat_bin,
+                    scale_factors=scale_factors,
+                )
+            )
+
+    return results
 
 
 def run() -> None:
     # Basic setup
     iterative_splittings = True
-    jet_R_values = [0.4]
+    jet_R_values = [0.2]
     min_jet_pt = {
         "pp": 5,
         "pythia": {"det_level": 5},
@@ -177,9 +298,11 @@ def run() -> None:
 
     # Job execution configuration
     task_config = job_utils.TaskConfig(name=task_name, n_cores_per_task=1)
-    # n_cores_to_allocate = 64
-    n_cores_to_allocate = 2
+    # n_cores_to_allocate = 120
+    # walltime = "1:59:00"
+    n_cores_to_allocate = 80
     walltime = "24:00:00"
+    # n_cores_to_allocate = 2
 
     # Validation
     # Collision system
@@ -199,6 +322,7 @@ def run() -> None:
     #       we don't actually lose any info.
     config, facility_config, stored_messages = job_utils.config(
         facility="ORNL_b587_long",
+        # facility="ORNL_b587_short",
         task_config=task_config,
         n_tasks=n_cores_to_allocate,
         walltime=walltime,
@@ -245,7 +369,7 @@ def run() -> None:
     # In order to support writing histograms from multiple systems, we need to index the output histograms
     # by the collision system + centrality.
     output_hists: Dict[str, Dict[Any, Any]] = {k: {} for k in collision_systems_to_process}
-    with Progress(console=helpers.rich_console, refresh_per_second=1) as progress:
+    with Progress(console=helpers.rich_console, refresh_per_second=1, speed_estimate_period=300) as progress:
         track_results = progress.add_task(total=len(all_results), description="Processing results...")
         # for a in all_results:
         for result in gen_results:
