@@ -185,6 +185,7 @@ def setup_calculate_thermal_model_skim(
     event_activity: str,
     scale_factors_dataset: str,
     r_max: float = 0.25,
+    n_repeat_file: int = 1,
 ) -> List[AppFuture]:
     """Analyze and skim hardest kt embedding"""
     # NOTE: These are pythia input files. They include an extra "*" to account for the pt hard bin...
@@ -236,21 +237,22 @@ def setup_calculate_thermal_model_skim(
             output_dir = train_directory / "skim" / collision_system / event_activity / f"R{round(jet_R * 10):02}" / run_dir
             if not output_dir.exists():
                 output_dir.mkdir(parents=True, exist_ok=True)
-            output_filename = output_dir / f"{input_filename.stem}_{iterative_splittings_label}_splittings.root"
-            results.append(
-                run_embedding_skim(
-                    collision_system=collision_system,
-                    jet_R=jet_R,
-                    min_jet_pt=min_jet_pt,
-                    iterative_splittings=iterative_splittings,
-                    thermal_model_parameters=thermal_model_parameters,
-                    convert_data_format_prefixes=convert_data_format_prefixes,
-                    scale_factor=scale_factors[pt_hat_bin],
-                    r_max=r_max,
-                    inputs=[File(str(input_filename))],
-                    outputs=[File(str(output_filename))],
+            for i in range(n_repeat_file):
+                output_filename = output_dir / f"{input_filename.stem}_{iterative_splittings_label}_splittings_{i:02}.root"
+                results.append(
+                    run_embedding_skim(
+                        collision_system=collision_system,
+                        jet_R=jet_R,
+                        min_jet_pt=min_jet_pt,
+                        iterative_splittings=iterative_splittings,
+                        thermal_model_parameters=thermal_model_parameters,
+                        convert_data_format_prefixes=convert_data_format_prefixes,
+                        scale_factor=scale_factors[pt_hat_bin],
+                        r_max=r_max,
+                        inputs=[File(str(input_filename))],
+                        outputs=[File(str(output_filename))],
+                    )
                 )
-            )
 
     return results
 
@@ -380,6 +382,7 @@ def run() -> None:
                     convert_data_format_prefixes=convert_data_format_prefixes[collision_system],
                     scale_factors_dataset=scale_factors_dataset,
                     input_path=input_paths[collision_system],
+                    n_repeat_file=5,
                 )
             )
 
