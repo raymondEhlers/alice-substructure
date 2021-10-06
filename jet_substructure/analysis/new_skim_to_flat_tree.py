@@ -15,8 +15,10 @@ from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 
 import attr
 import awkward as ak
+from networkx.drawing.nx_pylab import draw
 import numba as nb
 import numpy as np
+import numpy.typing as npt
 import uproot
 
 
@@ -630,7 +632,7 @@ def generator_subjet_momentum_fraction_in_measured_jet_numba_wrapper(
 
 
 def _calculate_jet_kinematics(
-    constituents: new_methods.JetConstituentArray, float_type: Optional[np.dtype] = None
+    constituents: new_methods.JetConstituentArray, float_type: Optional[npt.DTypeLike] = None
 ) -> Tuple[ak.Array, ak.Array]:
     """Calculate jet kinematics.
 
@@ -644,9 +646,9 @@ def _calculate_jet_kinematics(
     """
     # jet_four_vec = jets.jet_constituents.four_vectors().sum()
     # Since vector isn't ready yet, just do this by hand...
-    px = ak.sum(constituents.pt * np.cos(constituents.phi), axis=1)
-    py = ak.sum(constituents.pt * np.sin(constituents.phi), axis=1)
-    pz = ak.sum(constituents.pt * np.sinh(constituents.eta), axis=1)
+    px = ak.sum(constituents.pt * np.cos(constituents.phi), axis=1)  # type: ignore
+    py = ak.sum(constituents.pt * np.sin(constituents.phi), axis=1)  # type: ignore
+    pz = ak.sum(constituents.pt * np.sinh(constituents.eta), axis=1)  # type: ignore
     # Formulas just from inverting the above.
     eta = np.arcsinh(pz / np.sqrt(px ** 2 + py ** 2))
     phi = np.arctan2(py, px)
@@ -656,12 +658,15 @@ def _calculate_jet_kinematics(
         return ak.values_astype(eta, float_type), ak.values_astype(phi, float_type)
 
 
-def calculate_embedding_skim(  # noqa: C901
+def calculate_embedding_skim_impl(  # noqa: C901
+    all_jets: ak. Array,
     input_filename: Path,
     iterative_splittings: bool,
     prefixes: Mapping[str, str],
-    scale_factors: Mapping[int, float],
-    train_directory: Path,
+    # TODO: For full embedding with the track skim, this could be a problem.
+    #       However, it will be fine to the thermal model, since we only embed one pt hard bin
+    #scale_factors: Mapping[int, float],
+    scale_factor: float,
     jet_R: float,
     output_filename: Path,
     output_tree_name: str = "tree",
@@ -688,19 +693,9 @@ def calculate_embedding_skim(  # noqa: C901
     # Output consistent types.
     float_type = np.float32
     to_float = functools.partial(ak.values_astype, to=np.float32)
-    # Setup
-    # Use the train configuration to extract the train number and pt hard bin, which are used to get the scale factor.
-    y = yaml.yaml()
-    with open(train_directory / "config.yaml", "r") as f:
-        train_config = y.load(f)
-    train_number = train_config["number"]
-    pt_hard_bin = train_config["pt_hard_bin"]
-    logger.debug(f"Extracted train number: {train_number}, pt hard bin: {pt_hard_bin}")
-    scale_factor = scale_factors[pt_hard_bin]
 
     # Jets setup.
     logger.info(f"Skimming tree from file {input_filename}")
-    all_jets = new_methods.parquet_to_substructure_analysis(filename=input_filename, prefixes=prefixes)
     # true_jets = all_jets["matched"]
     # det_level_jets = all_jets["detLevel"]
     # hybrid_jets = all_jets["data"]
@@ -889,17 +884,19 @@ def calculate_embedding_skim(  # noqa: C901
                         i
                     ][0]
 
+                    splitting_graph_output_dir = output_filename.parent
+
                     # Draw the splittings
                     draw_splitting.splittings_graph(
                         jet=hybrid_jet,
-                        path=train_directory / "leading_correct_subleading_failed/",
+                        path=splitting_graph_output_dir / "leading_correct_subleading_failed/",
                         filename=f"{i}_hybrid_splittings_jet_pt_{hybrid_jet.jet_pt:.1f}GeV_selected_splitting_index_{hybrid_jet_selected_splitting_index}",
                         show_subjet_pt=True,
                         selected_splitting_index=hybrid_jet_selected_splitting_index,
                     )
                     draw_splitting.splittings_graph(
                         jet=det_level_jet,
-                        path=train_directory / "leading_correct_subleading_failed/",
+                        path=splitting_graph_output_dir / "leading_correct_subleading_failed/",
                         filename=f"{i}_det_level_splittings_jet_pt_{det_level_jet.jet_pt:.1f}GeV_selected_splitting_index_{det_level_jet_selected_splitting_index}",
                         show_subjet_pt=True,
                         selected_splitting_index=det_level_jet_selected_splitting_index,
@@ -911,13 +908,19 @@ def calculate_embedding_skim(  # noqa: C901
     output_filename.parent.mkdir(parents=True, exist_ok=True)
     # First, convert to numpy since we want to write to an output tree.
     grooming_results_np = {k: np.asarray(v) for k, v in grooming_results.items()}
-    branches = {k: v.dtype for k, v in grooming_results_np.items()}
+    #branches = {k: v.dtype for k, v in grooming_results_np.items()}
     logger.info(f"Writing embedding skim to {output_filename}")
     # Write with uproot
-    with uproot3.recreate(output_filename) as output_file:
-        output_file[output_tree_name] = uproot3.newtree(branches)
+    #uproot3_filename = output_filename.parent / f"{output_filename.stem}_uproot3{output_filename.suffix}"
+    #with uproot3.recreate(uproot3_filename) as output_file:
+    #    output_file[output_tree_name] = uproot3.newtree(branches)
+    #    # Write all of the calculations
+    #    output_file[output_tree_name].extend(grooming_results_np)
+    #uproot4_filename = output_filename.parent / f"{output_filename.stem}_uproot4{output_filename.suffix}"
+    #with uproot.recreate(uproot4_filename) as output_file:
+    with uproot.recreate(output_filename) as output_file:
         # Write all of the calculations
-        output_file[output_tree_name].extend(grooming_results_np)
+        output_file[output_tree_name] = grooming_results_np
 
     # Some alternative formats for other analysis techniques.
     if write_parquet:
@@ -932,6 +935,55 @@ def calculate_embedding_skim(  # noqa: C901
 
     logger.info(f"Finished processing tree from file {input_filename}")
     return True, output_filename, "processed"
+
+
+def calculate_embedding_skim(  # noqa: C901
+    input_filename: Path,
+    iterative_splittings: bool,
+    prefixes: Mapping[str, str],
+    scale_factors: Mapping[int, float],
+    train_directory: Path,
+    jet_R: float,
+    output_filename: Path,
+    output_tree_name: str = "tree",
+    create_friend_tree: bool = False,
+    draw_example_splittings: bool = False,
+    write_feather: bool = False,
+    write_parquet: bool = False,
+) -> Tuple[bool, Path, str]:
+    # Validation
+    # Bail out early if the file already exists.
+    if output_filename.exists():
+        return True, output_filename, "already exists"
+
+    # Setup
+    # Use the train configuration to extract the train number and pt hard bin, which are used to get the scale factor.
+    y = yaml.yaml()
+    with open(train_directory / "config.yaml", "r") as f:
+        train_config = y.load(f)
+    train_number = train_config["number"]
+    pt_hard_bin = train_config["pt_hard_bin"]
+    logger.debug(f"Extracted train number: {train_number}, pt hard bin: {pt_hard_bin}")
+    scale_factor = scale_factors[pt_hard_bin]
+
+    # Jets setup.
+    logger.info(f"Skimming tree from file {input_filename}")
+    all_jets = new_methods.parquet_to_substructure_analysis(filename=input_filename, prefixes=prefixes)
+
+    return calculate_embedding_skim_impl(
+        all_jets=all_jets,
+        input_filename=input_filename,
+        iterative_splittings=iterative_splittings,
+        prefixes=prefixes,
+        scale_factor=scale_factor,
+        jet_R=jet_R,
+        output_filename=output_filename,
+        output_tree_name=output_tree_name,
+        create_friend_tree=create_friend_tree,
+        draw_example_splittings=draw_example_splittings,
+        write_feather=write_feather,
+        write_parquet=write_parquet,
+    )
 
 
 def calculate_data_skim_impl(  # noqa: C901
@@ -1069,7 +1121,7 @@ def calculate_data_skim_impl(  # noqa: C901
 
             # Need to mask because we didn't when masking the original jets.
             pt_hard_bins = np.array(all_jets["pt_hard_bin"][mask], dtype=np.int16)
-            logger.debug(f"Pt hard bins contained in the file: {np.unique(pt_hard_bins)}")
+            logger.debug(f"Pt hard bins contained in the file: {np.unique(pt_hard_bins)}")  # type: ignore
             pythia_specific_columns = {
                 "scale_factor": np.array([output_scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
                 "pt_hard_bin": pt_hard_bins,
@@ -1150,8 +1202,8 @@ def calculate_data_skim(  # noqa: C901
 def cross_check_task_names_to_export(
     grooming_method: str,
     prefixes: Mapping[str, str],
-) -> Dict[str, np.dtype]:
-    branch_names = {}
+) -> Dict[str, npt.DTypeLike]:
+    branch_names: Dict[str, npt.DTypeLike] = {}
 
     substructure_variables = [
         "{grooming_method}_{prefix}_delta_R",

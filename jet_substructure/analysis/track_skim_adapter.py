@@ -5,37 +5,24 @@
 
 import logging
 from pathlib import Path
-from typing import Mapping, Optional, Tuple, Union
+from typing import Dict, Mapping, Optional, Tuple, Union
 
 import awkward as ak
 import numpy as np
+from mammoth import helpers
+from mammoth.framework import sources
 from mammoth.hardest_kt import analysis_alice
 
 from jet_substructure.analysis import new_skim_to_flat_tree
-from jet_substructure.base import helpers
 
 
 logger = logging.getLogger(__name__)
 
-
-def _hardest_kt_data_skim(
+def _convert_analyzed_jets_to_all_jets_for_skim(
     jets: ak.Array,
-    input_filename: Path,
-    collision_system: str,
-    jet_R: float,
-    iterative_splittings: bool,
     convert_data_format_prefixes: Mapping[str, str],
-    output_filename: Path,
-    scale_factors: Optional[Mapping[int, float]] = None,
-    pt_hat_bin: Optional[int] = -1,
-) -> None:
-    """Implementation of the hardest kt data skim.
-
-    Supports pp, pythia, PbPb, and embedded pythia. The data and jet finding needs to be
-    handled in a separate function.
-    """
-    # Now, adapt into the expected format.
-    all_jets = {
+) -> Dict[str, ak.Array]:
+    return {
         convert_data_format_prefixes[k]: ak.zip(
             {
                 "jet_pt": jets[k].pt,
@@ -71,7 +58,28 @@ def _hardest_kt_data_skim(
         for k in convert_data_format_prefixes
     }
 
-    scale_factors = None
+
+def _hardest_kt_data_skim(
+    jets: ak.Array,
+    input_filename: Path,
+    collision_system: str,
+    jet_R: float,
+    iterative_splittings: bool,
+    convert_data_format_prefixes: Mapping[str, str],
+    output_filename: Path,
+    scale_factors: Optional[Mapping[int, float]] = None,
+    pt_hat_bin: Optional[int] = -1,
+) -> None:
+    """Implementation of the hardest kt data skim.
+
+    Supports pp, pythia, PbPb, and embedded pythia. The data and jet finding needs to be
+    handled in a separate function.
+    """
+    # Now, adapt into the expected format.
+    all_jets = _convert_analyzed_jets_to_all_jets_for_skim(
+        jets=jets, convert_data_format_prefixes=convert_data_format_prefixes,
+    )
+
     prefixes = {"data": "data"}
     if collision_system == "pythia":
         # Store externally provided pt hard bin
@@ -161,18 +169,143 @@ def hardest_kt_data_skim(
     return (True, f"success for {collision_system}, R={jet_R}, {input_filename}")
 
 
+def _hardest_kt_embedding_skim(
+    jets: ak.Array,
+    input_filename: Path,
+    jet_R: float,
+    iterative_splittings: bool,
+    scale_factor: float,
+    convert_data_format_prefixes: Mapping[str, str],
+    output_filename: Path,
+) -> None:
+    # Now, adapt into the expected format.
+    all_jets = _convert_analyzed_jets_to_all_jets_for_skim(
+        jets=jets, convert_data_format_prefixes=convert_data_format_prefixes,
+    )
+
+    # For the thermal model.
+    # TODO: Probably should be an argument for embedding, but can start with this for the thermal model
+    prefixes = {
+        "hybrid": "hybrid",
+        #"part_level": "part_level",
+        "true": "true",
+        "det_level": "det_level",
+    }
+
+    new_skim_to_flat_tree.calculate_embedding_skim_impl(
+        all_jets=all_jets,
+        input_filename=input_filename,
+        iterative_splittings=iterative_splittings,
+        prefixes=prefixes,
+        scale_factor=scale_factor,
+        jet_R=jet_R,
+        output_filename=output_filename,
+    )
+
+def hardest_kt_embedding_skim(
+    input_filename: Path,
+    jet_R: float,
+    min_jet_pt: Union[float, Mapping[str, float]],
+    iterative_splittings: bool,
+    output_filename: Path,
+    thermal_model_parameters: sources.ThermalModelParameters,
+    convert_data_format_prefixes: Mapping[str, str],
+    scale_factor: float,
+    r_max: float,
+) -> Tuple[bool, str]:
+    # TODO: Remove hard code...
+    collision_system = "thermal_model"
+
+    # Setup
+    empty_filename = output_filename.with_suffix(f"{output_filename.suffix}_empty")
+
+    # Try to bail out early to avoid reprocessing if possible.
+    if empty_filename.exists():
+        # It will be empty, so there's nothing to check. Just return
+        return (True, f"Done - no jets to recluster for {collision_system}, R={jet_R}, {input_filename}")
+
+    if output_filename.exists():
+        import uproot
+
+        try:
+            with uproot.open(output_filename) as f:
+                # If the tree exists, can be read, and has more than 0 entries, we should be good
+                if f["tree"].num_entries > 0:
+                    # Return immediately to indicate that we're done.
+                    return (True, f"already processed for {collision_system}, R={jet_R}, {input_filename}")
+        except Exception:
+            # If it fails for some reason, give up - we want to try again
+            pass
+
+    if True:
+        jets = analysis_alice.analysis_embedding(
+            *analysis_alice.load_thermal_model(
+                signal_filename=input_filename,
+                thermal_model_parameters=thermal_model_parameters,
+            ),
+            jet_R=jet_R,
+            min_jet_pt=min_jet_pt,
+            r_max=r_max,
+        )
+    else:
+        raise NotImplementedError(
+            #f"Not yet implemented for {collision_system}..."
+            "Not yet implemented..."
+        )
+
+    # There were no jets. Note that with a specially crafted empty file
+    if len(jets) == 0:
+        # Just create the empty filename and return. This will prevent trying to re-run with no jets in the future.
+        # Remember that this depends heavily on the jet pt cuts!
+        empty_filename.touch()
+        return (True, f"Done - no jets to recluster, so not trying to skim for {collision_system}, R={jet_R}, {input_filename}")
+
+    _hardest_kt_embedding_skim(
+        jets=jets,
+        input_filename=input_filename,
+        jet_R=jet_R,
+        iterative_splittings=iterative_splittings,
+        scale_factor=scale_factor,
+        convert_data_format_prefixes=convert_data_format_prefixes,
+        output_filename=output_filename,
+    )
+
+    return (True, f"success for {collision_system}, R={jet_R}, {input_filename}")
+
 
 if __name__ == "__main__":
-    helpers.setup_logging(logging.INFO)
+    helpers.setup_logging(level=logging.INFO)
 
-    collision_system = "PbPb"
-    base_path = Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}")
-    hardest_kt_data_skim(
-        input_filename=base_path / "AnalysisResults_track_skim.parquet",
-        collision_system=collision_system,
-        jet_R=0.4,
-        min_jet_pt=5 if collision_system == "pp" else 20,
+    # collision_system = "PbPb"
+    # base_path = Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}")
+    # hardest_kt_data_skim(
+    #     input_filename=base_path / "AnalysisResults_track_skim.parquet",
+    #     collision_system=collision_system,
+    #     jet_R=0.4,
+    #     min_jet_pt=5 if collision_system == "pp" else 20,
+    #     iterative_splittings=True,
+    #     convert_data_format_prefixes={"data": "data"},
+    #     output_filename=base_path / "skim" / "skim_output.root",
+    # )
+
+    import jet_substructure.analysis.parsl
+    scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
+        # TODO: Unclear if the collision system should be hard coded
+        collision_system="embedPythia",
+        dataset_name="LHC20g4_embedded_into_LHC18qr_central_R02_6982_7001",
+    )
+
+    base_path = Path(f"/software/rehlers/dev/substructure/trains/pythia/641")
+    hardest_kt_embedding_skim(
+        #input_filename=base_path / "run_by_run/LHC20g4/295612/11/AnalysisResults.20g4.016.root",
+        input_filename=base_path / "run_by_run/LHC20g4/297544/19/AnalysisResults.20g4.005.root",
+        jet_R=0.2,
+        min_jet_pt={"hybrid": 20},
         iterative_splittings=True,
-        convert_data_format_prefixes={"data": "data"},
-        output_filename=base_path / "skim" / "skim_output.root",
+        output_filename=base_path / "skim" / "test" / "thermal_model_skim_output.root",
+        thermal_model_parameters=sources.THERMAL_MODEL_SETTINGS["central"],
+        convert_data_format_prefixes={"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
+        #scale_factor=scale_factors[11],
+        scale_factor=scale_factors[19],
+        r_max=0.25,
     )

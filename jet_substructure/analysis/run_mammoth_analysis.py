@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Mapping, Sequence, Union
 
 import IPython
 from mammoth import helpers, job_utils
+from mammoth.framework import sources
 from parsl.app.app import python_app
 from parsl.data_provider.files import File
 from parsl.dataflow.futures import AppFuture
@@ -142,11 +143,10 @@ def run_embedding_skim(
     jet_R: float,
     min_jet_pt: float,
     iterative_splittings: bool,
-    loading_data_rename_prefix: Mapping[str, str],
+    thermal_model_parameters: sources.ThermalModelParameters,
     convert_data_format_prefixes: Mapping[str, str],
-    event_activity: str,
-    scale_factors: Mapping[int, float],
-    pt_hat_bin: int,
+    scale_factor: float,
+    r_max: float,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> AppFuture:
@@ -156,17 +156,15 @@ def run_embedding_skim(
     from jet_substructure.analysis import track_skim_adapter
 
     try:
-        result = track_skim_adapter.hardest_kt_data_skim(
+        result = track_skim_adapter.hardest_kt_embedding_skim(
             input_filename=Path(inputs[0].filepath),
-            collision_system=collision_system,
-            event_activity=event_activity,
             jet_R=jet_R,
             min_jet_pt=min_jet_pt,
             iterative_splittings=iterative_splittings,
-            loading_data_rename_prefix=loading_data_rename_prefix,
+            thermal_model_parameters=thermal_model_parameters,
             convert_data_format_prefixes=convert_data_format_prefixes,
-            scale_factors=scale_factors,
-            pt_hat_bin=pt_hat_bin,
+            scale_factor=scale_factor,
+            r_max=r_max,
             output_filename=Path(outputs[0].filepath),
         )
     except Exception:
@@ -176,33 +174,37 @@ def run_embedding_skim(
         )
     return result
 
+
 def setup_calculate_thermal_model_skim(
-    probe_collision_system: str,
+    collision_system: str,
     min_jet_pt: Union[float, Mapping[str, float]],
     jet_R_values: Sequence[float],
     iterative_splittings: bool,
-    loading_data_rename_prefix: Mapping[str, str],
     convert_data_format_prefixes: Mapping[str, str],
     input_path: Path,
-    event_activity: str = "",
-    scale_factors_dataset: str = "",
+    event_activity: str,
+    scale_factors_dataset: str,
+    r_max: float = 0.25,
 ) -> List[AppFuture]:
-    """Analyze hardest kt data"""
-    input_files = sorted(input_path.glob("*/*/*.root"))
+    """Analyze and skim hardest kt embedding"""
+    # NOTE: These are pythia input files. They include an extra "*" to account for the pt hard bin...
+    input_files = sorted(input_path.glob("*/*/*/*.root"))
 
     # TEMP for testing
-    # input_files = input_files[:4]
+    #input_files = input_files[:1]
+    #input_files = input_files[:4]
+    #input_files = input_files[:10]
     # ENDTEMP
 
-    scale_factors = None
-    if scale_factors_dataset:
-        import jet_substructure.analysis.parsl
+    # NOTE: Delayed import since this comes with _a lot_ of other things. Should be refactored...
+    import jet_substructure.analysis.parsl
+    scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
+        # TODO: Unclear if this should be hard coded
+        collision_system="embedPythia",
+        dataset_name=scale_factors_dataset,
+    )
 
-        scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
-            # TODO: Unclear if this should be hard coded
-            collision_system="pythia",
-            dataset_name=scale_factors_dataset,
-        )
+    thermal_model_parameters = sources.THERMAL_MODEL_SETTINGS[event_activity]
 
     results = []
     for i, input_filename in enumerate(input_files):
@@ -215,7 +217,8 @@ def setup_calculate_thermal_model_skim(
         run_dir = input_filename.parent.name
         pt_hat_bin = -1
         # However, if we're looking at pythia, we also need to account for the pt hard bin
-        if collision_system == "pythia":
+        #if collision_system == "pythia":
+        if True:
             # In this case, the input_file is in trains/collision_system/train_number/run_by_run/period/run_number/pt_hard_bin/filename.root
             # At least for LHC20g4 and LHC18b8
             # Thus, to get the train directory, we need to take the parent 5 times
@@ -230,23 +233,22 @@ def setup_calculate_thermal_model_skim(
 
         for jet_R in jet_R_values:
             # Setup file I/O
-            output_dir = train_directory / "skim" / f"R{round(jet_R * 10):02}" / run_dir
+            output_dir = train_directory / "skim" / collision_system / event_activity / f"R{round(jet_R * 10):02}" / run_dir
             if not output_dir.exists():
                 output_dir.mkdir(parents=True, exist_ok=True)
             output_filename = output_dir / f"{input_filename.stem}_{iterative_splittings_label}_splittings.root"
             results.append(
                 run_embedding_skim(
                     collision_system=collision_system,
-                    event_activity=event_activity,
                     jet_R=jet_R,
                     min_jet_pt=min_jet_pt,
                     iterative_splittings=iterative_splittings,
-                    loading_data_rename_prefix=loading_data_rename_prefix,
+                    thermal_model_parameters=thermal_model_parameters,
                     convert_data_format_prefixes=convert_data_format_prefixes,
+                    scale_factor=scale_factors[pt_hat_bin],
+                    r_max=r_max,
                     inputs=[File(str(input_filename))],
                     outputs=[File(str(output_filename))],
-                    pt_hat_bin=pt_hat_bin,
-                    scale_factors=scale_factors,
                 )
             )
 
@@ -262,8 +264,9 @@ def run() -> None:
         "pythia": {"det_level": 5},
         "embedPythia": 20,
         "PbPb": 20,
+        "thermal_model": {"hybrid": 20},
     }
-    collision_systems_to_process = ["PbPb"]
+    collision_systems_to_process = ["thermal_model"]
     dataset_name = "LHC18qr_central_642"
     event_activity = "central"
 
@@ -271,6 +274,7 @@ def run() -> None:
     input_paths = {
         "pythia": Path("trains/pythia/2619/run_by_run/LHC18b8_fast/"),
         "PbPb": Path("trains/PbPb/642/run_by_run/"),
+        "thermal_model": Path("trains/pythia/641/run_by_run/"),
     }
     loading_data_rename_prefix = {
         "pp": {"data": "data"},
@@ -286,14 +290,15 @@ def run() -> None:
         # so we have to handle it here.
         "pythia": {"det_level": "data", "part_level": "true"},
         "PbPb": {"data": "data"},
+        "thermal_model": {"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
     }
 
     # Job execution parameters
     task_name = "hardest_kt_mammoth"
     tasks_to_execute = [
-        "calculate_data_skim"
+        # "calculate_data_skim"
         # "calculate_embedding_skim",
-        # "calculate_thermal_model_skim",
+        "calculate_thermal_model_skim",
     ]
 
     # Job execution configuration
@@ -302,7 +307,8 @@ def run() -> None:
     # walltime = "1:59:00"
     n_cores_to_allocate = 80
     walltime = "24:00:00"
-    # n_cores_to_allocate = 2
+    #n_cores_to_allocate = 2
+    #n_cores_to_allocate = 10
 
     # Validation
     # Collision system
@@ -311,7 +317,7 @@ def run() -> None:
         "pythia",
         "PbPb",
         "embedPythia",
-        "thermalModel",
+        "thermal_model",
     ]
     if not set(collision_systems_to_process).issubset(_possible_collision_systems):
         raise ValueError(f"Invalid collisions system(s) to process. Provided: {collision_systems_to_process}")
@@ -351,6 +357,26 @@ def run() -> None:
                     jet_R_values=jet_R_values,
                     iterative_splittings=iterative_splittings,
                     loading_data_rename_prefix=loading_data_rename_prefix.get(collision_system, {}),
+                    convert_data_format_prefixes=convert_data_format_prefixes[collision_system],
+                    scale_factors_dataset=scale_factors_dataset,
+                    input_path=input_paths[collision_system],
+                )
+            )
+        if "calculate_thermal_model_skim" in tasks_to_execute:
+            if event_activity == "central":
+                scale_factors_dataset = "LHC20g4_embedded_into_LHC18qr_central_R02_6982_7001"
+            elif event_activity == "semi_central":
+                scale_factors_dataset = "LHC20g4_embedded_into_LHC18qr_semi_central_R02_6932_6951"
+            else:
+                raise RuntimeError(f"Dunno what to do with {event_activity} for the scale factors dataset. Check this...")
+
+            system_results.extend(
+                setup_calculate_thermal_model_skim(
+                    collision_system=collision_system,
+                    event_activity=event_activity,
+                    min_jet_pt=min_jet_pt[collision_system],  # type: ignore
+                    jet_R_values=jet_R_values,
+                    iterative_splittings=iterative_splittings,
                     convert_data_format_prefixes=convert_data_format_prefixes[collision_system],
                     scale_factors_dataset=scale_factors_dataset,
                     input_path=input_paths[collision_system],
