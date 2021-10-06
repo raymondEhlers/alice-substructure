@@ -104,10 +104,11 @@ def setup_calculate_data_skim(
             # At least for LHC20g4 and LHC18b8
             # Thus, to get the train directory, we need to take the parent 5 times
             train_directory = input_filename.parent.parent.parent.parent.parent
-            # And the run dir is two parents up. Here, we want to include the period to differentiate it
-            run_dir = str(Path(input_filename.parent.parent.parent.name) / input_filename.parent.parent.name)
-            # And the pt hard bin is the parent dir
+            # The pt hard bin is the parent dir
             pt_hat_bin = int(str(input_filename.parent.name))
+            # For the run dir, we want to include the period, run, and pt hat bin
+            # The period is 3 parents up and the run number is 2 parents up
+            run_dir = str(Path(input_filename.parent.parent.parent.name) / input_filename.parent.parent.name / str(pt_hat_bin))
 
         # Further setup
         iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
@@ -224,10 +225,11 @@ def setup_calculate_thermal_model_skim(
             # At least for LHC20g4 and LHC18b8
             # Thus, to get the train directory, we need to take the parent 5 times
             train_directory = input_filename.parent.parent.parent.parent.parent
-            # And the run dir is two parents up. Here, we want to include the period to differentiate it
-            run_dir = str(Path(input_filename.parent.parent.parent.name) / input_filename.parent.parent.name)
-            # And the pt hard bin is the parent dir
+            # The pt hard bin is the parent dir
             pt_hat_bin = int(str(input_filename.parent.name))
+            # For the run dir, we want to include the period, run, and pt hat bin
+            # The period is 3 parents up and the run number is 2 parents up
+            run_dir = str(Path(input_filename.parent.parent.parent.name) / input_filename.parent.parent.name / str(pt_hat_bin))
 
         # Further setup
         iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
@@ -235,9 +237,11 @@ def setup_calculate_thermal_model_skim(
         for jet_R in jet_R_values:
             # Setup file I/O
             output_dir = train_directory / "skim" / collision_system / event_activity / f"R{round(jet_R * 10):02}" / run_dir
+
             if not output_dir.exists():
                 output_dir.mkdir(parents=True, exist_ok=True)
             for i in range(n_repeat_file):
+                # NOTE: This includes the period, run, and pt hat
                 output_filename = output_dir / f"{input_filename.stem}_{iterative_splittings_label}_splittings_{i:02}.root"
                 results.append(
                     run_embedding_skim(

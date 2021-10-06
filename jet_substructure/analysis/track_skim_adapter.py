@@ -217,7 +217,7 @@ def hardest_kt_embedding_skim(
     collision_system = "thermal_model"
 
     # Setup
-    empty_filename = output_filename.with_suffix(f"{output_filename.suffix}_empty")
+    empty_filename = output_filename.with_suffix(".empty")
 
     # Try to bail out early to avoid reprocessing if possible.
     if empty_filename.exists():
