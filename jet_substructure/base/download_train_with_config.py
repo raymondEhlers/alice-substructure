@@ -254,7 +254,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                     _pass_value = str(config.get("pass", ""))
                     # Add "pass" to the front of the name. Only if it's a general dataset pass
                     if _pass_value != "":
-                        _pass_value = f"pass{str(pass_value)}"
+                        _pass_value = f"pass{str(_pass_value)}"
                 if _pass_value is None:
                     _pass_value = ""
                 pass_value = Path(_pass_value)
