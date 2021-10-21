@@ -94,7 +94,7 @@ tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>
 
 [[package]]
 name = "awkward"
-version = "1.4.0"
+version = "1.5.1"
 description = "Manipulate JSON-like data with NumPy-like idioms."
 category = "main"
 optional = false
@@ -104,9 +104,9 @@ python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
 numpy = ">=1.13.1"
 
 [package.extras]
-all = ["pytest (>=3.9)", "awkward-cuda-kernels (==1.4.0)", "flake8", "pyyaml", "autograd", "numba (>=0.50.0)", "numexpr", "pandas (>=0.24.0)", "jax (>=0.2.7)", "jaxlib (>=0.1.57,<0.1.68)", "pyarrow (>=3.0.0)"]
-cuda = ["awkward-cuda-kernels (==1.4.0)"]
-dev = ["flake8", "pyyaml", "autograd", "numba (>=0.50.0)", "numexpr", "pandas (>=0.24.0)", "jax (>=0.2.7)", "jaxlib (>=0.1.57,<0.1.68)", "pyarrow (>=3.0.0)"]
+all = ["pytest (>=3.9)", "awkward-cuda-kernels (==1.5.1)", "flake8", "pyyaml", "autograd", "numba (>=0.50.0)", "numexpr", "pandas (>=0.24.0)", "jax (>=0.2.7)", "jaxlib (>=0.1.57,!=0.1.68)", "pyarrow (>=3.0.0)"]
+cuda = ["awkward-cuda-kernels (==1.5.1)"]
+dev = ["flake8", "pyyaml", "autograd", "numba (>=0.50.0)", "numexpr", "pandas (>=0.24.0)", "jax (>=0.2.7)", "jaxlib (>=0.1.57,!=0.1.68)", "pyarrow (>=3.0.0)"]
 test = ["pytest (>=3.9)"]
 
 [[package]]
@@ -379,7 +379,7 @@ six = "*"
 
 [[package]]
 name = "dask"
-version = "2021.9.0"
+version = "2021.9.1"
 description = "Parallel PyData with Task Scheduling"
 category = "main"
 optional = false
@@ -397,10 +397,10 @@ toolz = ">=0.8.2"
 
 [package.extras]
 array = ["numpy (>=1.18)"]
-complete = ["bokeh (>=1.0.0,!=2.0.0)", "distributed (==2021.09.0)", "jinja2", "numpy (>=1.18)", "pandas (>=1.0)"]
+complete = ["bokeh (>=1.0.0,!=2.0.0)", "distributed (==2021.09.1)", "jinja2", "numpy (>=1.18)", "pandas (>=1.0)"]
 dataframe = ["numpy (>=1.18)", "pandas (>=1.0)"]
 diagnostics = ["bokeh (>=1.0.0,!=2.0.0)", "jinja2"]
-distributed = ["distributed (==2021.09.0)"]
+distributed = ["distributed (==2021.09.1)"]
 test = ["pytest", "pytest-rerunfailures", "pytest-xdist"]
 
 [[package]]
@@ -2287,7 +2287,7 @@ docs = ["sphinx (>=3.0,<4.0)", "sphinx_book_theme (>=0.0.40)", "sphinx_copybutto
 
 [[package]]
 name = "uproot"
-version = "4.1.1"
+version = "4.1.5"
 description = "ROOT I/O in pure Python and NumPy."
 category = "main"
 optional = false
@@ -2452,7 +2452,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7.1,<3.10"
-content-hash = "0b838da63799fbd25ed63358d74b4fc40c0a3172192b2ac1e88094b38b4daa99"
+content-hash = "4cb8b29d8f3a2555662daba211ea07393eaaf975742122d9d00d67525d9e7117"
 
 [metadata.files]
 algopy = [
@@ -2496,41 +2496,41 @@ attrs = [
     {file = "attrs-21.2.0.tar.gz", hash = "sha256:ef6aaac3ca6cd92904cdd0d83f629a15f18053ec84e6432106f7a4d04ae4f5fb"},
 ]
 awkward = [
-    {file = "awkward-1.4.0-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:a9b399bc4162dbc8a6ca88fa8a16eb6059fe4c5cfe12c82a8a475af560f54885"},
-    {file = "awkward-1.4.0-cp27-cp27m-manylinux1_x86_64.whl", hash = "sha256:63deb3b46755633c89e05cb63ee75e863a91371b556a94e9d2ee78f20a744732"},
-    {file = "awkward-1.4.0-cp27-cp27mu-manylinux1_x86_64.whl", hash = "sha256:74a23d62998899197fafe194b094f3782fcb9ad00337512a97080eb9586e83b7"},
-    {file = "awkward-1.4.0-cp35-cp35m-macosx_10_9_x86_64.whl", hash = "sha256:6cf0c0f5133019fbf8b0abf94fc234136b2c3e6e919bc28bddd8e0f852559a12"},
-    {file = "awkward-1.4.0-cp35-cp35m-manylinux1_x86_64.whl", hash = "sha256:d9772c752c42e3df0d0e667569a6409096d69952e366b5d2f0ba62b8026ffd7e"},
-    {file = "awkward-1.4.0-cp35-cp35m-win32.whl", hash = "sha256:d96caf1062d82ba6dea08151eaf1e2a500aff405a732380f166a2aa08f345f79"},
-    {file = "awkward-1.4.0-cp35-cp35m-win_amd64.whl", hash = "sha256:2671328646b1da7e0c9b935936afeae630b5b70da18c00d223801cdbdc456e50"},
-    {file = "awkward-1.4.0-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:c81d4a26d24044ba40cbe5e1a3a737495162c08d8d9c8d0e70953ba114cdf9df"},
-    {file = "awkward-1.4.0-cp36-cp36m-manylinux1_x86_64.whl", hash = "sha256:0e5e3761173bb9af8d90dbc80db18f1de6c96fc9a364aaeb739d3c26003a3847"},
-    {file = "awkward-1.4.0-cp36-cp36m-manylinux2010_x86_64.whl", hash = "sha256:900840eac4dcb2c5a20f9bafd58cdbfe32d909f91c74903a0ca0f4e689062d76"},
-    {file = "awkward-1.4.0-cp36-cp36m-manylinux2014_aarch64.whl", hash = "sha256:a23c8735ed5eda05a1e368f7dc9399d9ace527e48b789e915f2b64437b0271bb"},
-    {file = "awkward-1.4.0-cp36-cp36m-win32.whl", hash = "sha256:d461b6ebc07c665413d7a0f09497631d33915df72b1fd0a6902f98efc1cefb58"},
-    {file = "awkward-1.4.0-cp36-cp36m-win_amd64.whl", hash = "sha256:dc348a2aa80bfb868bf9d04c313cdff2732c32dcebd4f3f9d98218dd8e7f2d8a"},
-    {file = "awkward-1.4.0-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:dd096f59e8f9f81386426415edfb5220fa8d10d1bac3ed77eaf313d9f07112ff"},
-    {file = "awkward-1.4.0-cp37-cp37m-manylinux1_x86_64.whl", hash = "sha256:9cdbd20bf7d95500e5226a1b70b0489a3edb419e768674381e1ae60994a71f73"},
-    {file = "awkward-1.4.0-cp37-cp37m-manylinux2010_x86_64.whl", hash = "sha256:a140a27d59bcbe21a855e3e5cbb6ffa3592bce554e4e482ce0c5ab10d56b6073"},
-    {file = "awkward-1.4.0-cp37-cp37m-manylinux2014_aarch64.whl", hash = "sha256:561167b1774673265100fa53bdb34b0b13a6925368dff1446edd32114a53b227"},
-    {file = "awkward-1.4.0-cp37-cp37m-win32.whl", hash = "sha256:71c4dcbc19f2634d09387bbc7725e1ae7b95b6e20e5dd1f1b862267431afd673"},
-    {file = "awkward-1.4.0-cp37-cp37m-win_amd64.whl", hash = "sha256:4058a9f49e7705ee66987b7fe06a3d4cbdc3e73a02abb27ebb6e4c95b0cbbd13"},
-    {file = "awkward-1.4.0-cp38-cp38-macosx_10_9_universal2.whl", hash = "sha256:9a028ba26e239a733ab1e5338391d8325401e98aed3a8aa1f3c81048904a19dd"},
-    {file = "awkward-1.4.0-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:b5d2693b9d3923c89b917e83e158a74c2f80ab70e79413da93480db0a88fe9e5"},
-    {file = "awkward-1.4.0-cp38-cp38-manylinux1_x86_64.whl", hash = "sha256:94b5adbaf155cd67487fb0119f81697365e43c9d5667bf53166de97b8af33321"},
-    {file = "awkward-1.4.0-cp38-cp38-manylinux2010_x86_64.whl", hash = "sha256:95fe8e9dbc07431dac2fedc4499b09abd019dfd55d94661073f9f20510f8a0d9"},
-    {file = "awkward-1.4.0-cp38-cp38-manylinux2014_aarch64.whl", hash = "sha256:74d2548302448d419a499d535919e425114d333d6b84ec642e19fba7a65dcd0f"},
-    {file = "awkward-1.4.0-cp38-cp38-win32.whl", hash = "sha256:4b5d06bf63a693d1e660f6dad6a079f829d6134ff14df77a09b2faab9beb24fd"},
-    {file = "awkward-1.4.0-cp38-cp38-win_amd64.whl", hash = "sha256:aca60d6ff7dbd493cb403afa1f47a6e6c12bb39f2ffd4b27e340f9abef72c808"},
-    {file = "awkward-1.4.0-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:a911d61c4e20d4612727ab2caf9a2fcf38ffa629d647b3f7fe80e1fda1b404a7"},
-    {file = "awkward-1.4.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:8e544669b497f16ba18e67c7f4dfb0491a4f65e74294ae674570307e4f3aa0ad"},
-    {file = "awkward-1.4.0-cp39-cp39-manylinux2010_x86_64.whl", hash = "sha256:d0ba578d7936034ebc754eaed14a305aacb880049b0336995c2437ba61d53e4c"},
-    {file = "awkward-1.4.0-cp39-cp39-manylinux2014_aarch64.whl", hash = "sha256:0a4d6e07a10d589963d7541910ea0cc570be38dc53cf2ab1deb6aedd49e47215"},
-    {file = "awkward-1.4.0-cp39-cp39-win32.whl", hash = "sha256:ece0d1777898b075582b2ec7612577f806dd330c8301ea76123fdbc0e710852a"},
-    {file = "awkward-1.4.0-cp39-cp39-win_amd64.whl", hash = "sha256:3c32db587cc5cd85aaee4ed71031d29e5687ea4976e44308ac45a560dde22f3b"},
-    {file = "awkward-1.4.0-pp37-pypy37_pp73-macosx_10_9_x86_64.whl", hash = "sha256:9f6317fc0d26f808ad952e83c5c1196a123bb53b3cd3b03b004fe3114041fec1"},
-    {file = "awkward-1.4.0-pp37-pypy37_pp73-manylinux2010_x86_64.whl", hash = "sha256:7ba2433e68c959445a4950736099e05b2526faa15fcbf3d90d4fd9bf7de06880"},
-    {file = "awkward-1.4.0.tar.gz", hash = "sha256:25ae6114d5962c717cb87e3bc30a2f6eaa232b252cf8c51ba805b8f04664ae0d"},
+    {file = "awkward-1.5.1-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:24d1ac692bc426e062145f3208fb11e3c0f61777236078413bcfd90ee5894d93"},
+    {file = "awkward-1.5.1-cp27-cp27m-manylinux1_x86_64.whl", hash = "sha256:2d162c9a48285c2c22715d13516d1cbae3cbf4b96a42298397dfe2950c7af015"},
+    {file = "awkward-1.5.1-cp27-cp27mu-manylinux1_x86_64.whl", hash = "sha256:45d80dd3829db3f760d162eb17c122caa79c52a85171045f1827104c5ea72af7"},
+    {file = "awkward-1.5.1-cp35-cp35m-macosx_10_9_x86_64.whl", hash = "sha256:58c09693448f4340d0687dd14c9e34f2c4a45d420b14572b56629cebe7a9309d"},
+    {file = "awkward-1.5.1-cp35-cp35m-manylinux1_x86_64.whl", hash = "sha256:d94540da882277f06457d21e1285d28da2a193ecd020169571540ecf70655187"},
+    {file = "awkward-1.5.1-cp35-cp35m-win32.whl", hash = "sha256:1aa0a8170766185b47b649705ca41b926af90b3673a04cb036b69d1936a40a53"},
+    {file = "awkward-1.5.1-cp35-cp35m-win_amd64.whl", hash = "sha256:714274d4276fb4c7b110cd6879b52c9d08be9d7be06ba956dc149b1e00317ac2"},
+    {file = "awkward-1.5.1-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:0c813c873a1345a0759c78d4260a013d32965c9d0ad0516294d04844ddc77456"},
+    {file = "awkward-1.5.1-cp36-cp36m-manylinux1_x86_64.whl", hash = "sha256:916532e6df19de186f6cf2c18aac0dac9157a4fd1586a9f5cedd9e1d4bbd9527"},
+    {file = "awkward-1.5.1-cp36-cp36m-manylinux2010_x86_64.whl", hash = "sha256:18de93a26097e9c002f9637df8d1fc7614726b7b025d0667d3e179816ad4ea46"},
+    {file = "awkward-1.5.1-cp36-cp36m-manylinux2014_aarch64.whl", hash = "sha256:b2eaff6072cd25cef668e0c3fe2330897979de778cfa324e969c882dbcd022d1"},
+    {file = "awkward-1.5.1-cp36-cp36m-win32.whl", hash = "sha256:669ce71602efb958d2bd93971d8e8d6b829c0fd80da4fcb0796a92b1f707254c"},
+    {file = "awkward-1.5.1-cp36-cp36m-win_amd64.whl", hash = "sha256:e4f688569a4e06e683835e35496b629f93685f5a722031d0b18dd52fac37d82a"},
+    {file = "awkward-1.5.1-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:a38712b1936de70d8646480234af8b520e612eea7d98f331218a609e30f7771f"},
+    {file = "awkward-1.5.1-cp37-cp37m-manylinux1_x86_64.whl", hash = "sha256:846e2eb0a40a9b811d4c6d26a5eb0d1c3aa4cc10c89fc9edc0b422404f17737b"},
+    {file = "awkward-1.5.1-cp37-cp37m-manylinux2010_x86_64.whl", hash = "sha256:2c3d36c3e257e11f5bfcdb30c77898313b0c81111b32a1e6f596cdd9406be85a"},
+    {file = "awkward-1.5.1-cp37-cp37m-manylinux2014_aarch64.whl", hash = "sha256:307a3308cf854c8ab45b44509074ba03a707e10701dc1d49a0af439bfad82619"},
+    {file = "awkward-1.5.1-cp37-cp37m-win32.whl", hash = "sha256:3ae415566b3e942e0af6e0cb4182344273c58b0150e52a4177531e6bc940678b"},
+    {file = "awkward-1.5.1-cp37-cp37m-win_amd64.whl", hash = "sha256:c089abaff5089e4c0e93131eba794abb0049e19de845448d07bd48580105f26e"},
+    {file = "awkward-1.5.1-cp38-cp38-macosx_10_9_universal2.whl", hash = "sha256:0e582e45eb079f4909cfd7534655ed7f0c2a88c1cbde912a0a2d33a43753f6f3"},
+    {file = "awkward-1.5.1-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:584154bce26fea5f6e7652ec70d8fff145aa4d8121b8c18c3f7e8e410b87cc9d"},
+    {file = "awkward-1.5.1-cp38-cp38-manylinux1_x86_64.whl", hash = "sha256:dafb1e5765d95c3c49ed048805fdc4d17cc9485e2f0dba66dba55589b9c9d0df"},
+    {file = "awkward-1.5.1-cp38-cp38-manylinux2010_x86_64.whl", hash = "sha256:6a4223c13207edfd750b724315ca576830375dd5cdf6e79afa28362c1ef6042a"},
+    {file = "awkward-1.5.1-cp38-cp38-manylinux2014_aarch64.whl", hash = "sha256:74310f5c1d8ae0b7731bb6714d5bbb98b36c8dedde415ce5c00d650898d47e82"},
+    {file = "awkward-1.5.1-cp38-cp38-win32.whl", hash = "sha256:ba0fce4ae05da2002fc16104ec4ebb696abcde85a581b0f87ba7c3379594cf8b"},
+    {file = "awkward-1.5.1-cp38-cp38-win_amd64.whl", hash = "sha256:5028c9a186833e83ee7ae3e216c99f014bfdde30d2aa680b78cc347955c4efa6"},
+    {file = "awkward-1.5.1-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:1ec23b1df5c79ac7ea82bc01200d80c47be0b0cbf8042dfe1b893d495dc0fecd"},
+    {file = "awkward-1.5.1-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:19039e676e4f4bb88d75bfadc8933cab72b12f1225d594a1499e89aa0fade121"},
+    {file = "awkward-1.5.1-cp39-cp39-manylinux2010_x86_64.whl", hash = "sha256:82fd37aad622946e169fcb371a7443da52970b733f90c2f486f223694c66ac3d"},
+    {file = "awkward-1.5.1-cp39-cp39-manylinux2014_aarch64.whl", hash = "sha256:01339fd080cd4b79ba8958cd92f69765dab8da35af9d1fbfb80705b54fa07c29"},
+    {file = "awkward-1.5.1-cp39-cp39-win32.whl", hash = "sha256:927ee584e49107f358cbbb09520047b5a1a8ae3ecfb6dea5ac6c634302195f91"},
+    {file = "awkward-1.5.1-cp39-cp39-win_amd64.whl", hash = "sha256:55ad443425d386eaf3dfb45a94e13c012224f81cadb6a4ae9ca8b5fe29b62ac4"},
+    {file = "awkward-1.5.1-pp37-pypy37_pp73-macosx_10_9_x86_64.whl", hash = "sha256:169a988a40c236f78139c6d2966f6e4c241f23327b5c5d331ac527c48482e60b"},
+    {file = "awkward-1.5.1-pp37-pypy37_pp73-manylinux2010_x86_64.whl", hash = "sha256:af3e37aa0ed413a55c7d5dd954f875954c152858a82320603089792a2118ec19"},
+    {file = "awkward-1.5.1.tar.gz", hash = "sha256:c0357c62223fefcfc7a7565389dbd4db900623bf10eccf2bc8e87586ec59b38d"},
 ]
 awkward0 = [
     {file = "awkward0-0.15.5-py3-none-any.whl", hash = "sha256:5fdaa3b29ea2426665215478b9b9199e991da5ab1f1f2996dcbfe848e08a40a1"},
@@ -2710,8 +2710,8 @@ cycler = [
     {file = "cycler-0.10.0.tar.gz", hash = "sha256:cd7b2d1018258d7247a71425e9f26463dfb444d411c39569972f4ce586b0c9d8"},
 ]
 dask = [
-    {file = "dask-2021.9.0-py3-none-any.whl", hash = "sha256:cf557bfd8f0086270ca3f6b344d945e4a8061f118a7c5b7b0c2e4b56f6c419c4"},
-    {file = "dask-2021.9.0.tar.gz", hash = "sha256:7c1ed5069fd81925130db7a7c94037eb8259fb3599adb4d130748aa3966e5684"},
+    {file = "dask-2021.9.1-py3-none-any.whl", hash = "sha256:816beb22d6b3f71d5bbc68ed374b53fb47feee871399dbf0e41f456092f44e62"},
+    {file = "dask-2021.9.1.tar.gz", hash = "sha256:e11f2bf2cac809e5408fc107dcf727af3bc3472160f206cb4b828211396ad65c"},
 ]
 debugpy = [
     {file = "debugpy-1.4.1-cp27-cp27m-macosx_10_14_x86_64.whl", hash = "sha256:a2c5a1c49239707ed5bc8e97d8f9252fb392d9e13c79c7b477593d7dde4ae24a"},
@@ -3963,8 +3963,8 @@ uhi = [
     {file = "uhi-0.3.0.tar.gz", hash = "sha256:3f441bfa89fae11aa762ae1ef1b1b454362d228e9084477773ffb82d6e9f5d2c"},
 ]
 uproot = [
-    {file = "uproot-4.1.1-py2.py3-none-any.whl", hash = "sha256:1b2c67fabe32ec9cd0e953c4167c47c71385f2702875bbbcec9d13b9f37218ee"},
-    {file = "uproot-4.1.1.tar.gz", hash = "sha256:beecf0fb5115928e201e131f770dcca0e0e0100a99d5b9b1d22d56d56ddf9d04"},
+    {file = "uproot-4.1.5-py2.py3-none-any.whl", hash = "sha256:0699c7538209c9fb231f5b65f8c0ff9ee130074f62ed187d560598e2f180c623"},
+    {file = "uproot-4.1.5.tar.gz", hash = "sha256:a84833c8b9c2a66ec0d45e9195ddcc5b07c51ecaa524b2a454798c0f4e1fcb4f"},
 ]
 uproot3 = [
     {file = "uproot3-3.14.4-py3-none-any.whl", hash = "sha256:d0b513aed4af17278d582a4879eff7037efe0752c7e2154683ac4c4f083c30c0"},
