@@ -8,6 +8,7 @@
 from pathlib import Path
 from typing import Dict, Mapping, Optional, Sequence
 
+import boost_histogram as bh
 import hist
 import matplotlib.pyplot as plt
 import numpy as np
@@ -36,7 +37,7 @@ def get_hists(filename: Path) -> Dict[str, hist.Hist]:
 
 def combine_spectra_in_cent_bins(hists: Mapping[str, hist.Hist], jet_type: str, jet_R: float, a: str, b: str) -> hist.Hist:
     #name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
-    name = "n_events"
+    name = "n_events_weighted"
 
     a_n_events = hists[f"PbPb_{a}"][name]
     b_n_events = hists[f"PbPb_{b}"][name]
@@ -51,6 +52,7 @@ def combine_spectra_in_cent_bins(hists: Mapping[str, hist.Hist], jet_type: str, 
 def plot(output_dir: Path,
          jet_R_values: Optional[Sequence[float]] = None,
          jet_types: Optional[Sequence[str]] = None,
+         write_hists: bool = False,
          ) -> None:
     # Validation
     if jet_R_values is None:
@@ -95,7 +97,7 @@ def plot(output_dir: Path,
                 print(text)
 
                 # Finish labeling
-                text += "\n" + r"JETSCAPE MATTER + LBT"
+                text += "\n" + r"JETSCAPE Work in Progress" + "\n" + "MATTER + LBT"
                 text += "\n" + r"$\alpha_{s} = 0.3$, $Q_{\text{switch}} = 2$ GeV"
 
                 plot_config = pb.PlotConfig(
@@ -158,7 +160,7 @@ def plot(output_dir: Path,
 
                 # Get scaled pp ref for RAA
                 #name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
-                name = "n_events"
+                name = "n_events_weighted"
                 h_pp_ref_n_events = hists["pp"][name]
                 name = f"{jet_type}_jetR{format_R(jet_R)}_jet_pt"
                 # Scale immediately, since we're going to do it anyway
@@ -167,7 +169,7 @@ def plot(output_dir: Path,
 
                 for system, v in hists.items():
                     #name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
-                    name = "n_events"
+                    name = "n_events_weighted"
                     h_n_events = v[name]
                     name = f"{jet_type}_jetR{format_R(jet_R)}_jet_pt"
                     h_jet_pt = v[name]
@@ -209,8 +211,8 @@ def plot(output_dir: Path,
                 #h_RAA = h_pp_ref_jet_pt / h_PbPb_00_10_jet_pt
                 #(h_RAA[::hist.rebin(5)] / 5).plot(ax=ax_RAA, label=labels["PbPb_00_10"], linewidth=2)
                 h_RAA = (
-                    binned_data.BinnedData.from_existing_data((h_PbPb_00_10_jet_pt[::hist.rebin(10)] / 10))
-                    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[::hist.rebin(10)] / 10))
+                    binned_data.BinnedData.from_existing_data((h_PbPb_00_10_jet_pt[10j::hist.rebin(10)] / 10))
+                    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[10j::hist.rebin(10)] / 10))
                 )
                 RAA_hists["PbPb_00_10"][f"{jet_type}_R{format_R(jet_R)}"] = h_RAA
                 ax_RAA.errorbar(
@@ -226,8 +228,8 @@ def plot(output_dir: Path,
                 #h_RAA = h_pp_ref_jet_pt / h_PbPb_30_50_jet_pt
                 #(h_RAA[::hist.rebin(5)] / 5).plot(ax=ax_RAA, label=labels["PbPb_30_50"], linewidth=2)
                 h_RAA = (
-                    binned_data.BinnedData.from_existing_data((h_PbPb_30_50_jet_pt[::hist.rebin(10)] / 10))
-                    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[::hist.rebin(10)] / 10))
+                    binned_data.BinnedData.from_existing_data((h_PbPb_30_50_jet_pt[10j::hist.rebin(10)] / 10))
+                    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[10j::hist.rebin(10)] / 10))
                 )
                 RAA_hists["PbPb_30_50"][f"{jet_type}_R{format_R(jet_R)}"] = h_RAA
                 ax_RAA.errorbar(
@@ -266,7 +268,7 @@ def plot(output_dir: Path,
                 print(text)
 
                 # Finish labeling
-                text += "\n" + r"JETSCAPE MATTER + LBT"
+                text += "\n" + r"JETSCAPE Work in Progress" + "\n" + "MATTER + LBT"
                 text += "\n" + r"$\alpha_{s} = 0.3$, $Q_{\text{switch}} = 2$ GeV"
 
                 plot_config = pb.PlotConfig(
@@ -290,11 +292,13 @@ def plot(output_dir: Path,
                 )
                 for jet_R in jet_R_values:
                     h_RAA = RAA_hists[system][f"{jet_type}_R{format_R(jet_R)}"]
-                    ax.errorbar(
+                    p = ax.fill_between(
                         h_RAA.axes[0].bin_centers,
-                        h_RAA.values,
-                        xerr=h_RAA.axes[0].bin_widths / 2,
-                        yerr=h_RAA.errors,
+                        h_RAA.values - h_RAA.errors,
+                        h_RAA.values + h_RAA.errors,
+                        #h_RAA.values,
+                        #xerr=h_RAA.axes[0].bin_widths / 2,
+                        #yerr=h_RAA.errors,
                         label=fr"$R$ = {jet_R}",
                     )
 
@@ -303,6 +307,37 @@ def plot(output_dir: Path,
                 fig.savefig(output_dir / f"{filename}.pdf")
                 plt.close(fig)
 
+    # Write hists
+    if write_hists:
+        with uproot.recreate(output_dir / "raa_hists.root") as f:
+            for jet_type in jet_types:
+                for system in ["PbPb_00_10", "PbPb_30_50"]:
+                    for jet_R in jet_R_values:
+                        h_RAA = RAA_hists[system][f"{jet_type}_R{format_R(jet_R)}"]
+                        # Convert to boost histogram by hand. We need to do this here because
+                        # we don't hold onto overflow and underflow values, but uproot expects them
+                        # So this is just a one time ugly hack (although it would be good to figure out for later...)
+                        axes = []
+                        for axis in h_RAA.axes:
+                            # NOTE: We use Variable instead of Regular even if the bin edges are Regular because it allows us to
+                            #       construct the axes just from the bin edges.
+                            #bin_edges = np.zeros(len(axis.bin_edges) + 2)
+                            #bin_edges[0] = -np.inf
+                            #bin_edges[-1] = np.inf
+                            axes.append(bh.axis.Variable(axis.bin_edges))
+                        h = bh.Histogram(*axes, storage=bh.storage.Weight())
+                        # Need to shape the array properly so that it will actually be able to assign to the boost histogram.
+                        arr = np.zeros(shape=h.view(flow=True).shape, dtype=h.view(flow=True).dtype)
+                        arr["value"][1:-1] = h_RAA.values
+                        arr["variance"][1:-1] = h_RAA.variances
+                        h[...] = arr
+
+                        # Finally, write the converted hist
+                        f[f"{system}_{jet_type}_R{format_R(jet_R)}"] = h
+
 
 if __name__ == "__main__":
-    plot(output_dir=Path("jetscape_RAA_output/plots"))
+    plot(
+        output_dir=Path("jetscape_RAA_output/plots"),
+        write_hists=True,
+    )
