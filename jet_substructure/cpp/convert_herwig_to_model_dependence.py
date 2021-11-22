@@ -16,7 +16,9 @@ from jet_substructure.analysis import plot_unfolding
 from jet_substructure.base import helpers
 
 
-def convert_file(input_path: Path, jet_R: str, grooming_method: str, n_iter: int, unfolding_output: plot_unfolding.UnfoldingOutput) -> bool:
+def convert_file(
+    input_path: Path, jet_R: str, grooming_method: str, n_iter: int, unfolding_output: plot_unfolding.UnfoldingOutput
+) -> bool:
     # Delay import to avoid explicit dependence.
     import ROOT
 
@@ -31,10 +33,7 @@ def convert_file(input_path: Path, jet_R: str, grooming_method: str, n_iter: int
     }
 
     f = ROOT.TFile.Open(
-        str(
-            input_path
-            / input_filename
-        ),
+        str(input_path / input_filename),
         "READ",
     )
     input_hist_names = [k.GetName() for k in f.GetListOfKeys()]
@@ -50,8 +49,21 @@ def convert_file(input_path: Path, jet_R: str, grooming_method: str, n_iter: int
 
     # print(f"hist_name: {hist_name}")
     f.cd()
+    # NOTE: This is actually a TGraphAsymmErrors
     h_temp = f.Get(grooming_method_to_histogram_name[grooming_method])
     new_name = f"bayesian_unfolded_iter_{n_iter}"
+
+    # We need to clean up this graph manually
+    if grooming_method == "soft_drop_z_cut_02":
+        # Bins edges should be: -0.05, 0, 0.25, 0.5, ...
+        # Practically, we can drop the first two points
+        #h_temp.RemovePoint(0)
+        #h_temp.RemovePoint(0)
+
+        #h_temp.SetPointX(0, -0.025)
+        #h_temp.SetPoint
+        #h_temp.SetPointEXlow(0, )
+        pass
 
     f_out.cd()
     h_temp.SetName(new_name)
@@ -73,7 +85,7 @@ def convert(grooming_method: str) -> None:
 
     # Model dependence
     # R = 0.2
-    smeared_untagged_var=helpers.KtRange(0, 0.25) if "soft_drop" in grooming_method else helpers.KtRange(0.25, 0.25)
+    smeared_untagged_var = helpers.KtRange(0, 0.25) if "soft_drop" in grooming_method else helpers.KtRange(0.25, 0.25)
     unfolding_output = plot_unfolding.UnfoldingOutput(
         grooming_method=grooming_method,
         substructure_variable="kt",
@@ -87,11 +99,13 @@ def convert(grooming_method: str) -> None:
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
         hists={"ignore": "this"},  # type: ignore
     )
-    convert_file(input_path=input_path, jet_R="R02", grooming_method=grooming_method, n_iter=3, unfolding_output=unfolding_output)
+    convert_file(
+        input_path=input_path, jet_R="R02", grooming_method=grooming_method, n_iter=3, unfolding_output=unfolding_output
+    )
 
     # R = 0.4
     # Previously, 8-9
-    smeared_untagged_var=helpers.KtRange(0, 0.25) if "soft_drop" in grooming_method else helpers.KtRange(0.25, 0.25)
+    smeared_untagged_var = helpers.KtRange(0, 0.25) if "soft_drop" in grooming_method else helpers.KtRange(0.25, 0.25)
     unfolding_output = plot_unfolding.UnfoldingOutput(
         grooming_method=grooming_method,
         substructure_variable="kt",
@@ -105,7 +119,9 @@ def convert(grooming_method: str) -> None:
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
         hists={"ignore": "this"},  # type: ignore
     )
-    convert_file(input_path=input_path, jet_R="R04", grooming_method=grooming_method, n_iter=5, unfolding_output=unfolding_output)
+    convert_file(
+        input_path=input_path, jet_R="R04", grooming_method=grooming_method, n_iter=5, unfolding_output=unfolding_output
+    )
 
 
 if __name__ == "__main__":
