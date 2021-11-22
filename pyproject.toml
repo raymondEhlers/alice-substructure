@@ -40,6 +40,7 @@ pyarrow = "^4.0.0"
 numba = "^0.53.1"
 parsl = {git = "https://github.com/Parsl/parsl.git", rev = "9eca2a949471520f161a82cc046397a1d69d939c", extras = ["monitoring"]}
 mplhep = "^0.3.4"
+hist = {extras = ["plot"], version = "^2.5.2"}
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.812"
