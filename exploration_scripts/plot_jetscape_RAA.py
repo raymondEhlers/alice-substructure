@@ -22,6 +22,20 @@ from jet_substructure.analysis import plot_base as pb
 
 pachyderm.plot.configure()
 
+_okabe_ito_colors = [
+    "#E69F00",
+    "#56B4E9",
+    "#009E73",
+    #"#F0E442",
+    "#0072B2",
+    "#D55E00",
+    "#CC79A7",
+    "#000000",
+]
+
+_jet_R_to_color_index = {0.2: 0, 0.4: 1, 0.5: 2, 0.6: 3, 0.8: 4, 1.0: 5}
+
+
 def format_R(R: float) -> str:
     return f"{round(R * 100):03}"
 
@@ -258,59 +272,61 @@ def plot(output_dir: Path,
                 plt.close(fig_RAA)
 
     # Plot RAA as a function of R
-    with sns.color_palette("Set2"):
-        for jet_type in jet_types:
-            for system in ["PbPb_00_10", "PbPb_30_50"]:
-                for restricted_range in [False, True]:
-                    fig, ax = plt.subplots(figsize=(10, 8))
+    #with sns.color_palette("Set2"):
+    for jet_type in jet_types:
+        for system in ["PbPb_00_10", "PbPb_30_50"]:
+            for restricted_range in [False, True]:
+                fig, ax = plt.subplots(figsize=(10, 8))
 
-                    text = fr"{labels[system]}, {jet_type.capitalize()} jets"
-                    # Just for some user feedback
-                    print(text)
+                text = fr"{labels[system]}, {jet_type.capitalize()} jets"
+                # Just for some user feedback
+                print(text)
 
-                    # Finish labeling
-                    text += "\n" + r"JETSCAPE Work in Progress" + "\n" + "MATTER + LBT"
-                    text += "\n" + r"$\alpha_{s} = 0.3$, $Q_{\text{switch}} = 2$ GeV"
+                # Finish labeling
+                text += "\n" + r"JETSCAPE Work in Progress" + "\n" + "MATTER + LBT"
+                text += "\n" + r"$\alpha_{s} = 0.3$, $Q_{\text{switch}} = 2$ GeV"
 
-                    x_axis_kwargs = {}
-                    if restricted_range:
-                        x_axis_kwargs = {"range": (0, 200)}
-                    plot_config = pb.PlotConfig(
-                        name=f"jet_RAA_R_{jet_type}_{system}" + ("_zoom" if restricted_range else ""),
-                        panels=[
-                            pb.Panel(
-                                axes=[
-                                    pb.AxisConfig(
-                                        "y",
-                                        label=r"$R_{\text{AA}}$",
-                                        range=(0.0, 1.4),
-                                        font_size=22,
-                                    ),
-                                    pb.AxisConfig("x", label=r"$p_{\text{T,jet}}\:(\text{GeV}/c)$", font_size=22, **x_axis_kwargs),
-                                ],
-                                text=pb.TextConfig(x=0.97, y=0.03, text=text, font_size=22),
-                                legend=pb.LegendConfig(location="upper right", font_size=22),
-                            ),
-                        ],
-                        figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.08)),
+                x_axis_kwargs = {}
+                if restricted_range:
+                    x_axis_kwargs = {"range": (0, 200)}
+                plot_config = pb.PlotConfig(
+                    name=f"jet_RAA_R_{jet_type}_{system}" + ("_zoom" if restricted_range else ""),
+                    panels=[
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y",
+                                    label=r"$R_{\text{AA}}$",
+                                    range=(0.0, 1.4),
+                                    font_size=22,
+                                ),
+                                pb.AxisConfig("x", label=r"$p_{\text{T,jet}}\:(\text{GeV}/c)$", font_size=22, **x_axis_kwargs),
+                            ],
+                            text=pb.TextConfig(x=0.97, y=0.03, text=text, font_size=22),
+                            legend=pb.LegendConfig(location="upper right", font_size=22),
+                        ),
+                    ],
+                    figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.08)),
+                )
+                for jet_R in jet_R_values:
+                    print(f"jet_R: {jet_R}")
+                    h_RAA = RAA_hists[system][f"{jet_type}_R{format_R(jet_R)}"]
+                    p = ax.fill_between(
+                        h_RAA.axes[0].bin_centers,
+                        h_RAA.values - h_RAA.errors,
+                        h_RAA.values + h_RAA.errors,
+                        #h_RAA.values,
+                        #xerr=h_RAA.axes[0].bin_widths / 2,
+                        #yerr=h_RAA.errors,
+                        label=fr"$R$ = {jet_R}",
+                        alpha=0.9,
+                        color=_okabe_ito_colors[_jet_R_to_color_index[jet_R]],
                     )
-                    for jet_R in jet_R_values:
-                        h_RAA = RAA_hists[system][f"{jet_type}_R{format_R(jet_R)}"]
-                        p = ax.fill_between(
-                            h_RAA.axes[0].bin_centers,
-                            h_RAA.values - h_RAA.errors,
-                            h_RAA.values + h_RAA.errors,
-                            #h_RAA.values,
-                            #xerr=h_RAA.axes[0].bin_widths / 2,
-                            #yerr=h_RAA.errors,
-                            label=fr"$R$ = {jet_R}",
-                            alpha=0.9,
-                        )
 
-                    plot_config.apply(fig=fig, ax=ax)
-                    filename = f"{plot_config.name}"
-                    fig.savefig(output_dir / f"{filename}.pdf")
-                    plt.close(fig)
+                plot_config.apply(fig=fig, ax=ax)
+                filename = f"{plot_config.name}"
+                fig.savefig(output_dir / f"{filename}.pdf")
+                plt.close(fig)
 
     # Write hists
     if write_hists:
@@ -345,5 +361,6 @@ if __name__ == "__main__":
     plot(
         output_dir=Path("jetscape_RAA_output/plots"),
         write_hists=True,
-        #jet_R_values=[0.2, 0.4, 0.5, 0.6],
+        jet_R_values=[0.2, 0.4, 0.5, 0.6, 0.8],
+        jet_types=["charged"],
     )
