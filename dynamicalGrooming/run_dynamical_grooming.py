@@ -219,6 +219,8 @@ def run_dynamical_grooming(  # noqa: C901
     physics_selection: int,
     data_type: DataType,
     enable_track_skim: bool = False,
+    enable_HF_tree: bool = False,
+    grooming_jet_pt_threshold: float = 20,
 ) -> ROOT.AliAnalysisManager:
     """Run the event extractor.
 
@@ -249,6 +251,13 @@ def run_dynamical_grooming(  # noqa: C901
             dtype=np.int32,
         )
         pt_hard_binning_root = ROOT.TArrayI(len(pt_hard_binning), pt_hard_binning)
+    # Centrality ranges
+    # This is rather lazy, but works for these purposes.
+    centrality_min, centrality_max = 0, 10
+    if ROOT.AliVEvent.kSemiCentral & physics_selection:
+        centrality_min, centrality_max = 30, 50
+    if analysis_mode == AnalysisMode.PbPb:
+        print(f"Centrality range: {centrality_min}-{centrality_max}")
 
     # Basic setup (analysis manager and input handler).
     analysis_manager = ROOT.AliAnalysisManager(task_name)
@@ -281,6 +290,47 @@ def run_dynamical_grooming(  # noqa: C901
     # ROOT.AliLog.SetClassDebugLevel("AliJetContainer", AliLog::kDebug+7)
 
     if enable_track_skim:
+        if analysis_mode == AnalysisMode.pp:
+            skim_task = _run_add_task_macro(
+                "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskTrackSkim.C",
+                "PWGJE::EMCALJetTasks::AliAnalysisTaskTrackSkim",
+                "pp",
+            )
+            # skim_task = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskTrackSkim.AddTaskTrackSkim("pp")
+            skim_task.SelectCollisionCandidates(physics_selection)
+            skim_task.AddTrackContainer("tracks")
+            skim_task.Initialize()
+        elif analysis_mode == AnalysisMode.pythia:
+            skim_task = _run_add_task_macro(
+                "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskTrackSkim.C",
+                "PWGJE::EMCALJetTasks::AliAnalysisTaskTrackSkim",
+                "pythia",
+            )
+            skim_task.SetIsPythia(True)
+            skim_task.SelectCollisionCandidates(physics_selection)
+
+            skim_task.AddTrackContainer("tracks")
+
+            contMC = skim_task.AddMCParticleContainer("mcparticles")
+            status_acc = 1 << 16
+            contMC.SetMCFlag(ROOT.AliAODMCParticle.kPhysicalPrim | status_acc)
+            contMC.SetCharge(ROOT.AliParticleContainer.kCharged)
+
+            skim_task.Initialize()
+        elif analysis_mode == AnalysisMode.PbPb:
+            skim_task = _run_add_task_macro(
+                "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskTrackSkim.C",
+                "PWGJE::EMCALJetTasks::AliAnalysisTaskTrackSkim",
+                "PbPb",
+            )
+            skim_task.SetCentRange(centrality_min, centrality_max)
+            skim_task.SetUseNewCentralityEstimation(True)
+            skim_task.SelectCollisionCandidates(physics_selection)
+
+            skim_task.AddTrackContainer("tracks")
+            skim_task.Initialize()
+
+    if enable_HF_tree:
         # PID eesponse is a dependency
         pid_response = _run_add_task_macro(
             "$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C",
@@ -305,7 +355,8 @@ def run_dynamical_grooming(  # noqa: C901
                 False,
                 0,
                 "HFTreeCreator_pp",
-                "alien://///alice/cern.ch/user/l/lvermunt/cuts_tree_creator/25-03-2020/pp/D0DsDplusDstarLcBplusBsLbCuts_pp.root",
+                # "alien://///alice/cern.ch/user/l/lvermunt/cuts_tree_creator/25-03-2020/pp/D0DsDplusDstarLcBplusBsLbCuts_pp.root",
+                "/home/rehlers/code/alice/substructure/dynamicalGrooming/mammoth/framework/pp/D0DsDplusDstarLcBplusBsLbCuts_pp_kAny.root",
                 0,
                 False,
                 False,
@@ -332,7 +383,8 @@ def run_dynamical_grooming(  # noqa: C901
                 True,
                 0,
                 "HFTreeCreator_pp_5TeV",
-                "alien://///alice/cern.ch/user/l/lvermunt/cuts_tree_creator/25-03-2020/pp/D0DsDplusDstarLcBplusBsLbCuts_pp.root",
+                # "alien://///alice/cern.ch/user/l/lvermunt/cuts_tree_creator/25-03-2020/pp/D0DsDplusDstarLcBplusBsLbCuts_pp.root",
+                "/home/rehlers/code/alice/substructure/dynamicalGrooming/mammoth/framework/pp/D0DsDplusDstarLcBplusBsLbCuts_pp_kAny.root",
                 0,
                 False,
                 True,
@@ -349,6 +401,7 @@ def run_dynamical_grooming(  # noqa: C901
                 CppEnum("AliHFTreeHandler::kRedSingleTrackVars"),
                 True,
             )
+
             skim_task.SelectCollisionCandidates(physics_selection)
 
             skim_task.AddTrackContainer("tracks")
@@ -365,6 +418,7 @@ def run_dynamical_grooming(  # noqa: C901
                 False,
                 1,
                 "HFTreeCreator_PbPb_5TeV",
+                # NOTE: This means that the skimming will _only_ work for central!!
                 "alien://///alice/cern.ch/user/j/jmulliga/cutfile/20200428_D0DsDplusDstarLcBplusBsLbCuts_PbPb2018_Central.root",
                 0,
                 False,
@@ -382,6 +436,10 @@ def run_dynamical_grooming(  # noqa: C901
                 CppEnum("AliHFTreeHandler::kRedSingleTrackVars"),
                 True,
             )
+            if centrality_min != 0 and centrality_max != 10:
+                raise RuntimeError(
+                    "Using a central cut configuration, but central collisions are not selected. Please update the config or the event selection!"
+                )
             skim_task.SelectCollisionCandidates(physics_selection)
 
             skim_task.AddTrackContainer("tracks")
@@ -673,13 +731,13 @@ def run_dynamical_grooming(  # noqa: C901
     if beam_type == BeamType.PbPb:
         dynamical_grooming.SetCentralitySelectionOn(True)
         dynamical_grooming.SetUseNewCentralityEstimation(True)
-        dynamical_grooming.SetMinCentrality(30)
-        dynamical_grooming.SetMaxCentrality(50)
+        dynamical_grooming.SetMinCentrality(centrality_min)
+        dynamical_grooming.SetMaxCentrality(centrality_max)
     else:
         # Need to disable here because it's on by default!!
         dynamical_grooming.SetCentralitySelectionOn(False)
 
-    dynamical_grooming.SetJetPtThreshold(20)
+    dynamical_grooming.SetJetPtThreshold(grooming_jet_pt_threshold)
     dynamical_grooming.SetNeedEmcalGeom(False)
     # dynamical_grooming.SetZvertexDiffValue(0.1)
     dynamical_grooming.SetStoreRecursiveJetSplittings(True)
@@ -806,13 +864,13 @@ def run_dynamical_grooming(  # noqa: C901
     if beam_type == BeamType.PbPb:
         hardest_kt.SetCentralitySelectionOn(True)
         hardest_kt.SetUseNewCentralityEstimation(True)
-        hardest_kt.SetMinCentrality(30)
-        hardest_kt.SetMaxCentrality(50)
+        hardest_kt.SetMinCentrality(centrality_min)
+        hardest_kt.SetMaxCentrality(centrality_max)
     else:
         # Need to disable here because it's on by default!!
         hardest_kt.SetCentralitySelectionOn(False)
 
-    hardest_kt.SetJetPtThreshold(20)
+    hardest_kt.SetJetPtThreshold(grooming_jet_pt_threshold)
     hardest_kt.SetNeedEmcalGeom(False)
     # hardest_kt.SetZvertexDiffValue(0.1)
 
@@ -1447,14 +1505,20 @@ def start_analysis_manager(
         # ROOT.AliLog.SetClassDebugLevel("AliAnalysisTaskEmcalEmbeddingHelper", ROOT.AliLog.kDebug+4)
         # ROOT.AliLog.SetClassDebugLevel("AliAnalysisTaskEmcal", 10)
         # ROOT.AliLog.SetClassDebugLevel("AliAnalysisTaskEmcal", ROOT.AliLog.kDebug+10)
-        # ROOT.AliLog.SetClassDebugLevel("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming", ROOT.AliLog.kDebug)
+        # ROOT.AliLog.SetClassDebugLevel("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming", ROOT.AliLog.kDebug+5)
         # Start the analysis
         analysis_manager.StartAnalysis("local", chain, n_events)
     elif mode == "grid":
         raise RuntimeError("Not implemented yet!")
 
 
-def run(analysis_mode: AnalysisMode, period_name: str, physics_selection: int, input_files: Sequence[Path]) -> None:
+def run(
+    analysis_mode: AnalysisMode,
+    period_name: str,
+    physics_selection: int,
+    input_files: Sequence[Path],
+    grooming_jet_pt_threshold: float,
+) -> None:
     # Setup and validation
     task_name = "DynamicalGrooming"
     period = _normalize_period(period_name)
@@ -1468,6 +1532,7 @@ def run(analysis_mode: AnalysisMode, period_name: str, physics_selection: int, i
         physics_selection=physics_selection,
         data_type=data_type,
         enable_track_skim=True,
+        grooming_jet_pt_threshold=grooming_jet_pt_threshold,
     )
 
     start_analysis_manager(analysis_manager=analysis_manager, mode="local", n_events=1000, input_files=input_files)
@@ -1502,7 +1567,9 @@ if __name__ == "__main__":
             # NOTE: For some reason, kAnyINT will include some events where the centrality seems to be uncalibrated.
             #       It's unclear why this occurs, but since we're only interested in semi-central at the moment, it
             #       doesn't matter.
-            physics_selection=ROOT.AliVEvent.kSemiCentral,
+            physics_selection=ROOT.AliVEvent.kSemiCentral | ROOT.AliVEvent.kINT7,
+            # physics_selection=ROOT.AliVEvent.kCentral,
+            grooming_jet_pt_threshold=20,
             input_files=[
                 Path(
                     "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
@@ -1527,6 +1594,7 @@ if __name__ == "__main__":
             analysis_mode=analysis_mode,
             period_name="LHC17q",
             physics_selection=ROOT.AliVEvent.kAnyINT,
+            grooming_jet_pt_threshold=5,
             input_files=[
                 Path(
                     "/opt/scott/data/rehlers/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD234/0001/root_archive.zip#AliAOD.root"
@@ -1543,17 +1611,19 @@ if __name__ == "__main__":
         run(
             analysis_mode=analysis_mode,
             period_name="LHC20g4",
-            physics_selection=0,
+            # physics_selection=0,
+            physics_selection=ROOT.AliVEvent.kAnyINT,
+            grooming_jet_pt_threshold=20,
             input_files=[
                 Path(
                     "/opt/scott/data/rehlers/alice/datasets/sim/2020/LHC20g4/12/296191/AOD/001/aod_archive.zip#AliAOD.root"
                 ),
-                Path(
-                    "/opt/scott/data/rehlers/alice/datasets/sim/2020/LHC20g4/12/296191/AOD/002/aod_archive.zip#AliAOD.root"
-                ),
-                Path(
-                    "/opt/scott/data/rehlers/alice/datasets/sim/2020/LHC20g4/12/296191/AOD/003/aod_archive.zip#AliAOD.root"
-                ),
+                # Path(
+                #    "/opt/scott/data/rehlers/alice/datasets/sim/2020/LHC20g4/12/296191/AOD/002/aod_archive.zip#AliAOD.root"
+                # ),
+                # Path(
+                #    "/opt/scott/data/rehlers/alice/datasets/sim/2020/LHC20g4/12/296191/AOD/003/aod_archive.zip#AliAOD.root"
+                # ),
                 # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0003/AliAOD.root"),
                 # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0002/AliAOD.root"),
                 # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0001/AliAOD.root"),
