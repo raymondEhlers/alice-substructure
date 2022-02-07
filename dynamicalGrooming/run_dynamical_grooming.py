@@ -306,8 +306,15 @@ def run_dynamical_grooming(  # noqa: C901
                 "PWGJE::EMCALJetTasks::AliAnalysisTaskTrackSkim",
                 "pythia",
             )
-            skim_task.SetIsPythia(True)
             skim_task.SelectCollisionCandidates(physics_selection)
+            skim_task.SetIsPythia(True)
+            if period == "LHC20g4":
+                # For this period, we need to manually configure the event cuts to use Run2 pp cuts.
+                # Otherwise, it will use the PbPb cuts, which will dramatically cut into the statistics.
+                # NOTE: This isn't an issue with embedding because we don't apply event selection to the external event
+                eventCuts = skim_task.GetEventCuts()
+                eventCuts.SetManualMode()
+                eventCuts.SetupRun2pp()
 
             skim_task.AddTrackContainer("tracks")
 
