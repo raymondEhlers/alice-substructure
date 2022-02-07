@@ -673,8 +673,8 @@ available_datasets:
             - "trains/embedPythia/6693/AnalysisResults.*.repaired.root"
     # Systematic: Tracking efficiency
     # yamllint disable-line rule:line-length
-    LHC20g4_embedded_into_LHC18qr_semi_central_R04__tracking_efficiency_6695_6714: &LHC18qr_semi_central_R04_embedded_tracking_efficiency
-        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R04__tracking_efficiency_6695_6714"
+    LHC20g4_embedded_into_LHC18qr_semi_central_R04_tracking_efficiency_6695_6714: &LHC18qr_semi_central_R04_embedded_tracking_efficiency
+        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R04_tracking_efficiency_6695_6714"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl"
         # Map for the uniform prefix name to the analysis task prefix.
