@@ -1877,12 +1877,12 @@ analysis_configurations:
                     # true_kt: [0., 0.5, 1, 2, 3, 4, 6, 10]
                     # smeared_kt: [0.25, 0.25, 0.5, 1., 2., 3, 4, 6]
                     # In May 2021, we found out that SD z > 0.2 can unfold in semi-central down to low kt.
-                    # So we need to futher align the binning. Below is the additional alignment
+                    # So we need to further align the binning. Below is the additional alignment
                     # (namely, the 1-2 bin is split in two)
                     true_kt: [0., 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 10]
                     smeared_kt: [0.25, 0.25, 0.5, 1., 1.5, 2., 3, 4, 6]
                 soft_drop_z_cut_02:
-                    # Ssame as above, but we include the untagged bin because it's meaningful for SD z > 0.2
+                    # Same as above, but we include the untagged bin because it's meaningful for SD z > 0.2
                     true_kt: [-0.05, 0., 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 10]
                     smeared_kt: [0, 0.25, 0.5, 1., 1.5, 2., 3, 4, 6]
             settings:
