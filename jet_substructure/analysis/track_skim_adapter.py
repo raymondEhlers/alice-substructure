@@ -103,7 +103,7 @@ def hardest_kt_data_skim(
     input_filename: Path,
     collision_system: str,
     jet_R: float,
-    min_jet_pt: Union[float, Mapping[str, float]],
+    min_jet_pt: Mapping[str, float],
     iterative_splittings: bool,
     output_filename: Path,
     convert_data_format_prefixes: Mapping[str, str],
@@ -126,28 +126,33 @@ def hardest_kt_data_skim(
                 # If the tree exists, can be read, and has more than 0 entries, we should be good
                 if f["tree"].num_entries > 0:
                     # Return immediately to indicate that we're done.
-                    return (True, f"already processed for {collision_system}, R={jet_R}, {input_filename}")
+                    return (True, f"already processed for {collision_system}, R={jet_R}, input: \"{input_filename}\", output: \"{output_filename}\"")
         except Exception:
             # If it fails for some reason, give up - we want to try again
             pass
 
-    if len(convert_data_format_prefixes) == 1:
-        assert not isinstance(min_jet_pt, dict)  # help out mypy
-
+    if collision_system in ["pp", "PbPb"]:
         jets = analysis_alice.analysis_data(
             collision_system=collision_system,
             arrays=analysis_alice.load_data(
                 filename=input_filename,
-                collision_system=collision_system if not event_activity else f"{collision_system}_{event_activity}",
+                collision_system=collision_system,
                 rename_prefix=loading_data_rename_prefix,
             ),
             jet_R=jet_R,
             min_jet_pt=min_jet_pt,
         )
-    elif collision_system == "pythia":
-        assert isinstance(min_jet_pt, dict)  # help out mypy
+    elif collision_system in ["pythia"]:
+        # Although we could in principle analyze the MC loading only particle or detector level alone,
+        # it's more consistent to analyze it with the data quality conditions applied on both part
+        # and det level.
+        # (ie. we want to analyze in exactly the same as would provided by the substructure analysis task)
         jets = analysis_alice.analysis_MC(
-            arrays=analysis_alice.load_MC(filename=input_filename, collision_system=collision_system),
+            arrays=analysis_alice.load_data(
+                filename=input_filename,
+                collision_system=collision_system,
+                rename_prefix=loading_data_rename_prefix,
+            ),
             jet_R=jet_R,
             min_jet_pt=min_jet_pt,
         )
@@ -276,17 +281,26 @@ def hardest_kt_embedding_skim(
 if __name__ == "__main__":
     helpers.setup_logging(level=logging.INFO)
 
-    # collision_system = "PbPb"
-    # base_path = Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}")
-    # hardest_kt_data_skim(
-    #     input_filename=base_path / "AnalysisResults_track_skim.parquet",
-    #     collision_system=collision_system,
-    #     jet_R=0.4,
-    #     min_jet_pt=5 if collision_system == "pp" else 20,
-    #     iterative_splittings=True,
-    #     convert_data_format_prefixes={"data": "data"},
-    #     output_filename=base_path / "skim" / "skim_output.root",
-    # )
+    #for collision_system in ["pp", "PbPb"]:
+    for collision_system in ["pp", "pythia", "PbPb"]:
+        logger.info(f"Analyzing \"{collision_system}\"")
+        base_path = Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}")
+        _min_jet_pt = {
+            "pp": 5.,
+            "pythia": {"det_level": 20.},
+            "PbPb": 20.,
+        }
+        result = hardest_kt_data_skim(
+            input_filename=base_path / "AnalysisResults_track_skim.parquet",
+            collision_system=collision_system,
+            jet_R=0.4,
+            min_jet_pt=_min_jet_pt[collision_system],  # type: ignore
+            iterative_splittings=True,
+            convert_data_format_prefixes={"data": "data"} if collision_system != "pythia" else {"det_level": "data", "part_level": "true"},
+            loading_data_rename_prefix={"data": "data"} if collision_system != "pythia" else {"data": "det_level"},
+            output_filename=base_path / "skim" / "skim_output.root",
+        )
+        logger.info(f"Result: {result}")
 
     import jet_substructure.analysis.parsl
     scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
