@@ -1579,21 +1579,21 @@ if __name__ == "__main__":
             grooming_jet_pt_threshold=20,
             input_files=[
                 Path(
-                    "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
+                    "/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
                 ),
                 Path(
-                    "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
+                    "/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
                 ),
-                # Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/003/aod_archive.zip#AliAOD.root"),
-                # Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/004/aod_archive.zip#AliAOD.root"),
+                # Path("/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/003/aod_archive.zip#AliAOD.root"),
+                # Path("/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/004/aod_archive.zip#AliAOD.root"),
                 Path(
-                    "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
+                    "/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
                 ),
                 Path(
-                    "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
+                    "/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
                 ),
-                # Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass3/AOD252/AOD/003/aod_archive.zip#AliAOD.root"),
-                # Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18r/000297595/pass3/AOD252/AOD/004/aod_archive.zip#AliAOD.root"),
+                # Path("/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/003/aod_archive.zip#AliAOD.root"),
+                # Path("/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/004/aod_archive.zip#AliAOD.root"),
             ],
         )
     if analysis_mode == AnalysisMode.pp:
@@ -1604,13 +1604,13 @@ if __name__ == "__main__":
             grooming_jet_pt_threshold=5,
             input_files=[
                 Path(
-                    "/opt/scott/data/rehlers/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD234/0001/root_archive.zip#AliAOD.root"
+                    "/alf/data/rehlers/data/alice/data/2017/LHC17p/000282343/pass1_FAST/AOD234/0001/root_archive.zip#AliAOD.root"
                 ),
                 Path(
-                    "/opt/scott/data/rehlers/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD234/0002/root_archive.zip#AliAOD.root"
+                    "/alf/data/rehlers/data/alice/data/2017/LHC17p/000282343/pass1_FAST/AOD234/0002/root_archive.zip#AliAOD.root"
                 ),
                 Path(
-                    "/opt/scott/data/rehlers/alice/datasets/data/2017/LHC17p/000282343/pass1_FAST/AOD234/0003/root_archive.zip#AliAOD.root"
+                    "/alf/data/rehlers/data/alice/data/2017/LHC17p/000282343/pass1_FAST/AOD234/0003/root_archive.zip#AliAOD.root"
                 ),
             ],
         )
@@ -1623,14 +1623,14 @@ if __name__ == "__main__":
             grooming_jet_pt_threshold=20,
             input_files=[
                 Path(
-                    "/opt/scott/data/rehlers/alice/datasets/sim/2020/LHC20g4/12/296191/AOD/001/aod_archive.zip#AliAOD.root"
+                    "/alf/data/rehlers/data/alice/sim/2020/LHC20g4/12/296191/AOD/001/aod_archive.zip#AliAOD.root"
                 ),
-                # Path(
-                #    "/opt/scott/data/rehlers/alice/datasets/sim/2020/LHC20g4/12/296191/AOD/002/aod_archive.zip#AliAOD.root"
-                # ),
-                # Path(
-                #    "/opt/scott/data/rehlers/alice/datasets/sim/2020/LHC20g4/12/296191/AOD/003/aod_archive.zip#AliAOD.root"
-                # ),
+                Path(
+                    "/alf/data/rehlers/data/alice/sim/2020/LHC20g4/12/296191/AOD/002/aod_archive.zip#AliAOD.root"
+                ),
+                Path(
+                    "/alf/data/rehlers/data/alice/sim/2020/LHC20g4/12/296191/AOD/003/aod_archive.zip#AliAOD.root"
+                ),
                 # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0003/AliAOD.root"),
                 # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0002/AliAOD.root"),
                 # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0001/AliAOD.root"),
