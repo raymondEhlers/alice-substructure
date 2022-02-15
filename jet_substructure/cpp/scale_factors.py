@@ -3,6 +3,7 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+import fnmatch
 import logging
 import warnings
 from pathlib import Path
@@ -31,14 +32,18 @@ def scale_factor_ROOT_wrapper(base_path: Path, train_number: int) -> Tuple[int, 
     return scale_factor_ROOT(filenames)
 
 
-def scale_factor_ROOT(filenames: Sequence[Path]) -> Tuple[int, int, Any, Any]:
+def scale_factor_ROOT(filenames: Sequence[Path], list_name: str = "") -> Tuple[int, int, Any, Any]:
     """Calculate the scale factor for a given train.
 
     Args:
         filenames: Filenames for output from a given train.
+        list_name: Name of the list from which we will retrieve the hists.
     Returns:
         n_accepted_events, n_entries, cross_section, n_trials
     """
+    # Validation
+    if not list_name:
+        list_name = "*DynamicalGrooming*"
     # Delay import to avoid direct dependence
     import ROOT
 
@@ -54,11 +59,12 @@ def scale_factor_ROOT(filenames: Sequence[Path]) -> Tuple[int, int, Any, Any]:
         hists = f.Get("AliAnalysisTaskEmcalEmbeddingHelper_histos")
         # If the embedding helper isn't available, let's try to get the task output.
         if not hists:
-            # This will only work for my tasks. But this should be fine, and can be improved later if needed.
+            # If the embedding helper isn't available, try to move on to an analysis task.
+            # We will search through the keys using a glob.
+            task_hists_name = fnmatch.filter([k.GetName() for k in f.GetListOfKeys()], list_name)
+            # And then require that "Tree" is not in the name (otherwise we're likely to put up the TTree)
             task_hists_name = [
-                key.GetName()
-                for key in f.GetListOfKeys()
-                if "DynamicalGrooming" in key.GetName() and "Tree" not in key.GetName()
+                name for name in task_hists_name if "Tree" not in name
             ]
             if len(task_hists_name) != 1:
                 raise RuntimeError(f"Cannot find unique task name. Names: {task_hists_name}. Skipping!")
