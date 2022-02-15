@@ -210,7 +210,7 @@ def _hardest_kt_embedding_skim(
 def hardest_kt_embedding_skim(
     input_filename: Path,
     jet_R: float,
-    min_jet_pt: Union[float, Mapping[str, float]],
+    min_jet_pt: Mapping[str, float],
     iterative_splittings: bool,
     output_filename: Path,
     thermal_model_parameters: sources.ThermalModelParameters,
