@@ -1193,7 +1193,7 @@ def setup_calculate_cross_check_task_skim(
     # Setup
     results = []
     # Retrieve the scale factors.
-    # Only possible input is the yaml scale factors, so we block on that result, so we need it immeaditely.
+    # Only possible input is the yaml scale factors, so we block on that result, so we need it immediately.
     if input_results:
         _ = input_results[0].result()
     scale_factors = read_extracted_scale_factors(collision_system=collision_system, dataset_name=dataset_config["name"])
@@ -1221,7 +1221,7 @@ def setup_calculate_cross_check_task_skim(
     # Now, setup the Apps based on the input filenames
     for input_filename in input_filenames:
         # NOTE: Although we nominally iterate over grooming methods, cross check tasks should only ever have one.
-        #       It's mostly to keep consistentcy with other tasks.
+        #       It's mostly to keep consistency with other tasks.
         for grooming_method in grooming_methods:
             train_directory = input_filename.parent
             # Select train numbers.
@@ -1684,7 +1684,7 @@ def setup_all_unfolding(  # noqa: C901
         base_dataset_config: Base dataset configuration.
         grooming_methods: Grooming methods to unfold.
         n_cores_per_job: N cores to make available for ROOT. This is of limited utility for RooUnfold,
-            but annecdotally, it seems to still hope a bit with I/O.
+            but anecdotally, it seems to still hope a bit with I/O.
         selected_unfolding_settings: Subset of unfolding settings to run. Default: all defined in the config.
     Returns:
         List of `AppFuture` created when defining the jobs.
@@ -1700,7 +1700,7 @@ def setup_all_unfolding(  # noqa: C901
     output_dir = Path("output") / data_collision_system / "unfolding" / "parsl"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Things are treatedly so different that it's better to be direct about the data collision system.
+    # Things are treated so different that it's better to be direct about the data collision system.
     unfolding_for_pp = data_collision_system == "pp"
     # Need the response collision system too.
     data_to_response_collision_system_name = {
@@ -1810,7 +1810,7 @@ def setup_all_unfolding(  # noqa: C901
 
             # If we're requesting a reweighted prior, we need to ensure that it's created before
             # we attempt to unfold it.
-            # NOTE: We could put this above the itearation over grooming methods, but then we would have to match
+            # NOTE: We could put this above the iteration over grooming methods, but then we would have to match
             #       the grooming method outputs to the unfolding, which could be potentially quite tedious.
             #       Instead, we take a slight hit in efficiency and just call it here, and then easily match them.
             reweight_prior_results = []
@@ -1896,8 +1896,8 @@ def setup_all_unfolding(  # noqa: C901
                     )
                 )
 
-            # Skip the untagged bin moved to above the smeared range.
             if unfolding_settings["closures"]:
+                # Skip the untagged bin moved to above the smeared range.
                 for s in list(settings.values())[:-1]:
                     for closure_variation in ["split_MC", "reweight_pseudo_data", "reweight_response"]:
                         logger.info(f"Adding unfolding closures: {s.output_tag}, variation: {closure_variation}")
