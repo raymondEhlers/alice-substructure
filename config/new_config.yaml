@@ -134,7 +134,7 @@ available_datasets:
         prefix_branches: *prefix_branches
         jet_R: 0.4
         files:
-            # NOTE: These probably need to be redownloaded and repaired because they
+            # NOTE: These probably need to be re-downloaded and repaired because they
             #       followed an older standard...
             - "trains/pythia/2110/AnalysisResults.FAST.*.repaired.root"
             - "trains/pythia/2110/AnalysisResults.woSDD.*.repaired.root"
@@ -153,7 +153,7 @@ available_datasets:
         prefix_branches: *prefix_branches
         jet_R: 0.4
         files:
-            # NOTE: These probably need to be redownloaded and repaired because they
+            # NOTE: These probably need to be re-downloaded and repaired because they
             #       followed an older standard...
             - "trains/pythia/2161/AnalysisResults.FAST.*.repaired.root"
             - "trains/pythia/2161/AnalysisResults.woSDD.*.repaired.root"
@@ -325,7 +325,7 @@ available_datasets:
         entries_per_job: 1.5e5
         files:
             - "trains/PbPb/6672/AnalysisResults.*.repaired.root"
-    # Rmax = 0.7 systmeatic. NOTE: This value is different than the pass1 AOD value
+    # Rmax = 0.7 systematic. NOTE: This value is different than the pass1 AOD value
     LHC18qr_semi_central_R04_Rmax070_6673: &LHC18qr_semi_central_R04_Rmax070
         name: "LHC18qr_semi_central_R04_Rmax070_6673"
         # yamllint disable-line rule:line-length
@@ -341,7 +341,7 @@ available_datasets:
         entries_per_job: 1.5e5
         files:
             - "trains/PbPb/6673/AnalysisResults.*.repaired.root"
-    # Rmax = 0.05 systmeatic.
+    # Rmax = 0.05 systematic.
     LHC18qr_semi_central_R04_Rmax005_6748: &LHC18qr_semi_central_R04_Rmax005
         name: "LHC18qr_semi_central_R04_Rmax005_6748"
         # yamllint disable-line rule:line-length
