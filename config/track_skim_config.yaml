@@ -1,0 +1,236 @@
+skimmed_datasets:
+  # pp
+  LHC17pq_pass1_AOD234_2111_2112: &LHC17pq_pp
+    name: "LHC17pq_pass1_AOD234_2111_2112"
+    # Keep track of the skim type for documentation
+    skim_type: "track_skim_task"
+    # Parameters of the output
+    list_name: "AliAnalysisTaskTrackSkim_pp"
+    tree_name: "AliAnalysisTaskTrackSkim_pp_tree"
+    prefixes_in_output_file:
+      - "data"
+    # Strictly speaking, this is defined by the track skim data normalization, and is only a convention.
+    # However, it's the piece of information that's actually useful, so we document it here.
+    prefixes_in_loaded_data:
+      - "data"
+    files:
+      # LHC17p
+      - "trains/pp/2111/run_by_run/LHC17p_CENT_woSDD/*/AnalysisResults.17p.*.root"
+      - "trains/pp/2111/run_by_run/LHC17p_FAST/*/AnalysisResults.17p.*.root"
+      # LHC17q
+      - "trains/pp/2112/run_by_run/LHC17q_CENT_woSDD/*/AnalysisResults.17q.*.root"
+      - "trains/pp/2112/run_by_run/LHC17q_FAST/*/AnalysisResults.17q.*.root"
+
+  # pythia
+  # Anchored to LHC17pq pass1
+  LHC18b8_AOD_2619: &LHC18b8_pythia
+    name: "LHC18b8_AOD_2619"
+    # Keep track of the skim type for documentation
+    skim_type: "track_skim_task"
+    # Parameters of the output
+    list_name: "AliAnalysisTaskTrackSkim_pythia"
+    tree_name: "AliAnalysisTaskTrackSkim_pythia_tree"
+    prefixes_in_output_file:
+      - "data"
+      - "gen"
+    reference_dataset_for_scale_factors: ""
+    files:
+      - "trains/pythia/2619/LHC18b8_cent_woSDD/*/{pt_hat_bin}/AnalysisResults.18b8_cent_woSDD.*.root"
+      - "trains/pythia/2619/LHC18b8_fast/*/{pt_hat_bin}/AnalysisResults.18b8_fast.*.root"
+  # Anchored to LHC18qr pass3
+  LHC20g4_AOD_2640: &LHC20g4_pythia
+    name: "LHC20g4_AOD_2640"
+    # Keep track of the skim type for documentation
+    skim_type: "track_skim_task"
+    # Parameters of the output
+    list_name: "AliAnalysisTaskTrackSkim_pythia"
+    tree_name: "AliAnalysisTaskTrackSkim_pythia_tree"
+    prefixes_in_output_file:
+      - "data"
+      - "gen"
+    reference_dataset_for_scale_factors: ""
+    files:
+      - "trains/pythia/2640/LHC20g4/*/{pt_hat_bin}/AnalysisResults.20g4.*.root"
+
+  # PbPb
+  LHC18qr_pass3_AOD252_central_642: &LHC18qr_PbPb_central
+    name: "LHC18qr_pass3_AOD252_central_642"
+    # Keep track of the skim type for documentation
+    skim_type: "track_skim_task"
+    # Parameters of the output
+    list_name: "AliAnalysisTaskTrackSkim_PbPb_central"
+    tree_name: "AliAnalysisTaskTrackSkim_PbPb_central_tree"
+    files:
+      - "trains/PbPb/642/run_by_run/LHC18q/*/AnalysisResults.18q.*.root"
+      - "trains/PbPb/642/run_by_run/LHC18r/*/AnalysisResults.18r.*.root"
+  LHC18qr_pass3_AOD252_semi_central_645: &LHC18qr_PbPb_semi_central
+    name: "LHC18qr_pass3_AOD252_semi_central_645"
+    # Keep track of the skim type for documentation
+    skim_type: "track_skim_task"
+    # Parameters of the output
+    list_name: "AliAnalysisTaskTrackSkim_PbPb_semi_central"
+    tree_name: "AliAnalysisTaskTrackSkim_PbPb_semi_central_tree"
+    files:
+      - "trains/PbPb/645/run_by_run/LHC18q/*/AnalysisResults.18q.*.root"
+      - "trains/PbPb/645/run_by_run/LHC18r/*/AnalysisResults.18r.*.root"
+  LHC15o_pass1_AOD194_central_7666: &LHC15o_PbPb_central
+    name: "LHC15o_pass1_AOD194_central_7666"
+    # Keep track of the skim type for documentation
+    skim_type: "track_skim_task"
+    # Parameters of the output
+    list_name: "AliAnalysisTaskTrackSkim_PbPb_central"
+    tree_name: "AliAnalysisTaskTrackSkim_PbPb_central_tree"
+    files:
+      - "trains/PbPb/7666/run_by_run/LHC15o/*/AnalysisResults.15o.*.root"
+  LHC15o_pass1_AOD194_semi_central_7668: &LHC15o_PbPb_semi_central
+    name: "LHC15o_pass1_AOD194_semi_central_7668"
+    # Keep track of the skim type for documentation
+    skim_type: "track_skim_task"
+    # Parameters of the output
+    list_name: "AliAnalysisTaskTrackSkim_PbPb_semi_central"
+    tree_name: "AliAnalysisTaskTrackSkim_PbPb_semi_central_tree"
+    files:
+      - "trains/PbPb/7668/run_by_run/LHC15o/*/AnalysisResults.15o.*.root"
+
+analysis_settings:
+  _base:
+    _pp:
+      metadata: &base_metadata_pp
+        # Parameters relevant for loading the dataset
+        # Map from value -> key of how prefixes should be renamed when loading data
+        loading_data_rename_prefix:
+          data: "data"
+        # Map from key -> value of how prefixes should be renamed when converting the skimmed output
+        # to the jet substructure format
+        convert_data_format_prefixes:
+          data: "data"
+      settings: &_base_analysis_settings_pp
+        # In GeV
+        min_jet_pt: {"data": 5}
+
+    _pythia:
+      metadata: &base_metadata_pythia
+        # Parameters relevant for loading the dataset
+        # Map from value -> key of how prefixes should be renamed when loading data
+        # For pythia, this isn't necessary since it has a dedicated function for loading MC data
+        loading_data_rename_prefix: {}
+        # Map from key -> value of how prefixes should be renamed when converting the skimmed output
+        # to the jet substructure format
+        convert_data_format_prefixes:
+          det_level: "data"
+          part_level: "true"
+      settings: &_base_analysis_settings_pythia
+        # In GeV
+        # We don't want to restrict the part_level
+        min_jet_pt: {"det_level": 5}
+
+    _PbPb:
+      metadata: &base_metadata_PbPb
+        # Parameters relevant for loading the dataset
+        # Map from value -> key of how prefixes should be renamed when loading data
+        loading_data_rename_prefix:
+          data: "data"
+        # Map from key -> value of how prefixes should be renamed when converting the skimmed output
+        # to the jet substructure format
+        convert_data_format_prefixes:
+          data: "data"
+      settings: &_base_analysis_settings_PbPb
+        # In GeV
+        min_jet_pt: {"data": 20}
+
+    _embed:
+      metadata: &base_metadata_embed
+        # Parameters relevant for loading the dataset
+        # Map from value -> key of how prefixes should be renamed when loading data
+        # For embedding, this isn't necessary since it has a dedicated function for loading embedding data
+        loading_data_rename_prefix: {}
+        # Map from key -> value of how prefixes should be renamed when converting the skimmed output
+        # to the jet substructure format
+        convert_data_format_prefixes:
+          hybrid: "hybrid"
+          det_level: "det_level"
+          part_level: "true"
+      settings: &_base_analysis_settings_embed
+        # In GeV
+        # We don't want to restrict the "det_level" or "part_level" jet pt values
+        min_jet_pt: {"hybrid": 20}
+
+
+  pp_R02: &analysis_settings_pp_R02
+    <<: *_base_analysis_settings_pp
+    jet_R: 0.2
+
+  pythia_R02: &analysis_settings_pythia_R02
+    <<: *_base_analysis_settings_pp
+    jet_R: 0.2
+
+  PbPb_R02: &analysis_settings_PbPb_R02
+    <<: *_base_analysis_settings_PbPb
+    jet_R: 0.2
+
+  embed_R02: &analysis_settings_embed_R02
+    <<: *_base_analysis_settings_embed
+    jet_R: 0.2
+
+
+productions:
+  pp:
+    60:
+      metadata:
+        <<: *base_metadata_pp
+        dataset: &LHC17pq_pp
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 60
+        # TODO: Add dataset name
+        # TODO: Add date automatically
+        #       Add to "production.yaml"
+        #       Also make a "config.yaml(?)"
+        label: ""
+      settings:
+        <<: *analysis_settings_pp_R02
+
+  pythia:
+    60:
+      metadata:
+        <<: *base_metadata_pythia
+        dataset: &LHC18b8_pythia
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 60
+        scale_factors_dataset: "TODO"
+        label: ""
+      settings:
+        <<: *analysis_settings_pythia_R02
+
+  PbPb:
+    60:
+      metadata:
+        <<: *base_metadata_PbPb
+        dataset: &LHC18qr_PbPb_central
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 60
+        label: "central"
+      settings:
+        <<: *analysis_settings_PbPb_R02
+        event_activity: "central"
+    61:
+      metadata:
+        <<: *base_metadata_PbPb
+        dataset: &LHC18qr_PbPb_semi_central
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 60
+        label: "semi_central"
+      settings:
+        <<: *analysis_settings_PbPb_R02
+        event_activity: "semi_central"
+  embed_pythia:
+    60:
+      metadata:
+        <<: *base_metadata_PbPb
+        dataset: &LHC18qr_PbPb_semi_central
+        signal_dataset: &LHC20g4_pythia
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 60
+        label: "embed_pythia_semi_central"
+      settings:
+        <<: *analysis_settings_embed_R02
+        event_activity: "semi_central"
