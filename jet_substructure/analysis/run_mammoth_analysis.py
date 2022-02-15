@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @python_app  # type: ignore
-def run_data_skim(
+def _run_data_skim(
     collision_system: str,
     jet_R: float,
     min_jet_pt: float,
@@ -120,7 +120,7 @@ def setup_calculate_data_skim(
                 output_dir.mkdir(parents=True, exist_ok=True)
             output_filename = output_dir / f"{input_filename.stem}_{iterative_splittings_label}_splittings.root"
             results.append(
-                run_data_skim(
+                _run_data_skim(
                     collision_system=collision_system,
                     event_activity=event_activity,
                     jet_R=jet_R,
