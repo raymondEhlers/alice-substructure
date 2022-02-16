@@ -757,9 +757,10 @@ def setup_extract_scale_factors(
 
     for pt_hard_bin, input_files in input_files_per_pt_hard_bin.items():
         logger.debug(f"pt_hard_bin: {pt_hard_bin}, filenames: {input_files}")
-        scale_factors[pt_hard_bin] = _extract_scale_factors_from_hists(
-            inputs=[File(str(fname)) for fname in input_files],
-        )
+        if input_files:
+            scale_factors[pt_hard_bin] = _extract_scale_factors_from_hists(
+                inputs=[File(str(fname)) for fname in input_files],
+            )
 
     return scale_factors
 
@@ -2220,7 +2221,7 @@ if __name__ == "__main__":  # noqa: C901
     # asking for the result. By embedded here, we can inspect results, etc in the meantime.
     # NOTE: This may be commented out sometimes when I have long running processes and wil
     #       probably forget to close it.
-    IPython.start_ipython(user_ns=locals())
+    IPython.start_ipython(user_ns={**locals(), **globals()})
 
     # In case we close IPython early, wait on results
     # print each job status, initially all are running
