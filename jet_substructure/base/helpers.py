@@ -28,6 +28,7 @@ from typing import (
 
 import attr
 import numpy as np
+import numpy.typing as npt
 
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,7 @@ class UprootArray(Collection[T]):
         ...
 
     @typing.overload
-    def __getitem__(self, key: np.ndarray) -> UprootArray[T]:
+    def __getitem__(self, key: npt.NDArray[np.bool_]) -> UprootArray[T]:
         ...
 
     @typing.overload
@@ -113,10 +114,10 @@ class UprootArray(Collection[T]):
     def argmax(self) -> UprootArray[int]:
         raise NotImplementedError("Just typing information.")
 
-    def offsets(self) -> np.ndarray:
+    def offsets(self) -> npt.NDArray[np.int64]:
         raise NotImplementedError("Just typing information.")
 
-    def flatten(self, axis: Optional[int] = ...) -> np.ndarray:
+    def flatten(self, axis: Optional[int] = ...) -> npt.NDArray[Any]:
         raise NotImplementedError("Just typing information.")
 
     @property
@@ -182,7 +183,9 @@ def setup_logging(level: int = logging.DEBUG) -> None:
     logging.getLogger("matplotlib").setLevel(logging.INFO)
     # For sanity when using IPython
     logging.getLogger("parso").setLevel(logging.INFO)
-    # Quiet down BinndData copy warnings
+    logging.getLogger("blib2to3").setLevel(logging.INFO)
+    logging.getLogger("asyncio").setLevel(logging.INFO)
+    # Quiet down BinnedData copy warnings
     logging.getLogger("pachyderm.binned_data").setLevel(logging.INFO)
     # Quiet down numba
     logging.getLogger("numba").setLevel(logging.INFO)
