@@ -255,7 +255,12 @@ def pt_hard_spectra_from_hists(
                     )
                 )
         h_temp = sum(single_bin_pt_hard_spectra)
-        pt_hard_spectra.append(h_temp * scale_factors[pt_hard_bin])
+        # The scale factor may not be defined if (for example) working with a test production without all pt hard bins
+        # If it's not available, don't bother trying to append the spectra - it doesn't gain anything, and it's likely
+        # to cause additional issues.
+        _scale_factor = scale_factors.get(pt_hard_bin)
+        if _scale_factor:
+            pt_hard_spectra.append(h_temp * _scale_factor)
 
     final_spectra = sum(pt_hard_spectra)
 
