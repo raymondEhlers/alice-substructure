@@ -196,24 +196,6 @@ available_datasets:
         files:
             - "trains/pythia/2521/AnalysisResults.FAST.*.repaired.root"
             - "trains/pythia/2521/AnalysisResults.cent_woSDD.*.repaired.root"
-    LHC18b8_pythia_R04_2520_test: &LHC18b8_pythia_R04_test
-        # NOTE: This is nominally the same output as in 2110, but produced with the newer
-        #       substructure task output, so it's much easier to work with.
-        name: "LHC18b8_pythia_R04_2520_test"
-        # yamllint disable-line rule:line-length
-        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeTree_PythiaDef_NoSub_Incl"
-        # Map for the uniform prefix name to the analysis task prefix.
-        prefixes:
-            data: "data"
-            "true": "matched"
-        # Branches which don't exist for all prefixes
-        branches: ["ptHard", "ptHardBin"]
-        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
-        prefix_branches: *prefix_branches
-        jet_R: 0.4
-        entries_per_job: 2e5
-        files:
-            - "trains/pythia/1/AnalysisResults.repaired.root"
     # pythia R = 0.2
     LHC18b8_pythia_R02_2461: &LHC18b8_pythia_R02
         name: "LHC18b8_pythia_R02_2461"
@@ -959,6 +941,56 @@ available_datasets:
             - "trains/embedPythia/6999/AnalysisResults.*.root"
             - "trains/embedPythia/7000/AnalysisResults.*.root"
             - "trains/embedPythia/7001/AnalysisResults.*.root"
+
+
+    # Validation productions
+    LHC17pq_pp_R04_1: &LHC17pq_pp_R04_validation
+        name: "LHC17pq_pp_R04_1"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_scheme_RawTree_Data_NoSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't exist for all prefixes
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.4
+        entries_per_job: 2e5
+        files:
+            - "trains/pp/1/AnalysisResults.repaired.root"
+    LHC18b8_pythia_R04_1: &LHC18b8_pythia_R04_validation
+        # NOTE: This is nominally the same output as in 2110, but produced with the newer
+        #       substructure task output, so it's much easier to work with.
+        name: "LHC18b8_pythia_R04_1"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeTree_PythiaDef_NoSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+            "true": "matched"
+        # Branches which don't exist for all prefixes
+        branches: ["pt_hard", "pt_hard_bin"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.4
+        entries_per_job: 2e5
+        files:
+            - "trains/pythia/1/AnalysisResults.12.repaired.root"
+    LHC18qr_central_R04_1: &LHC18qr_central_R04_validation
+        name: "LHC18qr_central_R04_1"
+        # yamllint disable-line rule:line-length
+        tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't exist for all prefixes
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.4
+        files:
+            - "trains/PbPb/1/AnalysisResults.repaired.root"
 
 analysis_configurations:
     PbPb_semi_central_R04_pass1:
