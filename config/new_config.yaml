@@ -1979,12 +1979,13 @@ analysis_configurations:
                             # Same as above, but including the untagged bin.
                             smeared_kt: [0, 0.25, 0.52, 0.97, 1.52, 2.05, 3.01, 4., 6]
 
-execution:
-    PbPb:
-        dataset: *LHC18qr_central_R02
-    embedPythia:
-        dataset: *LHC18qr_semi_central_R04_embedded
-    pp:
-        dataset: *LHC17pq_pp_R02
-    pythia:
-        dataset: *LHC18b8_pythia_R02
+
+    PbPb_central_R04_validation:
+        datasets:
+            nominal:
+                PbPb: *LHC18qr_central_R04_validation
+    pp_R04_validation:
+        datasets:
+            nominal:
+                pp: *LHC17pq_pp_R04_validation
+                pythia: *LHC18b8_pythia_R04_validation
