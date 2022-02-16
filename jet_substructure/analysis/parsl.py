@@ -151,7 +151,7 @@ def setup_parsl_587(
             software_to_load.append("RooUnfold/latest")
         slurm_kwargs.update(
             dict(
-                worker_init=f"eval `/usr/local/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv {','.join(software_to_load)}`",
+                worker_init=f"eval `/usr/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv {','.join(software_to_load)}`",
             )
         )
 
