@@ -218,6 +218,7 @@ def run_dynamical_grooming(  # noqa: C901
     period: str,
     physics_selection: int,
     data_type: DataType,
+    jet_R: float = 0.2,
     enable_track_skim: bool = False,
     enable_HF_tree: bool = False,
     grooming_jet_pt_threshold: float = 20,
@@ -258,6 +259,8 @@ def run_dynamical_grooming(  # noqa: C901
         centrality_min, centrality_max = 30, 50
     if analysis_mode == AnalysisMode.PbPb:
         print(f"Centrality range: {centrality_min}-{centrality_max}")
+    # jet R needs to be formatted as a string too
+    jet_R_str = f"{round(jet_R*100):03}"
 
     # Basic setup (analysis manager and input handler).
     analysis_manager = ROOT.AliAnalysisManager(task_name)
@@ -537,7 +540,7 @@ def run_dynamical_grooming(  # noqa: C901
         "tracks",
         "",
         ROOT.AliJetContainer.antikt_algorithm,
-        0.4,
+        jet_R,
         ROOT.AliJetContainer.kChargedJet,
         0.15,
         0.30,
@@ -580,7 +583,7 @@ def run_dynamical_grooming(  # noqa: C901
             "mcparticles",
             "",
             ROOT.AliJetContainer.antikt_algorithm,
-            0.4,
+            jet_R,
             ROOT.AliJetContainer.kChargedJet,
             0.0,
             0.0,
@@ -596,13 +599,13 @@ def run_dynamical_grooming(  # noqa: C901
     # Pythia detector to particle level tagger
     if analysis_mode in [AnalysisMode.pythia, AnalysisMode.embedPythia]:
         # Tagger
-        # JetTaggerMCChargedR040
+        # JetTaggerMCChargedR{jet_R_str}
         tagger = _run_add_task_macro(
             "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskEmcalJetTagger.C",
             "AliAnalysisTaskEmcalJetTagger",
-            "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
-            "Jet_AKTChargedR040_mcparticles_pT0000_E_scheme",
-            0.4,
+            f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+            f"Jet_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
+            jet_R,
             "",
             "",
             "tracks",
@@ -629,8 +632,8 @@ def run_dynamical_grooming(  # noqa: C901
     if analysis_mode == AnalysisMode.PbPb:
         # task = _run_add_task_macro(
         #    "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskJetDynamicalGrooming.C", "PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming",
-        #    "Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
-        #    "Jet_AKTChargedR040_tracks_pT0150_E_scheme", "", "", 0.4, "Rho",
+        #    f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_schemeConstSub",
+        #    f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme", "", "", jet_R, "Rho",
         #    "tracksSubR02", "tracks", "", "", "", "TPC", "V0M", physics_selection,
         #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kData"),
         #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kConstSub"),
@@ -640,11 +643,11 @@ def run_dynamical_grooming(  # noqa: C901
         #    "Raw"
         # )
         dynamical_grooming = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
-            "Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
-            "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
+            f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_schemeConstSub",
+            f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
             "",
             "",
-            0.4,
+            jet_R,
             "Rho",
             "tracksSubR02",
             "tracks",
@@ -665,8 +668,8 @@ def run_dynamical_grooming(  # noqa: C901
         )
     elif analysis_mode == AnalysisMode.pp:
         # dynamical_grooming = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
-        #    "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
-        #    "", "", "", 0.4, "",
+        #    f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+        #    "", "", "", jet_R, "",
         #    "tracks", "", "", "", "", "TPC", "V0M", physics_selection,
         #    ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kData,
         #    ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kNoSub,
@@ -676,11 +679,11 @@ def run_dynamical_grooming(  # noqa: C901
         #    "Raw"
         # )
         dynamical_grooming = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
-            "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
+            f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
             "",
             "",
             "",
-            0.4,
+            0.2,
             "",
             "tracks",
             "",
@@ -701,11 +704,11 @@ def run_dynamical_grooming(  # noqa: C901
         )
     elif analysis_mode == AnalysisMode.pythia:
         dynamical_grooming = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
-            "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
+            f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
             "",
-            "Jet_AKTChargedR040_mcparticles_pT0000_E_scheme",
+            f"Jet_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
             "",
-            0.4,
+            jet_R,
             "tracks",
             "",
             "",
@@ -727,7 +730,7 @@ def run_dynamical_grooming(  # noqa: C901
     if beam_type == BeamType.PbPb:
         cont.SetRhoName("Rho")
         cont.SetRhoMassName("RhoMass")
-    cont.SetJetRadius(0.4)
+    cont.SetJetRadius(jet_R)
     cont.SetJetAcceptanceType(ROOT.AliJetContainer.kTPCfid)
     cont.SetMaxTrackPt(100)
     cont.SetJetPtCut(0)
@@ -762,8 +765,8 @@ def run_dynamical_grooming(  # noqa: C901
     if analysis_mode == AnalysisMode.PbPb:
         # task = _run_add_task_macro(
         #    "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskJetHardestKt.C", "PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt",
-        #    "Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
-        #    "Jet_AKTChargedR040_tracks_pT0150_E_scheme", "", "", 0.4, "Rho",
+        #    f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_schemeConstSub",
+        #    f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme", "", "", jet_R, "Rho",
         #    "tracksSubR02", "tracks", "", "", "", "TPC", "V0M", physics_selection,
         #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt::kData"),
         #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt::kConstSub"),
@@ -773,11 +776,11 @@ def run_dynamical_grooming(  # noqa: C901
         #    "Raw"
         # )
         hardest_kt = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.AddTaskJetHardestKt(
-            "Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
-            "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
+            f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_schemeConstSub",
+            f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
             "",
             "",
-            0.4,
+            jet_R,
             "Rho",
             "tracksSubR02",
             "tracks",
@@ -798,8 +801,8 @@ def run_dynamical_grooming(  # noqa: C901
         )
     elif analysis_mode == AnalysisMode.pp:
         # hardest_kt = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.AddTaskJetHardestKt(
-        #    "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
-        #    "", "", "", 0.4, "",
+        #    f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+        #    "", "", "", jet_R, "",
         #    "tracks", "", "", "", "", "TPC", "V0M", physics_selection,
         #    ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kData,
         #    ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kNoSub,
@@ -809,11 +812,11 @@ def run_dynamical_grooming(  # noqa: C901
         #    "Raw"
         # )
         hardest_kt = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.AddTaskJetHardestKt(
-            "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
+            f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
             "",
             "",
             "",
-            0.4,
+            jet_R,
             "",
             "tracks",
             "",
@@ -834,11 +837,11 @@ def run_dynamical_grooming(  # noqa: C901
         )
     elif analysis_mode == AnalysisMode.pythia:
         hardest_kt = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.AddTaskJetHardestKt(
-            "Jet_AKTChargedR040_tracks_pT0150_E_scheme",
+            f"Jet_AKTCharged{jet_R_str}_tracks_pT0150_E_scheme",
             "",
-            "Jet_AKTChargedR040_mcparticles_pT0000_E_scheme",
+            f"Jet_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
             "",
-            0.4,
+            jet_R,
             "tracks",
             "",
             "",
@@ -860,7 +863,7 @@ def run_dynamical_grooming(  # noqa: C901
     if beam_type == BeamType.PbPb:
         cont.SetRhoName("Rho")
         cont.SetRhoMassName("RhoMass")
-    cont.SetJetRadius(0.4)
+    cont.SetJetRadius(jet_R)
     cont.SetJetAcceptanceType(ROOT.AliJetContainer.kTPCfid)
     cont.SetMaxTrackPt(100)
     cont.SetJetPtCut(0)
@@ -922,7 +925,7 @@ def run_dynamical_grooming(  # noqa: C901
 
 
 def run_dynamical_grooming_embedding(
-    task_name: str, analysis_mode: AnalysisMode, period: str, physics_selection: int, data_type: DataType
+    task_name: str, analysis_mode: AnalysisMode, period: str, physics_selection: int, data_type: DataType, jet_R: float,
 ) -> ROOT.AliAnalysisManager:
     """Run dynamical grooming embedding.
 
@@ -952,6 +955,8 @@ def run_dynamical_grooming_embedding(
             dtype=np.int32,
         )
         pt_hard_binning_root = ROOT.TArrayI(len(pt_hard_binning), pt_hard_binning)  # noqa: F841
+    # jet R needs to be formatted as a string too
+    jet_R_str = f"{round(jet_R*100):03}"
 
     # Basic setup (analysis manager and input handler).
     analysis_manager = ROOT.AliAnalysisManager(task_name)
@@ -1092,7 +1097,7 @@ def run_dynamical_grooming_embedding(
         "tracks",
         "",
         ROOT.AliJetContainer.antikt_algorithm,
-        0.4,
+        jet_R,
         ROOT.AliJetContainer.kChargedJet,
         0.15,
         0.3,
@@ -1136,7 +1141,7 @@ def run_dynamical_grooming_embedding(
         "mcparticles",
         "",
         ROOT.AliJetContainer.antikt_algorithm,
-        0.4,
+        jet_R,
         ROOT.AliJetContainer.kChargedJet,
         0.0,
         0.0,
@@ -1159,7 +1164,7 @@ def run_dynamical_grooming_embedding(
         "usedefault",
         "",
         ROOT.AliJetContainer.antikt_algorithm,
-        0.4,
+        jet_R,
         ROOT.AliJetContainer.kChargedJet,
         0.15,
         0.3,
@@ -1183,9 +1188,9 @@ def run_dynamical_grooming_embedding(
     hybrid_sub_tagger = _run_add_task_macro(
         "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskEmcalJetTagger.C",
         "AliAnalysisTaskEmcalJetTagger",
-        "hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
-        "hybridLevelJets_AKTChargedR040_tracks_pT0150_E_scheme",
-        0.4,
+        f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_schemeConstSub",
+        f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+        jet_R,
         "Rho",
         "",
         "tracksSubR04",
@@ -1212,9 +1217,9 @@ def run_dynamical_grooming_embedding(
     detector_hybrid_tagger = _run_add_task_macro(
         "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskEmcalJetTagger.C",
         "AliAnalysisTaskEmcalJetTagger",
-        "hybridLevelJets_AKTChargedR040_tracks_pT0150_E_scheme",
-        "detLevelJets_AKTChargedR040_tracks_pT0150_E_scheme",
-        0.4,
+        f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+        f"detLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+        jet_R,
         "Rho",
         "",
         "tracks",
@@ -1245,9 +1250,9 @@ def run_dynamical_grooming_embedding(
     particle_detector_tagger = _run_add_task_macro(
         "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskEmcalJetTagger.C",
         "AliAnalysisTaskEmcalJetTagger",
-        "detLevelJets_AKTChargedR040_tracks_pT0150_E_scheme",
-        "partLevelJets_AKTChargedR040_mcparticles_pT0000_E_scheme",
-        0.4,
+        f"detLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+        f"partLevelJets_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
+        jet_R,
         "",
         "",
         "tracks",
@@ -1282,8 +1287,8 @@ def run_dynamical_grooming_embedding(
     # Dynamical grooming
     # task = _run_add_task_macro(
     #    "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskJetDynamicalGrooming.C", "PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming",
-    #    "Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
-    #    "Jet_AKTChargedR040_tracks_pT0150_E_scheme", "", "", 0.4, "Rho",
+    #    f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_schemeConstSub",
+    #    f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme", "", "", jet_R, "Rho",
     #    "tracksSubR02", "tracks", "", "", "", "TPC", "V0M", physics_selection,
     #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kData"),
     #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kConstSub"),
@@ -1293,11 +1298,11 @@ def run_dynamical_grooming_embedding(
     #    "Raw"
     # )
     dynamical_grooming = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
-        "hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
-        "hybridLevelJets_AKTChargedR040_tracks_pT0150_E_scheme",
-        "detLevelJets_AKTChargedR040_tracks_pT0150_E_scheme",
-        "partLevelJets_AKTChargedR040_mcparticles_pT0000_E_scheme",
-        0.4,
+        f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_schemeConstSub",
+        f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+        f"detLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+        f"partLevelJets_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
+        jet_R,
         "Rho",
         "tracksSubR04",
         "tracks",
@@ -1319,7 +1324,7 @@ def run_dynamical_grooming_embedding(
     cont = dynamical_grooming.GetJetContainer(0)
     cont.SetRhoName("Rho")
     cont.SetRhoMassName("RhoMass")
-    cont.SetJetRadius(0.4)
+    cont.SetJetRadius(jet_R)
     cont.SetJetAcceptanceType(ROOT.AliJetContainer.kTPCfid)
     cont.SetMaxTrackPt(100)
 
@@ -1343,11 +1348,11 @@ def run_dynamical_grooming_embedding(
 
     # Hardest kt cross check task.
     hardest_kt = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.AddTaskJetHardestKt(
-        "hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
-        "hybridLevelJets_AKTChargedR040_tracks_pT0150_E_scheme",
-        "detLevelJets_AKTChargedR040_tracks_pT0150_E_scheme",
-        "partLevelJets_AKTChargedR040_mcparticles_pT0000_E_scheme",
-        0.4,
+        f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_schemeConstSub",
+        f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+        f"detLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+        f"partLevelJets_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
+        jet_R,
         "Rho",
         "tracksSubR04",
         "tracks",
@@ -1369,7 +1374,7 @@ def run_dynamical_grooming_embedding(
     cont = hardest_kt.GetJetContainer(0)
     cont.SetRhoName("Rho")
     cont.SetRhoMassName("RhoMass")
-    cont.SetJetRadius(0.4)
+    cont.SetJetRadius(jet_R)
     cont.SetJetAcceptanceType(ROOT.AliJetContainer.kTPCfid)
     cont.SetMaxTrackPt(100)
 
@@ -1398,11 +1403,11 @@ def run_dynamical_grooming_embedding(
     ll_substructure = _run_add_task_macro(
         "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskNewJetSubstructure.C",
         "AliAnalysisTaskNewJetSubstructure",
-        "hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub",
-        "hybridLevelJets_AKTChargedR040_tracks_pT0150_E_scheme",
-        "detLevelJets_AKTChargedR040_tracks_pT0150_E_scheme",
-        "partLevelJets_AKTChargedR040_mcparticles_pT0000_E_scheme",
-        0.4,
+        f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_schemeConstSub",
+        f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+        f"detLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
+        f"partLevelJets_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
+        0.2,
         "Rho",
         "tracksSubR04",
         "tracks",
@@ -1422,7 +1427,7 @@ def run_dynamical_grooming_embedding(
     cont = ll_substructure.GetJetContainer(0)
     cont.SetRhoName("Rho")
     cont.SetRhoMassName("RhoMass")
-    cont.SetJetRadius(0.4)
+    cont.SetJetRadius(jet_R)
     cont.SetJetAcceptanceType(ROOT.AliJetContainer.kTPCfid)
     cont.SetMaxTrackPt(100)
 
@@ -1540,6 +1545,7 @@ def run(
         data_type=data_type,
         enable_track_skim=True,
         grooming_jet_pt_threshold=grooming_jet_pt_threshold,
+        jet_R=0.2,
     )
 
     start_analysis_manager(analysis_manager=analysis_manager, mode="local", n_events=1000, input_files=input_files)
