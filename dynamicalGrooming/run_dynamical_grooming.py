@@ -837,7 +837,7 @@ def run_dynamical_grooming(  # noqa: C901
         )
     elif analysis_mode == AnalysisMode.pythia:
         hardest_kt = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.AddTaskJetHardestKt(
-            f"Jet_AKTCharged{jet_R_str}_tracks_pT0150_E_scheme",
+            f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
             "",
             f"Jet_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
             "",
