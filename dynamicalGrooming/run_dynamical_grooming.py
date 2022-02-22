@@ -631,9 +631,15 @@ def run_dynamical_grooming(  # noqa: C901
             tagger.SetIsPythia(True)
         tagger.SetJetTaggingType(ROOT.AliAnalysisTaskEmcalJetTagger.kClosest)
         tagger.SetJetTaggingMethod(ROOT.AliAnalysisTaskEmcalJetTagger.kGeo)
-        tagger.SetTypeAcceptance(3)
         tagger.SetNumberOfPtHardBins(len(pt_hard_binning) - 1)
         tagger.SetUserPtHardBinning(pt_hard_binning_root)
+        # This is what's used on the LEGO train (2461, for example). However, it's really broad, so we use something a bit
+        # narrower here for testing and validation.
+        # NOTE: In particular, type 3 adds extra margin around the jet acceptance. We don't have this functionality in
+        #       the track skim analysis, so we disable it for now.
+        #tagger.SetTypeAcceptance(3)
+        #tagger.SetMaxDistance(1.0)
+        tagger.SetTypeAcceptance(0)
         tagger.SetMaxDistance(1.0)
 
     # Dynamical grooming
