@@ -212,6 +212,17 @@ def _add_mult_selection(is_run2_data: bool, physics_selection: int) -> Optional[
     return None
 
 
+def _handle_special_event_selection_for_pythia(period: str, task: Any) -> None:
+    if period == "LHC20g4":
+        # For this period, we need to manually configure the event cuts to use Run2 pp cuts.
+        # Otherwise, it will use the PbPb cuts, which will dramatically cut into the statistics.
+        # NOTE: This isn't an issue with embedding because we don't apply event selection to the external event
+        eventCuts = task.GetEventCuts()
+        eventCuts.SetManualMode()
+        eventCuts.SetupRun2pp()
+        print(f"Fixing event selection for {period} for {task.GetName()}")
+
+
 def run_dynamical_grooming(  # noqa: C901
     task_name: str,
     analysis_mode: AnalysisMode,
@@ -311,13 +322,7 @@ def run_dynamical_grooming(  # noqa: C901
             )
             skim_task.SelectCollisionCandidates(physics_selection)
             skim_task.SetIsPythia(True)
-            if period == "LHC20g4":
-                # For this period, we need to manually configure the event cuts to use Run2 pp cuts.
-                # Otherwise, it will use the PbPb cuts, which will dramatically cut into the statistics.
-                # NOTE: This isn't an issue with embedding because we don't apply event selection to the external event
-                eventCuts = skim_task.GetEventCuts()
-                eventCuts.SetManualMode()
-                eventCuts.SetupRun2pp()
+            _handle_special_event_selection_for_pythia(period=period, task=skim_task)
 
             skim_task.AddTrackContainer("tracks")
 
@@ -552,6 +557,7 @@ def run_dynamical_grooming(  # noqa: C901
         False,
     )
     akt_jet_finder.SelectCollisionCandidates(physics_selection)
+    _handle_special_event_selection_for_pythia(period=period, task=akt_jet_finder)
     akt_jet_finder.SetNeedEmcalGeom(False)
     akt_jet_finder.SetZvertexDiffValue(0.1)
 
@@ -595,6 +601,7 @@ def run_dynamical_grooming(  # noqa: C901
             False,
         )
         akt_particle_level_jet_finder.SelectCollisionCandidates(physics_selection)
+        _handle_special_event_selection_for_pythia(period=period, task=akt_particle_level_jet_finder)
 
     # Pythia detector to particle level tagger
     if analysis_mode in [AnalysisMode.pythia, AnalysisMode.embedPythia]:
@@ -616,7 +623,8 @@ def run_dynamical_grooming(  # noqa: C901
             "",
         )
         tagger.SetNCentBins(1)
-        tagger.SelectCollisionCandidates(ROOT.AliVEvent.kMB)
+        tagger.SelectCollisionCandidates(physics_selection)
+        _handle_special_event_selection_for_pythia(period=period, task=tagger)
         # tagger.SetUseInternalEventSelection(kTRUE)
         # tagger.SetForceBeamType(AliAnalysisTaskEmcal::kpp)
         if is_MC:
@@ -724,6 +732,7 @@ def run_dynamical_grooming(  # noqa: C901
         )
     dynamical_grooming.SelectCollisionCandidates(physics_selection)
     if analysis_mode in [AnalysisMode.pythia, AnalysisMode.embedPythia]:
+        _handle_special_event_selection_for_pythia(period=period, task=dynamical_grooming)
         dynamical_grooming.SetNumberOfPtHardBins(len(pt_hard_binning) - 1)
         dynamical_grooming.SetUserPtHardBinning(pt_hard_binning_root)
     cont = dynamical_grooming.GetJetContainer(0)
@@ -857,6 +866,7 @@ def run_dynamical_grooming(  # noqa: C901
         )
     hardest_kt.SelectCollisionCandidates(physics_selection)
     if analysis_mode in [AnalysisMode.pythia, AnalysisMode.embedPythia]:
+        _handle_special_event_selection_for_pythia(period=period, task=hardest_kt)
         hardest_kt.SetNumberOfPtHardBins(len(pt_hard_binning) - 1)
         hardest_kt.SetUserPtHardBinning(pt_hard_binning_root)
     cont = hardest_kt.GetJetContainer(0)
@@ -1572,7 +1582,7 @@ def run_embedding(
 
 
 if __name__ == "__main__":
-    analysis_mode = AnalysisMode.PbPb
+    analysis_mode = AnalysisMode.pythia
     if analysis_mode == AnalysisMode.PbPb:
         run(
             analysis_mode=analysis_mode,
