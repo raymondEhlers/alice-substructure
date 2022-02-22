@@ -287,44 +287,63 @@ if __name__ == "__main__":
     helpers.setup_logging(level=logging.INFO)
 
     #for collision_system in ["pp", "PbPb"]:
+    _min_jet_pt = {
+        "pp": {"data": 5.},
+        "pythia": {"det_level": 20.},
+        "PbPb": {"data": 20.},
+    }
     for collision_system in ["pp", "pythia", "PbPb"]:
         logger.info(f"Analyzing \"{collision_system}\"")
         base_path = Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}")
-        _min_jet_pt = {
-            "pp": 5.,
-            "pythia": {"det_level": 20.},
-            "PbPb": 20.,
-        }
+
+        scale_factors = None
+        pt_hat_bin = -1
+        if collision_system == "pythia":
+            import jet_substructure.analysis.parsl
+            # NOTE: Using external information here to set this up. Normally, we would set
+            #       this via a configuration file
+            scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
+                collision_system=collision_system,
+                dataset_name="LHC18b8_pythia_R04_1",
+            )
+            pt_hat_bin = 12
+
         result = hardest_kt_data_skim(
             input_filename=base_path / "AnalysisResults_track_skim.parquet",
             collision_system=collision_system,
             jet_R=0.4,
-            min_jet_pt=_min_jet_pt[collision_system],  # type: ignore
+            min_jet_pt=_min_jet_pt[collision_system],
             iterative_splittings=True,
+            loading_data_rename_prefix={"data": "data"} if collision_system != "pythia" else {},
             convert_data_format_prefixes={"data": "data"} if collision_system != "pythia" else {"det_level": "data", "part_level": "true"},
-            loading_data_rename_prefix={"data": "data"} if collision_system != "pythia" else {"data": "det_level"},
             output_filename=base_path / "skim" / "skim_output.root",
+            scale_factors=scale_factors,
+            pt_hat_bin=pt_hat_bin,
         )
         logger.info(f"Result: {result}")
 
-    import jet_substructure.analysis.parsl
-    scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
-        # TODO: Unclear if the collision system should be hard coded
-        collision_system="embedPythia",
-        dataset_name="LHC20g4_embedded_into_LHC18qr_central_R02_6982_7001",
-    )
+    # import jet_substructure.analysis.parsl
+    # scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
+    #     # TODO: Unclear if the collision system should be hard coded
+    #     collision_system="embedPythia",
+    #     dataset_name="LHC20g4_embedded_into_LHC18qr_central_R02_6982_7001",
+    # )
 
-    base_path = Path(f"/software/rehlers/dev/substructure/trains/pythia/641")
-    hardest_kt_embedding_skim(
-        #input_filename=base_path / "run_by_run/LHC20g4/295612/11/AnalysisResults.20g4.016.root",
-        input_filename=base_path / "run_by_run/LHC20g4/297544/19/AnalysisResults.20g4.005.root",
-        jet_R=0.2,
-        min_jet_pt={"hybrid": 20},
-        iterative_splittings=True,
-        output_filename=base_path / "skim" / "test" / "thermal_model_skim_output.root",
-        thermal_model_parameters=sources.THERMAL_MODEL_SETTINGS["central"],
-        convert_data_format_prefixes={"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
-        #scale_factor=scale_factors[11],
-        scale_factor=scale_factors[19],
-        r_max=0.25,
-    )
+    # base_path = Path("/software/rehlers/dev/substructure/trains/pythia/641")
+    # hardest_kt_embedding_skim(
+    #     #input_filename=base_path / "run_by_run/LHC20g4/295612/11/AnalysisResults.20g4.016.root",
+    #     #input_filename=base_path / "run_by_run/LHC20g4/297544/19/AnalysisResults.20g4.005.root",
+    #     #input_filename=base_path / "run_by_run/LHC20g4/295819/12/AnalysisResults.20g4.016.root",
+    #     input_filename=base_path / "run_by_run/LHC20g4/297588/4/AnalysisResults.20g4.001.root",
+    #     jet_R=0.2,
+    #     min_jet_pt={"hybrid": 20},
+    #     iterative_splittings=True,
+    #     output_filename=base_path / "skim" / "test" / "thermal_model_skim_output.root",
+    #     thermal_model_parameters=sources.THERMAL_MODEL_SETTINGS["central"],
+    #     convert_data_format_prefixes={"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
+    #     #scale_factor=scale_factors[11],
+    #     #scale_factor=scale_factors[19],
+    #     #scale_factor=scale_factors[12],
+    #     scale_factor=scale_factors[4],
+    #     r_max=0.25,
+    # )
