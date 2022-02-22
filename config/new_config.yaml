@@ -977,8 +977,8 @@ available_datasets:
         entries_per_job: 2e5
         files:
             - "trains/pythia/1/AnalysisResults.12.repaired.root"
-    LHC18qr_central_R04_1: &LHC18qr_central_R04_validation
-        name: "LHC18qr_central_R04_1"
+    LHC18qr_semi_central_R04_1: &LHC18qr_semi_central_R04_validation
+        name: "LHC18qr_semi_central_R04_1"
         # yamllint disable-line rule:line-length
         tree_name: "AliAnalysisTaskJetDynamicalGrooming_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
         # Map for the uniform prefix name to the analysis task prefix.
@@ -1980,10 +1980,10 @@ analysis_configurations:
                             smeared_kt: [0, 0.25, 0.52, 0.97, 1.52, 2.05, 3.01, 4., 6]
 
 
-    PbPb_central_R04_validation:
+    PbPb_semi_central_R04_validation:
         datasets:
             nominal:
-                PbPb: *LHC18qr_central_R04_validation
+                PbPb: *LHC18qr_semi_central_R04_validation
     pp_R04_validation:
         datasets:
             nominal:
