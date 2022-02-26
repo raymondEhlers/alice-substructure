@@ -1,8 +1,16 @@
+"""Comparison between standard analysis and track skim
+
+.. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, LBNL/UCB
+"""
+
+import logging
+import pprint
 from pathlib import Path
 
 import attr
 import awkward as ak
 import boost_histogram as bh
+import mammoth.helpers
 import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
@@ -11,6 +19,9 @@ from pachyderm import binned_data
 
 
 pachyderm.plot.configure()
+
+
+logger = logging.getLogger(__name__)
 
 
 @attr.s
@@ -104,11 +115,12 @@ def plot_attribute_compare(
 
 
 def compare(collision_system: str, standard_filename: Path, track_skim_filename: Path) -> None:
-    standard_tree_name = "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
-    if collision_system == "pp":
-        standard_tree_name = "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_scheme_RawTree_Data_NoSub_Incl"
-    if collision_system == "pythia":
-        standard_tree_name = "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeTree_PythiaDef_NoSub_Incl"
+    #standard_tree_name = "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
+    #if collision_system == "pp":
+    #    standard_tree_name = "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_scheme_RawTree_Data_NoSub_Incl"
+    #if collision_system == "pythia":
+    #    standard_tree_name = "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeTree_PythiaDef_NoSub_Incl"
+    standard_tree_name = "tree"
     standard = uproot.open(standard_filename)[standard_tree_name].arrays()
     track_skim = uproot.open(track_skim_filename)["tree"].arrays()
     print(f"standard.type: {standard.type}")
@@ -126,41 +138,70 @@ def compare(collision_system: str, standard_filename: Path, track_skim_filename:
         axis=bh.axis.Regular(50, 0, 100),
         output_dir=output_dir,
     )
+    standard_jet_pt = standard["data_jet_pt"]
+    track_skim_jet_pt = track_skim["data_jet_pt"]
 
-    plot_attribute_compare(
-        other=Input(arrays=standard, attribute="dynamical_kt_data_kt", name="Standard"),
-        mine=Input(arrays=track_skim, attribute="dynamical_kt_data_kt", name="Track skim"),
-        output_name="dyg_kt_data_kt",
-        log_y=True,
-        normalize=True,
-        axis=bh.axis.Regular(20, 0, 10),
-        output_dir=output_dir,
-    )
+    #logger.info("jet pt")
+    #_arr = ak.zip({"s": standard_jet_pt, "t": track_skim_jet_pt})
+    #logger.info(pprint.pformat(_arr.to_list()))
 
-    plot_attribute_compare(
-        other=Input(arrays=standard, attribute="dynamical_kt_data_delta_R", name="Standard"),
-        mine=Input(arrays=track_skim, attribute="dynamical_kt_data_delta_R", name="Track skim"),
-        output_name="dyg_kt_data_delta_R",
-        normalize=True,
-        axis=bh.axis.Regular(20, 0, 0.6),
-        output_dir=output_dir,
-    )
+    for grooming_method in ["dynamical_kt", "soft_drop_z_cut_02"]:
+        logger.info(f"Plotting method \"{grooming_method}\"")
+        plot_attribute_compare(
+            other=Input(arrays=standard, attribute=f"{grooming_method}_data_kt", name="Standard"),
+            mine=Input(arrays=track_skim, attribute=f"{grooming_method}_data_kt", name="Track skim"),
+            output_name=f"{grooming_method}_data_kt",
+            log_y=True,
+            normalize=True,
+            axis=bh.axis.Regular(50, 0, 10),
+            output_dir=output_dir,
+        )
+        standard_kt = standard[f"{grooming_method}_data_kt"]
+        track_skim_kt = track_skim[f"{grooming_method}_data_kt"]
 
-    plot_attribute_compare(
-        other=Input(arrays=standard, attribute="dynamical_kt_data_z", name="Standard"),
-        mine=Input(arrays=track_skim, attribute="dynamical_kt_data_z", name="Track skim"),
-        output_name="dyg_kt_data_z",
-        normalize=True,
-        axis=bh.axis.Regular(20, 0, 0.5),
-        output_dir=output_dir,
+        logger.info(f"standard_kt: {standard_kt}")
+        logger.info(f"track_skim_kt: {track_skim_kt}")
+
+        plot_attribute_compare(
+            other=Input(arrays=standard, attribute=f"{grooming_method}_data_delta_R", name="Standard"),
+            mine=Input(arrays=track_skim, attribute=f"{grooming_method}_data_delta_R", name="Track skim"),
+            output_name=f"{grooming_method}_data_delta_R",
+            normalize=True,
+            axis=bh.axis.Regular(50, 0, 0.6),
+            output_dir=output_dir,
+        )
+        standard_rg = standard[f"{grooming_method}_data_delta_R"]
+        track_skim_rg = track_skim[f"{grooming_method}_data_delta_R"]
+
+        #logger.info("delta_R")
+        #_arr = ak.zip({"s": standard_rg, "t": track_skim_rg})
+        #logger.info(pprint.pformat(_arr.to_list()))
+
+        #import IPython; IPython.embed()
+
+
+        #logger.info(f"standard_rg: {standard_rg}")
+        #logger.info(f"track_skim_rg: {track_skim_rg}")
+
+        plot_attribute_compare(
+            other=Input(arrays=standard, attribute=f"{grooming_method}_data_z", name="Standard"),
+            mine=Input(arrays=track_skim, attribute=f"{grooming_method}_data_z", name="Track skim"),
+            output_name=f"{grooming_method}_data_z",
+            normalize=True,
+            axis=bh.axis.Regular(50, 0, 0.5),
+            output_dir=output_dir,
+        )
+
+
+def run(collision_system: str) -> None:
+    mammoth.helpers.setup_logging()
+    path_to_mammoth = Path("/Users/re239/code/alice/mammoth")
+    compare(
+        collision_system=collision_system,
+        standard_filename=path_to_mammoth / f"projects/framework/{collision_system}/1/skim/AnalysisResults.repaired.00_iterative_splittings.root",
+        track_skim_filename=path_to_mammoth / f"projects/framework/{collision_system}/1/skim/skim_output.root",
     )
 
 
 if __name__ == "__main__":
-    collision_system = "pythia"
-    compare(
-        collision_system=collision_system,
-        # TODO: Do the proper skim for comparison...
-        standard_filename=Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}/AnalysisResults.root"),
-        track_skim_filename=Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}/skim/skim_output.root"),
-    )
+    run(collision_system="pythia")
