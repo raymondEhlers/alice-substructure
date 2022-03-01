@@ -113,6 +113,8 @@ def hardest_kt_data_skim(
     # Pythia specific
     pt_hat_bin: Optional[int] = -1,
     scale_factors: Optional[Mapping[int, float]] = None,
+    # Validation
+    validation_mode: bool = False,
 ) -> Tuple[bool, str]:
     if loading_data_rename_prefix is None:
         loading_data_rename_prefix = {"data": "data"}
@@ -146,6 +148,7 @@ def hardest_kt_data_skim(
             ),
             jet_R=jet_R,
             min_jet_pt=min_jet_pt,
+            validation_mode=validation_mode,
         )
     elif collision_system in ["pythia"]:
         # Although we could in principle analyze the MC loading only particle or detector level alone,
@@ -160,6 +163,7 @@ def hardest_kt_data_skim(
             ),
             jet_R=jet_R,
             min_jet_pt=min_jet_pt,
+            validation_mode=validation_mode,
         )
     else:
         raise NotImplementedError(f"Not yet implemented for {collision_system}...")
@@ -222,6 +226,7 @@ def hardest_kt_embedding_skim(
     convert_data_format_prefixes: Mapping[str, str],
     scale_factor: float,
     r_max: float,
+    validation_mode: bool = False,
 ) -> Tuple[bool, str]:
     # TODO: Remove hard code...
     collision_system = "thermal_model"
@@ -256,6 +261,7 @@ def hardest_kt_embedding_skim(
             jet_R=jet_R,
             min_jet_pt=min_jet_pt,
             r_max=r_max,
+            validation_mode=validation_mode,
         )
     else:
         raise NotImplementedError(
@@ -285,6 +291,8 @@ def hardest_kt_embedding_skim(
 
 if __name__ == "__main__":
     helpers.setup_logging(level=logging.INFO)
+    #logging.getLogger("mammoth.framework.jet_finding").setLevel(logging.INFO)
+    #logging.getLogger("mammoth._ext").setLevel(logging.DEBUG)
 
     #for collision_system in ["pp", "PbPb"]:
     _min_jet_pt = {
