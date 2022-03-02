@@ -664,7 +664,7 @@ def run_dynamical_grooming(  # noqa: C901
         #    f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme", "", "", jet_R, "Rho",
         #    "tracksSubR02", "tracks", "", "", "", "TPC", "V0M", physics_selection,
         #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kData"),
-        #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kConstSub"),
+        #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kEventSub"),
         #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kInclusive"),
         #    0, 0, 0.6,
         #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kSecondOrder"),
@@ -686,7 +686,7 @@ def run_dynamical_grooming(  # noqa: C901
             "V0M",
             physics_selection,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kData,
-            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kConstSub,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kEventSub,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.kInclusive,
             0,
             0,
@@ -798,7 +798,7 @@ def run_dynamical_grooming(  # noqa: C901
         #    f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme", "", "", jet_R, "Rho",
         #    "tracksSubR02", "tracks", "", "", "", "TPC", "V0M", physics_selection,
         #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt::kData"),
-        #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt::kConstSub"),
+        #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt::kEventSub"),
         #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt::kInclusive"),
         #    0, 0, 0.6,
         #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetHardestKt::kSecondOrder"),
@@ -820,7 +820,7 @@ def run_dynamical_grooming(  # noqa: C901
             "V0M",
             physics_selection,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kData,
-            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kConstSub,
+            ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kEventSub,
             ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.kInclusive,
             0,
             0,
@@ -1350,7 +1350,7 @@ def run_dynamical_grooming_embedding(
     #    f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme", "", "", jet_R, "Rho",
     #    "tracksSubR02", "tracks", "", "", "", "TPC", "V0M", physics_selection,
     #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kData"),
-    #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kConstSub"),
+    #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kEventSub"),
     #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kInclusive"),
     #    0, 0, 0.6,
     #    CppEnum("PWGJE::EMCALJetTasks::AliAnalysisTaskJetDynamicalGrooming::kSecondOrder"),
@@ -1636,7 +1636,7 @@ def run_embedding(
 
 
 if __name__ == "__main__":
-    analysis_mode = AnalysisMode.embedPythia
+    analysis_mode = AnalysisMode.PbPb
     if analysis_mode == AnalysisMode.PbPb:
         run(
             analysis_mode=analysis_mode,
@@ -1652,19 +1652,15 @@ if __name__ == "__main__":
                 Path(
                     "/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
                 ),
-                #Path(
-                #    "/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
-                #),
-                # Path("/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/003/aod_archive.zip#AliAOD.root"),
-                # Path("/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/004/aod_archive.zip#AliAOD.root"),
-                #Path(
-                #    "/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
-                #),
-                #Path(
-                #    "/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
-                #),
-                # Path("/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/003/aod_archive.zip#AliAOD.root"),
-                # Path("/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/004/aod_archive.zip#AliAOD.root"),
+                # Path(
+                #     "/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
+                # ),
+                # Path(
+                #     "/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
+                # ),
+                # Path(
+                #     "/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
+                # ),
             ],
         )
     if analysis_mode == AnalysisMode.pp:
