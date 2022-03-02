@@ -233,6 +233,7 @@ def run_dynamical_grooming(  # noqa: C901
     enable_track_skim: bool = False,
     enable_HF_tree: bool = False,
     grooming_jet_pt_threshold: float = 20,
+    validation_mode: bool = True,
 ) -> ROOT.AliAnalysisManager:
     """Run the event extractor.
 
@@ -242,7 +243,12 @@ def run_dynamical_grooming(  # noqa: C901
         period: Run period.
         physics_selection: Physics selection to apply to the analysis.
         data_type: ALICE data type over which the analysis will run.
-        add_track_skim: Enable track skimming classes.
+        jet_R: Jet R. Default: 0.2
+        enable_track_skim: Add track skimming to analysis. Default: False.
+        enable_HF_tree: Add HF tree skimming to analysis. Default: False.
+        grooming_jet_pt_threshold: Jet pt threshold for grooming tasks. Default: 20
+        validation_mode: If True, adjust some settings to enable validation mode.
+            See the setup for the exact settings that are adjusted. Default: True
 
     Returns:
         The analysis manager.
@@ -272,6 +278,14 @@ def run_dynamical_grooming(  # noqa: C901
         print(f"Centrality range: {centrality_min}-{centrality_max}")
     # jet R needs to be formatted as a string too
     jet_R_str = f"{round(jet_R*100):03}"
+    # Setup for validation mode
+    particle_level_min_pt = 0.
+    if validation_mode:
+        # In the past, we've run the AliPhysics analysis tasks with min of 0. However, as of Feb 2022, the track
+        # skims tend to go down to 150 MeV even at track level to keep the data volume reasonable. For the sake
+        # of validation, we set the AliPhysics tasks to go a min of 150 MeV, and can consider a reskim later.
+        particle_level_min_pt = 0.15
+    particle_level_min_pt_str = f"{round(particle_level_min_pt*1000):04}"
 
     # Basic setup (analysis manager and input handler).
     analysis_manager = ROOT.AliAnalysisManager(task_name)
@@ -505,7 +519,7 @@ def run_dynamical_grooming(  # noqa: C901
         # rho_task.GetClusterContainer(0).SetMCClusterBitMap(TObject.kBitMask)
         # rho_task.SetHistoBins(250,0,250)
         rho_task.SetNeedEmcalGeom(False)
-        rho_task.SetZvertexDiffValue(0.1)
+        #rho_task.SetZvertexDiffValue(0.1)
         cont_rho = rho_task.GetJetContainer(0)
         cont_rho.SetJetRadius(0.2)
         cont_rho.SetJetAcceptanceType(ROOT.AliJetContainer.kTPCfid)
@@ -538,7 +552,7 @@ def run_dynamical_grooming(  # noqa: C901
         cont_rho_mass.SetJetAcceptanceType(ROOT.AliJetContainer.kTPCfid)
         cont_rho_mass.SetMaxTrackPt(100)
         rho_mass.SetNeedEmcalGeom(False)
-        rho_mass.SetZvertexDiffValue(0.1)
+        #rho_mass.SetZvertexDiffValue(0.1)
 
     # Standard akt jet finder. Wagon name: "JetFinderQGAKTCharged_R04_Escheme" from PbPb train.
     akt_jet_finder = ROOT.AliEmcalJetTask.AddTaskEmcalJet(
@@ -559,7 +573,7 @@ def run_dynamical_grooming(  # noqa: C901
     akt_jet_finder.SelectCollisionCandidates(physics_selection)
     _handle_special_event_selection_for_pythia(period=period, task=akt_jet_finder)
     akt_jet_finder.SetNeedEmcalGeom(False)
-    akt_jet_finder.SetZvertexDiffValue(0.1)
+    # akt_jet_finder.SetZvertexDiffValue(0.1)
 
     # Add event subtractor in PbPb.
     if beam_type == BeamType.PbPb:
@@ -591,7 +605,7 @@ def run_dynamical_grooming(  # noqa: C901
             ROOT.AliJetContainer.antikt_algorithm,
             jet_R,
             ROOT.AliJetContainer.kChargedJet,
-            0.0,
+            particle_level_min_pt,
             0.0,
             ghost_area,
             ROOT.AliJetContainer.E_scheme,
@@ -611,7 +625,7 @@ def run_dynamical_grooming(  # noqa: C901
             "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskEmcalJetTagger.C",
             "AliAnalysisTaskEmcalJetTagger",
             f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
-            f"Jet_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
+            f"Jet_AKTChargedR{jet_R_str}_mcparticles_pT{particle_level_min_pt_str}_E_scheme",
             jet_R,
             "",
             "",
@@ -720,7 +734,7 @@ def run_dynamical_grooming(  # noqa: C901
         dynamical_grooming = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetDynamicalGrooming.AddTaskJetDynamicalGrooming(
             f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
             "",
-            f"Jet_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
+            f"Jet_AKTChargedR{jet_R_str}_mcparticles_pT{particle_level_min_pt_str}_E_scheme",
             "",
             jet_R,
             "tracks",
@@ -854,7 +868,7 @@ def run_dynamical_grooming(  # noqa: C901
         hardest_kt = ROOT.PWGJE.EMCALJetTasks.AliAnalysisTaskJetHardestKt.AddTaskJetHardestKt(
             f"Jet_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
             "",
-            f"Jet_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
+            f"Jet_AKTChargedR{jet_R_str}_mcparticles_pT{particle_level_min_pt_str}_E_scheme",
             "",
             jet_R,
             "tracks",
@@ -941,9 +955,15 @@ def run_dynamical_grooming(  # noqa: C901
 
 
 def run_dynamical_grooming_embedding(
-    task_name: str, analysis_mode: AnalysisMode, period: str, physics_selection: int, data_type: DataType, jet_R: float,
+    task_name: str, analysis_mode: AnalysisMode, period: str, physics_selection: int, data_type: DataType, jet_R: float = 0.2,
+    grooming_jet_pt_threshold: float = 20,
+    validation_mode: bool = True,
 ) -> ROOT.AliAnalysisManager:
     """Run dynamical grooming embedding.
+
+    Note:
+        We don't add the track skim here because it doesn't really make sense. We only run the track skim
+        on the true datasets.
 
     Args:
         task_name: Name of the analysis (ie. given to the analysis manager).
@@ -951,6 +971,10 @@ def run_dynamical_grooming_embedding(
         period: Run period.
         physics_selection: Physics selection to apply to the analysis.
         data_type: ALICE data type over which the analysis will run.
+        jet_R: Jet R. Default: 0.2
+        grooming_jet_pt_threshold: Jet pt threshold for grooming tasks. Default: 20
+        validation_mode: If True, adjust some settings to enable validation mode.
+            See the setup for the exact settings that are adjusted. Default: True
 
     Returns:
         The analysis manager.
@@ -971,8 +995,22 @@ def run_dynamical_grooming_embedding(
             dtype=np.int32,
         )
         pt_hard_binning_root = ROOT.TArrayI(len(pt_hard_binning), pt_hard_binning)  # noqa: F841
+    # Centrality ranges
+    # This is rather lazy, but works for these purposes.
+    centrality_min, centrality_max = 0, 10
+    if ROOT.AliVEvent.kSemiCentral & physics_selection:
+        centrality_min, centrality_max = 30, 50
+    print(f"Centrality range: {centrality_min}-{centrality_max}")
     # jet R needs to be formatted as a string too
     jet_R_str = f"{round(jet_R*100):03}"
+    # Setup for validation mode
+    particle_level_min_pt = 0.
+    if validation_mode:
+        # In the past, we've run the AliPhysics analysis tasks with min of 0. However, as of Feb 2022, the track
+        # skims tend to go down to 150 MeV even at track level to keep the data volume reasonable. For the sake
+        # of validation, we set the AliPhysics tasks to go a min of 150 MeV, and can consider a reskim later.
+        particle_level_min_pt = 0.15
+    particle_level_min_pt_str = f"{round(particle_level_min_pt*1000):04}"
 
     # Basic setup (analysis manager and input handler).
     analysis_manager = ROOT.AliAnalysisManager(task_name)
@@ -1000,8 +1038,11 @@ def run_dynamical_grooming_embedding(
     ##embedding_helper.SetInputFilename("*/AOD/*/aod_archive.zip")
     # embedding_helper.SetInputFilename("*/AOD/*/AliAOD.root")
     # embedding_helper.SetInputFilename("*/AOD/*/AliAOD.root")
-    # embedding_helper.SetTriggerMask(ROOT.AliVEvent.kAny) # Equivalent to 0
-    embedding_helper.SetTriggerMask(0xFFFFFFFF)  # Equivalent to 0
+    if validation_mode:
+        embedding_helper.SetTriggerMask(ROOT.AliVEvent.kAnyINT)  # Match what we expect from the skim
+    else:
+        # embedding_helper.SetTriggerMask(ROOT.AliVEvent.kAny)  # Equivalent to 0
+        embedding_helper.SetTriggerMask(0xFFFFFFFF)  # Equivalent to 0
 
     embedding_helper.SetRandomFileAccess(False)
     embedding_helper.SetRandomEventNumberAccess(False)
@@ -1011,6 +1052,8 @@ def run_dynamical_grooming_embedding(
 
     # Set YAML configuration, including good runlist of embedded events, and internal event selection feature
     # embedding_helper.SetConfigurationPath("alien:///alice/cern.ch/user/l/lhavener/embeddingHelper_LHC18_LHC19f4_kCentral.yaml")
+    # NOTE: This is fine for LHC20g4 also - it's not at all MC specific.
+    #       However, it is specific to the centrality range
     embedding_helper.SetConfigurationPath("embedding/embeddingHelper_LHC18_LHC19f4_kSemiCentral.yaml")
     # Set the pt hard auto config identifier
     # embedding_helper.SetAutoConfigureIdentifier("20200514Raymond")
@@ -1159,7 +1202,7 @@ def run_dynamical_grooming_embedding(
         ROOT.AliJetContainer.antikt_algorithm,
         jet_R,
         ROOT.AliJetContainer.kChargedJet,
-        0.0,
+        particle_level_min_pt,
         0.0,
         ghost_area,
         ROOT.AliJetContainer.E_scheme,
@@ -1267,7 +1310,7 @@ def run_dynamical_grooming_embedding(
         "$ALICE_PHYSICS/PWGJE/EMCALJetTasks/macros/AddTaskEmcalJetTagger.C",
         "AliAnalysisTaskEmcalJetTagger",
         f"detLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
-        f"partLevelJets_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
+        f"partLevelJets_AKTChargedR{jet_R_str}_mcparticles_pT{particle_level_min_pt_str}_E_scheme",
         jet_R,
         "",
         "",
@@ -1317,7 +1360,7 @@ def run_dynamical_grooming_embedding(
         f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_schemeConstSub",
         f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
         f"detLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
-        f"partLevelJets_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
+        f"partLevelJets_AKTChargedR{jet_R_str}_mcparticles_pT{particle_level_min_pt_str}_E_scheme",
         jet_R,
         "Rho",
         "tracksSubR04",
@@ -1350,13 +1393,13 @@ def run_dynamical_grooming_embedding(
     partLevelJetCont = dynamical_grooming.GetJetContainer(3)
     partLevelJetCont.SetMaxTrackPt(1000)
     dynamical_grooming.SetUseNewCentralityEstimation(True)
-    dynamical_grooming.SetJetPtThreshold(20)
+    dynamical_grooming.SetJetPtThreshold(grooming_jet_pt_threshold)
     dynamical_grooming.SetCutDoubleCounts(False)
     dynamical_grooming.SetCheckResolution(False)
     dynamical_grooming.SelectCollisionCandidates(physics_selection)
     dynamical_grooming.SetNeedEmcalGeom(False)
-    dynamical_grooming.SetMinCentrality(30)
-    dynamical_grooming.SetMaxCentrality(50)
+    dynamical_grooming.SetMinCentrality(centrality_min)
+    dynamical_grooming.SetMaxCentrality(centrality_max)
     dynamical_grooming.SetMinFractionShared(0.5)
     dynamical_grooming.SetDetLevelJetsOn(True)
     dynamical_grooming.SetStoreRecursiveJetSplittings(True)
@@ -1367,7 +1410,7 @@ def run_dynamical_grooming_embedding(
         f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_schemeConstSub",
         f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
         f"detLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
-        f"partLevelJets_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
+        f"partLevelJets_AKTChargedR{jet_R_str}_mcparticles_pT{particle_level_min_pt_str}_E_scheme",
         jet_R,
         "Rho",
         "tracksSubR04",
@@ -1400,13 +1443,13 @@ def run_dynamical_grooming_embedding(
     partLevelJetCont = hardest_kt.GetJetContainer(3)
     partLevelJetCont.SetMaxTrackPt(1000)
     hardest_kt.SetUseNewCentralityEstimation(True)
-    hardest_kt.SetJetPtThreshold(20)
+    hardest_kt.SetJetPtThreshold(grooming_jet_pt_threshold)
     hardest_kt.SetCutDoubleCounts(False)
     hardest_kt.SetCheckResolution(False)
     hardest_kt.SelectCollisionCandidates(physics_selection)
     hardest_kt.SetNeedEmcalGeom(False)
-    hardest_kt.SetMinCentrality(30)
-    hardest_kt.SetMaxCentrality(50)
+    hardest_kt.SetMinCentrality(centrality_min)
+    hardest_kt.SetMaxCentrality(centrality_max)
     hardest_kt.SetMinFractionShared(0.5)
     hardest_kt.SetDetLevelJetsOn(True)
     hardest_kt.SetEnableSubjetMatching(True)
@@ -1422,7 +1465,7 @@ def run_dynamical_grooming_embedding(
         f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_schemeConstSub",
         f"hybridLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
         f"detLevelJets_AKTChargedR{jet_R_str}_tracks_pT0150_E_scheme",
-        f"partLevelJets_AKTChargedR{jet_R_str}_mcparticles_pT0000_E_scheme",
+        f"partLevelJets_AKTChargedR{jet_R_str}_mcparticles_pT{particle_level_min_pt_str}_E_scheme",
         0.2,
         "Rho",
         "tracksSubR04",
@@ -1453,14 +1496,14 @@ def run_dynamical_grooming_embedding(
     partLevelJetCont = ll_substructure.GetJetContainer(3)
     partLevelJetCont.SetMaxTrackPt(1000)
     ll_substructure.SetUseNewCentralityEstimation(True)
-    ll_substructure.SetJetPtThreshold(20)
+    ll_substructure.SetJetPtThreshold(grooming_jet_pt_threshold)
     ll_substructure.SetCutDoubleCounts(False)
     ll_substructure.SetCheckResolution(True)
     ll_substructure.SelectCollisionCandidates(physics_selection)
     ll_substructure.SetNeedEmcalGeom(True)
     ll_substructure.SetHardCutoff(0.2)
-    ll_substructure.SetMinCentrality(30)
-    ll_substructure.SetMaxCentrality(50)
+    ll_substructure.SetMinCentrality(centrality_min)
+    ll_substructure.SetMaxCentrality(centrality_max)
     ll_substructure.SetPowerAlgorithm(0)
     ll_substructure.SetMinFractionShared(0.5)
     ll_substructure.SetDetLevelJetsOn(True)
@@ -1561,14 +1604,16 @@ def run(
         data_type=data_type,
         enable_track_skim=True,
         grooming_jet_pt_threshold=grooming_jet_pt_threshold,
-        jet_R=0.2,
+        jet_R=0.4,
+        validation_mode=True,
     )
 
     start_analysis_manager(analysis_manager=analysis_manager, mode="local", n_events=1000, input_files=input_files)
 
 
 def run_embedding(
-    analysis_mode: AnalysisMode, period_name: str, physics_selection: int, input_files: Sequence[Path]
+    analysis_mode: AnalysisMode, period_name: str, physics_selection: int, input_files: Sequence[Path],
+    grooming_jet_pt_threshold: float,
 ) -> None:
     # Setup and validation
     task_name = "DynamicalGrooming"
@@ -1582,13 +1627,16 @@ def run_embedding(
         period=period,
         physics_selection=physics_selection,
         data_type=data_type,
+        jet_R=0.4,
+        grooming_jet_pt_threshold=grooming_jet_pt_threshold,
+        validation_mode=True,
     )
 
     start_analysis_manager(analysis_manager=analysis_manager, mode="local", n_events=1000, input_files=input_files)
 
 
 if __name__ == "__main__":
-    analysis_mode = AnalysisMode.pythia
+    analysis_mode = AnalysisMode.embedPythia
     if analysis_mode == AnalysisMode.PbPb:
         run(
             analysis_mode=analysis_mode,
@@ -1596,24 +1644,25 @@ if __name__ == "__main__":
             # NOTE: For some reason, kAnyINT will include some events where the centrality seems to be uncalibrated.
             #       It's unclear why this occurs, but since we're only interested in semi-central at the moment, it
             #       doesn't matter.
-            physics_selection=ROOT.AliVEvent.kSemiCentral | ROOT.AliVEvent.kINT7,
+            physics_selection=ROOT.AliVEvent.kSemiCentral,
+            # physics_selection=ROOT.AliVEvent.kSemiCentral | ROOT.AliVEvent.kINT7,
             # physics_selection=ROOT.AliVEvent.kCentral,
             grooming_jet_pt_threshold=20,
             input_files=[
                 Path(
                     "/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
                 ),
-                Path(
-                    "/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
-                ),
+                #Path(
+                #    "/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
+                #),
                 # Path("/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/003/aod_archive.zip#AliAOD.root"),
                 # Path("/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/004/aod_archive.zip#AliAOD.root"),
-                Path(
-                    "/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
-                ),
-                Path(
-                    "/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
-                ),
+                #Path(
+                #    "/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
+                #),
+                #Path(
+                #    "/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
+                #),
                 # Path("/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/003/aod_archive.zip#AliAOD.root"),
                 # Path("/alf/data/rehlers/data/alice/data/2018/LHC18r/000297595/pass3/AOD252/AOD/004/aod_archive.zip#AliAOD.root"),
             ],
@@ -1647,12 +1696,13 @@ if __name__ == "__main__":
                 Path(
                     "/alf/data/rehlers/data/alice/sim/2020/LHC20g4/12/296191/AOD/001/aod_archive.zip#AliAOD.root"
                 ),
-                Path(
-                    "/alf/data/rehlers/data/alice/sim/2020/LHC20g4/12/296191/AOD/002/aod_archive.zip#AliAOD.root"
-                ),
-                Path(
-                    "/alf/data/rehlers/data/alice/sim/2020/LHC20g4/12/296191/AOD/003/aod_archive.zip#AliAOD.root"
-                ),
+                #Path(
+                #    "/alf/data/rehlers/data/alice/sim/2020/LHC20g4/12/296191/AOD/002/aod_archive.zip#AliAOD.root"
+                #),
+                #Path(
+                #    "/alf/data/rehlers/data/alice/sim/2020/LHC20g4/12/296191/AOD/003/aod_archive.zip#AliAOD.root"
+                #),
+
                 # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0003/AliAOD.root"),
                 # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0002/AliAOD.root"),
                 # Path("/opt/scott/data/rehlers/alice/datasets/data/2016/LHC16j5/4/246945/AOD200/0001/AliAOD.root"),
@@ -1680,13 +1730,14 @@ if __name__ == "__main__":
             #       It's unclear why this occurs, but since we're only interested in semi-central at the moment, it
             #       doesn't matter.
             physics_selection=ROOT.AliVEvent.kSemiCentral,
+            grooming_jet_pt_threshold=20,
             input_files=[
                 Path(
-                    "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
+                    "/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
                 ),
-                Path(
-                    "/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
-                ),
+                #Path(
+                #    "/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/002/aod_archive.zip#AliAOD.root"
+                #),
                 # Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/003/aod_archive.zip#AliAOD.root"),
                 # Path("/opt/scott/data/rehlers/alice/datasets/data/2018/LHC18q/000296550/pass3/AOD252/AOD/004/aod_archive.zip#AliAOD.root"),
                 # Path("/Volumes/Elements/alice/data/data/2018/LHC18q/000296550/pass1/AOD/001/AliAOD.root"),
