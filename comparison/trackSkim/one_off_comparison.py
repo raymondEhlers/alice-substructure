@@ -144,13 +144,16 @@ def compare(collision_system: str, prefix: str, standard_filename: Path, track_s
     standard_jet_pt = standard[f"{prefix}_jet_pt"]
     track_skim_jet_pt = track_skim[f"{prefix}_jet_pt"]
 
-    # import IPython; IPython.embed()
-    logger.info(f"standard_jet_pt: {standard_jet_pt.to_list()}")
-    logger.info(f"track_skim_jet_pt: {track_skim_jet_pt.to_list()}")
+    # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessasry
+    #logger.info(f"standard_jet_pt: {standard_jet_pt.to_list()}")
+    #logger.info(f"track_skim_jet_pt: {track_skim_jet_pt.to_list()}")
 
     try:
         all_close_jet_pt = np.allclose(ak.to_numpy(standard_jet_pt), ak.to_numpy(track_skim_jet_pt))
+        is_not_close_jet_pt = np.where(~np.isclose(ak.to_numpy(standard_jet_pt), ak.to_numpy(track_skim_jet_pt)))
+
         logger.info(f"jet_pt all close? {all_close_jet_pt}")
+        #import IPython; IPython.embed()
         if not all_close_jet_pt:
             logger.info("jet pt")
             _arr = ak.zip({"s": standard_jet_pt, "t": track_skim_jet_pt})
@@ -173,16 +176,19 @@ def compare(collision_system: str, prefix: str, standard_filename: Path, track_s
         standard_kt = standard[f"{grooming_method}_{prefix}_kt"]
         track_skim_kt = track_skim[f"{grooming_method}_{prefix}_kt"]
 
-        logger.info(f"standard_kt: {standard_kt.to_list()}")
-        logger.info(f"track_skim_kt: {track_skim_kt.to_list()}")
+        # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessasry
+        #logger.info(f"standard_kt: {standard_kt.to_list()}")
+        #logger.info(f"track_skim_kt: {track_skim_kt.to_list()}")
 
         try:
-            all_close_kt = np.allclose(ak.to_numpy(standard_kt), ak.to_numpy(track_skim_kt))
+            all_close_kt = np.allclose(ak.to_numpy(standard_kt), ak.to_numpy(track_skim_kt), rtol=1e-4)
             logger.info(f"kt all close? {all_close_kt}")
             if not all_close_kt:
                 logger.info("delta_R")
                 _arr = ak.zip({"s": standard_kt, "t": track_skim_kt})
                 logger.info(pprint.pformat(_arr.to_list()))
+                is_not_close_kt = np.where(~np.isclose(ak.to_numpy(standard_kt), ak.to_numpy(track_skim_kt)))
+                logger.info(f"Indicies where not close: {is_not_close_kt}")
         except ValueError as e:
             logger.exception(e)
 
@@ -199,12 +205,14 @@ def compare(collision_system: str, prefix: str, standard_filename: Path, track_s
         track_skim_rg = track_skim[f"{grooming_method}_{prefix}_delta_R"]
 
         try:
-            all_close_rg = np.allclose(ak.to_numpy(standard_rg), ak.to_numpy(track_skim_rg))
+            all_close_rg = np.allclose(ak.to_numpy(standard_rg), ak.to_numpy(track_skim_rg), rtol=1e-4)
             logger.info(f"Rg all close? {all_close_rg}")
             if not all_close_rg:
                 logger.info("delta_R")
                 _arr = ak.zip({"s": standard_rg, "t": track_skim_rg})
                 logger.info(pprint.pformat(_arr.to_list()))
+                is_not_close_rg = np.where(~np.isclose(ak.to_numpy(standard_rg), ak.to_numpy(track_skim_rg)))
+                logger.info(f"Indicies where not close: {is_not_close_rg}")
         except ValueError as e:
             logger.exception(e)
 
@@ -253,5 +261,13 @@ def run(collision_system: str, prefix: str = "data") -> None:
 
 
 if __name__ == "__main__":
-    run(collision_system="pythia", prefix="data")
-    run(collision_system="pythia", prefix="true")
+    collision_system = "embedPythia"
+
+    _prefixes = {
+        "pp": ["data"],
+        "pythia": ["data", "true"],
+        "PbPb": ["data"],
+        "embedPythia": ["hybrid", "det_level", "true"],
+    }
+    for prefix in _prefixes[collision_system]:
+        run(collision_system=collision_system, prefix=prefix)
