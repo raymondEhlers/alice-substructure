@@ -1170,12 +1170,14 @@ def run_dynamical_grooming_embedding(
     akt_jet_finder.SelectCollisionCandidates(physics_selection)
     akt_jet_finder.SetUseNewCentralityEstimation(True)
 
-    # Artificial tracking efficiency derived from the full jet R_AA paper.
-    # 10-30 \approx .99
-    # 0-10% \approx .98
-    # Apply only to embedded particles
-    akt_jet_finder.SetTrackEfficiency(0.98)
-    akt_jet_finder.SetTrackEfficiencyOnlyForEmbedding(True)
+    # This introduces randomness, so we need to disable it during validation mode
+    if not validation_mode:
+        # Artificial tracking efficiency derived from the full jet R_AA paper.
+        # 10-30 \approx .99
+        # 0-10% \approx .98
+        # Apply only to embedded particles
+        akt_jet_finder.SetTrackEfficiency(0.98)
+        akt_jet_finder.SetTrackEfficiencyOnlyForEmbedding(True)
 
     constUtil = akt_jet_finder.AddUtility(ROOT.AliEmcalJetUtilityEventSubtractor("EventSubtractor"))
     genSub = akt_jet_finder.AddUtility(ROOT.AliEmcalJetUtilityGenSubtractor("GenSubtractor"))
