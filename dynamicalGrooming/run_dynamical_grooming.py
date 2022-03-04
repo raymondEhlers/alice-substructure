@@ -1591,6 +1591,8 @@ def run(
     physics_selection: int,
     input_files: Sequence[Path],
     grooming_jet_pt_threshold: float,
+    jet_R: float,
+    validation_mode: bool,
 ) -> None:
     # Setup and validation
     task_name = "DynamicalGrooming"
@@ -1606,8 +1608,8 @@ def run(
         data_type=data_type,
         enable_track_skim=True,
         grooming_jet_pt_threshold=grooming_jet_pt_threshold,
-        jet_R=0.4,
-        validation_mode=True,
+        jet_R=jet_R,
+        validation_mode=validation_mode,
     )
 
     start_analysis_manager(analysis_manager=analysis_manager, mode="local", n_events=1000, input_files=input_files)
@@ -1615,7 +1617,7 @@ def run(
 
 def run_embedding(
     analysis_mode: AnalysisMode, period_name: str, physics_selection: int, input_files: Sequence[Path],
-    grooming_jet_pt_threshold: float,
+    grooming_jet_pt_threshold: float, jet_R: float, validation_mode: bool,
 ) -> None:
     # Setup and validation
     task_name = "DynamicalGrooming"
@@ -1629,16 +1631,18 @@ def run_embedding(
         period=period,
         physics_selection=physics_selection,
         data_type=data_type,
-        jet_R=0.4,
+        jet_R=jet_R,
         grooming_jet_pt_threshold=grooming_jet_pt_threshold,
-        validation_mode=True,
+        validation_mode=validation_mode,
     )
 
     start_analysis_manager(analysis_manager=analysis_manager, mode="local", n_events=1000, input_files=input_files)
 
 
 if __name__ == "__main__":
-    analysis_mode = AnalysisMode.PbPb
+    analysis_mode = AnalysisMode.embedPythia
+    jet_R = 0.4
+    validation_mode = True
     if analysis_mode == AnalysisMode.PbPb:
         run(
             analysis_mode=analysis_mode,
@@ -1650,6 +1654,8 @@ if __name__ == "__main__":
             # physics_selection=ROOT.AliVEvent.kSemiCentral | ROOT.AliVEvent.kINT7,
             # physics_selection=ROOT.AliVEvent.kCentral,
             grooming_jet_pt_threshold=20,
+            jet_R=jet_R,
+            validation_mode=validation_mode,
             input_files=[
                 Path(
                     "/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
@@ -1671,6 +1677,8 @@ if __name__ == "__main__":
             period_name="LHC17q",
             physics_selection=ROOT.AliVEvent.kAnyINT,
             grooming_jet_pt_threshold=5,
+            jet_R=jet_R,
+            validation_mode=validation_mode,
             input_files=[
                 Path(
                     "/alf/data/rehlers/data/alice/data/2017/LHC17p/000282343/pass1_FAST/AOD234/0001/root_archive.zip#AliAOD.root"
@@ -1690,6 +1698,8 @@ if __name__ == "__main__":
             # physics_selection=0,
             physics_selection=ROOT.AliVEvent.kAnyINT,
             grooming_jet_pt_threshold=20,
+            jet_R=jet_R,
+            validation_mode=validation_mode,
             input_files=[
                 Path(
                     "/alf/data/rehlers/data/alice/sim/2020/LHC20g4/12/296191/AOD/001/aod_archive.zip#AliAOD.root"
@@ -1729,6 +1739,8 @@ if __name__ == "__main__":
             #       doesn't matter.
             physics_selection=ROOT.AliVEvent.kSemiCentral,
             grooming_jet_pt_threshold=20,
+            jet_R=jet_R,
+            validation_mode=validation_mode,
             input_files=[
                 Path(
                     "/alf/data/rehlers/data/alice/data/2018/LHC18q/000296550/pass3/AOD252/AOD/001/aod_archive.zip#AliAOD.root"
