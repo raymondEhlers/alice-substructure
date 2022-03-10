@@ -5,7 +5,7 @@
 
 import logging
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, Mapping, Optional, Tuple, Union
 
 import awkward as ak
 import numpy as np
@@ -79,6 +79,8 @@ def _hardest_kt_data_skim(
     all_jets = _convert_analyzed_jets_to_all_jets_for_skim(
         jets=jets, convert_data_format_prefixes=convert_data_format_prefixes,
     )
+
+    ak.to_parquet(all_jets, input_filename.parent / Path("intermediate.parquet"))
 
     prefixes = {"data": "data"}
     if collision_system == "pythia":
@@ -216,7 +218,35 @@ def _hardest_kt_embedding_skim(
         output_filename=output_filename,
     )
 
-def hardest_kt_embedding_skim(
+def _description_from_parameters(parameters: Mapping[str, Any]) -> str:
+    return ", ".join([f"{k}={v}" for k, v in parameters.items()])
+
+
+def _check_for_output_file(output_filename: Path, description: str) -> Tuple[bool, str]:
+    # Try to bail out early to avoid reprocessing if possible.
+    # First, check for the empty filename
+    empty_filename = output_filename.with_suffix(".empty")
+    if empty_filename.exists():
+        # It will be empty, so there's nothing to check. Just return
+        return (True, f"Done - no jets to recluster for {description}")
+    # Next, the output file
+    if output_filename.exists():
+        import uproot
+
+        try:
+            with uproot.open(output_filename) as f:
+                # If the tree exists, can be read, and has more than 0 entries, we should be good
+                if f["tree"].num_entries > 0:
+                    # Return immediately to indicate that we're done.
+                    return (True, f"already processed for {description}")
+        except Exception:
+            # If it fails for some reason, give up - we want to try again
+            pass
+
+    return (False, "")
+
+
+def hardest_kt_embed_thermal_model_skim(
     input_filename: Path,
     jet_R: float,
     min_jet_pt: Mapping[str, float],
@@ -228,53 +258,47 @@ def hardest_kt_embedding_skim(
     r_max: float,
     validation_mode: bool = False,
 ) -> Tuple[bool, str]:
-    # TODO: Remove hard code...
-    collision_system = "thermal_model"
-
     # Setup
-    empty_filename = output_filename.with_suffix(".empty")
+    collision_system = "embed_thermal_model"
 
     # Try to bail out early to avoid reprocessing if possible.
-    if empty_filename.exists():
-        # It will be empty, so there's nothing to check. Just return
-        return (True, f"Done - no jets to recluster for {collision_system}, R={jet_R}, {input_filename}")
+    _description = _description_from_parameters(
+        parameters={
+            "collision_system": collision_system, "R": jet_R, "input_filename": input_filename
+        }
+    )
+    res = _check_for_output_file(output_filename=output_filename, description=_description)
+    if res[0]:
+        return res
 
-    if output_filename.exists():
-        import uproot
-
-        try:
-            with uproot.open(output_filename) as f:
-                # If the tree exists, can be read, and has more than 0 entries, we should be good
-                if f["tree"].num_entries > 0:
-                    # Return immediately to indicate that we're done.
-                    return (True, f"already processed for {collision_system}, R={jet_R}, {input_filename}")
-        except Exception:
-            # If it fails for some reason, give up - we want to try again
-            pass
-
-    if True:
-        jets = analysis_alice.analysis_embedding(
-            *analysis_alice.load_thermal_model(
-                signal_filename=input_filename,
-                thermal_model_parameters=thermal_model_parameters,
-            ),
-            jet_R=jet_R,
-            min_jet_pt=min_jet_pt,
-            r_max=r_max,
-            validation_mode=validation_mode,
-        )
-    else:
-        raise NotImplementedError(
-            #f"Not yet implemented for {collision_system}..."
-            "Not yet implemented..."
-        )
+    jets = analysis_alice.analysis_embedding(
+        *analysis_alice.load_embed_thermal_model(
+            signal_filename=input_filename,
+            thermal_model_parameters=thermal_model_parameters,
+        ),
+        jet_R=jet_R,
+        min_jet_pt=min_jet_pt,
+        r_max=r_max,
+        validation_mode=validation_mode,
+    )
+    #jets = analysis_alice.analysis_embedding(
+    #    *analysis_alice.load_embedding(
+    #        signal_filename=input_filename,
+    #        background_filename= ,
+    #    ),
+    #    jet_R=jet_R,
+    #    min_jet_pt=min_jet_pt,
+    #    r_max=r_max,
+    #    validation_mode=validation_mode,
+    #)
 
     # There were no jets. Note that with a specially crafted empty file
     if len(jets) == 0:
         # Just create the empty filename and return. This will prevent trying to re-run with no jets in the future.
         # Remember that this depends heavily on the jet pt cuts!
+        empty_filename = output_filename.with_suffix(".empty")
         empty_filename.touch()
-        return (True, f"Done - no jets to recluster, so not trying to skim for {collision_system}, R={jet_R}, {input_filename}")
+        return (True, f"Done - no jets to recluster, so not trying to skim for {_description}")
 
     _hardest_kt_embedding_skim(
         jets=jets,
@@ -286,7 +310,68 @@ def hardest_kt_embedding_skim(
         output_filename=output_filename,
     )
 
-    return (True, f"success for {collision_system}, R={jet_R}, {input_filename}")
+    return (True, f"success for {_description}")
+
+
+def hardest_kt_embedding_skim(
+    signal_input_filename: Path,
+    background_input_filename: Path,
+    jet_R: float,
+    min_jet_pt: Mapping[str, float],
+    iterative_splittings: bool,
+    output_filename: Path,
+    convert_data_format_prefixes: Mapping[str, str],
+    scale_factor: float,
+    r_max: float,
+    validation_mode: bool = False,
+) -> Tuple[bool, str]:
+    # Setup
+    collision_system = "embedPythia"
+
+    # Try to bail out early to avoid reprocessing if possible.
+    _description = _description_from_parameters(
+        parameters={
+            "collision_system": collision_system, "R": jet_R,
+            "signal_input_filename": signal_input_filename,
+            "background_input_filename": background_input_filename,
+        }
+    )
+    res = _check_for_output_file(output_filename=output_filename, description=_description)
+    if res[0]:
+        return res
+
+    jets = analysis_alice.analysis_embedding(
+        *analysis_alice.load_embedding(
+            signal_filename=signal_input_filename,
+            background_filename=background_input_filename,
+        ),
+        jet_R=jet_R,
+        min_jet_pt=min_jet_pt,
+        r_max=r_max,
+        validation_mode=validation_mode,
+    )
+
+    # There were no jets. Note that with a specially crafted empty file
+    if len(jets) == 0:
+        # Just create the empty filename and return. This will prevent trying to re-run with no jets in the future.
+        # Remember that this depends heavily on the jet pt cuts!
+        empty_filename = output_filename.with_suffix(".empty")
+        empty_filename.touch()
+        return (True, f"Done - no jets to recluster, so not trying to skim for {_description}")
+
+    _hardest_kt_embedding_skim(
+        jets=jets,
+        # NOTE: This argument is only for logging messages. Since the PbPb is the constraining factor,
+        #       we focus on processing those files.
+        input_filename=background_input_filename,
+        jet_R=jet_R,
+        iterative_splittings=iterative_splittings,
+        scale_factor=scale_factor,
+        convert_data_format_prefixes=convert_data_format_prefixes,
+        output_filename=output_filename,
+    )
+
+    return (True, f"success for {_description}")
 
 
 if __name__ == "__main__":
@@ -294,11 +379,12 @@ if __name__ == "__main__":
     #logging.getLogger("mammoth.framework.jet_finding").setLevel(logging.INFO)
     #logging.getLogger("mammoth._ext").setLevel(logging.DEBUG)
 
-    #for collision_system in ["pp", "PbPb"]:
     _min_jet_pt = {
         "pp": {"data": 5.},
         "pythia": {"det_level": 20.},
         "PbPb": {"data": 20.},
+        "embed_thermal_model": {"hybrid": 20.},
+        "embedPythia": {"hybrid": 20.},
     }
     for collision_system in ["pp", "pythia", "PbPb"]:
         logger.info(f"Analyzing \"{collision_system}\"")
@@ -327,31 +413,77 @@ if __name__ == "__main__":
             output_filename=base_path / "skim" / "skim_output.root",
             scale_factors=scale_factors,
             pt_hat_bin=pt_hat_bin,
+            validation_mode=True,
         )
         logger.info(f"Result: {result}")
 
-    # import jet_substructure.analysis.parsl
-    # scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
-    #     # TODO: Unclear if the collision system should be hard coded
-    #     collision_system="embedPythia",
-    #     dataset_name="LHC20g4_embedded_into_LHC18qr_central_R02_6982_7001",
-    # )
+    ###############
+    # Thermal model
+    ###############
+    #### import jet_substructure.analysis.parsl
+    #### scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
+    ####     # TODO: Unclear if the collision system should be hard coded
+    ####     collision_system="embedPythia",
+    ####     dataset_name="LHC20g4_embedded_into_LHC18qr_central_R02_6982_7001",
+    #### )
 
-    # base_path = Path("/software/rehlers/dev/substructure/trains/pythia/641")
-    # hardest_kt_embedding_skim(
-    #     #input_filename=base_path / "run_by_run/LHC20g4/295612/11/AnalysisResults.20g4.016.root",
-    #     #input_filename=base_path / "run_by_run/LHC20g4/297544/19/AnalysisResults.20g4.005.root",
-    #     #input_filename=base_path / "run_by_run/LHC20g4/295819/12/AnalysisResults.20g4.016.root",
-    #     input_filename=base_path / "run_by_run/LHC20g4/297588/4/AnalysisResults.20g4.001.root",
-    #     jet_R=0.2,
-    #     min_jet_pt={"hybrid": 20},
-    #     iterative_splittings=True,
-    #     output_filename=base_path / "skim" / "test" / "thermal_model_skim_output.root",
-    #     thermal_model_parameters=sources.THERMAL_MODEL_SETTINGS["central"],
-    #     convert_data_format_prefixes={"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
-    #     #scale_factor=scale_factors[11],
-    #     #scale_factor=scale_factors[19],
-    #     #scale_factor=scale_factors[12],
-    #     scale_factor=scale_factors[4],
-    #     r_max=0.25,
-    # )
+    #### base_path = Path("/software/rehlers/dev/substructure/trains/pythia/641")
+    #### hardest_kt_embed_thermal_model_skim(
+    ####     #input_filename=base_path / "run_by_run/LHC20g4/295612/11/AnalysisResults.20g4.016.root",
+    ####     #input_filename=base_path / "run_by_run/LHC20g4/297544/19/AnalysisResults.20g4.005.root",
+    ####     #input_filename=base_path / "run_by_run/LHC20g4/295819/12/AnalysisResults.20g4.016.root",
+    ####     input_filename=base_path / "run_by_run/LHC20g4/297588/4/AnalysisResults.20g4.001.root",
+    ####     jet_R=0.2,
+    ####     min_jet_pt=_min_jet_pt["thermal_model"],
+    ####     iterative_splittings=True,
+    ####     output_filename=base_path / "skim" / "test" / "thermal_model_skim_output.root",
+    ####     thermal_model_parameters=sources.THERMAL_MODEL_SETTINGS["central"],
+    ####     convert_data_format_prefixes={"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
+    ####     #scale_factor=scale_factors[11],
+    ####     #scale_factor=scale_factors[19],
+    ####     #scale_factor=scale_factors[12],
+    ####     scale_factor=scale_factors[4],
+    ####     r_max=0.25,
+    ####     validation_mode=True,
+    #### )
+
+    ###########
+    # Embedding
+    ###########
+    standalone_tests = False
+
+    import jet_substructure.analysis.parsl
+    scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
+        #collision_system="pythia",
+        #dataset_name="LHC18b8_pythia_R04_1",
+        collision_system="embedPythia",
+        dataset_name="LHC20g4_embedded_into_LHC18qr_semi_central_R04_1",
+    )
+
+    # Mammoth validation needs something like
+    base_path = Path(f"/software/rehlers/dev/mammoth/projects/framework/embedPythia")
+    #signal_path = base_path / "AnalysisResults_pythia_track_skim.parquet"
+    #background_path = base_path / "AnalysisResults_PbPb_track_skim.parquet"
+    signal_path = base_path / "track_skim" / "pythia" / "AnalysisResults.root"
+    background_path = base_path / "track_skim" / "PbPb" / "AnalysisResults.root"
+    output_filename = base_path / "skim" / "skim_output.root"
+    if standalone_tests:
+        # But we can also run standalone tests on the skim train output
+        base_path = Path("/software/rehlers/dev/substructure/trains/PbPb/645")
+        signal_path = Path("/software/rehlers/dev/substructure/trains/pythia/2640") / "run_by_run/LHC20g4/296191/12/AnalysisResults.20g4.001.root"
+        background_path = Path("/software/rehlers/dev/substructure/trains/PbPb/645") / "run_by_run/LHC18q/295612/AnalysisResults.18q.001.root"
+        output_filename = base_path / "skim" / "test" / "embedding_skim_output.root"
+
+    result = hardest_kt_embedding_skim(
+        signal_input_filename=signal_path,
+        background_input_filename=background_path,
+        jet_R=0.4,
+        min_jet_pt=_min_jet_pt["embedPythia"],
+        iterative_splittings=True,
+        output_filename=output_filename,
+        convert_data_format_prefixes={"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
+        scale_factor=scale_factors[12],
+        r_max=0.25,
+        validation_mode=True,
+    )
+    logger.info(f"Result: {result}")
