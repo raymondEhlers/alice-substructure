@@ -30,8 +30,8 @@ skimmed_datasets:
       - "data"
       - "gen"
     files:
-      - "trains/pythia/2619/LHC18b8_cent_woSDD/*/{pt_hat_bin}/AnalysisResults.18b8_cent_woSDD.*.root"
-      - "trains/pythia/2619/LHC18b8_fast/*/{pt_hat_bin}/AnalysisResults.18b8_fast.*.root"
+      - "trains/pythia/2619/run_by_run/LHC18b8_cent_woSDD/*/{pt_hat_bin}/AnalysisResults.18b8_cent_woSDD.*.root"
+      - "trains/pythia/2619/run_by_run/LHC18b8_fast/*/{pt_hat_bin}/AnalysisResults.18b8_fast.*.root"
   # Anchored to LHC18qr pass3
   LHC20g4_AOD_2640: &LHC20g4_pythia
     name: "LHC20g4_AOD_2640"
@@ -44,7 +44,7 @@ skimmed_datasets:
       - "data"
       - "gen"
     files:
-      - "trains/pythia/2640/LHC20g4/*/{pt_hat_bin}/AnalysisResults.20g4.*.root"
+      - "trains/pythia/run_by_run/2640/LHC20g4/*/{pt_hat_bin}/AnalysisResults.20g4.*.root"
 
   # PbPb
   LHC18qr_pass3_AOD252_central_642: &LHC18qr_PbPb_central
