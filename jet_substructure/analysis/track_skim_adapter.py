@@ -140,7 +140,7 @@ def hardest_kt_data_skim(
     #       with pythia (as of Feb 2022) since it will then fail during the data skim. But since we already
     #       implemented it, we leave it in place - perhaps it can be fixed later (or maybe just needs the right
     #       combination of options passed).
-    if collision_system in ["pp", "PbPb"] or collision_system in ["pythia"] and "data" in loading_data_rename_prefix:
+    if collision_system in ["pp", "PbPb"] or (collision_system in ["pythia"] and "data" in loading_data_rename_prefix):
         jets = analysis_alice.analysis_data(
             collision_system=collision_system,
             arrays=analysis_alice.load_data(
