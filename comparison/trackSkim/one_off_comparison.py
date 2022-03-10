@@ -6,6 +6,7 @@
 import logging
 import pprint
 from pathlib import Path
+from typing import Sequence
 
 import attr
 import awkward as ak
@@ -116,7 +117,7 @@ def plot_attribute_compare(
     plt.close(fig)
 
 
-def compare(collision_system: str, prefix: str, standard_filename: Path, track_skim_filename: Path) -> None:
+def compare(collision_system: str, prefixes: Sequence[str], standard_filename: Path, track_skim_filename: Path) -> None:
     #standard_tree_name = "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_Data_ConstSub_Incl"
     #if collision_system == "pp":
     #    standard_tree_name = "AliAnalysisTaskJetHardestKt_Jet_AKTChargedR040_tracks_pT0150_E_scheme_RawTree_Data_NoSub_Incl"
@@ -131,137 +132,151 @@ def compare(collision_system: str, prefix: str, standard_filename: Path, track_s
     output_dir = Path("comparison") / "trackSkim" / collision_system
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    plot_attribute_compare(
-        other=Input(arrays=standard, attribute=f"{prefix}_jet_pt", name="Standard"),
-        mine=Input(arrays=track_skim, attribute=f"{prefix}_jet_pt", name="Track skim"),
-        x_label=r"$p_{\text{T,ch jet}}$ (GeV/$c$)",
-        output_name=f"{prefix}_jet_pt",
-        log_y=True,
-        normalize=True,
-        axis=bh.axis.Regular(50, 0, 100),
-        output_dir=output_dir,
-    )
-    standard_jet_pt = standard[f"{prefix}_jet_pt"]
-    track_skim_jet_pt = track_skim[f"{prefix}_jet_pt"]
+    for prefix in prefixes:
+        logger.info(f"Comparing prefix '{prefix}'")
 
-    # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessasry
-    #logger.info(f"standard_jet_pt: {standard_jet_pt.to_list()}")
-    #logger.info(f"track_skim_jet_pt: {track_skim_jet_pt.to_list()}")
-
-    try:
-        all_close_jet_pt = np.allclose(ak.to_numpy(standard_jet_pt), ak.to_numpy(track_skim_jet_pt))
-        is_not_close_jet_pt = np.where(~np.isclose(ak.to_numpy(standard_jet_pt), ak.to_numpy(track_skim_jet_pt)))
-
-        logger.info(f"jet_pt all close? {all_close_jet_pt}")
-        #import IPython; IPython.embed()
-        if not all_close_jet_pt:
-            logger.info("jet pt")
-            _arr = ak.zip({"s": standard_jet_pt, "t": track_skim_jet_pt})
-            logger.info(pprint.pformat(_arr.to_list()))
-    except ValueError as e:
-        logger.exception(e)
-
-    for grooming_method in ["dynamical_kt", "soft_drop_z_cut_02"]:
-        logger.info(f"Plotting method \"{grooming_method}\"")
         plot_attribute_compare(
-            other=Input(arrays=standard, attribute=f"{grooming_method}_{prefix}_kt", name="Standard"),
-            mine=Input(arrays=track_skim, attribute=f"{grooming_method}_{prefix}_kt", name="Track skim"),
-            x_label=r"$k_{\text{T,g}}$ (GeV/$c$)",
-            output_name=f"{grooming_method}_{prefix}_kt",
+            other=Input(arrays=standard, attribute=f"{prefix}_jet_pt", name="Standard"),
+            mine=Input(arrays=track_skim, attribute=f"{prefix}_jet_pt", name="Track skim"),
+            x_label=r"$p_{\text{T,ch jet}}$ (GeV/$c$)",
+            output_name=f"{prefix}_jet_pt",
             log_y=True,
             normalize=True,
-            axis=bh.axis.Regular(50, 0, 10),
+            axis=bh.axis.Regular(50, 0, 100),
             output_dir=output_dir,
         )
-        standard_kt = standard[f"{grooming_method}_{prefix}_kt"]
-        track_skim_kt = track_skim[f"{grooming_method}_{prefix}_kt"]
+        standard_jet_pt = standard[f"{prefix}_jet_pt"]
+        track_skim_jet_pt = track_skim[f"{prefix}_jet_pt"]
 
         # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessasry
-        #logger.info(f"standard_kt: {standard_kt.to_list()}")
-        #logger.info(f"track_skim_kt: {track_skim_kt.to_list()}")
+        #logger.info(f"standard_jet_pt: {standard_jet_pt.to_list()}")
+        #logger.info(f"track_skim_jet_pt: {track_skim_jet_pt.to_list()}")
 
         try:
-            all_close_kt = np.allclose(ak.to_numpy(standard_kt), ak.to_numpy(track_skim_kt), rtol=1e-4)
-            logger.info(f"kt all close? {all_close_kt}")
-            if not all_close_kt:
-                logger.info("delta_R")
-                _arr = ak.zip({"s": standard_kt, "t": track_skim_kt})
+            all_close_jet_pt = np.allclose(ak.to_numpy(standard_jet_pt), ak.to_numpy(track_skim_jet_pt))
+
+            logger.info(f"jet_pt all close? {all_close_jet_pt}")
+            #import IPython; IPython.embed()
+            if not all_close_jet_pt:
+                logger.info("jet pt")
+                _arr = ak.zip({"s": standard_jet_pt, "t": track_skim_jet_pt})
                 logger.info(pprint.pformat(_arr.to_list()))
-                is_not_close_kt = np.where(~np.isclose(ak.to_numpy(standard_kt), ak.to_numpy(track_skim_kt)))
-                logger.info(f"Indicies where not close: {is_not_close_kt}")
+                is_not_close_jet_pt = np.where(~np.isclose(ak.to_numpy(standard_jet_pt), ak.to_numpy(track_skim_jet_pt)))
+                logger.info(f"Indicies where not close: {is_not_close_jet_pt}")
         except ValueError as e:
             logger.exception(e)
 
-        plot_attribute_compare(
-            other=Input(arrays=standard, attribute=f"{grooming_method}_{prefix}_delta_R", name="Standard"),
-            mine=Input(arrays=track_skim, attribute=f"{grooming_method}_{prefix}_delta_R", name="Track skim"),
-            x_label=r"$R_{\text{g}}$",
-            output_name=f"{grooming_method}_{prefix}_delta_R",
-            normalize=True,
-            axis=bh.axis.Regular(50, 0, 0.6),
-            output_dir=output_dir,
-        )
-        standard_rg = standard[f"{grooming_method}_{prefix}_delta_R"]
-        track_skim_rg = track_skim[f"{grooming_method}_{prefix}_delta_R"]
+        for grooming_method in ["dynamical_kt", "soft_drop_z_cut_02"]:
+            logger.info(f"Plotting method \"{grooming_method}\"")
+            plot_attribute_compare(
+                other=Input(arrays=standard, attribute=f"{grooming_method}_{prefix}_kt", name="Standard"),
+                mine=Input(arrays=track_skim, attribute=f"{grooming_method}_{prefix}_kt", name="Track skim"),
+                x_label=r"$k_{\text{T,g}}$ (GeV/$c$)",
+                output_name=f"{grooming_method}_{prefix}_kt",
+                log_y=True,
+                normalize=True,
+                axis=bh.axis.Regular(50, 0, 10),
+                output_dir=output_dir,
+            )
+            standard_kt = standard[f"{grooming_method}_{prefix}_kt"]
+            track_skim_kt = track_skim[f"{grooming_method}_{prefix}_kt"]
 
-        try:
-            all_close_rg = np.allclose(ak.to_numpy(standard_rg), ak.to_numpy(track_skim_rg), rtol=1e-4)
-            logger.info(f"Rg all close? {all_close_rg}")
-            if not all_close_rg:
-                logger.info("delta_R")
-                _arr = ak.zip({"s": standard_rg, "t": track_skim_rg})
-                logger.info(pprint.pformat(_arr.to_list()))
-                is_not_close_rg = np.where(~np.isclose(ak.to_numpy(standard_rg), ak.to_numpy(track_skim_rg)))
-                logger.info(f"Indicies where not close: {is_not_close_rg}")
-        except ValueError as e:
-            logger.exception(e)
+            # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessasry
+            #logger.info(f"standard_kt: {standard_kt.to_list()}")
+            #logger.info(f"track_skim_kt: {track_skim_kt.to_list()}")
 
-        #import IPython; IPython.embed()
+            try:
+                all_close_kt = np.allclose(ak.to_numpy(standard_kt), ak.to_numpy(track_skim_kt), rtol=1e-4)
+                logger.info(f"kt all close? {all_close_kt}")
+                if not all_close_kt:
+                    logger.info("kt")
+                    _arr = ak.zip({"s": standard_kt, "t": track_skim_kt})
+                    logger.info(pprint.pformat(_arr.to_list()))
+                    is_not_close_kt = np.where(~np.isclose(ak.to_numpy(standard_kt), ak.to_numpy(track_skim_kt)))
+                    logger.info(f"Indicies where not close: {is_not_close_kt}")
+            except ValueError as e:
+                logger.exception(e)
 
-        #logger.info(f"standard_rg: {standard_rg}")
-        #logger.info(f"track_skim_rg: {track_skim_rg}")
+            plot_attribute_compare(
+                other=Input(arrays=standard, attribute=f"{grooming_method}_{prefix}_delta_R", name="Standard"),
+                mine=Input(arrays=track_skim, attribute=f"{grooming_method}_{prefix}_delta_R", name="Track skim"),
+                x_label=r"$R_{\text{g}}$",
+                output_name=f"{grooming_method}_{prefix}_delta_R",
+                normalize=True,
+                axis=bh.axis.Regular(50, 0, 0.6),
+                output_dir=output_dir,
+            )
+            standard_rg = standard[f"{grooming_method}_{prefix}_delta_R"]
+            track_skim_rg = track_skim[f"{grooming_method}_{prefix}_delta_R"]
 
-        plot_attribute_compare(
-            other=Input(arrays=standard, attribute=f"{grooming_method}_{prefix}_z", name="Standard"),
-            mine=Input(arrays=track_skim, attribute=f"{grooming_method}_{prefix}_z", name="Track skim"),
-            output_name=f"{grooming_method}_{prefix}_z",
-            x_label=r"$z$",
-            normalize=True,
-            axis=bh.axis.Regular(50, 0, 0.5),
-            output_dir=output_dir,
-        )
+            # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessasry
+            #logger.info(f"standard_zg: {standard_zg.to_list()}")
+            #logger.info(f"track_skim_zg: {track_skim_zg.to_list()}")
 
-        standard_zg = standard[f"{grooming_method}_{prefix}_z"]
-        track_skim_zg = track_skim[f"{grooming_method}_{prefix}_z"]
+            try:
+                all_close_rg = np.allclose(ak.to_numpy(standard_rg), ak.to_numpy(track_skim_rg), rtol=1e-4)
+                logger.info(f"Rg all close? {all_close_rg}")
+                if not all_close_rg:
+                    logger.info("delta_R")
+                    _arr = ak.zip({"s": standard_rg, "t": track_skim_rg})
+                    logger.info(pprint.pformat(_arr.to_list()))
+                    is_not_close_rg = np.where(~np.isclose(ak.to_numpy(standard_rg), ak.to_numpy(track_skim_rg)))
+                    logger.info(f"Indicies where not close: {is_not_close_rg}")
+            except ValueError as e:
+                logger.exception(e)
 
-        try:
-            all_close_zg = np.allclose(ak.to_numpy(standard_zg), ak.to_numpy(track_skim_zg))
-            logger.info(f"zg all close? {all_close_zg}")
-            if not all_close_zg:
-                logger.info("z")
-                _arr = ak.zip({"s": standard_zg, "t": track_skim_zg})
-                logger.info(pprint.pformat(_arr.to_list()))
-        except ValueError as e:
-            logger.exception(e)
+            #import IPython; IPython.embed()
+
+            #logger.info(f"standard_rg: {standard_rg.to_list()}")
+            #logger.info(f"track_skim_rg: {track_skim_rg.to_list()}")
+
+            plot_attribute_compare(
+                other=Input(arrays=standard, attribute=f"{grooming_method}_{prefix}_z", name="Standard"),
+                mine=Input(arrays=track_skim, attribute=f"{grooming_method}_{prefix}_z", name="Track skim"),
+                output_name=f"{grooming_method}_{prefix}_z",
+                x_label=r"$z$",
+                normalize=True,
+                axis=bh.axis.Regular(50, 0, 0.5),
+                output_dir=output_dir,
+            )
+
+            standard_zg = standard[f"{grooming_method}_{prefix}_z"]
+            track_skim_zg = track_skim[f"{grooming_method}_{prefix}_z"]
+
+            # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessasry
+            #logger.info(f"standard_zg: {standard_zg.to_list()}")
+            #logger.info(f"track_skim_zg: {track_skim_zg.to_list()}")
+
+            try:
+                all_close_zg = np.allclose(ak.to_numpy(standard_zg), ak.to_numpy(track_skim_zg))
+                logger.info(f"zg all close? {all_close_zg}")
+                if not all_close_zg:
+                    logger.info("z")
+                    _arr = ak.zip({"s": standard_zg, "t": track_skim_zg})
+                    logger.info(pprint.pformat(_arr.to_list()))
+            except ValueError as e:
+                logger.exception(e)
 
 
-def run(collision_system: str, prefix: str = "data") -> None:
+def run(collision_system: str, prefixes: Sequence[str] = None) -> None:
+    if prefixes is None:
+        prefixes = ["data"]
     mammoth.helpers.setup_logging()
-    logger.info(f"Running {collision_system} with prefix {prefix}")
+    logger.info(f"Running {collision_system} with prefixes {prefixes}")
     path_to_mammoth = Path(mammoth.helpers.__file__).parent.parent
     standard_base_filename = "AnalysisResults"
     if collision_system == "pythia":
         standard_base_filename += ".12"
     compare(
         collision_system=collision_system,
-        prefix=prefix,
+        prefixes=prefixes,
         standard_filename=path_to_mammoth / f"projects/framework/{collision_system}/1/skim/{standard_base_filename}.repaired.00_iterative_splittings.root",
         track_skim_filename=path_to_mammoth / f"projects/framework/{collision_system}/1/skim/skim_output.root",
     )
 
 
 if __name__ == "__main__":
-    collision_system = "embedPythia"
+    collision_system = "PbPb"
 
     _prefixes = {
         "pp": ["data"],
@@ -269,5 +284,4 @@ if __name__ == "__main__":
         "PbPb": ["data"],
         "embedPythia": ["hybrid", "det_level", "true"],
     }
-    for prefix in _prefixes[collision_system]:
-        run(collision_system=collision_system, prefix=prefix)
+    run(collision_system=collision_system, prefixes=_prefixes[collision_system])
