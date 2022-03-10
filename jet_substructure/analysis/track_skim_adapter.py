@@ -80,7 +80,7 @@ def _hardest_kt_data_skim(
         jets=jets, convert_data_format_prefixes=convert_data_format_prefixes,
     )
 
-    ak.to_parquet(all_jets, input_filename.parent / Path("intermediate.parquet"))
+    #ak.to_parquet(all_jets, input_filename.parent / Path("intermediate.parquet"))
 
     prefixes = {"data": "data"}
     if collision_system == "pythia":
@@ -117,7 +117,9 @@ def hardest_kt_data_skim(
     scale_factors: Optional[Mapping[int, float]] = None,
     # Validation
     validation_mode: bool = False,
+    background_subtraction: Optional[Mapping[str, Any]] = None,
 ) -> Tuple[bool, str]:
+    # Validation
     if loading_data_rename_prefix is None:
         loading_data_rename_prefix = {"data": "data"}
 
@@ -151,6 +153,7 @@ def hardest_kt_data_skim(
             jet_R=jet_R,
             min_jet_pt=min_jet_pt,
             validation_mode=validation_mode,
+            background_subtraction_settings=background_subtraction,
         )
     elif collision_system in ["pythia"]:
         # Although we could in principle analyze the MC loading only particle or detector level alone,
@@ -386,7 +389,8 @@ if __name__ == "__main__":
         "embed_thermal_model": {"hybrid": 20.},
         "embedPythia": {"hybrid": 20.},
     }
-    for collision_system in ["pp", "pythia", "PbPb"]:
+    #for collision_system in ["pp", "pythia", "PbPb"]:
+    for collision_system in ["PbPb"]:
         logger.info(f"Analyzing \"{collision_system}\"")
         base_path = Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}")
 
@@ -403,6 +407,7 @@ if __name__ == "__main__":
             pt_hat_bin = 12
 
         result = hardest_kt_data_skim(
+            #input_filename=Path("/software/rehlers/dev/substructure/trains/PbPb/645/run_by_run/LHC18q/295612/AnalysisResults.18q.002.root"),
             input_filename=base_path / "AnalysisResults_track_skim.parquet",
             collision_system=collision_system,
             jet_R=0.4,

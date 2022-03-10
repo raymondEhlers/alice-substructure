@@ -237,7 +237,7 @@ class ProductionSettings:
             "pp": "data",
             "pythia": "data",
             "PbPb": "data",
-            "embedPythia": "embedding",
+            "embedPythia": "embed_pythia",
             "embed_thermal_model": "embed_thermal_model",
         }
         _tasks.append(
@@ -291,6 +291,7 @@ def _run_data_skim(
     jet_R: float,
     min_jet_pt: Mapping[str, float],
     iterative_splittings: bool,
+    background_subtraction: Mapping[str, Any],
     loading_data_rename_prefix: Mapping[str, str],
     convert_data_format_prefixes: Mapping[str, str],
     event_activity: str,
@@ -312,6 +313,7 @@ def _run_data_skim(
             jet_R=jet_R,
             min_jet_pt=min_jet_pt,
             iterative_splittings=iterative_splittings,
+            background_subtraction=background_subtraction,
             loading_data_rename_prefix=loading_data_rename_prefix,
             convert_data_format_prefixes=convert_data_format_prefixes,
             scale_factors=scale_factors,
@@ -362,8 +364,8 @@ def setup_calculate_data_skim(
                 logger.info(f"Adding {input_filename} for analysis")
 
             # For testing...
-            if _file_counter > 1:
-                break
+            #if _file_counter > 1:
+            #    break
             # END
 
             # Setup file I/O
@@ -383,6 +385,7 @@ def setup_calculate_data_skim(
                     jet_R=_analysis_config["jet_R"],
                     min_jet_pt=_analysis_config["min_jet_pt"],
                     iterative_splittings=splittings_selection == SplittingsSelection.iterative,
+                    background_subtraction=_analysis_config.get("background_subtraction", {}),
                     loading_data_rename_prefix=_metadata_config["loading_data_rename_prefix"],
                     convert_data_format_prefixes=_metadata_config["convert_data_format_prefixes"],
                     inputs=[File(str(input_filename))],
@@ -718,9 +721,9 @@ def define_productions() -> List[ProductionSettings]:
 
     # Create and store production information
     productions.append(
-        # pp, production 2
+        # PbPb, production 61
         ProductionSettings.read_config(
-            collision_system="pp", number=2,
+            collision_system="PbPb", number=61,
         )
     )
 
@@ -739,10 +742,10 @@ def run() -> None:
     # Job execution configuration
     task_config = job_utils.TaskConfig(name=task_name, n_cores_per_task=1)
     # n_cores_to_allocate = 120
-    n_cores_to_allocate = 80
+    n_cores_to_allocate = 100
     walltime = "24:00:00"
-    n_cores_to_allocate = 2
-    walltime = "1:59:00"
+    #n_cores_to_allocate = 2
+    #walltime = "1:59:00"
     #n_cores_to_allocate = 10
 
     # Basic setup: logging and parsl.
@@ -750,8 +753,8 @@ def run() -> None:
     #       it's super verbose and a huge pain to turn off. Note that by passing on the storage messages,
     #       we don't actually lose any info.
     config, facility_config, stored_messages = job_utils.config(
-        #facility="ORNL_b587_long",
-        facility="ORNL_b587_short",
+        facility="ORNL_b587_long",
+        # facility="ORNL_b587_short",
         task_config=task_config,
         n_tasks=n_cores_to_allocate,
         walltime=walltime,
@@ -778,7 +781,21 @@ def run() -> None:
                     production=production,
                 )
             )
-        #if "calculate_thermal_model_skim" in tasks_to_execute:
+        if "calculate_thermal_model_skim" in tasks_to_execute:
+            system_results.extend(
+                setup_calculate_thermal_model_skim(
+                    production=production,
+                    # collision_system=collision_system,
+                    # event_activity=event_activity,
+                    # min_jet_pt=min_jet_pt[collision_system],  # type: ignore
+                    # jet_R_values=jet_R_values,
+                    # iterative_splittings=iterative_splittings,
+                    # convert_data_format_prefixes=convert_data_format_prefixes[collision_system],
+                    # scale_factors_dataset=scale_factors_dataset,
+                    # input_path=input_paths[collision_system],
+                    # n_repeat_file=5,
+                )
+            )
         #    if event_activity == "central":
         #        scale_factors_dataset = "LHC20g4_embedded_into_LHC18qr_central_R02_6982_7001"
         #    elif event_activity == "semi_central":
@@ -799,6 +816,22 @@ def run() -> None:
         #            n_repeat_file=5,
         #        )
         #    )
+
+        if "calculate_embed_pythia_skim" in tasks_to_execute:
+            system_results.extend(
+                setup_calculate_embedding_skim(
+                    production=production,
+                    # collision_system=collision_system,
+                    # event_activity=event_activity,
+                    # min_jet_pt=min_jet_pt[collision_system],  # type: ignore
+                    # jet_R_values=jet_R_values,
+                    # iterative_splittings=iterative_splittings,
+                    # convert_data_format_prefixes=convert_data_format_prefixes[collision_system],
+                    # scale_factors_dataset=scale_factors_dataset,
+                    # input_path=input_paths[collision_system],
+                    # n_repeat_file=5,
+                )
+            )
 
         all_results.extend(system_results)
         logger.info(f"Accumulated {len(system_results)} futures for {production.collision_system}")
