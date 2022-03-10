@@ -2,6 +2,7 @@ skimmed_datasets:
   # pp
   LHC17pq_pass1_AOD234_2111_2112: &LHC17pq_pp
     name: "LHC17pq_pass1_AOD234_2111_2112"
+    collision_system: "pp"
     # Keep track of the skim type for documentation
     skim_type: "track_skim_task"
     # Parameters of the output
@@ -21,6 +22,7 @@ skimmed_datasets:
   # Anchored to LHC17pq pass1
   LHC18b8_AOD_2619: &LHC18b8_pythia
     name: "LHC18b8_AOD_2619"
+    collision_system: "pythia"
     # Keep track of the skim type for documentation
     skim_type: "track_skim_task"
     # Parameters of the output
@@ -29,12 +31,14 @@ skimmed_datasets:
     prefixes_in_output_file:
       - "data"
       - "gen"
+    n_pt_hat_bins: 20
     files:
       - "trains/pythia/2619/run_by_run/LHC18b8_cent_woSDD/*/{pt_hat_bin}/AnalysisResults.18b8_cent_woSDD.*.root"
       - "trains/pythia/2619/run_by_run/LHC18b8_fast/*/{pt_hat_bin}/AnalysisResults.18b8_fast.*.root"
   # Anchored to LHC18qr pass3
   LHC20g4_AOD_2640: &LHC20g4_pythia
     name: "LHC20g4_AOD_2640"
+    collision_system: "pythia"
     # Keep track of the skim type for documentation
     skim_type: "track_skim_task"
     # Parameters of the output
@@ -43,12 +47,14 @@ skimmed_datasets:
     prefixes_in_output_file:
       - "data"
       - "gen"
+    n_pt_hat_bins: 20
     files:
       - "trains/pythia/run_by_run/2640/LHC20g4/*/{pt_hat_bin}/AnalysisResults.20g4.*.root"
 
   # PbPb
   LHC18qr_pass3_AOD252_central_642: &LHC18qr_PbPb_central
     name: "LHC18qr_pass3_AOD252_central_642"
+    collision_system: "PbPb"
     # Keep track of the skim type for documentation
     skim_type: "track_skim_task"
     # Parameters of the output
@@ -61,6 +67,7 @@ skimmed_datasets:
       - "trains/PbPb/642/run_by_run/LHC18r/*/AnalysisResults.18r.*.root"
   LHC18qr_pass3_AOD252_semi_central_645: &LHC18qr_PbPb_semi_central
     name: "LHC18qr_pass3_AOD252_semi_central_645"
+    collision_system: "PbPb"
     # Keep track of the skim type for documentation
     skim_type: "track_skim_task"
     # Parameters of the output
@@ -73,6 +80,7 @@ skimmed_datasets:
       - "trains/PbPb/645/run_by_run/LHC18r/*/AnalysisResults.18r.*.root"
   LHC15o_pass1_AOD194_central_7666: &LHC15o_PbPb_central
     name: "LHC15o_pass1_AOD194_central_7666"
+    collision_system: "PbPb"
     # Keep track of the skim type for documentation
     skim_type: "track_skim_task"
     # Parameters of the output
@@ -84,6 +92,7 @@ skimmed_datasets:
       - "trains/PbPb/7666/run_by_run/LHC15o/*/AnalysisResults.15o.*.root"
   LHC15o_pass1_AOD194_semi_central_7668: &LHC15o_PbPb_semi_central
     name: "LHC15o_pass1_AOD194_semi_central_7668"
+    collision_system: "PbPb"
     # Keep track of the skim type for documentation
     skim_type: "track_skim_task"
     # Parameters of the output
@@ -181,6 +190,16 @@ analysis_settings:
 
 productions:
   pp:
+    2:
+      name: "LHC17pq_pp_R02_60"
+      metadata:
+        <<: *base_metadata_pp
+        dataset: *LHC17pq_pp
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 2
+        label: ""
+      settings:
+        <<: *analysis_settings_pp_R02
     60:
       name: "LHC17pq_pp_R02_60"
       metadata:
