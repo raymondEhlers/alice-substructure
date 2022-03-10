@@ -750,7 +750,7 @@ def calculate_embedding_skim_impl(  # noqa: C901
             # Leading track
             leading_track_name = f"{prefix}_leading_track_pt"
             if prefix == "hybrid":
-                # First, store the unsubstracted (which we use for the double counting cut) as the normal leading track pt.
+                # First, store the unsubtracted (which we use for the double counting cut) as the normal leading track pt.
                 if "leading_track_pt" in ak.fields(input_jets.jets):
                     grooming_results[leading_track_name] = to_float(input_jets.jets["leading_track_pt"])
                 # Then update the name for the substracted constituents in data.
