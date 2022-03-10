@@ -3,27 +3,76 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+import datetime
 import logging
+import subprocess
+from itertools import product
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Sequence, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
 
 import IPython
 from mammoth import helpers, job_utils
 from mammoth.framework import sources
+from pachyderm import yaml
 from parsl.app.app import python_app
 from parsl.data_provider.files import File
 from parsl.dataflow.futures import AppFuture
 from rich.progress import Progress
 
+import jet_substructure.base.helpers
+
 
 logger = logging.getLogger(__name__)
+
+
+def read_full_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
+    """Read full YAML configuration file.
+
+    Args:
+        config_path: Path to the configuration file. Default: "config/new_config.yaml".
+    Returns:
+        Full YAML configuration. Requires some interpretation.
+    """
+    if config_path is None:
+        config_path = Path("config/track_skim_config.yaml")
+
+    # Here, we use ruamel.yaml directly with the "safe" type because we the roundtrip
+    # types that we usually use don't play so nicely when we rewrite a subset of the data
+    # (eg. anchors don't seem to resolve correctly because we only rewrite the subset, there
+    # are some stray comments that we don't really want to keep, etc)
+    import ruamel.yaml
+    y = ruamel.yaml.YAML(typ="safe")
+    with open(config_path, "r") as f:
+        full_config: Dict[str, Any] = y.load(f)
+
+    return full_config
+
+
+def _multi_star_glob(path: Path) -> List[Path]:
+    """Perform glob with multiple stars in it.
+
+    Note:
+        We sort to make the list consistent over runs.
+
+    Args:
+        path: Path to the files of interest, possibly containing one or more stars.
+    Returns:
+        Sorted list of all of the paths that were found.
+    """
+    s = str(path)
+    _first_star = s.find("*")
+    if s == -1:
+        # Since there's no "*", all we can do is return an iterable containing the single path
+        return [path]
+    expanded_paths = sorted(Path(s[:_first_star]).glob(s[_first_star:]))
+    return expanded_paths
 
 
 @python_app  # type: ignore
 def _run_data_skim(
     collision_system: str,
     jet_R: float,
-    min_jet_pt: float,
+    min_jet_pt: Mapping[str, float],
     iterative_splittings: bool,
     loading_data_rename_prefix: Mapping[str, str],
     convert_data_format_prefixes: Mapping[str, str],
@@ -142,7 +191,7 @@ def setup_calculate_data_skim(
 def run_embedding_skim(
     collision_system: str,
     jet_R: float,
-    min_jet_pt: float,
+    min_jet_pt: Mapping[str, float],
     iterative_splittings: bool,
     thermal_model_parameters: sources.ThermalModelParameters,
     convert_data_format_prefixes: Mapping[str, str],
@@ -272,12 +321,16 @@ def run() -> None:
         "PbPb": 20,
         "thermal_model": {"hybrid": 20},
     }
-    collision_systems_to_process = ["thermal_model"]
+    #collision_systems_to_process = ["thermal_model"]
+    collision_systems_to_process = ["pp"]
     dataset_name = "LHC18qr_central_642"
     event_activity = "central"
 
     # NOTE: Need to glob in the task
+    # TODO: Moved to config...
     input_paths = {
+        "pp": Path("trains/pp/2110/"),
+        # TODO: This really needs to be updated!
         "pythia": Path("trains/pythia/2619/run_by_run/LHC18b8_fast/"),
         "PbPb": Path("trains/PbPb/642/run_by_run/"),
         "thermal_model": Path("trains/pythia/641/run_by_run/"),
@@ -313,7 +366,7 @@ def run() -> None:
     # walltime = "1:59:00"
     n_cores_to_allocate = 80
     walltime = "24:00:00"
-    #n_cores_to_allocate = 2
+    n_cores_to_allocate = 2
     #n_cores_to_allocate = 10
 
     # Validation
@@ -415,7 +468,7 @@ def run() -> None:
             logger.info(f"output_hists: {output_hists}")
             progress.update(track_results, advance=1)
 
-    # Save hists to uproot
+    # Save hists to uproot (if needed)
     for system, hists in output_hists.items():
         if hists:
             import uproot
@@ -435,11 +488,10 @@ def run() -> None:
             with uproot.recreate(output_hist_filename) as f:
                 helpers.write_hists_to_file(hists=hists, f=f)
 
-    # As far as I can tell, jobs will start executing as soon as they can, regardless of
-    # asking for the result. By embedded here, we can inspect results, etc in the meantime.
+    # By embedded here, we can inspect results, etc in the meantime.
     # NOTE: This may be commented out sometimes when I have long running processes and wil
     #       probably forget to close it.
-    IPython.start_ipython(user_ns=locals())
+    IPython.start_ipython(user_ns={**locals(), **globals()})
 
     # In case we close IPython early, wait for all apps to complete
     # Also allows for a summary at the end.
@@ -448,6 +500,183 @@ def run() -> None:
     res = [r.result()[:2] for r in all_results]
     logger.info(res)
 
+import enum
+
+class SplittingsSelection(enum.Enum):
+    recursive = 0
+    iterative = 1
+
+    def __str__(self) -> str:
+        return f"{self.name}_splittings"
+
+
+def production_identifier(production_config: Mapping[str, Any], production_number: int) -> str:
+    name = ""
+    # First, handle the case of possible embedding
+    signal_dataset = production_config["metadata"].get("signal_dataset")
+    if signal_dataset:
+        name += f"{production_config['metadata']['signal_dataset']['name']}_embedded_into"
+    # Then, the production name
+    name = f"{production_config['metadata']['dataset']['name']}"
+    # The label
+    extra_label = production_config.get("label")
+    if extra_label:
+        name += f"_{extra_label}"
+    # New section: the analysis parameters
+    # First, we want to denote a new section with an extra "__"
+    name += "__"
+    _analysis_settings = production_config["settings"]
+    # We want particular handling for some, so we do those by hand. The rest are included automatically
+    _manual_analysis_parameter_keys = ["jet_R", "splittings_selection", "min_jet_pt"]
+    # Jet R
+    jet_R_value = _analysis_settings["jet_R"]
+    name += f"_jet_R{round(jet_R_value * 100):03}"
+    # Selection of splittings
+    splittings_selection_value = SplittingsSelection[_analysis_settings["splittings_selection"]]
+    name += f"_{str(splittings_selection_value)}"
+    # Min jet pt
+    name += "_min_jet_pt"
+    for k, v in _analysis_settings["min_jet_pt"].items():
+        name += f"_{k}_{round(v)}"
+    # And then all the rest
+    for k, v in _analysis_settings.items():
+        if k in _manual_analysis_parameter_keys:
+            continue
+        name += f"_{k}_{str(v)}"
+    # And finally, the production details
+    # First, we want to denote a new section with an extra "__"
+    name += "__"
+    # The production number itself
+    name += f"_production_{production_number}"
+    # The date for good measure
+    name += f"_{datetime.datetime.utcnow().strftime('%Y_%m_%d')}"
+    return name
+
+
+def _git_hash_from_module(module: Any) -> str:
+    """Retrieve the git hash from a particular module
+
+    Adapted from: https://stackoverflow.com/a/21901260/12907985
+
+    Note:
+        This assumes it is stored in a git repository, and it doesn't check.
+
+    Args:
+        module: Module to retrieve the git hist for.
+    Returns:
+        The git hash associated with the module.
+    """
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=Path(module.__file__).parent.parent,
+        capture_output=True
+    ).stdout.decode("ascii").strip()
+
+
+def _installed_python_software() -> List[str]:
+    """Extract all installed python software via `pip freeze`
+
+    Adapted from: https://stackoverflow.com/a/58013217/12907985
+
+    NOTE:
+        This doesn't really work as expected with poetry - it just points to local packages.
+        However, we also have poetry.lock, so as long as we have the has of the repo, we'll
+        know the versions of all of the software.
+
+    Args:
+        None
+    Returns:
+        List of str, which each entry specifying a package + version.
+    """
+    import sys
+    return subprocess.run(
+        [sys.executable, "-m", "pip", "freeze"], capture_output=True
+    ).stdout.decode("ascii").strip("\n").split("\n")
+
+
+def _describe_production_software(production_config: Mapping[str, Any]) -> Dict[str, Any]:
+    output: Dict[str, Any] = {}
+    output["software"] = {}
+
+    # We want to store the git hash of:
+    # - pachyderm
+    # - mammoth
+    # - jet_substructure
+    # To determine the location, we do something kind of lazy and import the file to determine the
+    # location of the git repo
+    output["software"]["hashes"] = {}
+    import importlib
+    for module_name in ["pachyderm", "mammoth", "jet_substructure"]:
+        m = importlib.import_module(module_name)
+        output["software"]["hashes"][module_name] = _git_hash_from_module(m)
+
+    # We also want a full pip freeze. We'll store each package as an entry in a list
+    output["software"]["packages"] = _installed_python_software()
+
+    return output
+
+
+def store_production_parameters(
+    output_dir: Path, identifier: str, config: Mapping[str, Any]
+) -> None:
+    output: Dict[str, Any] = {}
+    output["identifier"] = identifier
+    output["date"] = datetime.datetime.utcnow().strftime('%Y-%m-%d')
+    output["config"] = dict(config)
+    output["input_filenames"] = [
+        str(p) for p in jet_substructure.base.helpers.ensure_and_expand_paths(
+            config["metadata"]["dataset"]["files"]
+        )
+    ]
+    if "signal_dataset" in config["metadata"]:
+        output["signal_filenames"] = [
+            str(p) for p in jet_substructure.base.helpers.ensure_and_expand_paths(
+                config["metadata"]["signal_dataset"]["files"]
+            )
+        ]
+    if "background_dataset" in config["metadata"]:
+        output["background_filenames"] = [
+            str(p) for p in jet_substructure.base.helpers.ensure_and_expand_paths(
+                config["metadata"]["background_dataset"]["files"]
+            )
+        ]
+    # Add description of the software
+    output.update(
+        _describe_production_software(production_config=config)
+    )
+
+    y = yaml.yaml()
+    with open(output_dir / "production.yaml", "w") as f:
+        y.dump(output, f)
+
+
+def run2() -> None:
+    # Basic settings
+    collision_system = "pp"
+    production_number = 60
+    # Put some leading 0s for consistency in sorting, etc
+    formatted_production_number = f"{production_number:04}"
+
+    # Retrieve configuration
+    track_skim_config = read_full_config()
+    production_config = track_skim_config["productions"][collision_system][production_number]
+    production_output_dir = Path("trains") / collision_system / formatted_production_number
+    production_output_dir.mkdir(parents=True, exist_ok=True)
+
+    import IPython; IPython.embed()
+
+    # Production information
+    identifier = production_identifier(production_config=production_config, production_number=production_number)
+    # Store the production information
+    store_production_parameters(
+        output_dir=production_output_dir,
+        identifier=identifier,
+        config=production_config,
+    )
+
+    # Also make a "config.yaml(?)"
+
+    import IPython; IPython.embed()
+
 
 if __name__ == "__main__":
-    run()
+    run2()
