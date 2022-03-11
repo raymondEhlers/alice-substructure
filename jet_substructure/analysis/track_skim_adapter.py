@@ -281,7 +281,7 @@ def hardest_kt_embed_thermal_model_skim(
         ),
         jet_R=jet_R,
         min_jet_pt=min_jet_pt,
-        r_max=r_max,
+        background_subtraction_settings={"r_max": r_max},
         validation_mode=validation_mode,
     )
     #jets = analysis_alice.analysis_embedding(
@@ -350,7 +350,7 @@ def hardest_kt_embedding_skim(
         ),
         jet_R=jet_R,
         min_jet_pt=min_jet_pt,
-        r_max=r_max,
+        background_subtraction_settings={"r_max": r_max},
         validation_mode=validation_mode,
     )
 
@@ -389,8 +389,7 @@ if __name__ == "__main__":
         "embed_thermal_model": {"hybrid": 20.},
         "embedPythia": {"hybrid": 20.},
     }
-    #for collision_system in ["pp", "pythia", "PbPb"]:
-    for collision_system in ["PbPb"]:
+    for collision_system in ["pp", "pythia", "PbPb"]:
         logger.info(f"Analyzing \"{collision_system}\"")
         base_path = Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}")
 
