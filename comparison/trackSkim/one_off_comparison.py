@@ -18,6 +18,8 @@ import pachyderm.plot
 import uproot
 from pachyderm import binned_data
 
+from jet_substructure.analysis import plot_base as pb
+
 
 pachyderm.plot.configure()
 
@@ -44,11 +46,9 @@ def arrays_to_hist(
 def plot_attribute_compare(
     other: Input,
     mine: Input,
-    x_label: str,
-    output_name: str,
+    plot_config: pb.PlotConfig,
     output_dir: Path,
     axis: bh.axis.Regular = bh.axis.Regular(30, 0, 150),
-    log_y: bool = False,
     normalize: bool = False,
 ) -> None:
     # Plot
@@ -93,27 +93,12 @@ def plot_attribute_compare(
     print(f"other: {np.sum(other_hist.values)}")
     print(f"mine: {np.sum(mine_hist.values)}")
 
-    ax.set_ylabel("Prob.")
-    if log_y:
-        ax.set_yscale("log")
-    ax.legend(frameon=False, loc="upper right")
-    ax_ratio.set_xlabel(x_label)
-    ax_ratio.set_ylabel(f"{mine.name}/{other.name}")
-    # ax_ratio.set_xlabel(r"$p_{\text{T, det}}$")
-    ax_ratio.set_ylim([0.6, 1.4])
-    fig.tight_layout()
-    fig.align_ylabels()
-    fig.subplots_adjust(
-        # Reduce spacing between subplots
-        hspace=0,
-        wspace=0,
-        # Reduce external spacing
-        left=0.12,
-        bottom=0.105,
-        right=0.98,
-        top=0.98,
-    )
-    fig.savefig(output_dir / f"{output_name}.pdf")
+    # Apply the PlotConfig
+    plot_config.apply(fig=fig, axes=[ax, ax_ratio])
+
+    # filename = f"{plot_config.name}_{jet_pt_bin}{grooming_methods_filename_label}_{identifiers}_iterative_splittings"
+    filename = f"{plot_config.name}"
+    fig.savefig(output_dir / f"{filename}.pdf")
     plt.close(fig)
 
 
@@ -135,15 +120,48 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
     for prefix in prefixes:
         logger.info(f"Comparing prefix '{prefix}'")
 
+        text = f"{collision_system.replace('_', ' ')}: {prefix.replace('_', ' ')}"
         plot_attribute_compare(
             other=Input(arrays=standard, attribute=f"{prefix}_jet_pt", name="Standard"),
             mine=Input(arrays=track_skim, attribute=f"{prefix}_jet_pt", name="Track skim"),
-            x_label=r"$p_{\text{T,ch jet}}$ (GeV/$c$)",
-            output_name=f"{prefix}_jet_pt",
-            log_y=True,
-            normalize=True,
-            axis=bh.axis.Regular(50, 0, 100),
+            plot_config=pb.PlotConfig(
+                name=f"{prefix}_jet_pt",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label="Prob.",
+                                log=True,
+                                font_size=22,
+                            ),
+                        ],
+                        text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
+                        legend=pb.LegendConfig(location="center right", anchor=(0.985, 0.52), font_size=22),
+                    ),
+                    # Data ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "x",
+                                label=r"$p_{\text{T,ch jet}}$ (GeV/$c$)",
+                                font_size=22,
+                            ),
+                            pb.AxisConfig(
+                                "y",
+                                label=r"Track skim/Standard",
+                                range=(0.6, 1.4),
+                                font_size=22,
+                            ),
+                        ],
+                    ),
+                ],
+                figure=pb.Figure(edge_padding=dict(left=0.13, bottom=0.115)),
+            ),
             output_dir=output_dir,
+            axis=bh.axis.Regular(50, 0, 100),
+            normalize=True,
         )
         standard_jet_pt = standard[f"{prefix}_jet_pt"]
         track_skim_jet_pt = track_skim[f"{prefix}_jet_pt"]
@@ -171,13 +189,46 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
             plot_attribute_compare(
                 other=Input(arrays=standard, attribute=f"{grooming_method}_{prefix}_kt", name="Standard"),
                 mine=Input(arrays=track_skim, attribute=f"{grooming_method}_{prefix}_kt", name="Track skim"),
-                x_label=r"$k_{\text{T,g}}$ (GeV/$c$)",
-                output_name=f"{grooming_method}_{prefix}_kt",
-                log_y=True,
+                plot_config=pb.PlotConfig(
+                    name=f"{grooming_method}_{prefix}_kt",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y",
+                                    label="Prob.",
+                                    log=True,
+                                    font_size=22,
+                                ),
+                            ],
+                            text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
+                            legend=pb.LegendConfig(location="center right", anchor=(0.985, 0.52), font_size=22),
+                        ),
+                        # Data ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "x",
+                                    label=r"$k_{\text{T,g}}$ (GeV/$c$)",
+                                    font_size=22,
+                                ),
+                                pb.AxisConfig(
+                                    "y",
+                                    label=r"Track skim/Standard",
+                                    range=(0.6, 1.4),
+                                    font_size=22,
+                                ),
+                            ],
+                        ),
+                    ],
+                    figure=pb.Figure(edge_padding=dict(left=0.13, bottom=0.115)),
+                ),
                 normalize=True,
                 axis=bh.axis.Regular(50, 0, 10),
                 output_dir=output_dir,
             )
+
             standard_kt = standard[f"{grooming_method}_{prefix}_kt"]
             track_skim_kt = track_skim[f"{grooming_method}_{prefix}_kt"]
 
@@ -200,11 +251,44 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
             plot_attribute_compare(
                 other=Input(arrays=standard, attribute=f"{grooming_method}_{prefix}_delta_R", name="Standard"),
                 mine=Input(arrays=track_skim, attribute=f"{grooming_method}_{prefix}_delta_R", name="Track skim"),
-                x_label=r"$R_{\text{g}}$",
-                output_name=f"{grooming_method}_{prefix}_delta_R",
-                normalize=True,
-                axis=bh.axis.Regular(50, 0, 0.6),
+                plot_config=pb.PlotConfig(
+                    name=f"{grooming_method}_{prefix}_delta_R",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y",
+                                    label="Prob.",
+                                    log=True,
+                                    font_size=22,
+                                ),
+                            ],
+                            text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
+                            legend=pb.LegendConfig(location="upper left", font_size=22),
+                        ),
+                        # Data ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "x",
+                                    label=r"$R_{\text{g}}$",
+                                    font_size=22,
+                                ),
+                                pb.AxisConfig(
+                                    "y",
+                                    label=r"Track skim/Standard",
+                                    range=(0.6, 1.4),
+                                    font_size=22,
+                                ),
+                            ],
+                        ),
+                    ],
+                    figure=pb.Figure(edge_padding=dict(left=0.13, bottom=0.115)),
+                ),
                 output_dir=output_dir,
+                axis=bh.axis.Regular(50, 0, 0.6),
+                normalize=True,
             )
             standard_rg = standard[f"{grooming_method}_{prefix}_delta_R"]
             track_skim_rg = track_skim[f"{grooming_method}_{prefix}_delta_R"]
@@ -233,8 +317,41 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
             plot_attribute_compare(
                 other=Input(arrays=standard, attribute=f"{grooming_method}_{prefix}_z", name="Standard"),
                 mine=Input(arrays=track_skim, attribute=f"{grooming_method}_{prefix}_z", name="Track skim"),
-                output_name=f"{grooming_method}_{prefix}_z",
-                x_label=r"$z$",
+                plot_config=pb.PlotConfig(
+                    name=f"{grooming_method}_{prefix}_z",
+                    panels=[
+                        # Main panel
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y",
+                                    label="Prob.",
+                                    log=True,
+                                    font_size=22,
+                                ),
+                            ],
+                            text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
+                            legend=pb.LegendConfig(location="upper left", font_size=22),
+                        ),
+                        # Data ratio
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "x",
+                                    label=r"$z_{\text{g}}$",
+                                    font_size=22,
+                                ),
+                                pb.AxisConfig(
+                                    "y",
+                                    label=r"Track skim/Standard",
+                                    range=(0.6, 1.4),
+                                    font_size=22,
+                                ),
+                            ],
+                        ),
+                    ],
+                    figure=pb.Figure(edge_padding=dict(left=0.13, bottom=0.115)),
+                ),
                 normalize=True,
                 axis=bh.axis.Regular(50, 0, 0.5),
                 output_dir=output_dir,
@@ -276,7 +393,7 @@ def run(collision_system: str, prefixes: Sequence[str] = None) -> None:
 
 
 if __name__ == "__main__":
-    collision_system = "PbPb"
+    collision_system = "embedPythia"
 
     _prefixes = {
         "pp": ["data"],
