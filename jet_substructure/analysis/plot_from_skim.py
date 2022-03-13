@@ -2685,20 +2685,20 @@ def _plot_lund_plane(
     jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
     output_dir: Path,
+    rdf_plots: bool = True,
+    plot_png: bool = True,
 ) -> None:
     # Setup
     fig, ax = plt.subplots(figsize=(8, 6))
     logger.info(f"Plotting lund plane for {grooming_method}")
 
-    #    jet_pt_axis, bh.axis.Regular(100, 0, 5), bh.axis.Regular(100, -5.0, 5.0), storage=bh.storage.Weight(),
-    # )
-
-    bh_hist = hists[f"{grooming_method}_{prefix}_lund_plane"]
-    h = binned_data.BinnedData.from_existing_data(bh_hist[bh.loc(60) : bh.loc(80) : bh.sum, :, :])  # noqa: E203
-
-    import IPython
-
-    IPython.embed()
+    if rdf_plots:
+        # hist_name = f"{grooming_method}_{matching_level}_matching_all"
+        hist_name = f"{grooming_method}_{prefix}_lund_plane_{jet_pt_bin.histogram_str(label=prefix)}"
+        h = binned_data.BinnedData.from_existing_data(hists[hist_name])
+    else:
+        bh_hist = hists[f"{grooming_method}_{prefix}_lund_plane"]
+        h = binned_data.BinnedData.from_existing_data(bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :, :])  # noqa: E203
 
     # Scale by bin width
     x_bin_widths, y_bin_widths = np.meshgrid(*h.axes.bin_widths)
@@ -2729,8 +2729,12 @@ def _plot_lund_plane(
     plot_config.apply(fig=fig, ax=ax)
 
     # Save and cleanup
-    filename = f"{plot_config.name}_{jet_pt_bin}_part_level_{jet_pt_bin}_iterative_splittings"
+    filename = f"{plot_config.name}_{jet_pt_bin.histogram_str(label=prefix)}_iterative_splittings"
     fig.savefig(output_dir / f"{filename}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{filename}.png")
     plt.close(fig)
 
 
@@ -2738,17 +2742,24 @@ def lund_plane(
     hists: Mapping[str, bh.Histogram],
     grooming_methods: Sequence[str],
     output_dir: Path,
+    prefix: str,
+    rdf_plots: bool = True,
+    plot_png: bool = True,
+    jet_pt_bin: helpers.JetPtRange = helpers.JetPtRange(min=40, max=120)
 ) -> None:
-    true_jet_pt_bin = helpers.RangeSelector(min=60, max=80)
     for grooming_method in grooming_methods:
-        text = ""
+        text = "Iterative splittings"
+        text += "\n" + f"${jet_pt_bin.display_str(label='')}$"
+        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
         _plot_lund_plane(
             hists=hists,
             grooming_method=grooming_method,
-            prefix="matched",
-            jet_pt_bin=true_jet_pt_bin,
+            prefix=prefix,
+            jet_pt_bin=jet_pt_bin,
+            rdf_plots=rdf_plots,
+            plot_png=plot_png,
             plot_config=PlotConfig(
-                name="lund_plane_pythia_part_{grooming_method}",
+                name=f"lund_plane_{grooming_method}",
                 panels=Panel(
                     axes=[
                         AxisConfig("x", label=r"$\log{(1/\Delta R)}$"),
