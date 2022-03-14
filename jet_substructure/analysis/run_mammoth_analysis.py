@@ -782,8 +782,8 @@ def setup_calculate_embed_pythia_skim(
             logger.info(f"Adding {input_filename} for analysis")
 
         # For testing...
-        if _file_counter > 1:
-            break
+        #if _file_counter > 1:
+        #    break
         # END
 
         # Randomly select (in some manner) an input file to match up with the background input file.
@@ -819,7 +819,7 @@ def setup_calculate_embed_pythia_skim(
         # Setup file I/O
         # We want to identify as: "{signal_identifier}__embedded_into__{background_identifier}"
         # Take the first signal filename as the main identifier to the path.
-        # Otherwise, the filename could become indefinitely long...
+        # Otherwise, the filename could become indefinitely long... (apparently there are file length limits in unix...)
         output_identifier = safe_output_filename_from_relative_path(filename=signal_input[0], output_dir=production.output_dir)
         output_identifier += "__embedded_into__"
         output_identifier += safe_output_filename_from_relative_path(filename=input_filename, output_dir=production.output_dir)
@@ -836,7 +836,7 @@ def setup_calculate_embed_pythia_skim(
                 det_level_artificial_tracking_efficiency=_analysis_config["det_level_artificial_tracking_efficiency"],
                 convert_data_format_prefixes=_metadata_config["convert_data_format_prefixes"],
                 inputs=[
-                    *[File(_filename) for _filename in signal_input],
+                    *[File(str(_filename)) for _filename in signal_input],
                     File(str(input_filename)),
                 ],
                 outputs=[
