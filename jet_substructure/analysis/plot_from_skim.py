@@ -496,9 +496,11 @@ def _plot_fraction_of_subjet_pt_in_hybrid(
             f"Plotting {subjet_name} pt fraction in hybrid for {grooming_method}, {matching_type}, hist_suffix: {hist_suffix}"
         )
         if rdf_plots:
-            hist_name = (
-                f"{grooming_method}_hybrid_det_level_matching_{subjet_name}_pt_fraction_in_hybrid_{matching_type}"
-            )
+
+            hist_name = f"{grooming_method}_{subjet_name}_det_level_subjet_momentum_fraction_in_hybrid_matching_hybrid_det_level_type_{matching_type}_{hybrid_jet_pt_bin.histogram_str(label='hybrid')}"
+            #hist_name = (
+            #    f"{grooming_method}_hybrid_det_level_matching_{subjet_name}_pt_fraction_in_hybrid_{matching_type}"
+            #)
             if hist_suffix:
                 hist_name += f"_{hist_suffix}"
             h = binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(2)])
@@ -759,6 +761,8 @@ def _plot_residual_mean_and_width(
     plot_config_mean: PlotConfig,
     plot_config_width: PlotConfig,
     output_dir: Path,
+    rdf_plots: bool,
+    plot_png: bool,
 ) -> None:
     logger.debug(
         f"Plotting jet pt residual mean and width for {grooming_method} with hybrid jet pt: {hybrid_jet_pt_bin}"
@@ -867,8 +871,16 @@ def _plot_jet_pt_residual_distribution(
     plt.close(fig)
 
 
-def plot_residuals(hists: Mapping[str, bh.Histogram], grooming_methods: Sequence[str], output_dir: Path) -> None:
-    hybrid_jet_pt_bins = [helpers.RangeSelector(40, 120), helpers.RangeSelector(20, 200)]
+def plot_residuals(
+    hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    output_dir: Path,
+    rdf_plots: bool = False,
+    plot_png: bool = False,
+) -> None:
+    hybrid_jet_pt_bins = [helpers.RangeSelector(40, 120)]
+    if not rdf_plots:
+        hybrid_jet_pt_bins.append(helpers.RangeSelector(20, 200))
     true_jet_pt_bin = helpers.RangeSelector(40, 60)
     for grooming_method in grooming_methods:
         for hybrid_jet_pt_bin in hybrid_jet_pt_bins:
@@ -912,6 +924,8 @@ def plot_residuals(hists: Mapping[str, bh.Histogram], grooming_methods: Sequence
                     figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
                 ),
                 output_dir=output_dir,
+                rdf_plots=rdf_plots,
+                plot_png=plot_png,
             )
 
         text = "Iterative splittings"
@@ -937,6 +951,8 @@ def plot_residuals(hists: Mapping[str, bh.Histogram], grooming_methods: Sequence
                 figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
             ),
             output_dir=output_dir,
+            rdf_plots=rdf_plots,
+            plot_png=plot_png,
         )
 
 
@@ -962,10 +978,13 @@ def _plot_response_by_matching_type(
         )
 
         matches_label = " ".join(matching_type.split("_")).capitalize()
+        # leading_kt_hybrid_true_kt_response_matching_hybrid_det_level_type_all_jet_pt_hybrid_40_120
+        hist_name = f"{grooming_method}_{response_type}_{label}_response_matching_{matching_level}_type_{matching_type}_{hybrid_jet_pt_bin.histogram_str(label='hybrid')}"
         # hist_name = f"{grooming_method}_{response_type}_{label}_response_{matching_level}_matching_type_{matching_type}"
-        hist_name = f"{grooming_method}_{response_type}_{label}_response_{matching_level}_matching_type_{matching_type}_{subjet_name}_pt_fraction_in_hybrid"
+        # hist_name = f"{grooming_method}_{response_type}_{label}_response_{matching_level}_matching_type_{matching_type}_{subjet_name}_pt_fraction_in_hybrid"
         if hist_suffix:
             hist_name += f"_{hist_suffix}"
+        logger.debug(f"hist_name: {hist_name}")
         bh_input_hist = hists[hist_name]
         h_input = binned_data.BinnedData.from_existing_data(bh_input_hist)
 
@@ -973,9 +992,10 @@ def _plot_response_by_matching_type(
         # Axes: hybrid_pt, hybrid_kt, det_level_pt, det_level_kt
         # NOTE: We already applied the 40 < hybrid jet pt < 120 cut, so it doesn't need an additional selection.
         if rdf_plots:
-            # For RDF skim
-            subjet_range = slice(bh.loc(subjet_pt_fraction_range[0]), bh.loc(subjet_pt_fraction_range[1]), bh.sum)
-            h = binned_data.BinnedData.from_existing_data(bh_input_hist[::, ::, subjet_range])
+            ## For RDF skim
+            #subjet_range = slice(bh.loc(subjet_pt_fraction_range[0]), bh.loc(subjet_pt_fraction_range[1]), bh.sum)
+            #h = binned_data.BinnedData.from_existing_data(bh_input_hist[::, ::, subjet_range])
+            h = binned_data.BinnedData.from_existing_data(bh_input_hist)
         else:
             h = binned_data.BinnedData(
                 axes=[h_input.axes[1], h_input.axes[3]],
@@ -1013,11 +1033,11 @@ def _plot_response_by_matching_type(
         # Labeling and presentation
         # Help out mypy...
         assert plot_config.panels[0].text is not None
-        original_text = plot_config.panels[0].text.text
-        plot_config.panels[0].text.text += "\n" + matches_label + " matches"
+        original_text = plot_config.panels[0].text[0].text
+        plot_config.panels[0].text[0].text += "\n" + matches_label + " matches"
         plot_config.apply(fig=fig, ax=ax)
         # Restore the proper text after adding the matching label and plotting it.
-        plot_config.panels[0].text.text = original_text
+        plot_config.panels[0].text[0].text = original_text
 
         # Store and cleanup
         filename = (
