@@ -307,7 +307,7 @@ class ProductionSettings:
         ]
         if "signal_dataset" in self.config["metadata"]:
             output["signal_filenames"] = [
-                str(p) for p in self.input_files_per_pt_hat()
+                str(p) for p in self.input_files_per_pt_hat().values()
             ]
         # Add description of the software
         output.update(
