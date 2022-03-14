@@ -31,7 +31,7 @@ from parsl.monitoring.monitoring import MonitoringHub
 from parsl.providers import SlurmProvider
 
 from jet_substructure.base import helpers, skim_analysis_objects
-from jet_substructure.base import unfolding as unfolding_base
+from jet_substructure.base import unfolding as unfolding_base, job_utils as substructure_job_utils
 
 
 logger = logging.getLogger(__name__)
@@ -86,12 +86,9 @@ def read_extracted_scale_factors(
     Returns:
         Normalized scaled factors
     """
-    p = Path(f"trains/{collision_system}/{dataset_name}/scale_factors.yaml")
-    y = yaml.yaml(classes_to_register=[skim_analysis_objects.ScaleFactor])
-    with open(p, "r") as f:
-        scale_factors: Dict[int, skim_analysis_objects.ScaleFactor] = y.load(f)
-
-    return {pt_hard_bin: v.value() for pt_hard_bin, v in scale_factors.items()}
+    return substructure_job_utils.read_extracted_scale_factors(
+        path=Path(f"trains/{collision_system}/{dataset_name}/scale_factors.yaml")
+    )
 
 
 def setup_parsl_587(
@@ -1698,7 +1695,7 @@ def setup_all_unfolding(  # noqa: C901
     logger.info(f"Unfolding settings: {selected_unfolding_settings}")
     # Setup
     base_unfolding_config = base_dataset_config["unfolding"]
-    output_dir = Path("output") / data_collision_system / "unfolding" / "parsl"
+    output_dir = Path("output") / data_collision_system / "unfolding" / "parsl" / "2022-03-QM"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Things are treated so different that it's better to be direct about the data collision system.
