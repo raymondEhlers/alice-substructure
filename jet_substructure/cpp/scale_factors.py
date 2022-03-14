@@ -219,7 +219,8 @@ def create_scale_factor_tree_for_cross_check_task_output(
 
 
 def pt_hard_spectra_from_hists(
-    filenames: Mapping[int, Sequence[Path]], scale_factors: Mapping[int, float], output_filename: Path
+    filenames: Mapping[int, Sequence[Path]], scale_factors: Mapping[int, float], output_filename: Path,
+    list_name: str = "",
 ) -> bool:
     """Extract and save pt hard spectra from embedding or pythia.
 
@@ -236,6 +237,10 @@ def pt_hard_spectra_from_hists(
     Returns:
         True if successful.
     """
+    # Validation
+    if not list_name:
+        list_name = "*DynamicalGrooming*"
+
     pt_hard_spectra = []
     for pt_hard_bin, pt_hard_filenames in filenames.items():
         single_bin_pt_hard_spectra = []
@@ -244,15 +249,17 @@ def pt_hard_spectra_from_hists(
                 hists = f.get("AliAnalysisTaskEmcalEmbeddingHelper_histos", None)
                 if not hists:
                     # If not the embedding helper, look for the analysis task output.
-                    task_hists_name = [k for k in f.keys() if "DynamicalGrooming" in k and "Tree" not in k]
-                    if len(task_hists_name) != 1:
-                        raise RuntimeError(f"Cannot find unique task name. Names: {task_hists_name}. Skipping!")
-                    else:
-                        hists = f.get(task_hists_name[0], None)
-                        if not hists:
-                            raise RuntimeError(
-                                f"Cannot find a task output list. Tried: {task_hists_name[0]}. Keys: {list(f.GetListOfKeys())}"
-                            )
+                    logger.debug(f"Searching for task hists with the name pattern '{list_name}'")
+                    # Search for keys which contain the provided tree name. Very nicely, uproot already has this built-in
+                    _possible_task_hists_names = f.keys(
+                        cycle=False, filter_name=list_name, filter_classname=["AliEmcalList", "TList"]
+                    )
+                    if len(_possible_task_hists_names) != 1:
+                        raise ValueError(
+                            f"Ambiguous list name '{list_name}'. Please revise it as needed. Options: {_possible_task_hists_names}"
+                        )
+                    # We're good - let's keep going
+                    hists = f.get(_possible_task_hists_names[0], None)
 
                 if not isinstance(hists, uproot.models.TList.Model_TList):
                     # Grab the underlying TList rather than the AliEmcalList...
