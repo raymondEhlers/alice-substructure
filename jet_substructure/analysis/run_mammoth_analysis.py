@@ -706,8 +706,11 @@ def _run_embedding_skim(
     try:
         result = track_skim_adapter.hardest_kt_embedding_skim(
             collision_system=collision_system,
-            signal_input_filename=Path(inputs[0].filepath),
-            background_input_filename=Path(inputs[1].filepath),
+            signal_input=[
+                Path(_input_file.filepath)
+                for _input_file in inputs[:-1]
+            ],
+            background_input_filename=Path(inputs[-1].filepath),
             convert_data_format_prefixes=convert_data_format_prefixes,
             jet_R=jet_R,
             min_jet_pt=min_jet_pt,
@@ -720,7 +723,7 @@ def _run_embedding_skim(
     except Exception:
         result = (
             False,
-            f"failure for {collision_system}, R={jet_R}, {inputs[0].filepath} with: \n{traceback.format_exc()}",
+            f"failure for {collision_system}, R={jet_R}, signal={[_f.filepath for _f in inputs[:-1]]}, background={inputs[1].filepath} with: \n{traceback.format_exc()}",
         )
     return result
 
@@ -754,6 +757,7 @@ def setup_calculate_embed_pythia_skim(
     _metadata_config = production.config["metadata"]
     # Sample the pt hat equally, or directly sample the signal_input_files
     sample_each_pt_hat_bin_equally = _metadata_config["sample_each_pt_hat_bin_equally"]
+    n_signal_files_to_provide = _metadata_config["n_signal_files_to_provide"]
     _analysis_config = production.config["settings"]
 
     # Splitting selection (iterative vs recursive)
@@ -772,7 +776,7 @@ def setup_calculate_embed_pythia_skim(
         )
 
     results = []
-    _file_counter = 0
+    _embedding_file_pairs = {}
     for _file_counter, input_filename in enumerate(input_files):
         if _file_counter % 500 == 0:
             logger.info(f"Adding {input_filename} for analysis")
@@ -786,6 +790,7 @@ def setup_calculate_embed_pythia_skim(
         # NOTE: The signal input file will repeat if there are more background events.
         #       So far, this doesn't seem to be terribly common, but even if it was, it
         #       would be perfectly fine as long as it doesn't happen too often.
+        signal_input = []
         if sample_each_pt_hat_bin_equally:
             # Each pt hat bin will be equally likely, and then we select the file from
             # those which are available.
@@ -793,18 +798,32 @@ def setup_calculate_embed_pythia_skim(
             #       For example, if I compare a low and high pt hat bin, there are just going to be
             #       more accepted jets in the high pt hat sample.
             pt_hat_bin = secrets.choice(pt_hat_bins)
-            signal_input_filename = secrets.choice(signal_input_files_per_pt_hat[pt_hat_bin])
+            signal_input = [
+                secrets.choice(signal_input_files_per_pt_hat[pt_hat_bin])
+                for _ in range(n_signal_files_to_provide)
+            ]
         else:
             # Directly sample the files. This probes the generator stats because
             # the number of files is directly proportional to the generated statistics.
-            pt_hat_bin, signal_input_filename = secrets.choice(signal_input_files_flat)
+            pt_hat_bin, _signal_input_filename = secrets.choice(signal_input_files_flat)
+            signal_input = [_signal_input_filename]
+            # Since we want to keep the same pt hat bin, use the pt hat ban to randomly select additional files
+            signal_input.extend([
+                secrets.choice(signal_input_files_per_pt_hat[pt_hat_bin])
+                # -1 since we already have a filename
+                for _ in range(n_signal_files_to_provide - 1)
+            ])
+        # Store the file pairs for our records
+        _embedding_file_pairs[str(input_filename)] = [str(_filename) for _filename in signal_input]
 
         # Setup file I/O
         # We want to identify as: "{signal_identifier}__embedded_into__{background_identifier}"
-        output_identifier = safe_output_filename_from_relative_path(filename=signal_input_filename, output_dir=production.output_dir)
+        # Take the first signal filename as the main identifier to the path.
+        # Otherwise, the filename could become indefinitely long...
+        output_identifier = safe_output_filename_from_relative_path(filename=signal_input[0], output_dir=production.output_dir)
         output_identifier += "__embedded_into__"
         output_identifier += safe_output_filename_from_relative_path(filename=input_filename, output_dir=production.output_dir)
-        logger.info(f"output_identifier: {output_identifier}")
+        #logger.info(f"output_identifier: {output_identifier}")
         output_filename = output_dir / f"{output_identifier}_{str(splittings_selection)}.root"
         # And create the tasks
         results.append(
@@ -817,7 +836,7 @@ def setup_calculate_embed_pythia_skim(
                 det_level_artificial_tracking_efficiency=_analysis_config["det_level_artificial_tracking_efficiency"],
                 convert_data_format_prefixes=_metadata_config["convert_data_format_prefixes"],
                 inputs=[
-                    File(str(signal_input_filename)),
+                    *[File(_filename) for _filename in signal_input],
                     File(str(input_filename)),
                 ],
                 outputs=[

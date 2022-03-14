@@ -166,6 +166,9 @@ analysis_settings:
           part_level: "true"
         # Sample pt hat bin distribution equally
         sample_each_pt_hat_bin_equally: true
+        # Number of signal files to make available to a background file
+        # This ensures some additional diversity if we end up with a very small signal file
+        n_signal_files_to_provide: 3
       settings: &_base_analysis_settings_embed
         splittings_selection: "iterative"
         # In GeV

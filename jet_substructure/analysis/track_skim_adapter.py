@@ -3,9 +3,10 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+import collections
 import logging
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Tuple, Union
 
 import awkward as ak
 import numpy as np
@@ -317,7 +318,7 @@ def hardest_kt_embed_thermal_model_skim(
 
 def hardest_kt_embedding_skim(
     collision_system: str,
-    signal_input_filename: Path,
+    signal_input: Union[Path, Sequence[Path]],
     background_input_filename: Path,
     convert_data_format_prefixes: Mapping[str, str],
     jet_R: float,
@@ -329,12 +330,18 @@ def hardest_kt_embedding_skim(
     scale_factor: float,
     validation_mode: bool = False,
 ) -> Tuple[bool, str]:
+    # Validation
+    signal_input_filenames = []
+    if not isinstance(signal_input, collections.abc.Iterable):
+        signal_input_filenames = [signal_input]
+    else:
+        signal_input_filenames = list(signal_input)
     # Try to bail out early to avoid reprocessing if possible.
     _description = _description_from_parameters(
         parameters={
             "collision_system": collision_system, "R": jet_R,
-            "signal_input_filename": signal_input_filename,
             "background_input_filename": background_input_filename,
+            **{f"signal_input_filenames_{i}": _filename for i, _filename in enumerate(signal_input_filenames)},
         }
     )
     res = _check_for_output_file(output_filename=output_filename, description=_description)
@@ -343,7 +350,7 @@ def hardest_kt_embedding_skim(
 
     jets = analysis_alice.analysis_embedding(
         *analysis_alice.load_embedding(
-            signal_filename=signal_input_filename,
+            signal_input=signal_input_filenames,
             background_filename=background_input_filename,
         ),
         jet_R=jet_R,
