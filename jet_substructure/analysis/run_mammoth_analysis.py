@@ -339,10 +339,11 @@ def safe_output_filename_from_relative_path(filename: Path, output_dir: Path) ->
     Returns:
         Filename that is safe for using as the output filename.
     """
-    # NOTE: We use the parent of the output dir because the input filename is going to be a different train
-    #       than our output. So by going to the parent (ie train/{collision_system}), we end up with a shared path
+    # NOTE: We use the grandparent of the output dir because the input filename is going to be a different train
+    #       than our output. For the case of embedding trains, we might not even share the collision system.
+    #       So by going to the grandparent (ie `trains`), we end up with a shared path
     return str(
-        filename.relative_to(output_dir.parent).with_suffix("")
+        filename.relative_to(output_dir.parent.parent).with_suffix("")
     ).replace("/", "__").replace(".", "_")
 
 
@@ -539,7 +540,6 @@ def steer_extract_scale_factors(
     # Validation
     if production.collision_system not in _collision_systems_with_scale_factors:
         raise ValueError(f"Invalid collision system for extracting scale factors: {production.collision_system}")
-    logger.info("Extracting scale factors...")
 
     # Attempt to bail out early if it's already been extracted
     scale_factors_filename = production.scale_factors_filename
@@ -547,8 +547,9 @@ def steer_extract_scale_factors(
         scale_factors = production.scale_factors()
         # We check if it's non-zero to avoid the case where it's accidentally empty
         if scale_factors:
-            logger.info("Scale factors already exist. Skipping extracting them again!")
+            logger.debug("Scale factors already exist. Skipping extracting them again!")
             return []
+    logger.info("Extracting scale factors...")
 
     # First, we need to extract the scale factors and keep track of the results
     all_results: List[AppFuture] = []
@@ -822,7 +823,7 @@ def setup_calculate_embed_pythia_skim(
                 outputs=[
                     File(str(output_filename))
                 ],
-                scale_factors=scale_factors[pt_hat_bin],
+                scale_factor=scale_factors[pt_hat_bin],
             )
         )
 
