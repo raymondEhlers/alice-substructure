@@ -164,7 +164,7 @@ class ProductionSettings:
         name += "__"
         _analysis_settings = self.config["settings"]
         # We want particular handling for some, so we do those by hand. The rest are included automatically
-        _manual_analysis_parameter_keys = ["jet_R", "splittings_selection", "min_jet_pt"]
+        _manual_analysis_parameter_keys = ["jet_R", "splittings_selection", "min_jet_pt", "background_subtraction"]
         # Jet R
         jet_R_value = _analysis_settings["jet_R"]
         name += f"_jet_R{round(jet_R_value * 100):03}"
@@ -175,6 +175,10 @@ class ProductionSettings:
         name += "_min_jet_pt"
         for k, v in _analysis_settings["min_jet_pt"].items():
             name += f"_{k}_{round(v)}"
+        # Background subtraction
+        name += "_background_subtraction"
+        for k, v in _analysis_settings["background_subtraction"].items():
+            name += f"_{k}_{str(v)}"
         # And then all the rest
         for k, v in _analysis_settings.items():
             if k in _manual_analysis_parameter_keys:
@@ -376,8 +380,8 @@ def setup_calculate_data_skim(
             output_identifier = str(
                 input_filename.relative_to(production.output_dir.parent).with_suffix("")
             ).replace("/", "__").replace(".", "_")
-            logger.info(f"output_identifier: {output_identifier}")
             output_filename = output_dir / f"{output_identifier}_{str(splittings_selection)}.root"
+            # And create the tasks
             results.append(
                 _run_data_skim(
                     collision_system=production.collision_system,
