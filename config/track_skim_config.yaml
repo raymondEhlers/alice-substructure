@@ -224,6 +224,18 @@ productions:
         <<: *analysis_settings_pythia_R02
 
   PbPb:
+    2:
+      metadata:
+        <<: *base_metadata_PbPb
+        dataset: *LHC18qr_PbPb_semi_central
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 2
+        label: "semi_central"
+      settings:
+        <<: *analysis_settings_PbPb_R02
+        event_activity: "semi_central"
+        background_subtraction:
+          r_max: 0.5
     60:
       metadata:
         <<: *base_metadata_PbPb
@@ -239,11 +251,37 @@ productions:
         <<: *base_metadata_PbPb
         dataset: *LHC18qr_PbPb_semi_central
         # Equivalent to train number, but a more general term makes more sense here.
-        production_number: 60
+        production_number: 61
         label: "semi_central"
       settings:
         <<: *analysis_settings_PbPb_R02
         event_activity: "semi_central"
+        background_subtraction:
+          r_max: 0.5
+    62:
+      metadata:
+        <<: *base_metadata_PbPb
+        dataset: *LHC18qr_PbPb_semi_central
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 62
+        label: "semi_central"
+      settings:
+        <<: *analysis_settings_PbPb_R02
+        event_activity: "semi_central"
+        background_subtraction:
+          r_max: 0.05
+    63:
+      metadata:
+        <<: *base_metadata_PbPb
+        dataset: *LHC18qr_PbPb_semi_central
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 63
+        label: "semi_central"
+      settings:
+        <<: *analysis_settings_PbPb_R02
+        event_activity: "semi_central"
+        background_subtraction:
+          r_max: 0.7
   embed_pythia:
     60:
       metadata:
@@ -256,3 +294,6 @@ productions:
       settings:
         <<: *analysis_settings_embed_R02
         event_activity: "semi_central"
+        background_subtraction:
+          r_max: 0.5
+        det_level_artificial_tracking_efficiency: 0.99
