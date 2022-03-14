@@ -2357,7 +2357,7 @@ test = ["pytest (>=6)", "importlib-metadata (>=1.0)", "boost-histogram (>=1.0)"]
 
 [[package]]
 name = "uproot"
-version = "4.2.1"
+version = "4.2.2"
 description = "ROOT I/O in pure Python and NumPy."
 category = "main"
 optional = false
@@ -4083,8 +4083,8 @@ uhi = [
     {file = "uhi-0.3.1.tar.gz", hash = "sha256:6f1ebcadd1d0628337a30b012184325618047abc01c3539538b1655c69101d91"},
 ]
 uproot = [
-    {file = "uproot-4.2.1-py2.py3-none-any.whl", hash = "sha256:61528c5d38961290741acfa763e56c9436f8ae846d8b10d1d44d67cfb77db0d7"},
-    {file = "uproot-4.2.1.tar.gz", hash = "sha256:6a001eba57227af4375c059eef8fced210acdedb5115d4f324330c501dae958b"},
+    {file = "uproot-4.2.2-py2.py3-none-any.whl", hash = "sha256:39df5c4e501ba924c7ba12a9bf9ef91e332a593a422f0dbdde1c774ee5920ef8"},
+    {file = "uproot-4.2.2.tar.gz", hash = "sha256:d7ce5b5ffff566463fcdebfdc6468bce003cd764f17cf99e94823b9b80a6d793"},
 ]
 uproot3 = [
     {file = "uproot3-3.14.4-py3-none-any.whl", hash = "sha256:d0b513aed4af17278d582a4879eff7037efe0752c7e2154683ac4c4f083c30c0"},
