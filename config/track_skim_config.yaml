@@ -49,7 +49,7 @@ skimmed_datasets:
       - "gen"
     n_pt_hat_bins: 20
     files:
-      - "trains/pythia/run_by_run/2640/LHC20g4/*/{pt_hat_bin}/AnalysisResults.20g4.*.root"
+      - "trains/pythia/2640/run_by_run/LHC20g4/*/{pt_hat_bin}/AnalysisResults.20g4.*.root"
 
   # PbPb
   LHC18qr_pass3_AOD252_central_642: &LHC18qr_PbPb_central
@@ -165,7 +165,7 @@ analysis_settings:
           det_level: "det_level"
           part_level: "true"
         # Sample pt hat bin distribution equally
-        sample_signal_pt_hat_evenly: true
+        sample_each_pt_hat_bin_equally: true
       settings: &_base_analysis_settings_embed
         splittings_selection: "iterative"
         # In GeV
@@ -284,10 +284,10 @@ productions:
         event_activity: "semi_central"
         background_subtraction:
           r_max: 0.7
-  embed_pythia:
-    60:
+  embedPythia:
+    2:
       metadata:
-        <<: *base_metadata_PbPb
+        <<: *base_metadata_embed
         dataset: *LHC18qr_PbPb_semi_central
         signal_dataset: *LHC20g4_pythia
         # Equivalent to train number, but a more general term makes more sense here.
@@ -297,5 +297,23 @@ productions:
         <<: *analysis_settings_embed_R02
         event_activity: "semi_central"
         background_subtraction:
-          r_max: 0.5
+          r_max: 0.05
+        # Artificial tracking efficiency derived from the full jet R_AA paper.
+        # 10-30 \approx .99
+        # 0-10% \approx .98
+        # Apply only to embedded particles
+        det_level_artificial_tracking_efficiency: 0.99
+    60:
+      metadata:
+        <<: *base_metadata_embed
+        dataset: *LHC18qr_PbPb_semi_central
+        signal_dataset: *LHC20g4_pythia
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 60
+        label: "embed_pythia_semi_central"
+      settings:
+        <<: *analysis_settings_embed_R02
+        event_activity: "semi_central"
+        background_subtraction:
+          r_max: 0.05
         det_level_artificial_tracking_efficiency: 0.99
