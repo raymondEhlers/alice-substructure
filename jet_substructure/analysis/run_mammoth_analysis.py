@@ -9,6 +9,7 @@ import datetime
 import enum
 import functools
 import logging
+import secrets
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
@@ -288,6 +289,21 @@ class ProductionSettings:
         )
 
 
+def safe_output_filename_from_relative_path(filename: Path, output_dir: Path) -> str:
+    """Safe and identifiable name for naming output files based on the relative path.
+
+    Converts: "2111/run_by_run/LHC17p_CENT_woSDD/282341/AnalysisResults.17p.001.root"
+           -> "2111__run_by_run__LHC17p_CENT_woSDD__282341__AnalysisResults_17p_001"
+
+    Returns:
+        Filename that is safe for using as the output filename.
+    """
+    # NOTE: We use the parent of the output dir because the input filename is going to be a different train
+    #       than our output. So by going to the parent (ie train/{collision_system}), we end up with a shared path
+    return str(
+        filename.relative_to(output_dir.parent).with_suffix("")
+    ).replace("/", "__").replace(".", "_")
+
 
 @python_app  # type: ignore
 def _run_data_skim(
@@ -357,7 +373,7 @@ def setup_calculate_data_skim(
         "n_pt_hat_bins" in production.config["metadata"]["dataset"]:
         dataset_key = "signal_dataset" if "signal_dataset" in production.config["metadata"] else "dataset"
         scale_factors = substructure_job_utils.read_extracted_scale_factors(
-            path=Path(production.output_dir.parent / production.config[dataset_key])
+            path=Path(production.output_dir.parent / production.config[dataset_key]["name"])
         )
 
     results = []
@@ -373,13 +389,10 @@ def setup_calculate_data_skim(
             # END
 
             # Setup file I/O
-            # NOTE: We use the parent of the output dir because the input filename is going to be a different train
-            #       than our output. So by going to the parent (ie train/{collision_system}), we end up with a shared path
             # Converts: "2111/run_by_run/LHC17p_CENT_woSDD/282341/AnalysisResults.17p.001.root"
             #        -> "2111__run_by_run__LHC17p_CENT_woSDD__282341__AnalysisResults_17p_001"
-            output_identifier = str(
-                input_filename.relative_to(production.output_dir.parent).with_suffix("")
-            ).replace("/", "__").replace(".", "_")
+            output_identifier = safe_output_filename_from_relative_path(filename=input_filename,
+                                                                        output_dir=production.output_dir)
             output_filename = output_dir / f"{output_identifier}_{str(splittings_selection)}.root"
             # And create the tasks
             results.append(
@@ -405,15 +418,14 @@ def setup_calculate_data_skim(
 
 
 @python_app  # type: ignore
-def run_embedding_skim(
+def _run_embedding_skim(
     collision_system: str,
     jet_R: float,
     min_jet_pt: Mapping[str, float],
     iterative_splittings: bool,
-    thermal_model_parameters: sources.ThermalModelParameters,
+    background_subtraction: Mapping[str, Any],
     convert_data_format_prefixes: Mapping[str, str],
     scale_factor: float,
-    r_max: float,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> AppFuture:
@@ -423,16 +435,17 @@ def run_embedding_skim(
     from jet_substructure.analysis import track_skim_adapter
 
     try:
-        result = track_skim_adapter.hardest_kt_thermal_model_skim(
-            input_filename=Path(inputs[0].filepath),
+        result = track_skim_adapter.hardest_kt_embedding_skim(
+            collision_system=collision_system,
+            signal_input_filename=Path(inputs[0].filepath),
+            background_input_filename=Path(inputs[1].filepath),
+            convert_data_format_prefixes=convert_data_format_prefixes,
             jet_R=jet_R,
             min_jet_pt=min_jet_pt,
             iterative_splittings=iterative_splittings,
-            thermal_model_parameters=thermal_model_parameters,
-            convert_data_format_prefixes=convert_data_format_prefixes,
-            scale_factor=scale_factor,
-            r_max=r_max,
+            background_subtraction=background_subtraction,
             output_filename=Path(outputs[0].filepath),
+            scale_factor=scale_factor,
         )
     except Exception:
         result = (
@@ -440,6 +453,115 @@ def run_embedding_skim(
             f"failure for {collision_system}, R={jet_R}, {inputs[0].filepath} with: \n{traceback.format_exc()}",
         )
     return result
+
+
+def setup_calculate_embed_pythia_skim(
+    production: ProductionSettings,
+) -> List[AppFuture]:
+    """Create futures to produce hardest kt embedded pythia skim"""
+    # Setup input and output
+    output_dir = production.output_dir / "skim"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    input_files = production.input_files()
+    # We store the signal input files in a few different formats to enable sampling different ways.
+    # We can sample pt hat bins equally by sampling the pt hat bin, and then taking a random file
+    # from that bin. In this case, the pythia files _are not_ sampled equally.
+    signal_input_files_per_pt_hat = production.input_files_per_pt_hat()
+    # And since we would sample the pt hat bins, it's better to keep track of them directly.
+    pt_hat_bins = list(signal_input_files_per_pt_hat)
+    # Or alternatively, we sample the pythia files directly. In this case, the PYTHIA files are sampled
+    # evenly, while the pt hat bins are not (we will sample the higher pt hat bins more because there
+    # are more statistics).
+    # To do this sampling, we need to flatten out the list of signal input files.
+    # We also store the pt hat bin since we need that for the grabbing the right scale factor.
+    signal_input_files_flat = [
+        (_pt_hat_bin, _signal_path)
+        for _pt_hat_bin, _signal_paths in signal_input_files_per_pt_hat.items()
+        for _signal_path in _signal_paths
+    ]
+
+    # Setup for analysis and dataset settings
+    _metadata_config = production.config["metadata"]
+    # Sample the pt hat equally, or directly sample the signal_input_files
+    sample_each_pt_hat_bin_equally = _metadata_config["dataset"]["sample_each_pt_hat_bin_equally"]
+    _analysis_config = production.config["settings"]
+
+    # Splitting selection (iterative vs recursive)
+    splittings_selection = SplittingsSelection[_analysis_config["splittings_selection"]]
+    # Scale factors
+    scale_factors = None
+    if "signal_dataset" in production.config["metadata"] or \
+        "n_pt_hat_bins" in production.config["metadata"]["dataset"]:
+        dataset_key = "signal_dataset" if "signal_dataset" in production.config["metadata"] else "dataset"
+        scale_factors = substructure_job_utils.read_extracted_scale_factors(
+            path=Path(production.output_dir.parent / production.config[dataset_key]["name"])
+        )
+    else:
+        raise ValueError("Check the embedding config - you need a signal dataset.")
+
+    # Cross check
+    if set(scale_factors) != set(pt_hat_bins):
+        raise ValueError(
+            f"Mismatch between the pt hat bins in the scale factors ({set(scale_factors)}) and the pt hat bins ({set(pt_hat_bins)})"
+        )
+
+    results = []
+    _file_counter = 0
+    for _file_counter, input_filename in enumerate(input_files):
+        if _file_counter % 500 == 0:
+            logger.info(f"Adding {input_filename} for analysis")
+
+        # For testing...
+        #if _file_counter > 1:
+        #    break
+        # END
+
+        # Randomly select (in some manner) an input file to match up with the background input file.
+        # NOTE: The signal input file will repeat if there are more background events.
+        #       So far, this doesn't seem to be terribly common, but even if it was, it
+        #       would be perfectly fine as long as it doesn't happen too often.
+        if sample_each_pt_hat_bin_equally:
+            # Each pt hat bin will be equally likely, and then we select the file from
+            # those which are available.
+            # NOTE: This doesn't mean that the embedded statistics will still be the same in the end.
+            #       For example, if I compare a low and high pt hat bin, there are just going to be
+            #       more accepted jets in the high pt hat sample.
+            pt_hat_bin = secrets.choice(pt_hat_bins)
+            signal_input_filename = secrets.choice(signal_input_files_per_pt_hat[pt_hat_bin])
+        else:
+            # Directly sample the files. This probes the generator stats because
+            # the number of files is directly proportional to the generated statistics.
+            pt_hat_bin, signal_input_filename = secrets.choice(signal_input_files_flat)
+
+        # Setup file I/O
+        # We want to identify as: "{signal_identifier}__embedded_into__{background_identifier}"
+        output_identifier = safe_output_filename_from_relative_path(filename=signal_input_filename, output_dir=production.output_dir)
+        output_identifier += "__embedded_into__"
+        output_identifier += safe_output_filename_from_relative_path(filename=input_filename, output_dir=production.output_dir)
+        logger.info(f"output_identifier: {output_identifier}")
+        output_filename = output_dir / f"{output_identifier}_{str(splittings_selection)}.root"
+        # And create the tasks
+        results.append(
+            _run_embedding_skim(
+                collision_system=production.collision_system,
+                event_activity=_analysis_config.get("event_activity", ""),
+                jet_R=_analysis_config["jet_R"],
+                min_jet_pt=_analysis_config["min_jet_pt"],
+                iterative_splittings=splittings_selection == SplittingsSelection.iterative,
+                background_subtraction=_analysis_config["background_subtraction"],
+                convert_data_format_prefixes=_metadata_config["convert_data_format_prefixes"],
+                inputs=[
+                    File(str(signal_input_filename)),
+                    File(str(input_filename)),
+                ],
+                outputs=[
+                    File(str(output_filename))
+                ],
+                scale_factors=scale_factors[pt_hat_bin],
+            )
+        )
+
+    return results
 
 
 def setup_calculate_thermal_model_skim(
@@ -725,9 +847,9 @@ def define_productions() -> List[ProductionSettings]:
 
     # Create and store production information
     productions.append(
-        # PbPb, production 61
+        # PbPb, production 63
         ProductionSettings.read_config(
-            collision_system="PbPb", number=61,
+            collision_system="PbPb", number=63,
         )
     )
 
@@ -786,20 +908,21 @@ def run() -> None:
                 )
             )
         if "calculate_thermal_model_skim" in tasks_to_execute:
-            system_results.extend(
-                setup_calculate_thermal_model_skim(
-                    production=production,
-                    # collision_system=collision_system,
-                    # event_activity=event_activity,
-                    # min_jet_pt=min_jet_pt[collision_system],  # type: ignore
-                    # jet_R_values=jet_R_values,
-                    # iterative_splittings=iterative_splittings,
-                    # convert_data_format_prefixes=convert_data_format_prefixes[collision_system],
-                    # scale_factors_dataset=scale_factors_dataset,
-                    # input_path=input_paths[collision_system],
-                    # n_repeat_file=5,
-                )
-            )
+            #system_results.extend(
+            #    setup_calculate_thermal_model_skim(
+            #        production=production,
+            #        # collision_system=collision_system,
+            #        # event_activity=event_activity,
+            #        # min_jet_pt=min_jet_pt[collision_system],  # type: ignore
+            #        # jet_R_values=jet_R_values,
+            #        # iterative_splittings=iterative_splittings,
+            #        # convert_data_format_prefixes=convert_data_format_prefixes[collision_system],
+            #        # scale_factors_dataset=scale_factors_dataset,
+            #        # input_path=input_paths[collision_system],
+            #        # n_repeat_file=5,
+            #    )
+            #)
+            ...
         #    if event_activity == "central":
         #        scale_factors_dataset = "LHC20g4_embedded_into_LHC18qr_central_R02_6982_7001"
         #    elif event_activity == "semi_central":
@@ -823,7 +946,7 @@ def run() -> None:
 
         if "calculate_embed_pythia_skim" in tasks_to_execute:
             system_results.extend(
-                setup_calculate_embedding_skim(
+                setup_calculate_embed_pythia_skim(
                     production=production,
                     # collision_system=collision_system,
                     # event_activity=event_activity,

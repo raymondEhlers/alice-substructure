@@ -317,20 +317,18 @@ def hardest_kt_embed_thermal_model_skim(
 
 
 def hardest_kt_embedding_skim(
+    collision_system: str,
     signal_input_filename: Path,
     background_input_filename: Path,
+    convert_data_format_prefixes: Mapping[str, str],
     jet_R: float,
     min_jet_pt: Mapping[str, float],
     iterative_splittings: bool,
+    background_subtraction: Mapping[str, Any],
     output_filename: Path,
-    convert_data_format_prefixes: Mapping[str, str],
     scale_factor: float,
-    r_max: float,
     validation_mode: bool = False,
 ) -> Tuple[bool, str]:
-    # Setup
-    collision_system = "embedPythia"
-
     # Try to bail out early to avoid reprocessing if possible.
     _description = _description_from_parameters(
         parameters={
@@ -350,7 +348,7 @@ def hardest_kt_embedding_skim(
         ),
         jet_R=jet_R,
         min_jet_pt=min_jet_pt,
-        background_subtraction_settings={"r_max": r_max},
+        background_subtraction_settings=background_subtraction,
         validation_mode=validation_mode,
     )
 
@@ -479,6 +477,7 @@ if __name__ == "__main__":
         output_filename = base_path / "skim" / "test" / "embedding_skim_output.root"
 
     result = hardest_kt_embedding_skim(
+        collision_system="embedPythia",
         signal_input_filename=signal_path,
         background_input_filename=background_path,
         jet_R=0.4,
@@ -487,7 +486,7 @@ if __name__ == "__main__":
         output_filename=output_filename,
         convert_data_format_prefixes={"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
         scale_factor=scale_factors[12],
-        r_max=0.25,
+        background_subtraction={"r_max": 0.25},
         validation_mode=True,
     )
     logger.info(f"Result: {result}")

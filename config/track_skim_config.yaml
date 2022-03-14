@@ -164,6 +164,8 @@ analysis_settings:
           hybrid: "hybrid"
           det_level: "det_level"
           part_level: "true"
+        # Sample pt hat bin distribution equally
+        sample_signal_pt_hat_evenly: true
       settings: &_base_analysis_settings_embed
         splittings_selection: "iterative"
         # In GeV
