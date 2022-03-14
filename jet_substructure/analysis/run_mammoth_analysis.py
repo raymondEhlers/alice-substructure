@@ -588,7 +588,6 @@ def _run_data_skim(
     background_subtraction: Mapping[str, Any],
     loading_data_rename_prefix: Mapping[str, str],
     convert_data_format_prefixes: Mapping[str, str],
-    event_activity: str,
     scale_factors: Mapping[int, float],
     pt_hat_bin: int,
     inputs: Sequence[File] = [],
@@ -603,7 +602,6 @@ def _run_data_skim(
         result = track_skim_adapter.hardest_kt_data_skim(
             input_filename=Path(inputs[0].filepath),
             collision_system=collision_system,
-            event_activity=event_activity,
             jet_R=jet_R,
             min_jet_pt=min_jet_pt,
             iterative_splittings=iterative_splittings,
@@ -668,7 +666,6 @@ def setup_calculate_data_skim(
             results.append(
                 _run_data_skim(
                     collision_system=production.collision_system,
-                    event_activity=_analysis_config.get("event_activity", ""),
                     jet_R=_analysis_config["jet_R"],
                     min_jet_pt=_analysis_config["min_jet_pt"],
                     iterative_splittings=splittings_selection == SplittingsSelection.iterative,
@@ -812,7 +809,6 @@ def setup_calculate_embed_pythia_skim(
         results.append(
             _run_embedding_skim(
                 collision_system=production.collision_system,
-                event_activity=_analysis_config.get("event_activity", ""),
                 jet_R=_analysis_config["jet_R"],
                 min_jet_pt=_analysis_config["min_jet_pt"],
                 iterative_splittings=splittings_selection == SplittingsSelection.iterative,

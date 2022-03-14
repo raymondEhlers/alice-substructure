@@ -109,7 +109,6 @@ def hardest_kt_data_skim(
     iterative_splittings: bool,
     output_filename: Path,
     convert_data_format_prefixes: Mapping[str, str],
-    event_activity: str = "",
     # Data specific
     loading_data_rename_prefix: Optional[Mapping[str, str]] = None,
     # Pythia specific
