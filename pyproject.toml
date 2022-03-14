@@ -37,7 +37,7 @@ awkward0 = ">=0"
 awkward = ">=1.7"
 pyarrow = ">=4.0"
 numba = ">=0.55"
-parsl = {git = "https://github.com/Parsl/parsl.git", rev = "9eca2a949471520f161a82cc046397a1d69d939c", extras = ["monitoring"]}
+parsl = {git = "https://github.com/Parsl/parsl.git", rev = "6d1f9160d487b3265f6e9d65ebb357837a437c30", extras = ["monitoring"]}
 mplhep = ">=0.3.4"
 boost-histogram = ">=1.2"
 hist = {version = ">=2.5.0", extras = ["plot"]}
