@@ -325,6 +325,7 @@ def hardest_kt_embedding_skim(
     min_jet_pt: Mapping[str, float],
     iterative_splittings: bool,
     background_subtraction: Mapping[str, Any],
+    det_level_artificial_tracking_efficiency: float,
     output_filename: Path,
     scale_factor: float,
     validation_mode: bool = False,
@@ -349,6 +350,7 @@ def hardest_kt_embedding_skim(
         jet_R=jet_R,
         min_jet_pt=min_jet_pt,
         background_subtraction_settings=background_subtraction,
+        det_level_artificial_tracking_efficiency=det_level_artificial_tracking_efficiency,
         validation_mode=validation_mode,
     )
 
@@ -487,6 +489,7 @@ if __name__ == "__main__":
         convert_data_format_prefixes={"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
         scale_factor=scale_factors[12],
         background_subtraction={"r_max": 0.25},
+        det_level_artificial_tracking_efficiency=1.0,
         validation_mode=True,
     )
     logger.info(f"Result: {result}")
