@@ -75,6 +75,14 @@ def scale_factor_ROOT(filenames: Sequence[Path], list_name: str = "") -> Tuple[i
                         f"Cannot find a task output list. Tried: {task_hists_name[0]}. Keys: {list(f.GetListOfKeys())}"
                     )
 
+        # This list is usually an AliEmcalList. Although we don't care about any of the AliEmcalList functionality
+        # here, this still requires an AliPhysics installation, which may not always be so convenient.
+        # Since all we want is the TList base class, we can get ROOT to cast it into a TList.
+        # NOTE: Apparently I can't do a standard isinstance check, so this will have to do...
+        if "AliEmcalList" in str(type(hists)):
+            # This is basically a c++ cast
+            hists = ROOT.bind_object(ROOT.addressof(hists), "TList")
+
         cross_section_hists.append(hists.FindObject("fHistXsection"))
         cross_section_hists[-1].SetDirectory(0)
         n_entries += cross_section_hists[-1].GetEntries()
