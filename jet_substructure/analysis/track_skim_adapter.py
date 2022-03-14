@@ -340,8 +340,8 @@ def hardest_kt_embedding_skim(
     _description = _description_from_parameters(
         parameters={
             "collision_system": collision_system, "R": jet_R,
+            "signal_input_filenames": str([str(_filename) for _filename in signal_input_filenames]),
             "background_input_filename": background_input_filename,
-            **{f"signal_input_filenames_{i}": _filename for i, _filename in enumerate(signal_input_filenames)},
         }
     )
     res = _check_for_output_file(output_filename=output_filename, description=_description)
