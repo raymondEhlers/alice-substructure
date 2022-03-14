@@ -339,7 +339,9 @@ def _hists_to_map_for_ROOT(hists: Dict[str, TH2D]) -> Any:
     hists_map_for_root = ROOT.std.map("std::string", "TH2D *")()
     for k, h in hists.items():
         # Why not via __setitem__? Because that would be too easy...
-        hists_map_for_root.insert((k, h))
+        #hists_map_for_root.insert((k, h))
+        # With the newest versions of ROOT, it seems that setitem finally works!
+        hists_map_for_root[k] = h
         # hists_to_root[k] = ROOT.addressof(h, True)
 
     return hists_map_for_root
