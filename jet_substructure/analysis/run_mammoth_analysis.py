@@ -846,6 +846,11 @@ def setup_calculate_embed_pythia_skim(
             )
         )
 
+    # And write the file pairs, again for our records
+    y = yaml.yaml()
+    with open(production.output_dir / "embedding_file_pairs.yaml", "w") as f:
+        y.dump(_embedding_file_pairs, f)
+
     return results
 
 
