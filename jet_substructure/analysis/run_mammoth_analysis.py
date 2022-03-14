@@ -25,7 +25,7 @@ from parsl.dataflow.futures import AppFuture
 from rich.progress import Progress
 
 import jet_substructure.base.helpers
-from jet_substructure.base import job_utils as substructure_job_utils
+from jet_substructure.base import job_utils as substructure_job_utils, skim_analysis_objects
 
 
 logger = logging.getLogger(__name__)
@@ -136,6 +136,8 @@ def _validate_collision_system(instance: "ProductionSettings", attribute: attrs.
         raise ValueError(f"Invalid collisions system. Provided: {value}")
 
 
+_collision_systems_with_scale_factors = ["pythia", "thermal_model", "embedPythia"]
+
 @attrs.frozen(slots=False)
 class ProductionSettings:
     collision_system: str = attrs.field(validator=_validate_collision_system)
@@ -225,7 +227,44 @@ class ProductionSettings:
                     self.config["metadata"][dataset_key]["files"]
                 ]
             )
+
         return _files
+
+    @property
+    def has_scale_factors(self) -> bool:
+        return (
+            "signal_dataset" in self.config["metadata"]
+            or "n_pt_hat_bins" in self.config["metadata"]["dataset"]
+        )
+
+    @property
+    def scale_factors_filename(self) -> Path:
+        # Validation
+        if self.collision_system not in _collision_systems_with_scale_factors:
+            raise ValueError(f"Invalid collision system for extracting scale factors: {self.collision_system}")
+
+        dataset_key = "signal_dataset" if "signal_dataset" in self.config["metadata"] else "dataset"
+        # Need to go up twice to get back to the "trains" directory because the collision system
+        # stored in the production config may not be the same as the dataset that we're actually
+        # extracting the scale factors from (ie. embedPythia != pythia)
+        return (
+            self.output_dir.parent.parent
+            # NOTE: The values from the config are wrapped in a string to help out mypy.
+            #       Otherwise, it can't determine the type for some reason...
+            / str(self.config["metadata"][dataset_key]["collision_system"])
+            / str(self.config["metadata"][dataset_key]["name"])
+            / "scale_factors.yaml"
+        )
+
+    def scale_factors(self) -> Dict[int, float]:
+        # Validation
+        if self.collision_system not in _collision_systems_with_scale_factors:
+            raise ValueError(f"Invalid collision system for extracting scale factors: {self.collision_system}")
+
+        scale_factors = substructure_job_utils.read_extracted_scale_factors(
+            self.scale_factors_filename
+        )
+        return scale_factors
 
     @functools.cached_property
     def output_dir(self) -> Path:
@@ -235,8 +274,14 @@ class ProductionSettings:
 
     @functools.cached_property
     def tasks_to_execute(self) -> List[str]:
-        # Could in principle be multiple tasks. Here, it's just one.
+        # Could in principle be multiple tasks.
         _tasks = []
+
+        # Need scale factors
+        if self.collision_system in ["pythia", "embedPythia"]:
+            _tasks.append("extract_scale_factors")
+
+        # Skim task
         _base_name = "calculate_{label}_skim"
         _label_map = {
             "pp": "data",
@@ -258,15 +303,11 @@ class ProductionSettings:
         output["date"] = datetime.datetime.utcnow().strftime('%Y-%m-%d')
         output["config"] = dict(self.config)
         output["input_filenames"] = [
-            str(p) for p in jet_substructure.base.helpers.ensure_and_expand_paths(
-                self.config["metadata"]["dataset"]["files"]
-            )
+            str(p) for p in self.input_files()
         ]
         if "signal_dataset" in self.config["metadata"]:
             output["signal_filenames"] = [
-                str(p) for p in jet_substructure.base.helpers.ensure_and_expand_paths(
-                    self.config["metadata"]["signal_dataset"]["files"]
-                )
+                str(p) for p in self.input_files_per_pt_hat()
             ]
         # Add description of the software
         output.update(
@@ -303,6 +344,239 @@ def safe_output_filename_from_relative_path(filename: Path, output_dir: Path) ->
     return str(
         filename.relative_to(output_dir.parent).with_suffix("")
     ).replace("/", "__").replace(".", "_")
+
+
+@python_app  # type: ignore
+def _extract_scale_factors_from_hists(
+    list_name: str,
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+    stdout: Optional[str] = None,
+    stderr: Optional[str] = None,
+) -> AppFuture:
+    """
+    Copied from jet_substructure.analysis.parsl. The interface is slightly modified,
+    but the main functionality is the same.
+    """
+    from pathlib import Path
+
+    from jet_substructure.base import skim_analysis_objects
+    from jet_substructure.cpp import scale_factors as sf
+
+    res = skim_analysis_objects.ScaleFactor.from_hists(
+        *sf.scale_factor_ROOT(
+            filenames=[Path(i.filepath) for i in inputs], list_name=list_name
+        )
+    )
+    return res
+
+
+def setup_extract_scale_factors(
+    production: ProductionSettings,
+) -> Dict[int, AppFuture]:
+    """Extract scale factors from embedding or pythia hists.
+
+    Copied from jet_substructure.analysis.parsl. The interface is slightly modified,
+    but the main functionality is the same.
+
+    Note:
+        This is surprisingly fast.
+    """
+    # Setup
+    scale_factors = {}
+    logger.info("Determining input files for extracting scale factors.")
+    input_files_per_pt_hat_bin = production.input_files_per_pt_hat()
+
+    dataset_key = "signal_dataset" if "signal_dataset" in production.config["metadata"] else "dataset"
+    for pt_hat_bin, input_files in input_files_per_pt_hat_bin.items():
+        logger.debug(f"pt_hat_bin: {pt_hat_bin}, filenames: {input_files}")
+        if input_files:
+            scale_factors[pt_hat_bin] = _extract_scale_factors_from_hists(
+                inputs=[File(str(fname)) for fname in input_files],
+                list_name=production.config["metadata"][dataset_key]["list_name"],
+            )
+
+    return scale_factors
+
+
+@python_app  # type: ignore
+def _write_scale_factors_to_yaml(
+    scale_factors: Mapping[int, skim_analysis_objects.ScaleFactor],
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+) -> AppFuture:
+    """
+    Copied from jet_substructure.analysis.parsl. The interface is slightly modified,
+    but the main functionality is the same.
+    """
+    from pathlib import Path
+
+    from pachyderm import yaml
+
+    from jet_substructure.base import skim_analysis_objects
+
+    # Write them to YAML for later.
+    y = yaml.yaml(classes_to_register=[skim_analysis_objects.ScaleFactor])
+    output_dir = Path(outputs[0].filepath)
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_dir, "w") as f:
+        y.dump(scale_factors, f)
+
+    return True
+
+
+def setup_write_scale_factors(
+    production: ProductionSettings,
+    scale_factors: Mapping[int, AppFuture],
+) -> AppFuture:
+    """
+    Copied from jet_substructure.analysis.parsl. The interface is slightly modified,
+    but the main functionality is the same.
+    """
+    """Write scale factors to YAML and to trees if necessary."""
+    # First, we write to YAML.
+    # We want to do this regardless of potentially writing the scale factor trees.
+    logger.info("Writing scale factors to YAML. Jobs are executing, so this will take a minute...")
+    output_filename = production.scale_factors_filename
+    parsl_output_file = File(str(output_filename))
+    # NOTE: I'm guessing passing this is a problem because it's a class that's imported in an app, and then
+    #       we're trying to pass the result into another app. I think we can go one direction or the other,
+    #       but not both. So we just take the result.
+    yaml_result = _write_scale_factors_to_yaml(
+        scale_factors={k: v.result() for k, v in scale_factors.items()},
+        outputs=[parsl_output_file],
+    )
+
+    return yaml_result
+
+
+@python_app  # type: ignore
+def _extract_pt_hat_spectra(
+    scale_factors: Mapping[int, float],
+    offsets: Mapping[int, int],
+    list_name: str,
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+    stdout: Optional[str] = None,
+    stderr: Optional[str] = None,
+) -> AppFuture:
+    """
+    Copied from jet_substructure.analysis.parsl. The interface is slightly modified,
+    but the main functionality is the same.
+
+    Args:
+        scale_factors: pt_hat_bin to scale factor.
+        offsets: pt_hat_bin to index where files in that pt hard bin start.
+    """
+    from pathlib import Path
+
+    from jet_substructure.cpp import scale_factors as sf
+
+    # Convert back from parsl inputs
+    offsets_values = list(offsets.values())
+    filenames = {
+        pt_hat_bin: [
+            Path(f.filepath) for f in inputs[sum(offsets_values[:i]) : sum(offsets_values[: i + 1])]  # noqa: E203
+        ]
+        for i, pt_hat_bin in enumerate(offsets)
+    }
+
+    res = sf.pt_hard_spectra_from_hists(
+        filenames=filenames,
+        scale_factors=scale_factors,
+        list_name=list_name,
+        output_filename=Path(outputs[0].filepath),
+    )
+    return res
+
+
+def setup_check_pt_hat_spectra(
+    production: ProductionSettings,
+    input_results: Sequence[AppFuture],
+) -> AppFuture:
+    """
+    Copied from jet_substructure.analysis.parsl. The interface is slightly modified,
+    but the main functionality is the same.
+    """
+    logger.info("Checking pt hat spectra")
+    # Input files
+    input_files_per_pt_hat_bin = production.input_files_per_pt_hat()
+
+    # Need a hard dependency on the writing of the yaml output, so we ask for the result here.
+    # We don't actually care about the result, but it avoids a race condition.
+    _ = input_results[0].result()
+    # Must read the scale factors from file to get the properly scaled values.
+    scale_factors = production.scale_factors()
+
+    # Convert inputs to Parsl files.
+    # Needs to be a list, so flatten them, and then unflatten in the App.
+    parsl_files = []
+    offsets = {}
+    for pt_hat_bin, list_of_files in input_files_per_pt_hat_bin.items():
+        converted_filenames = [File(str(f)) for f in list_of_files]
+        offsets[pt_hat_bin] = len(converted_filenames)
+        parsl_files.extend(converted_filenames)
+    # Add the dependency. We won't actually open the file in the task, but this will provide explicit dependence.
+    parsl_files.extend([i.outputs[0] for i in input_results])
+
+    dataset_key = "signal_dataset" if "signal_dataset" in production.config["metadata"] else "dataset"
+    # We want to store it in the same directory as the scale factors, so it's easiest to just grab that filename.
+    output_filename = production.scale_factors_filename.parent / "pt_hat_spectra.yaml"
+    results = _extract_pt_hat_spectra(
+        scale_factors=scale_factors,
+        offsets=offsets,
+        list_name=production.config["metadata"][dataset_key]["list_name"],
+        inputs=parsl_files,
+        outputs=[File(str(output_filename))],
+    )
+
+    return results
+
+
+def steer_extract_scale_factors(
+    production: ProductionSettings,
+) -> List[AppFuture]:
+    # Validation
+    if production.collision_system not in _collision_systems_with_scale_factors:
+        raise ValueError(f"Invalid collision system for extracting scale factors: {production.collision_system}")
+    logger.info("Extracting scale factors...")
+
+    # Attempt to bail out early if it's already been extracted
+    scale_factors_filename = production.scale_factors_filename
+    if scale_factors_filename.exists():
+        scale_factors = production.scale_factors()
+        # We check if it's non-zero to avoid the case where it's accidentally empty
+        if scale_factors:
+            logger.info("Scale factors already exist. Skipping extracting them again!")
+            return []
+
+    # First, we need to extract the scale factors and keep track of the results
+    all_results: List[AppFuture] = []
+    scale_factors = setup_extract_scale_factors(production=production)
+    all_results.extend(list(scale_factors.values()))
+    # Then, we need to write them
+    all_results.append(
+        setup_write_scale_factors(production=production, scale_factors=scale_factors)
+    )
+    # And then create the spectra (and plot them) to cross check the extraction
+    # TODO: If needed, create a mock/dummy class to test...
+    all_results.append(
+        setup_check_pt_hat_spectra(
+            production=production,
+            # Need the future which writes the YAML
+            input_results=[all_results[-1]],
+        )
+    )
+
+    if all_results[-1].result() != True:
+        logger.warning("Some issue with the scale factor extraction! Check on them!")
+        IPython.start_ipython(user_ns={**locals(), **globals()})
+        # We want to stop here, so help ourselves out by raising the exception.
+        raise ValueError("Some issue with the scale factor extraction!")
+
+    # NOTE: We don't want to scale_factor futures because they contain the actual scale factors.
+    #       We'll just return the futures associated with writing to the file and the pt hat spectra cross check.
+    return all_results[-2:]
 
 
 @python_app  # type: ignore
@@ -369,12 +643,8 @@ def setup_calculate_data_skim(
     splittings_selection = SplittingsSelection[_analysis_config["splittings_selection"]]
     # Scale factors
     scale_factors = None
-    if "signal_dataset" in production.config["metadata"] or \
-        "n_pt_hat_bins" in production.config["metadata"]["dataset"]:
-        dataset_key = "signal_dataset" if "signal_dataset" in production.config["metadata"] else "dataset"
-        scale_factors = substructure_job_utils.read_extracted_scale_factors(
-            path=Path(production.output_dir.parent / production.config[dataset_key]["name"])
-        )
+    if production.has_scale_factors:
+        scale_factors = production.scale_factors()
 
     results = []
     _file_counter = 0
@@ -424,6 +694,7 @@ def _run_embedding_skim(
     min_jet_pt: Mapping[str, float],
     iterative_splittings: bool,
     background_subtraction: Mapping[str, Any],
+    det_level_artificial_tracking_efficiency: float,
     convert_data_format_prefixes: Mapping[str, str],
     scale_factor: float,
     inputs: Sequence[File] = [],
@@ -444,6 +715,7 @@ def _run_embedding_skim(
             min_jet_pt=min_jet_pt,
             iterative_splittings=iterative_splittings,
             background_subtraction=background_subtraction,
+            det_level_artificial_tracking_efficiency=det_level_artificial_tracking_efficiency,
             output_filename=Path(outputs[0].filepath),
             scale_factor=scale_factor,
         )
@@ -483,19 +755,15 @@ def setup_calculate_embed_pythia_skim(
     # Setup for analysis and dataset settings
     _metadata_config = production.config["metadata"]
     # Sample the pt hat equally, or directly sample the signal_input_files
-    sample_each_pt_hat_bin_equally = _metadata_config["dataset"]["sample_each_pt_hat_bin_equally"]
+    sample_each_pt_hat_bin_equally = _metadata_config["sample_each_pt_hat_bin_equally"]
     _analysis_config = production.config["settings"]
 
     # Splitting selection (iterative vs recursive)
     splittings_selection = SplittingsSelection[_analysis_config["splittings_selection"]]
     # Scale factors
     scale_factors = None
-    if "signal_dataset" in production.config["metadata"] or \
-        "n_pt_hat_bins" in production.config["metadata"]["dataset"]:
-        dataset_key = "signal_dataset" if "signal_dataset" in production.config["metadata"] else "dataset"
-        scale_factors = substructure_job_utils.read_extracted_scale_factors(
-            path=Path(production.output_dir.parent / production.config[dataset_key]["name"])
-        )
+    if production.has_scale_factors:
+        scale_factors = production.scale_factors()
     else:
         raise ValueError("Check the embedding config - you need a signal dataset.")
 
@@ -512,8 +780,8 @@ def setup_calculate_embed_pythia_skim(
             logger.info(f"Adding {input_filename} for analysis")
 
         # For testing...
-        #if _file_counter > 1:
-        #    break
+        if _file_counter > 1:
+            break
         # END
 
         # Randomly select (in some manner) an input file to match up with the background input file.
@@ -549,6 +817,7 @@ def setup_calculate_embed_pythia_skim(
                 min_jet_pt=_analysis_config["min_jet_pt"],
                 iterative_splittings=splittings_selection == SplittingsSelection.iterative,
                 background_subtraction=_analysis_config["background_subtraction"],
+                det_level_artificial_tracking_efficiency=_analysis_config["det_level_artificial_tracking_efficiency"],
                 convert_data_format_prefixes=_metadata_config["convert_data_format_prefixes"],
                 inputs=[
                     File(str(signal_input_filename)),
@@ -564,89 +833,89 @@ def setup_calculate_embed_pythia_skim(
     return results
 
 
-def setup_calculate_thermal_model_skim(
-    collision_system: str,
-    min_jet_pt: Union[float, Mapping[str, float]],
-    jet_R_values: Sequence[float],
-    iterative_splittings: bool,
-    convert_data_format_prefixes: Mapping[str, str],
-    input_path: Path,
-    event_activity: str,
-    scale_factors_dataset: str,
-    r_max: float = 0.25,
-    n_repeat_file: int = 1,
-) -> List[AppFuture]:
-    """Analyze and skim hardest kt embedding"""
-    # NOTE: These are pythia input files. They include an extra "*" to account for the pt hard bin...
-    input_files = sorted(input_path.glob("*/*/*/*.root"))
-
-    # TEMP for testing
-    #input_files = input_files[:1]
-    #input_files = input_files[:4]
-    #input_files = input_files[:10]
-    # ENDTEMP
-
-    # NOTE: Delayed import since this comes with _a lot_ of other things. Should be refactored...
-    import jet_substructure.analysis.parsl
-    scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
-        # TODO: Unclear if this should be hard coded
-        collision_system="embedPythia",
-        dataset_name=scale_factors_dataset,
-    )
-
-    thermal_model_parameters = sources.THERMAL_MODEL_SETTINGS[event_activity]
-
-    results = []
-    for i, input_filename in enumerate(input_files):
-        if i % 500 == 0:
-            logger.info(f"Adding {input_filename} for analysis")
-
-        # The input_file is in trains/collision_system/train_number/run_by_run/period/run_number/filename.root
-        # So to get the train directory, we need to take the parent 4 times.
-        train_directory = input_filename.parent.parent.parent.parent
-        run_dir = input_filename.parent.name
-        pt_hat_bin = -1
-        # However, if we're looking at pythia, we also need to account for the pt hard bin
-        #if collision_system == "pythia":
-        if True:
-            # In this case, the input_file is in trains/collision_system/train_number/run_by_run/period/run_number/pt_hard_bin/filename.root
-            # At least for LHC20g4 and LHC18b8
-            # Thus, to get the train directory, we need to take the parent 5 times
-            train_directory = input_filename.parent.parent.parent.parent.parent
-            # The pt hard bin is the parent dir
-            pt_hat_bin = int(str(input_filename.parent.name))
-            # For the run dir, we want to include the period, run, and pt hat bin
-            # The period is 3 parents up and the run number is 2 parents up
-            run_dir = str(Path(input_filename.parent.parent.parent.name) / input_filename.parent.parent.name / str(pt_hat_bin))
-
-        # Further setup
-        iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
-
-        for jet_R in jet_R_values:
-            # Setup file I/O
-            output_dir = train_directory / "skim" / collision_system / event_activity / f"R{round(jet_R * 10):02}" / run_dir
-
-            if not output_dir.exists():
-                output_dir.mkdir(parents=True, exist_ok=True)
-            for i in range(n_repeat_file):
-                # NOTE: This includes the period, run, and pt hat
-                output_filename = output_dir / f"{input_filename.stem}_{iterative_splittings_label}_splittings_{i:02}.root"
-                results.append(
-                    run_embedding_skim(
-                        collision_system=collision_system,
-                        jet_R=jet_R,
-                        min_jet_pt=min_jet_pt,
-                        iterative_splittings=iterative_splittings,
-                        thermal_model_parameters=thermal_model_parameters,
-                        convert_data_format_prefixes=convert_data_format_prefixes,
-                        scale_factor=scale_factors[pt_hat_bin],
-                        r_max=r_max,
-                        inputs=[File(str(input_filename))],
-                        outputs=[File(str(output_filename))],
-                    )
-                )
-
-    return results
+#def setup_calculate_thermal_model_skim(
+#    collision_system: str,
+#    min_jet_pt: Union[float, Mapping[str, float]],
+#    jet_R_values: Sequence[float],
+#    iterative_splittings: bool,
+#    convert_data_format_prefixes: Mapping[str, str],
+#    input_path: Path,
+#    event_activity: str,
+#    scale_factors_dataset: str,
+#    r_max: float = 0.25,
+#    n_repeat_file: int = 1,
+#) -> List[AppFuture]:
+#    """Analyze and skim hardest kt embedding"""
+#    # NOTE: These are pythia input files. They include an extra "*" to account for the pt hard bin...
+#    input_files = sorted(input_path.glob("*/*/*/*.root"))
+#
+#    # TEMP for testing
+#    #input_files = input_files[:1]
+#    #input_files = input_files[:4]
+#    #input_files = input_files[:10]
+#    # ENDTEMP
+#
+#    # NOTE: Delayed import since this comes with _a lot_ of other things. Should be refactored...
+#    import jet_substructure.analysis.parsl
+#    scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
+#        # TODO: Unclear if this should be hard coded
+#        collision_system="embedPythia",
+#        dataset_name=scale_factors_dataset,
+#    )
+#
+#    thermal_model_parameters = sources.THERMAL_MODEL_SETTINGS[event_activity]
+#
+#    results = []
+#    for i, input_filename in enumerate(input_files):
+#        if i % 500 == 0:
+#            logger.info(f"Adding {input_filename} for analysis")
+#
+#        # The input_file is in trains/collision_system/train_number/run_by_run/period/run_number/filename.root
+#        # So to get the train directory, we need to take the parent 4 times.
+#        train_directory = input_filename.parent.parent.parent.parent
+#        run_dir = input_filename.parent.name
+#        pt_hat_bin = -1
+#        # However, if we're looking at pythia, we also need to account for the pt hard bin
+#        #if collision_system == "pythia":
+#        if True:
+#            # In this case, the input_file is in trains/collision_system/train_number/run_by_run/period/run_number/pt_hat_bin/filename.root
+#            # At least for LHC20g4 and LHC18b8
+#            # Thus, to get the train directory, we need to take the parent 5 times
+#            train_directory = input_filename.parent.parent.parent.parent.parent
+#            # The pt hard bin is the parent dir
+#            pt_hat_bin = int(str(input_filename.parent.name))
+#            # For the run dir, we want to include the period, run, and pt hat bin
+#            # The period is 3 parents up and the run number is 2 parents up
+#            run_dir = str(Path(input_filename.parent.parent.parent.name) / input_filename.parent.parent.name / str(pt_hat_bin))
+#
+#        # Further setup
+#        iterative_splittings_label = "iterative" if iterative_splittings else "recursive"
+#
+#        for jet_R in jet_R_values:
+#            # Setup file I/O
+#            output_dir = train_directory / "skim" / collision_system / event_activity / f"R{round(jet_R * 10):02}" / run_dir
+#
+#            if not output_dir.exists():
+#                output_dir.mkdir(parents=True, exist_ok=True)
+#            for i in range(n_repeat_file):
+#                # NOTE: This includes the period, run, and pt hat
+#                output_filename = output_dir / f"{input_filename.stem}_{iterative_splittings_label}_splittings_{i:02}.root"
+#                results.append(
+#                    _run_embedding_skim(
+#                        collision_system=collision_system,
+#                        jet_R=jet_R,
+#                        min_jet_pt=min_jet_pt,
+#                        iterative_splittings=iterative_splittings,
+#                        thermal_model_parameters=thermal_model_parameters,
+#                        convert_data_format_prefixes=convert_data_format_prefixes,
+#                        scale_factor=scale_factors[pt_hat_bin],
+#                        r_max=r_max,
+#                        inputs=[File(str(input_filename))],
+#                        outputs=[File(str(output_filename))],
+#                    )
+#                )
+#
+#    return results
 
 
 def run_old() -> None:
@@ -768,19 +1037,19 @@ def run_old() -> None:
             else:
                 raise RuntimeError(f"Dunno what to do with {event_activity} for the scale factors dataset. Check this...")
 
-            system_results.extend(
-                setup_calculate_thermal_model_skim(
-                    collision_system=collision_system,
-                    event_activity=event_activity,
-                    min_jet_pt=min_jet_pt[collision_system],  # type: ignore
-                    jet_R_values=jet_R_values,
-                    iterative_splittings=iterative_splittings,
-                    convert_data_format_prefixes=convert_data_format_prefixes[collision_system],
-                    scale_factors_dataset=scale_factors_dataset,
-                    input_path=input_paths[collision_system],
-                    n_repeat_file=5,
-                )
-            )
+            #system_results.extend(
+            #    setup_calculate_thermal_model_skim(
+            #        collision_system=collision_system,
+            #        event_activity=event_activity,
+            #        min_jet_pt=min_jet_pt[collision_system],  # type: ignore
+            #        jet_R_values=jet_R_values,
+            #        iterative_splittings=iterative_splittings,
+            #        convert_data_format_prefixes=convert_data_format_prefixes[collision_system],
+            #        scale_factors_dataset=scale_factors_dataset,
+            #        input_path=input_paths[collision_system],
+            #        n_repeat_file=5,
+            #    )
+            #)
 
         all_results.extend(system_results)
         logger.info(f"Accumulated {len(system_results)} futures for {collision_system}")
@@ -840,6 +1109,39 @@ def run_old() -> None:
     logger.info(res)
 
 
+def determine_additional_worker_init(productions: Sequence[ProductionSettings],
+                                     tasks_requiring_root: Sequence[str],
+                                     tasks_requiring_aliphysics: Sequence[str]) -> str:
+    _software_to_load = []
+    _additional_worker_init_script = ""
+    if any(
+            (
+                task in tasks_requiring_root
+                for prod in productions
+                for task in prod.tasks_to_execute
+            )
+        ):
+        _software_to_load.append("ROOT/latest")
+    if any(
+            (
+                task in tasks_requiring_aliphysics
+                for prod in productions
+                for task in prod.tasks_to_execute
+            )
+        ):
+        # This is a little unconventional to redefine the list here, but ROOT is already
+        # a dependency of AliPhysics, so we redefine the list to remove ROOT.
+        _software_to_load = [s for s in _software_to_load if s != "ROOT/latest"]
+        # And then include AliPhysics
+        _software_to_load.append("AliPhysics/latest")
+
+    # If there is anything to load, add the initialization
+    if _software_to_load:
+        _additional_worker_init_script = f"eval `/usr/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv {','.join(_software_to_load)}`"
+
+    return _additional_worker_init_script
+
+
 def define_productions() -> List[ProductionSettings]:
     # We want to provide the opportunity to run multiple productions at once.
     # We'll do so by defining each production below and then iterating over them below
@@ -847,9 +1149,8 @@ def define_productions() -> List[ProductionSettings]:
 
     # Create and store production information
     productions.append(
-        # PbPb, production 63
         ProductionSettings.read_config(
-            collision_system="PbPb", number=63,
+            collision_system="embedPythia", number=2,
         )
     )
 
@@ -870,11 +1171,17 @@ def run() -> None:
     # n_cores_to_allocate = 120
     n_cores_to_allocate = 100
     walltime = "24:00:00"
-    #n_cores_to_allocate = 2
-    #walltime = "1:59:00"
+    n_cores_to_allocate = 2
+    walltime = "1:59:00"
     #n_cores_to_allocate = 10
 
     # Basic setup: logging and parsl.
+    # First, need to figure out if we need additional environments such as ROOT
+    _additional_worker_init_script = determine_additional_worker_init(
+        productions=productions,
+        tasks_requiring_root=["extract_scale_factors"],
+        tasks_requiring_aliphysics=[],
+    )
     # NOTE: Parsl's logger setup is broken, so we have to set it up before starting logging. Otherwise,
     #       it's super verbose and a huge pain to turn off. Note that by passing on the storage messages,
     #       we don't actually lose any info.
@@ -885,6 +1192,7 @@ def run() -> None:
         n_tasks=n_cores_to_allocate,
         walltime=walltime,
         enable_monitoring=True,
+        additional_worker_init_script=_additional_worker_init_script,
     )
     # Keep track of the dfk to keep parsl alive
     dfk = helpers.setup_logging_and_parsl(
@@ -901,6 +1209,13 @@ def run() -> None:
 
         # Setup tasks
         system_results = []
+        if "extract_scale_factors" in tasks_to_execute:
+            # NOTE: This will block on the result since it needs to be done before anything can proceed
+            system_results.extend(
+                steer_extract_scale_factors(
+                    production=production,
+                )
+            )
         if "calculate_data_skim" in tasks_to_execute:
             system_results.extend(
                 setup_calculate_data_skim(
@@ -948,15 +1263,6 @@ def run() -> None:
             system_results.extend(
                 setup_calculate_embed_pythia_skim(
                     production=production,
-                    # collision_system=collision_system,
-                    # event_activity=event_activity,
-                    # min_jet_pt=min_jet_pt[collision_system],  # type: ignore
-                    # jet_R_values=jet_R_values,
-                    # iterative_splittings=iterative_splittings,
-                    # convert_data_format_prefixes=convert_data_format_prefixes[collision_system],
-                    # scale_factors_dataset=scale_factors_dataset,
-                    # input_path=input_paths[collision_system],
-                    # n_repeat_file=5,
                 )
             )
 
