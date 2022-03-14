@@ -462,12 +462,10 @@ if __name__ == "__main__":
     ###########
     standalone_tests = False
 
-    import jet_substructure.analysis.parsl
-    scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
-        #collision_system="pythia",
-        #dataset_name="LHC18b8_pythia_R04_1",
-        collision_system="embedPythia",
-        dataset_name="LHC20g4_embedded_into_LHC18qr_semi_central_R04_1",
+    from jet_substructure.base import job_utils as substructure_job_utils
+    # In general, we're probably testing with this period, so good enough to hard code it here
+    scale_factors = substructure_job_utils.read_extracted_scale_factors(
+        path=Path("trains/pythia/LHC20g4_AOD_2640/scale_factors.yaml")
     )
 
     # Mammoth validation needs something like
@@ -480,20 +478,23 @@ if __name__ == "__main__":
     if standalone_tests:
         # But we can also run standalone tests on the skim train output
         base_path = Path("/software/rehlers/dev/substructure/trains/PbPb/645")
-        signal_path = Path("/software/rehlers/dev/substructure/trains/pythia/2640") / "run_by_run/LHC20g4/296191/12/AnalysisResults.20g4.001.root"
-        background_path = Path("/software/rehlers/dev/substructure/trains/PbPb/645") / "run_by_run/LHC18q/295612/AnalysisResults.18q.001.root"
+        #signal_path = Path("/software/rehlers/dev/substructure/trains/pythia/2640") / "run_by_run/LHC20g4/296191/12/AnalysisResults.20g4.001.root"
+        #background_path = Path("/software/rehlers/dev/substructure/trains/PbPb/645") / "run_by_run/LHC18q/295612/AnalysisResults.18q.001.root"
+        signal_path = Path("/software/rehlers/dev/substructure/trains/pythia/2640") / "run_by_run/LHC20g4/295788/15/AnalysisResults.20g4.005.root"
+        background_path = Path("/software/rehlers/dev/substructure/trains/PbPb/645") / "run_by_run/LHC18q/295788/AnalysisResults.18q.076.root"
         output_filename = base_path / "skim" / "test" / "embedding_skim_output.root"
 
     result = hardest_kt_embedding_skim(
         collision_system="embedPythia",
-        signal_input_filename=signal_path,
+        signal_input=[signal_path, signal_path, signal_path],
         background_input_filename=background_path,
-        jet_R=0.4,
+        jet_R=0.2,
         min_jet_pt=_min_jet_pt["embedPythia"],
         iterative_splittings=True,
         output_filename=output_filename,
         convert_data_format_prefixes={"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
-        scale_factor=scale_factors[12],
+        #scale_factor=scale_factors[12],
+        scale_factor=scale_factors[15],
         background_subtraction={"r_max": 0.25},
         det_level_artificial_tracking_efficiency=1.0,
         validation_mode=True,
