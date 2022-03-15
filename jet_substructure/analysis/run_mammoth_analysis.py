@@ -833,8 +833,6 @@ def setup_calculate_embed_pythia_skim(
                 # -1 since we already have a filename
                 for _ in range(n_signal_files_to_provide - 1)
             ])
-        # Store the file pairs for our records
-        _embedding_file_pairs[str(input_filename)] = [str(_filename) for _filename in signal_input]
 
         # Setup file I/O
         # We want to identify as: "{signal_identifier}__embedded_into__{background_identifier}"
@@ -845,6 +843,14 @@ def setup_calculate_embed_pythia_skim(
         output_identifier += safe_output_filename_from_relative_path(filename=input_filename, output_dir=production.output_dir)
         #logger.info(f"output_identifier: {output_identifier}")
         output_filename = output_dir / f"{output_identifier}_{str(splittings_selection)}.root"
+
+        # Store the file pairs for our records
+        # The output identifier contains the first signal filename, as well as the background filename.
+        # We use it here rather than _just_ the background filename because we may embed into data multiple times
+        # NOTE: In principle, if we're unlucky, we could overwrite entries here. However, it should be quite unlikely
+        #       given the large number of files that are embedded. So I won't worry about it for now (as of March 2022).
+        _embedding_file_pairs[output_identifier] = [str(_filename) for _filename in signal_input]
+
         # And create the tasks
         results.append(
             _run_embedding_skim(
@@ -868,7 +874,16 @@ def setup_calculate_embed_pythia_skim(
 
     # And write the file pairs, again for our records
     y = yaml.yaml()
-    with open(production.output_dir / "embedding_file_pairs.yaml", "w") as f:
+    embedding_file_pairs_filename = production.output_dir / "embedding_file_pairs.yaml"
+    _existing_embedding_file_pairs = {}
+    if embedding_file_pairs_filename.exists():
+        with open(embedding_file_pairs_filename, "r") as f:
+            _existing_embedding_file_pairs = y.load(f)
+    # Add back in the existing file pairs if we've read them
+    if _existing_embedding_file_pairs:
+        _embedding_file_pairs.update(_existing_embedding_file_pairs)
+    # And then (re)write the file pairs
+    with open(embedding_file_pairs_filename, "w") as f:
         y.dump(_embedding_file_pairs, f)
 
     return results
