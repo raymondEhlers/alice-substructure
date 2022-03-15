@@ -316,9 +316,27 @@ class ProductionSettings:
             _describe_production_software(production_config=self.config)
         )
 
-        y = yaml.yaml()
-        with open(self.output_dir / "production.yaml", "w") as f:
-            y.dump(output, f)
+        # If we've already run this production before, we don't want to overwrite the existing production.yaml
+        # Instead, we want to add a new production file with the new parameters (which should be the same as before,
+        # except for the production date).
+        # In order to avoid overwriting, we try adding an additional index to the filename.
+        # 100 is arbitrarily selected, but I see it as highly unlikely that we would have 100 productions...
+        for _additional_production_number in range(0, 100):
+            _production_filename = self.output_dir / "production.yaml"
+            # No need for an index for the first file.
+            if _additional_production_number > 0:
+                _production_filename = _production_filename.parent / f"production_{_additional_production_number}.yaml"
+
+            if _production_filename.exists():
+                # Don't overwrite the production file
+                continue
+            else:
+                y = yaml.yaml()
+                with open(_production_filename, "w") as f:
+                    y.dump(output, f)
+
+                # We've written, so no need to loop anymore
+                break
 
     @classmethod
     def read_config(cls, collision_system: str, number: int, track_skim_config_filename: Optional[Path] = None) -> "ProductionSettings":
