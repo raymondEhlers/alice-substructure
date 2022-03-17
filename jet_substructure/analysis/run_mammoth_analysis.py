@@ -136,7 +136,7 @@ def _validate_collision_system(instance: "ProductionSettings", attribute: attrs.
         raise ValueError(f"Invalid collisions system. Provided: {value}")
 
 
-_collision_systems_with_scale_factors = ["pythia", "thermal_model", "embedPythia"]
+_collision_systems_with_scale_factors = ["pythia", "embed_thermal_model", "embedPythia"]
 
 @attrs.frozen(slots=False)
 class ProductionSettings:
@@ -216,7 +216,7 @@ class ProductionSettings:
             raise ValueError(f"Asking for input files per pt hat doesn't make sense for collision system {self.collision_system}")
 
         # Will be signal_dataset if embedded, but otherwise will be the standard "dataset" key
-        dataset_key = "signal_dataset" if "embed" in self.collision_system else "dataset"
+        dataset_key = "signal_dataset" if "signal_dataset" in self.config["metadata"] else "dataset"
 
         # +1 due to pt hat bins being 1-indexed
         _files = {}
@@ -888,6 +888,128 @@ def setup_calculate_embed_pythia_skim(
 
     return results
 
+@python_app  # type: ignore
+def _run_embed_thermal_model_skim(
+    collision_system: str,
+    jet_R: float,
+    min_jet_pt: Mapping[str, float],
+    iterative_splittings: bool,
+    background_subtraction: Mapping[str, Any],
+    det_level_artificial_tracking_efficiency: float,
+    thermal_model_parameters: sources.ThermalModelParameters,
+    convert_data_format_prefixes: Mapping[str, str],
+    scale_factor: float,
+    inputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],
+) -> AppFuture:
+    import traceback
+    from pathlib import Path
+
+    from jet_substructure.analysis import track_skim_adapter
+
+    try:
+        result = track_skim_adapter.hardest_kt_embed_thermal_model_skim(
+            collision_system=collision_system,
+            signal_input=[
+                Path(_input_file.filepath)
+                for _input_file in inputs
+            ],
+            convert_data_format_prefixes=convert_data_format_prefixes,
+            jet_R=jet_R,
+            min_jet_pt=min_jet_pt,
+            iterative_splittings=iterative_splittings,
+            background_subtraction=background_subtraction,
+            det_level_artificial_tracking_efficiency=det_level_artificial_tracking_efficiency,
+            thermal_model_parameters=thermal_model_parameters,
+            output_filename=Path(outputs[0].filepath),
+            scale_factor=scale_factor,
+        )
+    except Exception:
+        result = (
+            False,
+            f"failure for {collision_system}, R={jet_R}, signal={[_f.filepath for _f in inputs]} with: \n{traceback.format_exc()}",
+        )
+    return result
+
+
+def setup_calculate_embed_thermal_model_skim(
+    production: ProductionSettings,
+) -> List[AppFuture]:
+    """Create futures to produce hardest kt embedded pythia skim"""
+    # Setup input and output
+    # Need to handle pt hat bin productions differently than standard productions
+    # since we need to keep track of the pt hat bin
+    if "n_pt_hat_bins" in production.config["metadata"]["dataset"]:
+        input_files: Dict[int, List[Path]] = production.input_files_per_pt_hat()
+    else:
+        input_files = {-1: production.input_files()}
+        raise RuntimeError("Need pt hat production for embedding into a thermal model...")
+    output_dir = production.output_dir / "skim"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Setup for analysis and dataset settings
+    _metadata_config = production.config["metadata"]
+    _analysis_config = production.config["settings"]
+    # Splitting selection (iterative vs recursive)
+    splittings_selection = SplittingsSelection[_analysis_config["splittings_selection"]]
+    thermal_model_parameters = sources.THERMAL_MODEL_SETTINGS[_analysis_config["event_activity"]]
+    # Scale factors
+    scale_factors = None
+    if production.has_scale_factors:
+        scale_factors = production.scale_factors()
+    else:
+        raise ValueError("Check the thermal model config - you need a signal dataset.")
+
+    # Cross check
+    if set(scale_factors) != set(list(input_files)):
+        raise ValueError(
+            f"Mismatch between the pt hat bins in the scale factors ({set(scale_factors)}) and the pt hat bins ({set(list(input_files))})"
+        )
+
+    results = []
+    _file_counter = 0
+    # Reversed because the higher pt hard bins are of more importance to get done sooner.
+    for pt_hat_bin, input_filenames in reversed(input_files.items()):
+        for input_filename in input_filenames:
+            if _file_counter % 500 == 0:
+                logger.info(f"Adding {input_filename} for analysis")
+
+            # For testing...
+            if _file_counter > 1:
+                break
+            # END
+
+            # Setup file I/O
+            # Converts: "2111/run_by_run/LHC17p_CENT_woSDD/282341/AnalysisResults.17p.001.root"
+            #        -> "2111__run_by_run__LHC17p_CENT_woSDD__282341__AnalysisResults_17p_001"
+            output_identifier = safe_output_filename_from_relative_path(filename=input_filename,
+                                                                        output_dir=production.output_dir)
+            output_filename = output_dir / f"{output_identifier}_{str(splittings_selection)}.root"
+            # And create the tasks
+            results.append(
+                _run_embed_thermal_model_skim(
+                    collision_system=production.collision_system,
+                    jet_R=_analysis_config["jet_R"],
+                    min_jet_pt=_analysis_config["min_jet_pt"],
+                    iterative_splittings=splittings_selection == SplittingsSelection.iterative,
+                    background_subtraction=_analysis_config["background_subtraction"],
+                    det_level_artificial_tracking_efficiency=_analysis_config["det_level_artificial_tracking_efficiency"],
+                    thermal_model_parameters=thermal_model_parameters,
+                    convert_data_format_prefixes=_metadata_config["convert_data_format_prefixes"],
+                    inputs=[
+                        File(str(input_filename)),
+                    ],
+                    outputs=[
+                        File(str(output_filename))
+                    ],
+                    scale_factor=scale_factors[pt_hat_bin],
+                )
+            )
+
+            _file_counter += 1
+
+    return results
+
 
 #def setup_calculate_thermal_model_skim(
 #    collision_system: str,
@@ -1204,10 +1326,18 @@ def define_productions() -> List[ProductionSettings]:
     productions = []
 
     # Create and store production information
-    productions.append(
-        ProductionSettings.read_config(
-            collision_system="embedPythia", number=2,
-        )
+    productions.extend(
+        [
+            # ProductionSettings.read_config(
+            #     collision_system="embedPythia", number=62,
+            # ),
+            # ProductionSettings.read_config(
+            #     collision_system="embedPythia", number=63,
+            # ),
+            ProductionSettings.read_config(
+                collision_system="embed_thermal_model", number=2,
+            ),
+        ]
     )
 
     # Write out the production settings
@@ -1225,7 +1355,7 @@ def run() -> None:
     # Job execution configuration
     task_config = job_utils.TaskConfig(name=task_name, n_cores_per_task=1)
     # n_cores_to_allocate = 120
-    n_cores_to_allocate = 100
+    n_cores_to_allocate = 110
     walltime = "24:00:00"
     n_cores_to_allocate = 2
     walltime = "1:59:00"
@@ -1315,6 +1445,12 @@ def run() -> None:
         #        )
         #    )
 
+        if "calculate_embed_thermal_model_skim" in tasks_to_execute:
+            system_results.extend(
+                setup_calculate_embed_thermal_model_skim(
+                    production=production,
+                )
+            )
         if "calculate_embed_pythia_skim" in tasks_to_execute:
             system_results.extend(
                 setup_calculate_embed_pythia_skim(

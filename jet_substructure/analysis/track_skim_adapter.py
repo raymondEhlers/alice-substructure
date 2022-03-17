@@ -250,24 +250,33 @@ def _check_for_output_file(output_filename: Path, description: str) -> Tuple[boo
 
 
 def hardest_kt_embed_thermal_model_skim(
-    input_filename: Path,
+    collision_system: str,
+    signal_input: Union[Path, Sequence[Path]],
+    convert_data_format_prefixes: Mapping[str, str],
     jet_R: float,
     min_jet_pt: Mapping[str, float],
     iterative_splittings: bool,
-    output_filename: Path,
+    background_subtraction: Mapping[str, Any],
+    det_level_artificial_tracking_efficiency: float,
     thermal_model_parameters: sources.ThermalModelParameters,
-    convert_data_format_prefixes: Mapping[str, str],
+    output_filename: Path,
     scale_factor: float,
-    r_max: float,
     validation_mode: bool = False,
 ) -> Tuple[bool, str]:
-    # Setup
-    collision_system = "embed_thermal_model"
-
+    # Validation
+    signal_input_filenames = []
+    if not isinstance(signal_input, collections.abc.Iterable):
+        signal_input_filenames = [signal_input]
+    else:
+        if len(signal_input) == 1:
+            signal_input_filenames = list(signal_input)
+        else:
+            raise RuntimeError(f"Thermal model can only support a single signal input. Provided: {signal_input}")
     # Try to bail out early to avoid reprocessing if possible.
     _description = _description_from_parameters(
         parameters={
-            "collision_system": collision_system, "R": jet_R, "input_filename": input_filename
+            "collision_system": collision_system, "R": jet_R,
+            "signal_input_filenames": str([str(_filename) for _filename in signal_input_filenames]),
         }
     )
     res = _check_for_output_file(output_filename=output_filename, description=_description)
@@ -276,24 +285,15 @@ def hardest_kt_embed_thermal_model_skim(
 
     jets = analysis_alice.analysis_embedding(
         *analysis_alice.load_embed_thermal_model(
-            signal_filename=input_filename,
+            signal_filename=signal_input_filenames[0],
             thermal_model_parameters=thermal_model_parameters,
         ),
         jet_R=jet_R,
         min_jet_pt=min_jet_pt,
-        background_subtraction_settings={"r_max": r_max},
+        background_subtraction_settings=background_subtraction,
+        det_level_artificial_tracking_efficiency=det_level_artificial_tracking_efficiency,
         validation_mode=validation_mode,
     )
-    #jets = analysis_alice.analysis_embedding(
-    #    *analysis_alice.load_embedding(
-    #        signal_filename=input_filename,
-    #        background_filename= ,
-    #    ),
-    #    jet_R=jet_R,
-    #    min_jet_pt=min_jet_pt,
-    #    r_max=r_max,
-    #    validation_mode=validation_mode,
-    #)
 
     # There were no jets. Note that with a specially crafted empty file
     if len(jets) == 0:
@@ -305,7 +305,9 @@ def hardest_kt_embed_thermal_model_skim(
 
     _hardest_kt_embedding_skim(
         jets=jets,
-        input_filename=input_filename,
+        # NOTE: This argument is only for logging messages. Since the PbPb is the constraining factor,
+        #       we focus on processing those files.
+        input_filename=signal_input_filenames[0],
         jet_R=jet_R,
         iterative_splittings=iterative_splittings,
         scale_factor=scale_factor,
