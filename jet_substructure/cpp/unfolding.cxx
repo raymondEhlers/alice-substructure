@@ -13,7 +13,7 @@
 #include <TPostScript.h>
 #include <TProfile.h>
 #include <TROOT.h>
-#include <TRandom.h>
+#include <TRandom3.h>
 #include <TString.h>
 #include <TStyle.h>
 #include <TSystem.h>
@@ -361,6 +361,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
 {
   // Print out the status.
   std::cout << "Binning and values:\n";
+  std::cout << "Grooming method: " << groomingMethod << "\n";
   std::cout << "Smeared jet pt bins:";
   for (auto v : smearedJetPtBins) {
       std::cout << " " << v;
@@ -391,7 +392,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
   double untaggedBelowThisValue = 0.;
   if (disableUntaggedBin) {
       // Select a very large negative value. We'll never have such a large negative value, so
-      // pratically this means that we'll never mark a value as untagged. This means that everything
+      // practically this means that we'll never mark a value as untagged. This means that everything
       // will have to be encapsulated in the standard binning or it will be cut.
       untaggedBelowThisValue = -1e5;
   }
