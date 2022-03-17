@@ -303,6 +303,7 @@ productions:
         event_activity: "semi_central"
         background_subtraction:
           r_max: 0.7
+
   embedPythia:
     2:
       metadata:
@@ -388,6 +389,23 @@ productions:
         dataset: *LHC20g4_pythia
         # Equivalent to train number, but a more general term makes more sense here.
         production_number: 2
+        label: "embed_pythia_semi_central"
+      settings:
+        <<: *analysis_settings_embed_R02
+        event_activity: "semi_central"
+        background_subtraction:
+          r_max: 0.25
+        # Artificial tracking efficiency derived from the full jet R_AA paper.
+        # 10-30 \approx .99
+        # 0-10% \approx .98
+        # Apply only to embedded particles
+        det_level_artificial_tracking_efficiency: 0.99
+    60:
+      metadata:
+        <<: *base_metadata_embed_thermal_model
+        dataset: *LHC20g4_pythia
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 60
         label: "embed_pythia_semi_central"
       settings:
         <<: *analysis_settings_embed_R02
