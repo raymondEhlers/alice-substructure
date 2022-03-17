@@ -175,6 +175,19 @@ analysis_settings:
         # We don't want to restrict the "det_level" or "part_level" jet pt values
         min_jet_pt: {"hybrid": 20}
 
+    _embed_thermal_model:
+      metadata: &base_metadata_embed_thermal_model
+        # Parameters relevant for loading the dataset
+        # Map from value -> key of how prefixes should be renamed when loading data
+        # For embedding, this isn't necessary since it has a dedicated function for loading embedding data
+        loading_data_rename_prefix: {}
+        # Map from key -> value of how prefixes should be renamed when converting the skimmed output
+        # to the jet substructure format
+        convert_data_format_prefixes:
+          hybrid: "hybrid"
+          det_level: "det_level"
+          part_level: "true"
+
 
   pp_R02: &analysis_settings_pp_R02
     <<: *_base_analysis_settings_pp
@@ -191,6 +204,9 @@ analysis_settings:
   embed_R02: &analysis_settings_embed_R02
     <<: *_base_analysis_settings_embed
     jet_R: 0.2
+
+  # We don't need an explicit one for embedding into a thermal model - we can just
+  # take the standard embedding analysis settings
 
 
 productions:
@@ -294,7 +310,7 @@ productions:
         dataset: *LHC18qr_PbPb_semi_central
         signal_dataset: *LHC20g4_pythia
         # Equivalent to train number, but a more general term makes more sense here.
-        production_number: 60
+        production_number: 2
         label: "embed_pythia_semi_central"
       settings:
         <<: *analysis_settings_embed_R02
@@ -319,4 +335,67 @@ productions:
         event_activity: "semi_central"
         background_subtraction:
           r_max: 0.05
+        det_level_artificial_tracking_efficiency: 0.99
+    61:
+      # Additional statistics for production 60
+      metadata:
+        <<: *base_metadata_embed
+        dataset: *LHC18qr_PbPb_semi_central
+        signal_dataset: *LHC20g4_pythia
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 61
+        label: "embed_pythia_semi_central"
+      settings:
+        <<: *analysis_settings_embed_R02
+        event_activity: "semi_central"
+        background_subtraction:
+          r_max: 0.05
+        det_level_artificial_tracking_efficiency: 0.99
+    62:
+      metadata:
+        <<: *base_metadata_embed
+        dataset: *LHC18qr_PbPb_semi_central
+        signal_dataset: *LHC20g4_pythia
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 62
+        label: "embed_pythia_semi_central"
+      settings:
+        <<: *analysis_settings_embed_R02
+        event_activity: "semi_central"
+        background_subtraction:
+          r_max: 0.7
+        det_level_artificial_tracking_efficiency: 0.99
+    63:
+      # Additional statistics for production 62
+      metadata:
+        <<: *base_metadata_embed
+        dataset: *LHC18qr_PbPb_semi_central
+        signal_dataset: *LHC20g4_pythia
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 63
+        label: "embed_pythia_semi_central"
+      settings:
+        <<: *analysis_settings_embed_R02
+        event_activity: "semi_central"
+        background_subtraction:
+          r_max: 0.7
+        det_level_artificial_tracking_efficiency: 0.99
+
+  embed_thermal_model:
+    2:
+      metadata:
+        <<: *base_metadata_embed_thermal_model
+        dataset: *LHC20g4_pythia
+        # Equivalent to train number, but a more general term makes more sense here.
+        production_number: 2
+        label: "embed_pythia_semi_central"
+      settings:
+        <<: *analysis_settings_embed_R02
+        event_activity: "semi_central"
+        background_subtraction:
+          r_max: 0.25
+        # Artificial tracking efficiency derived from the full jet R_AA paper.
+        # 10-30 \approx .99
+        # 0-10% \approx .98
+        # Apply only to embedded particles
         det_level_artificial_tracking_efficiency: 0.99
