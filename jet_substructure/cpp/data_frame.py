@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import attr
 import numpy as np
+import numpy.typing as npt
 import uproot
 from pachyderm import binned_data
 
@@ -41,9 +42,9 @@ def new_matching_hists(
     hist_suffix: str,
     matching_index: MatchingIndex,
     jet_pt_column_format: str,
-    kt_axis: np.ndarray,
-    jet_pt_axis: np.ndarray,
-    kt_selection_axis: np.ndarray,
+    kt_axis: npt.NDArray[np.float32],
+    jet_pt_axis: npt.NDArray[np.float32],
+    kt_selection_axis: npt.NDArray[np.float32],
     matching_jet_pt_prefix: Optional[str] = None,
     create_generator_subjet_in_measured_jet_hists: bool = False,
 ) -> List[RootHist]:
@@ -587,7 +588,7 @@ def run_create_closure_ratio(  # noqa: C901
     #       but we can't take advantage of that here because we need to pass just the config. Therefore, to have valid
     #       binning, we need to only take unique values. unique sorts, but this is fine because they must be strictly
     #       increasing anyway.
-    smeared_substructure_variable_bins = np.unique(
+    smeared_substructure_variable_bins = np.unique(  # type: ignore
         unfolding_base.get_binning(
             base_unfolding_config=base_unfolding_config,
             unfolding_settings=unfolding_settings,
@@ -1236,9 +1237,8 @@ def run_standalone(
     cross_check_task: bool = False,
 ) -> Tuple[bool, str]:
     # Determine the filenames based on the train numbers and predefined path here.
-    base_path = Path("trains/") / collision_system / "{train_number}/skim/AnalysisResults.*.root"
-    # TODO: Fix this bullshit!
-    # base_path = Path("../../clusterfs4/rehlers/substructure/trains/") / collision_system / "{train_number}/AnalysisResults.*.root"
+    #base_path = Path("trains/") / collision_system / "{train_number}/skim/AnalysisResults.*.root"
+    base_path = Path("trains/") / collision_system / "00{train_number}/skim/*.root"
     filenames = helpers.expand_wildcards_in_filenames(
         [Path(str(base_path).format(train_number=train_number)) for train_number in train_numbers]
     )
@@ -1300,19 +1300,20 @@ if __name__ == "__main__":
         collision_system="embedPythia",
         # train_numbers=list(range(5791, 5792)),
         # train_numbers=list(range(5966, 5968)),
-        train_numbers=list(range(6338, 6339)),
+        # train_numbers=list(range(6338, 6339)),
+        train_numbers=[61],
         # train_numbers=list(range(6017, 6018)),
         # train_numbers=list(range(5988, 5989)),
-        tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
-        # tree_name="tree",
+        # tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR020_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
+        tree_name="tree",
         # prefix="det_level",
         prefixes=prefixes,
-        grooming_method="leading_kt",
-        jet_R=0.4,
+        grooming_method="dynamical_core",
+        jet_R=0.2,
         main_jet_pt_range=helpers.JetPtRange(40, 120),
         n_cores=2,
         jet_pt_prefix_first=True,
-        cross_check_task=True,
+        cross_check_task=False,
     )
     # for grooming_method in ["leading_kt", "leading_kt_z_cut_02", "leading_kt_z_cut_04", "dynamical_z", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02", "soft_drop_z_cut_04"]:
     # run_standalone(
