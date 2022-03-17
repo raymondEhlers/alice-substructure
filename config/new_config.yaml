@@ -1012,7 +1012,6 @@ available_datasets:
     # Mammoth productions
     # Systematic: Rmax = 0.05
     # Data
-    # Rmax = 0.05 systematic.
     LHC18qr_semi_central_R02_Rmax005_0062: &LHC18qr_semi_central_R02_Rmax005
         name: "LHC18qr_semi_central_R02_Rmax005_0062"
         tree_name: "tree"
@@ -1045,6 +1044,40 @@ available_datasets:
         files:
             - "trains/embedPythia/0060/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/0061/AnalysisResults.*.repaired.root"
+    # Systematic: Rmax = 0.7
+    # Data
+    LHC18qr_semi_central_R02_Rmax070_0063: &LHC18qr_semi_central_R02_Rmax070
+        name: "LHC18qr_semi_central_R02_Rmax070_0063"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't exist for all prefixes
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/PbPb/0063/AnalysisResults.*.repaired.root"
+    # Embedded
+    LHC20g4_embedded_into_LHC18qr_semi_central_R02_Rmax070_0062_0063: &LHC18qr_semi_central_R02_embedded_Rmax070
+        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_Rmax070_0062_0063"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "hybrid"
+            "true": "true"
+            det_level: "det_level"
+        # Branches which don't exist for all prefixes
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/embedPythia/0062/AnalysisResults.*.repaired.root"
+            - "trains/embedPythia/0063/AnalysisResults.*.repaired.root"
 
 
 analysis_configurations:
@@ -1313,8 +1346,8 @@ analysis_configurations:
                 PbPb: *LHC18qr_semi_central_R02_Rmax005
                 embedPythia: *LHC18qr_semi_central_R02_embedded_Rmax005
             rmax_070:
-                PbPb: null  #*LHC18qr_semi_central_R02_Rmax070
-                embedPythia: null  #*LHC18qr_semi_central_R02_embedded_Rmax070
+                PbPb: *LHC18qr_semi_central_R02_Rmax070
+                embedPythia: *LHC18qr_semi_central_R02_embedded_Rmax070
         unfolding:
             suffix: "semi_central_R02_pass3"
             nominal_binning:
