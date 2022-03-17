@@ -23,6 +23,16 @@ def _convert_analyzed_jets_to_all_jets_for_skim(
     jets: ak.Array,
     convert_data_format_prefixes: Mapping[str, str],
 ) -> Dict[str, ak.Array]:
+    # Need the unsubtracted leading track pt for hybrid
+    additional_columns_per_prefix = {}
+    for prefix_to_check in convert_data_format_prefixes:
+        if prefix_to_check in ak.fields(jets) and "unsubtracted_leading_track_pt" in ak.fields(jets[prefix_to_check]):
+            # Store the unsubtracted track pt.
+            # It is expected to be under "leading_track_pt" even though it's unsubtracted
+            additional_columns_per_prefix[prefix_to_check] = {
+                "leading_track_pt": jets[prefix_to_check, "unsubtracted_leading_track_pt"],
+            }
+
     return {
         convert_data_format_prefixes[k]: ak.zip(
             {
@@ -53,6 +63,7 @@ def _convert_analyzed_jets_to_all_jets_for_skim(
                     # in the jet, so we use a depth limit of 2.
                     depth_limit=2,
                 ),
+                **additional_columns_per_prefix.get(k, {}),
             },
             depth_limit=1,
         )
