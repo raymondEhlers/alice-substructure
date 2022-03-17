@@ -597,7 +597,7 @@ ResponseResult create_closure_response_2D(
   double untaggedBelowThisValue = 0.;
   if (disableUntaggedBin) {
       // Select a very large negative value. We'll never have such a large negative value, so
-      // pratically this means that we'll never mark a value as untagged. This means that everything
+      // practically this means that we'll never mark a value as untagged. This means that everything
       // will have to be encapsulated in the standard binning or it will be cut.
       untaggedBelowThisValue = -1e5;
   }
