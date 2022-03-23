@@ -954,8 +954,9 @@ def setup_calculate_embed_thermal_model_skim(
     _analysis_config = production.config["settings"]
     # Splitting selection (iterative vs recursive)
     splittings_selection = SplittingsSelection[_analysis_config["splittings_selection"]]
-    thermal_model_parameters = sources.THERMAL_MODEL_SETTINGS[_analysis_config["event_activity"]]
+    thermal_model_parameters = sources.THERMAL_MODEL_SETTINGS[f"{_metadata_config['dataset']['sqrt_s']}_{_analysis_config['event_activity']}"]
     chunk_size = _analysis_config["chunk_size"]
+    logger.info(f"Processing chunk size for {chunk_size}")
     # Scale factors
     scale_factors = None
     if production.has_scale_factors:
