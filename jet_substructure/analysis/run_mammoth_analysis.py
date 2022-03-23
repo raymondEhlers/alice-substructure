@@ -580,7 +580,6 @@ def steer_extract_scale_factors(
         setup_write_scale_factors(production=production, scale_factors=scale_factors)
     )
     # And then create the spectra (and plot them) to cross check the extraction
-    # TODO: If needed, create a mock/dummy class to test...
     all_results.append(
         setup_check_pt_hat_spectra(
             production=production,
@@ -643,6 +642,7 @@ def _run_data_skim(
 
 def setup_calculate_data_skim(
     production: ProductionSettings,
+    debug_mode: bool,
 ) -> List[AppFuture]:
     """Create futures to produce hardest kt data skim"""
     # Setup input and output
@@ -672,10 +672,9 @@ def setup_calculate_data_skim(
             if _file_counter % 500 == 0:
                 logger.info(f"Adding {input_filename} for analysis")
 
-            # For testing...
-            #if _file_counter > 1:
-            #    break
-            # END
+            # For debugging
+            if debug_mode and _file_counter > 1:
+                break
 
             # Setup file I/O
             # Converts: "2111/run_by_run/LHC17p_CENT_woSDD/282341/AnalysisResults.17p.001.root"
@@ -750,6 +749,7 @@ def _run_embedding_skim(
 
 def setup_calculate_embed_pythia_skim(
     production: ProductionSettings,
+    debug_mode: bool,
 ) -> List[AppFuture]:
     """Create futures to produce hardest kt embedded pythia skim"""
     # Setup input and output
@@ -801,10 +801,9 @@ def setup_calculate_embed_pythia_skim(
         if _file_counter % 500 == 0:
             logger.info(f"Adding {input_filename} for analysis")
 
-        # For testing...
-        #if _file_counter > 1:
-        #    break
-        # END
+        # For debugging
+        if debug_mode and _file_counter > 1:
+            break
 
         # Randomly select (in some manner) an input file to match up with the background input file.
         # NOTE: The signal input file will repeat if there are more background events.
@@ -897,6 +896,7 @@ def _run_embed_thermal_model_skim(
     background_subtraction: Mapping[str, Any],
     det_level_artificial_tracking_efficiency: float,
     thermal_model_parameters: sources.ThermalModelParameters,
+    chunk_size: int,
     convert_data_format_prefixes: Mapping[str, str],
     scale_factor: float,
     inputs: Sequence[File] = [],
@@ -921,6 +921,7 @@ def _run_embed_thermal_model_skim(
             background_subtraction=background_subtraction,
             det_level_artificial_tracking_efficiency=det_level_artificial_tracking_efficiency,
             thermal_model_parameters=thermal_model_parameters,
+            chunk_size=chunk_size,
             output_filename=Path(outputs[0].filepath),
             scale_factor=scale_factor,
         )
@@ -934,6 +935,7 @@ def _run_embed_thermal_model_skim(
 
 def setup_calculate_embed_thermal_model_skim(
     production: ProductionSettings,
+    debug_mode: bool,
 ) -> List[AppFuture]:
     """Create futures to produce hardest kt embedded pythia skim"""
     # Setup input and output
@@ -953,6 +955,7 @@ def setup_calculate_embed_thermal_model_skim(
     # Splitting selection (iterative vs recursive)
     splittings_selection = SplittingsSelection[_analysis_config["splittings_selection"]]
     thermal_model_parameters = sources.THERMAL_MODEL_SETTINGS[_analysis_config["event_activity"]]
+    chunk_size = _analysis_config["chunk_size"]
     # Scale factors
     scale_factors = None
     if production.has_scale_factors:
@@ -974,10 +977,9 @@ def setup_calculate_embed_thermal_model_skim(
             if _file_counter % 500 == 0:
                 logger.info(f"Adding {input_filename} for analysis")
 
-            # For testing...
-            if _file_counter > 1:
+            # For debugging
+            if debug_mode and _file_counter > 1:
                 break
-            # END
 
             # Setup file I/O
             # Converts: "2111/run_by_run/LHC17p_CENT_woSDD/282341/AnalysisResults.17p.001.root"
@@ -995,6 +997,7 @@ def setup_calculate_embed_thermal_model_skim(
                     background_subtraction=_analysis_config["background_subtraction"],
                     det_level_artificial_tracking_efficiency=_analysis_config["det_level_artificial_tracking_efficiency"],
                     thermal_model_parameters=thermal_model_parameters,
+                    chunk_size=chunk_size,
                     convert_data_format_prefixes=_metadata_config["convert_data_format_prefixes"],
                     inputs=[
                         File(str(input_filename)),
@@ -1355,11 +1358,13 @@ def run() -> None:
     # Job execution configuration
     task_config = job_utils.TaskConfig(name=task_name, n_cores_per_task=1)
     # n_cores_to_allocate = 120
-    n_cores_to_allocate = 110
+    #n_cores_to_allocate = 110
+    n_cores_to_allocate = 50
     walltime = "24:00:00"
     n_cores_to_allocate = 2
     walltime = "1:59:00"
     #n_cores_to_allocate = 10
+    debug_mode = True
 
     # Basic setup: logging and parsl.
     # First, need to figure out if we need additional environments such as ROOT
@@ -1372,8 +1377,8 @@ def run() -> None:
     #       it's super verbose and a huge pain to turn off. Note that by passing on the storage messages,
     #       we don't actually lose any info.
     config, facility_config, stored_messages = job_utils.config(
-        facility="ORNL_b587_long",
-        # facility="ORNL_b587_short",
+        # facility="ORNL_b587_long",
+        facility="ORNL_b587_short",
         task_config=task_config,
         n_tasks=n_cores_to_allocate,
         walltime=walltime,
@@ -1406,6 +1411,7 @@ def run() -> None:
             system_results.extend(
                 setup_calculate_data_skim(
                     production=production,
+                    debug_mode=debug_mode,
                 )
             )
         if "calculate_thermal_model_skim" in tasks_to_execute:
@@ -1449,12 +1455,14 @@ def run() -> None:
             system_results.extend(
                 setup_calculate_embed_thermal_model_skim(
                     production=production,
+                    debug_mode=debug_mode,
                 )
             )
         if "calculate_embed_pythia_skim" in tasks_to_execute:
             system_results.extend(
                 setup_calculate_embed_pythia_skim(
                     production=production,
+                    debug_mode=debug_mode,
                 )
             )
 
