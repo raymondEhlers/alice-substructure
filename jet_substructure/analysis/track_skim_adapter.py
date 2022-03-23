@@ -429,6 +429,9 @@ if __name__ == "__main__":
         "embed_thermal_model": {"hybrid": 20.},
         "embedPythia": {"hybrid": 20.},
     }
+    # For validation, we use R = 0.4 jets
+    jet_R = 0.2
+    #for collision_system in ["pp", "pythia", "PbPb"]:
     for collision_system in ["pp", "pythia", "PbPb"]:
         logger.info(f"Analyzing \"{collision_system}\"")
         base_path = Path(f"/software/rehlers/dev/mammoth/projects/framework/{collision_system}")
@@ -449,7 +452,7 @@ if __name__ == "__main__":
             #input_filename=Path("/software/rehlers/dev/substructure/trains/PbPb/645/run_by_run/LHC18q/295612/AnalysisResults.18q.002.root"),
             input_filename=base_path / "AnalysisResults_track_skim.parquet",
             collision_system=collision_system,
-            jet_R=0.4,
+            jet_R=jet_R,
             min_jet_pt=_min_jet_pt[collision_system],
             iterative_splittings=True,
             loading_data_rename_prefix={"data": "data"} if collision_system != "pythia" else {},
@@ -464,32 +467,33 @@ if __name__ == "__main__":
     ###############
     # Thermal model
     ###############
-    #### import jet_substructure.analysis.parsl
-    #### scale_factors = jet_substructure.analysis.parsl.read_extracted_scale_factors(
-    ####     # TODO: Unclear if the collision system should be hard coded
-    ####     collision_system="embedPythia",
-    ####     dataset_name="LHC20g4_embedded_into_LHC18qr_central_R02_6982_7001",
-    #### )
+    from jet_substructure.base import job_utils as substructure_job_utils
+    # In general, we're probably testing with this period, so good enough to hard code it here
+    scale_factors = substructure_job_utils.read_extracted_scale_factors(
+        path=Path("trains/pythia/LHC20g4_AOD_2640/scale_factors.yaml")
+    )
 
-    #### base_path = Path("/software/rehlers/dev/substructure/trains/pythia/641")
-    #### hardest_kt_embed_thermal_model_skim(
-    ####     #input_filename=base_path / "run_by_run/LHC20g4/295612/11/AnalysisResults.20g4.016.root",
-    ####     #input_filename=base_path / "run_by_run/LHC20g4/297544/19/AnalysisResults.20g4.005.root",
-    ####     #input_filename=base_path / "run_by_run/LHC20g4/295819/12/AnalysisResults.20g4.016.root",
-    ####     input_filename=base_path / "run_by_run/LHC20g4/297588/4/AnalysisResults.20g4.001.root",
-    ####     jet_R=0.2,
-    ####     min_jet_pt=_min_jet_pt["thermal_model"],
-    ####     iterative_splittings=True,
-    ####     output_filename=base_path / "skim" / "test" / "thermal_model_skim_output.root",
-    ####     thermal_model_parameters=sources.THERMAL_MODEL_SETTINGS["central"],
-    ####     convert_data_format_prefixes={"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
-    ####     #scale_factor=scale_factors[11],
-    ####     #scale_factor=scale_factors[19],
-    ####     #scale_factor=scale_factors[12],
-    ####     scale_factor=scale_factors[4],
-    ####     r_max=0.25,
-    ####     validation_mode=True,
-    #### )
+    base_path = Path("/software/rehlers/dev/substructure/trains/pythia/641")
+    #signal_input = base_path / "run_by_run/LHC20g4/295612/11/AnalysisResults.20g4.016.root"
+    #signal_input = base_path / "run_by_run/LHC20g4/297544/19/AnalysisResults.20g4.005.root"
+    signal_input = base_path / "run_by_run/LHC20g4/295819/12/AnalysisResults.20g4.016.root"
+    #signal_input = base_path / "run_by_run/LHC20g4/297588/4/AnalysisResults.20g4.001.root"
+    pt_hat_bin = 12
+    hardest_kt_embed_thermal_model_skim(
+        collision_system="embed_thermal_model",
+        signal_input=[signal_input],
+        jet_R=jet_R,
+        min_jet_pt=_min_jet_pt["embed_thermal_model"],
+        iterative_splittings=True,
+        output_filename=base_path / "skim" / "test" / "thermal_model_skim_output.root",
+        thermal_model_parameters=sources.THERMAL_MODEL_SETTINGS["5020_central"],
+        convert_data_format_prefixes={"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
+        scale_factor=scale_factors[pt_hat_bin],
+        background_subtraction={"r_max": 0.25},
+        det_level_artificial_tracking_efficiency=0.98,
+        chunk_size=1000,
+        validation_mode=False,
+    )
 
     ###########
     # Embedding
@@ -509,6 +513,7 @@ if __name__ == "__main__":
     signal_path = base_path / "track_skim" / "pythia" / "AnalysisResults.root"
     background_path = base_path / "track_skim" / "PbPb" / "AnalysisResults.root"
     output_filename = base_path / "skim" / "skim_output.root"
+    pt_hat_bin = 12
     if standalone_tests:
         # But we can also run standalone tests on the skim train output
         base_path = Path("/software/rehlers/dev/substructure/trains/PbPb/645")
@@ -517,18 +522,18 @@ if __name__ == "__main__":
         signal_path = Path("/software/rehlers/dev/substructure/trains/pythia/2640") / "run_by_run/LHC20g4/295788/15/AnalysisResults.20g4.005.root"
         background_path = Path("/software/rehlers/dev/substructure/trains/PbPb/645") / "run_by_run/LHC18q/295788/AnalysisResults.18q.076.root"
         output_filename = base_path / "skim" / "test" / "embedding_skim_output.root"
+        pt_hat_bin = 15
 
     result = hardest_kt_embedding_skim(
         collision_system="embedPythia",
         signal_input=[signal_path, signal_path, signal_path],
         background_input_filename=background_path,
-        jet_R=0.2,
+        jet_R=jet_R,
         min_jet_pt=_min_jet_pt["embedPythia"],
         iterative_splittings=True,
         output_filename=output_filename,
         convert_data_format_prefixes={"hybrid": "hybrid", "det_level": "det_level", "part_level": "true"},
-        #scale_factor=scale_factors[12],
-        scale_factor=scale_factors[15],
+        scale_factor=scale_factors[pt_hat_bin],
         background_subtraction={"r_max": 0.25},
         det_level_artificial_tracking_efficiency=1.0,
         validation_mode=True,
