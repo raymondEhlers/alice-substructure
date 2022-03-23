@@ -114,6 +114,24 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
     print(f"standard.type: {standard.type}")
     print(f"track_skim.type: {track_skim.type}")
 
+    # For whatever reason, the sorting of the jets is inconsistent for embedding compared to all other datasets.
+    # So we just apply a mask here to swap the one event where we have two jets.
+    # NOTE: AliPhysics is actually the one that gets the sorting wrong here...
+    # NOTE: This is a super specialized thing, but better to do it here instead of messing around with
+    #       the actual mammoth analysis code.
+    if collision_system == "embedPythia":
+        # NOTE: I derived this mask by hand. It swaps index -2 and -3 (== swapping index 15 and 16)
+        #       It can be double checked by looking at the jet pt. The precision makes
+        #       it quite obvious which should go with which.
+        reorder_mask = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 15, 17]
+        track_skim = track_skim[reorder_mask]
+        # NOTE: ***********************************************************************************
+        #       The canonical file actually did go through the steps of making the order in mammoth
+        #       match AliPhysics by turning off sorting. But since we're more likely to be
+        #       testing in the future with new files to do validation, it's better that we apply
+        #       this remapping here.
+        #       ***********************************************************************************
+
     output_dir = Path("comparison") / "trackSkim" / collision_system
     output_dir.mkdir(parents=True, exist_ok=True)
 
