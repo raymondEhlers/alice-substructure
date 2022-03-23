@@ -272,6 +272,7 @@ def hardest_kt_embed_thermal_model_skim(
     thermal_model_parameters: sources.ThermalModelParameters,
     output_filename: Path,
     scale_factor: float,
+    chunk_size: sources.T_ChunkSize = sources.ChunkSizeSentinel.SINGLE_FILE,
     validation_mode: bool = False,
 ) -> Tuple[bool, str]:
     # Validation
@@ -279,52 +280,69 @@ def hardest_kt_embed_thermal_model_skim(
     if not isinstance(signal_input, collections.abc.Iterable):
         signal_input_filenames = [signal_input]
     else:
-        if len(signal_input) == 1:
-            signal_input_filenames = list(signal_input)
-        else:
-            raise RuntimeError(f"Thermal model can only support a single signal input. Provided: {signal_input}")
-    # Try to bail out early to avoid reprocessing if possible.
-    _description = _description_from_parameters(
-        parameters={
-            "collision_system": collision_system, "R": jet_R,
-            "signal_input_filenames": str([str(_filename) for _filename in signal_input_filenames]),
-        }
-    )
-    res = _check_for_output_file(output_filename=output_filename, description=_description)
-    if res[0]:
-        return res
+        signal_input_filenames = list(signal_input)
 
-    jets = analysis_alice.analysis_embedding(
-        *analysis_alice.load_embed_thermal_model(
-            signal_filename=signal_input_filenames[0],
-            thermal_model_parameters=thermal_model_parameters,
-        ),
-        jet_R=jet_R,
-        min_jet_pt=min_jet_pt,
-        background_subtraction_settings=background_subtraction,
-        det_level_artificial_tracking_efficiency=det_level_artificial_tracking_efficiency,
-        validation_mode=validation_mode,
-    )
+    _parameters = {
+        "collision_system": collision_system, "R": jet_R,
+        "signal_input_filenames": str([str(_filename) for _filename in signal_input_filenames]),
+    }
+    if chunk_size is not sources.ChunkSizeSentinel.FULL_SOURCE:
+        _parameters["chunk_size"] = chunk_size
+    _description = _description_from_parameters(parameters=_parameters)
 
-    # There were no jets. Note that with a specially crafted empty file
-    if len(jets) == 0:
-        # Just create the empty filename and return. This will prevent trying to re-run with no jets in the future.
-        # Remember that this depends heavily on the jet pt cuts!
-        empty_filename = output_filename.with_suffix(".empty")
-        empty_filename.touch()
-        return (True, f"Done - no jets to recluster, so not trying to skim for {_description}")
-
-    _hardest_kt_embedding_skim(
-        jets=jets,
-        # NOTE: This argument is only for logging messages. Since the PbPb is the constraining factor,
-        #       we focus on processing those files.
-        input_filename=signal_input_filenames[0],
-        jet_R=jet_R,
-        iterative_splittings=iterative_splittings,
-        scale_factor=scale_factor,
-        convert_data_format_prefixes=convert_data_format_prefixes,
-        output_filename=output_filename,
+    # Setup iteration over the input files
+    # If we don't use a processing chunk size, it should all be done in one chunk by default.
+    # However, the memory usage often gets too large, so this allows us to control the overall memory
+    # size by breaking it up into chunks, such that we only generate the thermal model chunk
+    # that's currently needed for processing
+    source_index_identifiers, iter_arrays = analysis_alice.load_embed_thermal_model(
+        signal_input=signal_input_filenames,
+        thermal_model_parameters=thermal_model_parameters,
+        chunk_size=chunk_size,
     )
+    # Cross check
+    assert not isinstance(iter_arrays, ak.Array), "Check configuration. This should be an iterable, not an ak.Array!"
+
+    for i_chunk, arrays in enumerate(iter_arrays):
+        # Setup. We need to identify the chunk
+        _output_filename = output_filename.parent / f"{output_filename.stem}_chunk_{i_chunk:03}{output_filename.suffix}"
+
+        # Try to bail out early to avoid reprocessing if possible.
+        res = _check_for_output_file(output_filename=_output_filename, description=_description)
+        if res[0]:
+            logger.info(f"Skipping chunk {i_chunk}: {res}")
+            continue
+
+        jets = analysis_alice.analysis_embedding(
+            source_index_identifiers=source_index_identifiers,
+            arrays=arrays,
+            jet_R=jet_R,
+            min_jet_pt=min_jet_pt,
+            background_subtraction_settings=background_subtraction,
+            det_level_artificial_tracking_efficiency=det_level_artificial_tracking_efficiency,
+            validation_mode=validation_mode,
+        )
+
+        # There were no jets. Note that with a specially crafted empty file
+        if len(jets) == 0:
+            # Just create the empty filename and return. This will prevent trying to re-run with no jets in the future.
+            # Remember that this depends heavily on the jet pt cuts!
+            empty_filename = _output_filename.with_suffix(".empty")
+            empty_filename.touch()
+            return (True, f"Done - no jets to recluster, so not trying to skim for {_description}")
+
+        _input_filename = signal_input_filenames[0].parent / f"{signal_input_filenames[0].stem}_chunk_{i_chunk:03}{signal_input_filenames[0].suffix}"
+        _hardest_kt_embedding_skim(
+            jets=jets,
+            # NOTE: This argument is only for logging messages. Since the PbPb is the constraining factor,
+            #       we focus on processing those files.
+            input_filename=_input_filename,
+            jet_R=jet_R,
+            iterative_splittings=iterative_splittings,
+            scale_factor=scale_factor,
+            convert_data_format_prefixes=convert_data_format_prefixes,
+            output_filename=_output_filename,
+        )
 
     return (True, f"success for {_description}")
 
@@ -361,11 +379,14 @@ def hardest_kt_embedding_skim(
     if res[0]:
         return res
 
+    source_index_identifiers, arrays = analysis_alice.load_embedding(
+        signal_input=signal_input_filenames,
+        background_filename=background_input_filename,
+    )
+
     jets = analysis_alice.analysis_embedding(
-        *analysis_alice.load_embedding(
-            signal_input=signal_input_filenames,
-            background_filename=background_input_filename,
-        ),
+        source_index_identifiers=source_index_identifiers,
+        arrays=arrays,
         jet_R=jet_R,
         min_jet_pt=min_jet_pt,
         background_subtraction_settings=background_subtraction,
