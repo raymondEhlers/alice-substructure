@@ -10,6 +10,7 @@ from typing import Callable, Dict, Iterable, Mapping, MutableMapping, Optional, 
 
 import attr
 import boost_histogram as bh
+import cycler
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -642,6 +643,15 @@ _models_styles = {
     ),
 }
 
+# Based on better colorblind presets
+_palette_6_mod = [
+    "#7e459e",
+    "#85aa55",
+    "#7385d9",
+    "#b84c7d",
+    "#4cab98",
+]
+
 
 def _plot_data_model_comparison_for_single_system(
     hists: Mapping[str, SingleResult],
@@ -654,6 +664,10 @@ def _plot_data_model_comparison_for_single_system(
 ) -> None:
     grooming_styling = pb.define_grooming_styles()
 
+    _markers = ["o", "o", "o", "s", "o"]
+    # Need to rotate down one since we plot one less
+    _markers_ratio = ["o", "o", "s", "o", "o"]
+
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
         # Size is specified to make it convenient to compare against Hard Probes plots.
@@ -664,7 +678,13 @@ def _plot_data_model_comparison_for_single_system(
             gridspec_kw={"height_ratios": [3, 1]},
             sharex=True,
         )
-        for grooming_method in grooming_methods:
+
+        #ax.set_prop_cycle(cycler.cycler(color=_palette_6_mod) + cycler.cycler(marker=_markers))
+        #ax_ratio.set_prop_cycle(cycler.cycler(color=_palette_6_mod) + cycler.cycler(marker=_markers_ratio))
+        ax.set_prop_cycle(cycler.cycler(marker=_markers))
+        ax_ratio.set_prop_cycle(cycler.cycler(marker=_markers_ratio))
+
+        for _i, grooming_method in enumerate(grooming_methods):
             plotting_last_method = grooming_method == grooming_methods[-1]
 
             # First, the data
@@ -689,6 +709,7 @@ def _plot_data_model_comparison_for_single_system(
                 linestyle="",
                 linewidth=3,
                 label=grooming_styling[grooming_method].label_short,
+                color=_palette_6_mod[_i],
             )
 
             # Systematic uncertainty
@@ -707,6 +728,7 @@ def _plot_data_model_comparison_for_single_system(
                 # color=style.color,
                 color=p[0].get_color(),
                 linewidth=0,
+                alpha=0.3,
             )
 
             for model_name, model_with_all_grooming_methods in models.items():
@@ -791,6 +813,7 @@ def _plot_data_model_comparison_for_single_system(
                     y_errors=np.array([y_systematic.low, y_systematic.high]),
                     color=p[0].get_color(),
                     linewidth=0,
+                    alpha=0.3,
                 )
 
         # reference value for ratio
@@ -817,6 +840,7 @@ def plot_grooming_model_comparisons_for_single_system(
     kt_range: Union[helpers.KtRange, Mapping[str, helpers.KtRange]],
     figure_kt_range: helpers.KtRange = helpers.KtRange(1.5, 15),
     jet_R_str: str = "R04",
+    alice_status: str = "work_in_progress",
 ) -> None:
     """Plot comparison of grooming methods for a single system."""
 
@@ -827,7 +851,7 @@ def plot_grooming_model_comparisons_for_single_system(
     # grooming_styling = pb.define_grooming_styles()
     jet_pt_bin = next(iter(hists.values())).ranges[0]
 
-    text = pb.label_to_display_string["ALICE"]["work_in_progress"]
+    text = pb.label_to_display_string["ALICE"][alice_status]
     text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
@@ -862,7 +886,7 @@ def plot_grooming_model_comparisons_for_single_system(
                             "y",
                             label=r"$\frac{\text{Model}}{\text{Data}}$",
                             range=(0.45, 1.55),
-                            font_size=22,
+                            font_size=24,
                         ),
                     ],
                 ),
@@ -884,6 +908,55 @@ def _plot_single_system_comparison(
 ) -> None:
     grooming_styling = pb.define_grooming_styles()
 
+    # Blue, Purple, Green, Red
+    _palette = ["#5a97d3",
+                "#9671c3",
+                "#69a75f",
+                "#cc5366",
+                "#c758a9"]
+    # Pink, Green, Purple, Orange
+    _palette_2 = ["#c85a9b",
+                 "#78a352",
+                 "#787bcf",
+                 "#ca6d42"]
+    # Orange, Purple, Green, Pink, Teal
+    _palette_3 = [#"#c57b3d",
+                  "#946fc7",
+                  "#7aa444",
+                  "#ca5477",
+                  "#4cab98"]
+    # Green, purple, orange, teal, red/pink
+    _palette_4 = ["#72a553",
+                  "#a265c2",
+                  "#c57c3d",
+                  "#6097ce",
+                  "#ca5572"]
+    # Pastel
+    _palette_5 = ["#c7d49f",
+                  "#d3b3e3",
+                  "#93dacb",
+                  "#ebb0a4",
+                  "#82c7eb"]
+    #
+    _palette_6 = [#"#ba543d",
+                  "#7e459e",
+                  "#85aa55",
+                  "#7385d9",
+                  "#b84c7d",
+                  "#4cab98"]
+    _palette_6_mod = [
+        "#7e459e",
+        "#85aa55",
+        "#7385d9",
+        "#b84c7d",
+        "#4cab98",
+    ]
+
+    #_markers = ["D", "s", "o", "P", "o"]
+    _markers = ["o", "o", "o", "s", "o"]
+    # Need to rotate down one since we plot one less
+    _markers_ratio = ["o", "o", "s", "o", "o"]
+
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
         # Size is specified to make it convenient to compare against Hard Probes plots.
@@ -894,6 +967,9 @@ def _plot_single_system_comparison(
             gridspec_kw={"height_ratios": [3, 1]},
             sharex=True,
         )
+
+        ax.set_prop_cycle(cycler.cycler(color=_palette_6_mod) + cycler.cycler(marker=_markers))
+        ax_ratio.set_prop_cycle(cycler.cycler(color=_palette_6_mod) + cycler.cycler(marker=_markers_ratio))
 
         # Use selected grooming method as a reference, but only in the range where the others are measured.
         ratio_reference_hist_unselected = hists[reference_grooming_method].data
@@ -910,13 +986,21 @@ def _plot_single_system_comparison(
                 h.errors[h.values == 0] = np.nan
                 h.values[h.values == 0] = np.nan
 
+            ## Plot options
+            #kwargs = {
+            #    "markerfacecolor": "white" if style.fillstyle == "none" else style.color,
+            #    "alpha": 1 if style.fillstyle == "none" else 0.8,
+            #}
+            #if style.fillstyle != "none":
+            #    kwargs["markeredgewidth"] = 0
+
             # Main data points
             p = ax.errorbar(
                 h.axes[0].bin_centers,
                 h.values,
                 yerr=h.errors,
                 xerr=h.axes[0].bin_widths / 2,
-                marker="o",
+                #marker="o",
                 markersize=11,
                 linestyle="",
                 linewidth=3,
@@ -939,6 +1023,7 @@ def _plot_single_system_comparison(
                 # color=style.color,
                 color=p[0].get_color(),
                 linewidth=0,
+                alpha=0.3,
             )
 
             # Ratio
@@ -973,7 +1058,7 @@ def _plot_single_system_comparison(
                 yerr=ratio.errors,
                 xerr=ratio.axes[0].bin_widths / 2,
                 color=p[0].get_color(),
-                marker="o",
+                #marker="o",
                 markersize=11,
                 linestyle="",
                 linewidth=3,
@@ -1019,6 +1104,7 @@ def _plot_single_system_comparison(
                 y_errors=np.array([y_systematic.low, y_systematic.high]),
                 color=p[0].get_color(),
                 linewidth=0,
+                alpha=0.3,
             )
 
     # Labeling and presentation
@@ -1042,6 +1128,7 @@ def plot_grooming_comparisons_for_single_system(
     kt_range: Union[helpers.KtRange, Mapping[str, helpers.KtRange]],
     figure_kt_range: helpers.KtRange = helpers.KtRange(1.5, 15),
     jet_R_str: str = "R04",
+    alice_status: str = "work_in_progress",
 ) -> None:
     """Plot comparison of grooming methods for a single system."""
 
@@ -1052,7 +1139,7 @@ def plot_grooming_comparisons_for_single_system(
     grooming_styling = pb.define_grooming_styles()
     jet_pt_bin = next(iter(hists.values())).ranges[0]
 
-    text = pb.label_to_display_string["ALICE"]["work_in_progress"]
+    text = pb.label_to_display_string["ALICE"][alice_status]
     text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
@@ -1089,7 +1176,7 @@ def plot_grooming_comparisons_for_single_system(
                             + grooming_styling[reference_grooming_method].label_short
                             + "}}$",
                             range=(0.45, 1.55),
-                            font_size=22,
+                            font_size=24,
                         ),
                     ],
                 ),
@@ -1129,6 +1216,28 @@ def _plot_pp_PbPb_comparison(
     #    "central": helpers.KtRange(3, 6),
     #}
 
+
+    _p7 = [
+        # Suggested by Hannah:
+        # Pretty yellow :-/
+        #"#FFA500",
+        #"#dd9132",
+        #"#5a3c00",
+        #"#FF8301",
+
+        #"#9cb94a",
+        "#845cba",
+        #"#be4977",
+
+        "#FF8301",
+
+        # Others from the original generation
+        # Orange
+        #"#c06835",
+        # Teal-ish
+        "#59c28c",
+    ]
+
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
         # Size is specified to make it convenient to compare against Hard Probes plots.
@@ -1139,6 +1248,9 @@ def _plot_pp_PbPb_comparison(
             gridspec_kw={"height_ratios": [3, 1]},
             sharex=True,
         )
+
+        ax.set_prop_cycle(cycler.cycler(color=_p7))
+        ax_ratio.set_prop_cycle(cycler.cycler(color=_p7))
 
         # Use pp as reference, but only in the range where the others are measured.
         ratio_reference_hist_unselected = hists["pp"].data
@@ -1162,7 +1274,7 @@ def _plot_pp_PbPb_comparison(
                 h.values,
                 yerr=h.errors,
                 xerr=h.axes[0].bin_widths / 2,
-                marker="o",
+                marker="s" if "soft_drop" in grooming_method else "o",
                 markersize=11,
                 linestyle="",
                 linewidth=3,
@@ -1185,6 +1297,7 @@ def _plot_pp_PbPb_comparison(
                 # color=style.color,
                 color=p[0].get_color(),
                 linewidth=0,
+                alpha=0.3,
             )
 
             # Ratio
@@ -1206,7 +1319,7 @@ def _plot_pp_PbPb_comparison(
                 yerr=ratio.errors,
                 xerr=ratio.axes[0].bin_widths / 2,
                 color=p[0].get_color(),
-                marker="o",
+                marker="s" if "soft_drop" in grooming_method else "o",
                 markersize=11,
                 linestyle="",
                 linewidth=3,
@@ -1252,6 +1365,7 @@ def _plot_pp_PbPb_comparison(
                 y_errors=np.array([y_systematic.low, y_systematic.high]),
                 color=p[0].get_color(),
                 linewidth=0,
+                alpha=0.3,
             )
 
     # Labeling and presentation
@@ -1272,13 +1386,14 @@ def plot_pp_PbPb_comparison(
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
     kt_display_range: Tuple[float, float] = (1.5, 15),
     jet_R_str: str = "R04",
+    alice_status: str = "work_in_progress",
 ) -> None:
     """Plot PbPb unfolded results with systematics."""
     jet_pt_bin = next(iter(hists.values())).ranges[0]
     grooming_styling = pb.define_grooming_styles()
     style = grooming_styling[grooming_method]
 
-    text = pb.label_to_display_string["ALICE"]["work_in_progress"]
+    text = pb.label_to_display_string["ALICE"][alice_status]
     text += "\n" + pb.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
@@ -1309,7 +1424,7 @@ def plot_pp_PbPb_comparison(
                 pb.Panel(
                     axes=[
                         pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=22),
-                        pb.AxisConfig("y", label=r"$\frac{\text{Pb-Pb}}{\text{pp}}$", range=(0.45, 1.55), font_size=22),
+                        pb.AxisConfig("y", label=r"$\frac{\text{Pb--Pb}}{\text{pp}}$", range=(0.45, 1.55), font_size=24),
                     ],
                 ),
             ],
