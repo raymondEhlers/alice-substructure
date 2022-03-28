@@ -50,6 +50,7 @@ class GroomingMethodStyle:
     marker: str = attr.ib()
     fillstyle: str = attr.ib()
     label: str = attr.ib()
+    label_short: str = attr.ib()
     zorder: int = attr.ib()
 
 
@@ -79,26 +80,37 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
         markers = ["o", "d", "s"]
         grooming_styling = {
             f"dynamical_z{label}": GroomingMethodStyle(
-                color=dynamical_grooming_colors[0], marker=markers[0], fillstyle="full", label="DyG. $z$", zorder=10
+                color=dynamical_grooming_colors[0], marker=markers[0], fillstyle="full",
+                label="Dynamical grooming $a = 0.1$",
+                label_short="DyG. $a = 0.1$",
+                zorder=10,
             ),
             f"dynamical_kt{label}": GroomingMethodStyle(
                 color=greens[1],
                 marker=markers[0],
                 fillstyle="full",
-                label=r"DyG $k_{\text{T}}$",
+                label="Dynamical grooming $a = 1.0$",
+                label_short=r"DyG $a = 1.0$",
                 zorder=10,
             ),
             f"dynamical_time{label}": GroomingMethodStyle(
-                color=reds[1], marker=markers[2], fillstyle="full", label=r"DyG time", zorder=10
+                color=reds[1], marker=markers[2], fillstyle="full",
+                label=r"Dynamical grooming $a = 2.0$",
+                label_short=r"DyG $a = 2.0$",
+                zorder=10,
             ),
             f"dynamical_core{label}": GroomingMethodStyle(
-                color=oranges[1], marker=markers[2], fillstyle="full", label=r"DyG core", zorder=10
+                color=oranges[1], marker=markers[2], fillstyle="full",
+                label=r"Dynamical grooming $a = 0.5$",
+                label_short=r"DyG $a = 0.5$",
+                zorder=10,
             ),
             f"leading_kt{label}": GroomingMethodStyle(
                 color=purples[1],
                 marker=markers[1],
                 fillstyle="full",
                 label=r"Leading $k_{\text{T}}$",
+                label_short=r"Lead. $k_{\text{T}}$",
                 zorder=10,
             ),
             f"leading_kt_z_cut_02{label}": GroomingMethodStyle(
@@ -106,6 +118,7 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
                 marker=markers[1],
                 fillstyle="none",
                 label=r"Leading $k_{\text{T}}$ $z > 0.2$",
+                label_short=r"Lead. $k_{\text{T}}$ $z > 0.2$",
                 zorder=4,
             ),
             f"leading_kt_z_cut_04{label}": GroomingMethodStyle(
@@ -113,6 +126,7 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
                 marker=markers[2],
                 fillstyle="full",
                 label=r"Leading $k_{\text{T}}$ $z > 0.4$",
+                label_short=r"Lead. $k_{\text{T}}$ $z > 0.4$",
                 zorder=10,
             ),
             # Leading kt with z cuts, but n <= 1
@@ -121,6 +135,7 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
                 marker="P",
                 fillstyle="none",
                 label=r"Leading $k_{\text{T}}$ $z > 0.2$, $n \leq 1$",
+                label_short=r"Lead. $k_{\text{T}}$ $z > 0.2$, $n \leq 1$",
                 zorder=4,
             ),
             f"leading_kt_z_cut_04_first_split{label}": GroomingMethodStyle(
@@ -128,13 +143,20 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
                 marker="P",
                 fillstyle="full",
                 label=r"Leading $k_{\text{T}}$ $z > 0.4$, $n \leq 1$",
+                label_short=r"Lead. $k_{\text{T}}$ $z > 0.4$, $n \leq 1$",
                 zorder=10,
             ),
             f"soft_drop_z_cut_02{label}": GroomingMethodStyle(
-                color=soft_drop_colors[1], marker=markers[1], fillstyle="none", label=r"SoftDrop $z > 0.2$", zorder=4
+                color=soft_drop_colors[1], marker=markers[1], fillstyle="none",
+                label=r"Soft drop $z_{\text{cut}} = 0.2$",
+                label_short=r"SD $z_{\text{cut}} = 0.2$",
+                zorder=4,
             ),
             f"soft_drop_z_cut_04{label}": GroomingMethodStyle(
-                color=soft_drop_colors[1], marker=markers[2], fillstyle="full", label=r"SoftDrop $z > 0.4$", zorder=5
+                color=soft_drop_colors[1], marker=markers[2], fillstyle="full",
+                label=r"Soft drop $z_{\text{cut}} = 0.4$",
+                label_short=r"SD $z_{\text{cut}} = 0.4$",
+                zorder=5,
             ),
         }
         styles.update(grooming_styling)
