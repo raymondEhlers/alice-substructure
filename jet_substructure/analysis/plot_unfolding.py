@@ -589,8 +589,8 @@ _models_styles = {
         linewidth=3,
         linestyle="-",
         marker="s",
-        #color=_model_palette[0],
-        color=_model_palette[7],
+        color=_model_palette[0],
+        #color=_model_palette[7],
         markerfacecolor="none",
         #markerfacecolor="white",
         markeredgewidth=3,
@@ -687,7 +687,7 @@ def _plot_data_model_comparison_for_single_system(
                 markersize=11,
                 linestyle="",
                 linewidth=3,
-                label=grooming_styling[grooming_method].label,
+                label=grooming_styling[grooming_method].label_short,
             )
 
             # Systematic uncertainty
@@ -723,21 +723,25 @@ def _plot_data_model_comparison_for_single_system(
                 # TODO: Careful, pythia is already normalized, but jetscape wasn't. So we need to resolve this...
                 #       Probably best to have some kind of "prepare model" function, which we can decide to use or not.
                 # Then normalize
-                model /= np.sum(model.values)
-                model /= model.axes[0].bin_widths
+                #####model /= np.sum(model.values)
+                #####model /= model.axes[0].bin_widths
                 # And select the same range.
-                # model = unfolding_base.select_hist_range(model, kt_range[grooming_method])
+                model = unfolding_base.select_hist_range(model, kt_range[grooming_method])
 
                 # And plot
                 # Make sure we copy the settings so we can modify them
                 temp_kwargs = dict(_models_styles[model_name])
                 temp_kwargs["label"] = temp_kwargs["label"] if plotting_last_method else None
+                temp_kwargs.pop("color")
+                temp_kwargs.pop("marker")
                 ax.errorbar(
                     model.axes[0].bin_centers,
                     model.values,
                     # yerr=model.errors,
                     # xerr=model.axes[0].bin_widths / 2,
-                    color=grooming_styling[grooming_method].color,
+                    # TODO: This isn't right if there are multiple models, but let's me get through the previews
+                    color=p[0].get_color(),
+                    #color=grooming_styling[grooming_method].color,
                     # marker=style.marker,
                     # fillstyle=grooming_styling[grooming_method].fillstyle,
                     # linestyle="",
@@ -841,7 +845,7 @@ def plot_grooming_model_comparisons_for_single_system(
                     axes=[
                         pb.AxisConfig(
                             "y",
-                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
                             range=(5e-3, 1),
                             font_size=22,
@@ -852,7 +856,7 @@ def plot_grooming_model_comparisons_for_single_system(
                 ),
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
+                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
                         pb.AxisConfig(
                             "y",
                             label=r"$\frac{\text{Model}}{\text{Data}}$",
@@ -915,7 +919,7 @@ def _plot_single_system_comparison(
                 markersize=11,
                 linestyle="",
                 linewidth=3,
-                label=grooming_styling[grooming_method].label,
+                label=grooming_styling[grooming_method].label_short,
             )
 
             # Systematic uncertainty
@@ -1066,7 +1070,7 @@ def plot_grooming_comparisons_for_single_system(
                     axes=[
                         pb.AxisConfig(
                             "y",
-                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
                             range=(5e-3, 1),
                             font_size=22,
@@ -1077,11 +1081,11 @@ def plot_grooming_comparisons_for_single_system(
                 ),
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
+                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
                         pb.AxisConfig(
                             "y",
                             label=r"$\frac{\text{Method}}{\text{"
-                            + grooming_styling[reference_grooming_method].label
+                            + grooming_styling[reference_grooming_method].label_short
                             + "}}$",
                             range=(0.45, 1.55),
                             font_size=22,
@@ -1099,6 +1103,7 @@ def _plot_pp_PbPb_comparison(
     hists: Mapping[str, SingleResult],
     grooming_method: str,
     set_zero_to_nan: bool,
+    event_activity_to_kt_range: Mapping[str, helpers.KtRange],
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
@@ -1113,14 +1118,15 @@ def _plot_pp_PbPb_comparison(
     }
     # NOTE: Probably should make this configurable at some point.
     # Based on kinematic eff and unfolding ranges
-    event_activity_to_range = {
-        # TEMP: Make this configurable...
-        "pp": helpers.KtRange(0.25, 6),
-        # "semi_central": helpers.KtRange(0.25, 6),
-        # "pp": helpers.KtRange(0.5, 6),
-        "semi_central": helpers.KtRange(2, 6),
-        "central": helpers.KtRange(3, 6),
-    }
+    #event_activity_to_range = {
+    #    # TEMP: Make this configurable...
+    #    "pp": helpers.KtRange(0.25, 6),
+    #    # "semi_central": helpers.KtRange(0.25, 6),
+    #    # "pp": helpers.KtRange(0.5, 6),
+    #    "semi_central": helpers.KtRange(2, 6),
+    #    #"semi_central": helpers.KtRange(0.25, 6),
+    #    "central": helpers.KtRange(3, 6),
+    #}
 
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
@@ -1142,7 +1148,7 @@ def _plot_pp_PbPb_comparison(
             h = hist.data
 
             # Select range to display.
-            h = unfolding_base.select_hist_range(h, event_activity_to_range[collision_system])
+            h = unfolding_base.select_hist_range(h, event_activity_to_kt_range[collision_system])
 
             # Set 0s to NaN
             if set_zero_to_nan:
@@ -1187,7 +1193,7 @@ def _plot_pp_PbPb_comparison(
 
             # Ensure the ratio is defined over the same range.
             ratio_reference_hist = unfolding_base.select_hist_range(
-                ratio_reference_hist_unselected, event_activity_to_range[collision_system]
+                ratio_reference_hist_unselected, event_activity_to_kt_range[collision_system]
             )
             logger.debug(f"h: {h.axes[0].bin_edges}")
             logger.debug(f"ratio_reference_hist: {ratio_reference_hist.axes[0].bin_edges}")
@@ -1262,7 +1268,8 @@ def plot_pp_PbPb_comparison(
     hists: Mapping[str, SingleResult],
     grooming_method: str,
     output_dir: Path,
-    kt_range: Tuple[float, float] = (1.5, 15),
+    event_activity_to_kt_range: Mapping[str, helpers.KtRange],
+    kt_display_range: Tuple[float, float] = (1.5, 15),
     jet_R_str: str = "R04",
 ) -> None:
     """Plot PbPb unfolded results with systematics."""
@@ -1280,6 +1287,7 @@ def plot_pp_PbPb_comparison(
         hists=hists,
         grooming_method=grooming_method,
         set_zero_to_nan=False,
+        event_activity_to_kt_range=event_activity_to_kt_range,
         plot_config=pb.PlotConfig(
             name=f"unfolded_kt_pp_PbPb_comparison_{jet_R_str}",
             panels=[
@@ -1288,7 +1296,7 @@ def plot_pp_PbPb_comparison(
                     axes=[
                         pb.AxisConfig(
                             "y",
-                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
                             range=(5e-3, 1),
                             font_size=22,
@@ -1299,7 +1307,7 @@ def plot_pp_PbPb_comparison(
                 ),
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=kt_range, font_size=22),
+                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=22),
                         pb.AxisConfig("y", label=r"$\frac{\text{Pb-Pb}}{\text{pp}}$", range=(0.45, 1.55), font_size=22),
                     ],
                 ),
@@ -1927,7 +1935,7 @@ def setup_unfolding_outputs(  # noqa: C901
         logger.debug("Skipping model dependence because the output file doesn't exist.")
 
     # Background subtraction
-    for background_setting in ["Rmax060", "Rmax005"]:
+    for background_setting in ["Rmax070", "Rmax005"]:
         try:
             unfolding_outputs[background_setting] = UnfoldingOutput(
                 substructure_variable=substructure_variable,
@@ -2251,7 +2259,7 @@ def calculate_systematics(  # noqa: C901
 
     # Background subtraction systematics.
     background_systematics = {}
-    for background_setting in ["Rmax060", "Rmax005"]:
+    for background_setting in ["Rmax070", "Rmax005"]:
         try:
             background_systematics[background_setting] = (
                 unfolded[background_setting].data.values - unfolded["default"].data.values
@@ -2264,9 +2272,16 @@ def calculate_systematics(  # noqa: C901
         unfolded["default"].data.metadata["y_systematic"][
             "background_sub"
         ] = unfolding_base.AsymmetricErrors.calculate_errors(
-            background_systematics.get("RMax005", first_background_sub),
-            background_systematics.get("RMax060", first_background_sub),
+            background_systematics.get("Rmax005", first_background_sub),
+            background_systematics.get("Rmax070", first_background_sub),
         )
+        #] = unfolding_base.AsymmetricErrors(
+        #    background_systematics.get("Rmax005", first_background_sub),
+        #    background_systematics.get("Rmax070", first_background_sub),
+        #)
+        logger.warning(f"Bin centers: {unfolded['default'].data.axes[0].bin_centers}")
+        logger.warning(f"RMax005: {background_systematics.get('Rmax005') / unfolded['default'].data.values}")
+        logger.warning(f"RMax070: {background_systematics.get('Rmax070') / unfolded['default'].data.values}")
     else:
         logger.debug("Skipping background subtraction systematic because no values are available")
 
@@ -2299,7 +2314,7 @@ def calculate_systematics(  # noqa: C901
         logger.debug(f"Skipping non closure systematic because of {e}")
 
     # Model dependence.
-    # The output should include _either_ the model dependence or the non-closure
+    # The output should include _either_ the model dependence or the prior
     if "model_dependence" in unfolding_outputs:
         # First, extract the model dependence graph
         # NOTE: This output is quite different, so we just need to handle the graph (not hist!) directly.
