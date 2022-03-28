@@ -229,7 +229,8 @@ class UnfoldingOutput:
         # Fully setup base dir.
         # NOTE: Added "parsl" for the newer output results.
         # self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "feb2021_test"
-        self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2021-04"
+        #self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2021-04"
+        self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2022-03-QM"
 
         # Initialize the file if the histograms aren't specified.
         if not self.hists:
@@ -2228,11 +2229,14 @@ def calculate_systematics(  # noqa: C901
     )
 
     # Random binning
+    # Take as a symmetric uncertainty because it's not clear why it should be one sided given that
+    # we're taking only one variation.
     try:
+        random_binning_sym = unfolded["random_binning"].data.values - unfolded["default"].data.values
         unfolded["default"].data.metadata["y_systematic"][
             "random_binning"
-        ] = unfolding_base.AsymmetricErrors.calculate_errors(
-            unfolded["random_binning"].data.values - unfolded["default"].data.values
+        ] = unfolding_base.AsymmetricErrors(
+            random_binning_sym, random_binning_sym,
         )
     except KeyError as e:
         logger.debug(f"Skipping random binning because of {e}")
