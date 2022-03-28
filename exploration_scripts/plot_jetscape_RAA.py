@@ -50,8 +50,8 @@ def get_hists(filename: Path) -> Dict[str, hist.Hist]:
 
 
 def combine_spectra_in_cent_bins(hists: Mapping[str, hist.Hist], jet_type: str, jet_R: float, a: str, b: str) -> hist.Hist:
-    #name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
-    name = "n_events_weighted"
+    name = f"{jet_type}_jetR{format_R(jet_R)}_n_events_weighted"
+    #name = "n_events_weighted"
 
     a_n_events = hists[f"PbPb_{a}"][name]
     b_n_events = hists[f"PbPb_{b}"][name]
@@ -59,7 +59,9 @@ def combine_spectra_in_cent_bins(hists: Mapping[str, hist.Hist], jet_type: str, 
     a_jet_pt = hists[f"PbPb_{a}"][name]
     b_jet_pt = hists[f"PbPb_{b}"][name]
 
-    return ((a_jet_pt / a_n_events.values()[0]) + (b_jet_pt / b_n_events.values()[0])) / 2
+    # See Laura's note on adding
+    #return ((a_jet_pt / a_n_events.values()[0]) + (b_jet_pt / b_n_events.values()[0])) / 2
+    return (a_jet_pt + b_jet_pt) / (a_n_events.values()[0] + b_n_events.values()[0])
     #return ((a_jet_pt / np.sum(a_jet_pt.values())) + (b_jet_pt / np.sum(b_jet_pt.values()))) / 2
 
 
@@ -113,6 +115,8 @@ def plot(output_dir: Path,
                 # Finish labeling
                 text += "\n" + r"JETSCAPE Work in Progress" + "\n" + "MATTER + LBT"
                 text += "\n" + r"$\alpha_{s} = 0.3$, $Q_{\text{switch}} = 2$ GeV"
+                jet_eta_range = 0.9 if jet_type == "charged" else 0.7
+                text += "\n" + r"anti-$k_{\text{T}}$ jets, $|\eta_{\text{jet}}| < " + str(jet_eta_range) + " - R$"
 
                 plot_config = pb.PlotConfig(
                     name=f"jet_pt_{jet_type}_R{format_R(jet_R)}",
@@ -173,17 +177,19 @@ def plot(output_dir: Path,
                 )
 
                 # Get scaled pp ref for RAA
-                #name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
-                name = "n_events_weighted"
+                name = f"{jet_type}_jetR{format_R(jet_R)}_n_events_weighted"
+                #name = "n_events_weighted"
                 h_pp_ref_n_events = hists["pp"][name]
                 name = f"{jet_type}_jetR{format_R(jet_R)}_jet_pt"
                 # Scale immediately, since we're going to do it anyway
                 h_pp_ref_jet_pt = hists["pp"][name] / h_pp_ref_n_events.values()[0]
                 #h_pp_ref_jet_pt = hists["pp"][name] / np.sum(hists["pp"][name].values())
 
+                # TODO: Check pp ratios!
+
                 for system, v in hists.items():
-                    #name = f"{jet_type}_jetR{format_R(jet_R)}_n_events"
-                    name = "n_events_weighted"
+                    name = f"{jet_type}_jetR{format_R(jet_R)}_n_events_weighted"
+                    #name = "n_events_weighted"
                     h_n_events = v[name]
                     name = f"{jet_type}_jetR{format_R(jet_R)}_jet_pt"
                     h_jet_pt = v[name]
@@ -285,6 +291,8 @@ def plot(output_dir: Path,
                 # Finish labeling
                 text += "\n" + r"JETSCAPE Work in Progress" + "\n" + "MATTER + LBT"
                 text += "\n" + r"$\alpha_{s} = 0.3$, $Q_{\text{switch}} = 2$ GeV"
+                jet_eta_range = 0.9 if jet_type == "charged" else 0.7
+                text += "\n" + r"anti-$k_{\text{T}}$ jets, $|\eta_{\text{jet}}| < " + str(jet_eta_range) + " - R$"
 
                 x_axis_kwargs = {}
                 if restricted_range:
@@ -308,9 +316,14 @@ def plot(output_dir: Path,
                     ],
                     figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.08)),
                 )
+                # 10 GeV wide bins up to 100 GeV, followed by 100 GeV wide bins beyond there.
+                new_bins = np.concatenate([np.arange(10, 100, 10), np.arange(100, 1100, 100)])
+                original_bin_width = 10
                 for jet_R in jet_R_values:
                     print(f"jet_R: {jet_R}")
-                    h_RAA = RAA_hists[system][f"{jet_type}_R{format_R(jet_R)}"]
+                    h_RAA = RAA_hists[system][f"{jet_type}_R{format_R(jet_R)}"][:: new_bins]
+                    # Normalize by bin width
+                    h_RAA /= (h_RAA.axes[0].bin_widths / original_bin_width)
                     p = ax.fill_between(
                         h_RAA.axes[0].bin_centers,
                         h_RAA.values - h_RAA.errors,
@@ -362,5 +375,6 @@ if __name__ == "__main__":
         output_dir=Path("jetscape_RAA_output/plots"),
         write_hists=True,
         jet_R_values=[0.2, 0.4, 0.5, 0.6, 0.8],
-        jet_types=["charged"],
+        #jet_R_values=[0.2],
+        jet_types=["full"],
     )
