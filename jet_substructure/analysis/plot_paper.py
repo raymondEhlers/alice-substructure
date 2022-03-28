@@ -24,6 +24,23 @@ logger = logging.getLogger(__name__)
 pachyderm.plot.configure()
 
 
+def adjust_lightness(color, amount=0.5):
+    """
+    From: https://stackoverflow.com/a/49601444/12907985
+
+    TODO: Cleanup
+    """
+    import matplotlib.colors as mc
+    import colorsys
+    try:
+        c = mc.cnames[color]
+    except:
+        c = color
+    #c = colorsys.rgb_to_hls(*mc.to_rgb(c))
+    c = colorsys.rgb_to_hls(*c)
+    return colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
+
+
 def _plot_pp_grooming_comparison_with_models(  # noqa: C901
     hists: Mapping[str, plot_unfolding.SingleResult],
     grooming_methods: Sequence[str],
@@ -212,7 +229,18 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
 
             #_temp_i = 0
             colors = ["Blues_r", "Oranges_r", "Greens_r", "Reds_r"]
-            colors_for_models = sns.color_palette(colors[i_grooming_method], n_colors = 6)
+            #colors_for_models = sns.color_palette(colors[i_grooming_method], n_colors = 6)
+            t = matplotlib.colors.LinearSegmentedColormap.from_list(
+                f"{grooming_method}_col",
+                N=6,
+                # From white to the plotted color
+                colors=[
+                    (1, 1, 1),
+                    #adjust_lightness(p[0].get_color(), 0.25)
+                    p[0].get_color(),
+                ]
+            )
+            colors_for_models = [t.reversed()(i/6.) for i in range(6)]
             for i_model, (model_name, model_with_all_grooming_methods) in enumerate(models.items()):
                 model = model_with_all_grooming_methods.get(grooming_method, None)
                 if not model:
