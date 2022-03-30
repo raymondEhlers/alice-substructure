@@ -820,7 +820,7 @@ def _plot_data_model_comparison_for_single_system(
                 )
 
     # reference value for ratio
-    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
 
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
@@ -1112,7 +1112,7 @@ def _plot_single_system_comparison(
             )
 
     # Reference value for ratio
-    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
 
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
@@ -1377,7 +1377,7 @@ def _plot_pp_PbPb_comparison(
             )
 
     # Reference value for ratio
-    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
 
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
