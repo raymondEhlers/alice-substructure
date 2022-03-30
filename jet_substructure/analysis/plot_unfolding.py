@@ -664,9 +664,12 @@ def _plot_data_model_comparison_for_single_system(
 ) -> None:
     grooming_styling = pb.define_grooming_styles()
 
-    _markers = ["o", "o", "o", "s", "o"]
-    # Need to rotate down one since we plot one less
-    _markers_ratio = ["o", "o", "s", "o", "o"]
+    _markers_by_grooming_method = {
+        "dynamical_core": "o",
+        "dynamical_kt": "o",
+        "dynamical_time": "o",
+        "soft_drop_z_cut_02": "s",
+    }
 
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
@@ -681,8 +684,8 @@ def _plot_data_model_comparison_for_single_system(
 
         #ax.set_prop_cycle(cycler.cycler(color=_palette_6_mod) + cycler.cycler(marker=_markers))
         #ax_ratio.set_prop_cycle(cycler.cycler(color=_palette_6_mod) + cycler.cycler(marker=_markers_ratio))
-        ax.set_prop_cycle(cycler.cycler(marker=_markers))
-        ax_ratio.set_prop_cycle(cycler.cycler(marker=_markers_ratio))
+        #ax.set_prop_cycle(cycler.cycler(marker=_markers))
+        #ax_ratio.set_prop_cycle(cycler.cycler(marker=_markers_ratio))
 
         for _i, grooming_method in enumerate(grooming_methods):
             plotting_last_method = grooming_method == grooming_methods[-1]
@@ -704,7 +707,7 @@ def _plot_data_model_comparison_for_single_system(
                 h.values,
                 yerr=h.errors,
                 xerr=h.axes[0].bin_widths / 2,
-                marker="o",
+                marker=_markers_by_grooming_method[grooming_method],
                 markersize=11,
                 linestyle="",
                 linewidth=3,
@@ -786,7 +789,7 @@ def _plot_data_model_comparison_for_single_system(
                     yerr=ratio.errors,
                     xerr=ratio.axes[0].bin_widths / 2,
                     color=p[0].get_color(),
-                    marker="o",
+                    marker=_markers_by_grooming_method[grooming_method],
                     markersize=11,
                     linestyle="",
                     linewidth=3,
@@ -816,8 +819,8 @@ def _plot_data_model_comparison_for_single_system(
                     alpha=0.3,
                 )
 
-        # reference value for ratio
-        ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+    # reference value for ratio
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
 
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
@@ -841,6 +844,7 @@ def plot_grooming_model_comparisons_for_single_system(
     figure_kt_range: helpers.KtRange = helpers.KtRange(1.5, 15),
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
+    text_font_size: int = 31,
 ) -> None:
     """Plot comparison of grooming methods for a single system."""
 
@@ -872,26 +876,26 @@ def plot_grooming_model_comparisons_for_single_system(
                             "y",
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
-                            range=(5e-3, 1),
-                            font_size=22,
+                            range=(7e-3, 1),
+                            font_size=text_font_size,
                         ),
                     ],
-                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
-                    legend=pb.LegendConfig(location="lower left", font_size=22),
+                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
+                    legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.015, 0.025), marker_label_spacing=0.075),
                 ),
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
+                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=text_font_size),  # type: ignore
                         pb.AxisConfig(
                             "y",
                             label=r"$\frac{\text{Model}}{\text{Data}}$",
                             range=(0.45, 1.55),
-                            font_size=24,
+                            font_size=text_font_size,
                         ),
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.08)),
+            figure=pb.Figure(edge_padding=dict(left=0.15, bottom=0.095, top=0.975)),
         ),
         output_dir=output_dir,
     )
@@ -1107,6 +1111,9 @@ def _plot_single_system_comparison(
                 alpha=0.3,
             )
 
+    # Reference value for ratio
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
     # A few additional tweaks.
@@ -1129,6 +1136,7 @@ def plot_grooming_comparisons_for_single_system(
     figure_kt_range: helpers.KtRange = helpers.KtRange(1.5, 15),
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
+    text_font_size: int = 31,
 ) -> None:
     """Plot comparison of grooming methods for a single system."""
 
@@ -1160,28 +1168,28 @@ def plot_grooming_comparisons_for_single_system(
                             "y",
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
-                            range=(5e-3, 1),
-                            font_size=22,
+                            range=(7e-3, 1),
+                            font_size=text_font_size,
                         ),
                     ],
-                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
-                    legend=pb.LegendConfig(location="lower left", font_size=22),
+                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
+                    legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.015, 0.025), marker_label_spacing=0.075),
                 ),
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
+                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=text_font_size),  # type: ignore
                         pb.AxisConfig(
                             "y",
                             label=r"$\frac{\text{Method}}{\text{"
                             + grooming_styling[reference_grooming_method].label_short
                             + "}}$",
                             range=(0.45, 1.55),
-                            font_size=24,
+                            font_size=text_font_size,
                         ),
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.08)),
+            figure=pb.Figure(edge_padding=dict(left=0.15, bottom=0.095, top=0.975)),
         ),
         output_dir=output_dir,
     )
@@ -1368,6 +1376,9 @@ def _plot_pp_PbPb_comparison(
                 alpha=0.3,
             )
 
+    # Reference value for ratio
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
     # A few additional tweaks.
@@ -1387,6 +1398,7 @@ def plot_pp_PbPb_comparison(
     kt_display_range: Tuple[float, float] = (1.5, 15),
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
+    text_font_size: int = 31,
 ) -> None:
     """Plot PbPb unfolded results with systematics."""
     jet_pt_bin = next(iter(hists.values())).ranges[0]
@@ -1398,7 +1410,6 @@ def plot_pp_PbPb_comparison(
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
-    text += "\n" + fr"{style.label}"
     _plot_pp_PbPb_comparison(
         hists=hists,
         grooming_method=grooming_method,
@@ -1414,21 +1425,26 @@ def plot_pp_PbPb_comparison(
                             "y",
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
-                            range=(5e-3, 1),
-                            font_size=22,
+                            range=(7e-3, 1),
+                            font_size=text_font_size,
                         ),
                     ],
-                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=22),
-                    legend=pb.LegendConfig(location="lower left", font_size=22),
+                    text=[
+                        pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
+                        # Add the grooming label in a separate location in the bottom left
+                        # Otherwise, it will overlap with the data
+                        pb.TextConfig(x=0.03, y=0.03, text=style.label, font_size=text_font_size),
+                    ],
+                    legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.0, 0.11), marker_label_spacing=0.05),
                 ),
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=22),
-                        pb.AxisConfig("y", label=r"$\frac{\text{Pb--Pb}}{\text{pp}}$", range=(0.45, 1.55), font_size=24),
+                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
+                        pb.AxisConfig("y", label=r"$\frac{\text{Pb--Pb}}{\text{pp}}$", range=(0.45, 1.55), font_size=text_font_size),
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.08)),
+            figure=pb.Figure(edge_padding=dict(left=0.15, bottom=0.095, top=0.975)),
         ),
         output_dir=output_dir,
     )
