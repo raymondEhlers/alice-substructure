@@ -41,7 +41,7 @@ label_to_display_string: Dict[str, Dict[str, str]] = {
     ),
     "jets": {f"R0{i}": (f"$R=0.{i}," + fr"\:|\eta_{{\text{{jet}}}}| < 0.{9-i}$") for i in range(1, 7)},
 }
-label_to_display_string["jets"]["general"] = r"$\text{Anti-}k_{\text{T}}\:\text{charged jets}$"
+label_to_display_string["jets"]["general"] = r"$\text{Anti-}k_{\text{T}}\:\text{ch-particle jets}$"
 
 
 @attr.s
