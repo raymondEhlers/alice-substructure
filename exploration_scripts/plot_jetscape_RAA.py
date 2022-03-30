@@ -230,9 +230,13 @@ def plot(output_dir: Path,
                 # 0-10%
                 #h_RAA = h_pp_ref_jet_pt / h_PbPb_00_10_jet_pt
                 #(h_RAA[::hist.rebin(5)] / 5).plot(ax=ax_RAA, label=labels["PbPb_00_10"], linewidth=2)
+                #h_RAA = (
+                #    binned_data.BinnedData.from_existing_data((h_PbPb_00_10_jet_pt[10j::hist.rebin(10)] / 10))
+                #    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[10j::hist.rebin(10)] / 10))
+                #)
                 h_RAA = (
-                    binned_data.BinnedData.from_existing_data((h_PbPb_00_10_jet_pt[10j::hist.rebin(10)] / 10))
-                    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[10j::hist.rebin(10)] / 10))
+                    binned_data.BinnedData.from_existing_data((h_PbPb_00_10_jet_pt[10j:]))
+                    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[10j:]))
                 )
                 RAA_hists["PbPb_00_10"][f"{jet_type}_R{format_R(jet_R)}"] = h_RAA
                 ax_RAA.errorbar(
@@ -247,9 +251,13 @@ def plot(output_dir: Path,
                 # 30-50%
                 #h_RAA = h_pp_ref_jet_pt / h_PbPb_30_50_jet_pt
                 #(h_RAA[::hist.rebin(5)] / 5).plot(ax=ax_RAA, label=labels["PbPb_30_50"], linewidth=2)
+                #h_RAA = (
+                #    binned_data.BinnedData.from_existing_data((h_PbPb_30_50_jet_pt[10j::hist.rebin(10)] / 10))
+                #    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[10j::hist.rebin(10)] / 10))
+                #)
                 h_RAA = (
-                    binned_data.BinnedData.from_existing_data((h_PbPb_30_50_jet_pt[10j::hist.rebin(10)] / 10))
-                    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[10j::hist.rebin(10)] / 10))
+                    binned_data.BinnedData.from_existing_data((h_PbPb_30_50_jet_pt[10j:]))
+                    / binned_data.BinnedData.from_existing_data((h_pp_ref_jet_pt[10j:]))
                 )
                 RAA_hists["PbPb_30_50"][f"{jet_type}_R{format_R(jet_R)}"] = h_RAA
                 ax_RAA.errorbar(
@@ -282,8 +290,6 @@ def plot(output_dir: Path,
     for jet_type in jet_types:
         for system in ["PbPb_00_10", "PbPb_30_50"]:
             for restricted_range in [False, True]:
-                fig, ax = plt.subplots(figsize=(10, 8))
-
                 text = fr"{labels[system]}, {jet_type.capitalize()} jets"
                 # Just for some user feedback
                 print(text)
@@ -294,52 +300,106 @@ def plot(output_dir: Path,
                 jet_eta_range = 0.9 if jet_type == "charged" else 0.7
                 text += "\n" + r"anti-$k_{\text{T}}$ jets, $|\eta_{\text{jet}}| < " + str(jet_eta_range) + " - R$"
 
-                x_axis_kwargs = {}
-                if restricted_range:
-                    x_axis_kwargs = {"range": (0, 200)}
-                plot_config = pb.PlotConfig(
-                    name=f"jet_RAA_R_{jet_type}_{system}" + ("_zoom" if restricted_range else ""),
-                    panels=[
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "y",
-                                    label=r"$R_{\text{AA}}$",
-                                    range=(0.0, 1.4),
-                                    font_size=22,
-                                ),
-                                pb.AxisConfig("x", label=r"$p_{\text{T,jet}}\:(\text{GeV}/c)$", font_size=22, **x_axis_kwargs),
-                            ],
-                            text=pb.TextConfig(x=0.97, y=0.03, text=text, font_size=22),
-                            legend=pb.LegendConfig(location="upper right", font_size=22),
-                        ),
-                    ],
-                    figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.08)),
-                )
-                # 10 GeV wide bins up to 100 GeV, followed by 100 GeV wide bins beyond there.
-                new_bins = np.concatenate([np.arange(10, 100, 10), np.arange(100, 1100, 100)])
-                original_bin_width = 10
-                for jet_R in jet_R_values:
-                    print(f"jet_R: {jet_R}")
-                    h_RAA = RAA_hists[system][f"{jet_type}_R{format_R(jet_R)}"][:: new_bins]
-                    # Normalize by bin width
-                    h_RAA /= (h_RAA.axes[0].bin_widths / original_bin_width)
-                    p = ax.fill_between(
-                        h_RAA.axes[0].bin_centers,
-                        h_RAA.values - h_RAA.errors,
-                        h_RAA.values + h_RAA.errors,
-                        #h_RAA.values,
-                        #xerr=h_RAA.axes[0].bin_widths / 2,
-                        #yerr=h_RAA.errors,
-                        label=fr"$R$ = {jet_R}",
-                        alpha=0.9,
-                        color=_okabe_ito_colors[_jet_R_to_color_index[jet_R]],
+                for jet_R_label, jet_R_values_to_iterate in [("", jet_R_values), ("_alice_comparison", [0.2, 0.4]), ("_requested", [0.2, 0.4, 0.6])]:
+                    x_axis_kwargs = {}
+                    if restricted_range:
+                        x_axis_kwargs = {"range": (15, 145)}
+                        if jet_R_label == "_alice_comparison":
+                            x_axis_kwargs = {"range": (55, 145)}
+
+                    plot_config = pb.PlotConfig(
+                        name=f"jet_RAA_R_{jet_type}_{system}" + ("_zoom" if restricted_range else ""),
+                        panels=[
+                            pb.Panel(
+                                axes=[
+                                    pb.AxisConfig(
+                                        "y",
+                                        label=r"$R_{\text{AA}}$",
+                                        range=(0.0, 1.2) if jet_R_label != "_alice_comparison" else (-0.2, 1.0),
+                                        font_size=22,
+                                    ),
+                                    pb.AxisConfig("x", label=r"$p_{\text{T,jet}}\:(\text{GeV}/c)$", font_size=22, **x_axis_kwargs),
+                                ],
+                                text=pb.TextConfig(x=0.97, y=0.03, text=text, font_size=22),
+                                legend=pb.LegendConfig(location="upper right", font_size=22),
+                            ),
+                        ],
+                        figure=pb.Figure(edge_padding=dict(left=0.10, bottom=0.09)),
                     )
 
-                plot_config.apply(fig=fig, ax=ax)
-                filename = f"{plot_config.name}"
-                fig.savefig(output_dir / f"{filename}.pdf")
-                plt.close(fig)
+                    fig, ax = plt.subplots(figsize=(10, 8))
+                    for jet_R in jet_R_values_to_iterate:
+                        print(f"jet_R_label: {jet_R_label}")
+
+                        if jet_R_label != "_requested":
+                            # 10 GeV wide bins up to 100 GeV, followed by 100 GeV wide bins beyond there.
+                            #new_bins = np.concatenate([np.arange(10, 100, 10), np.arange(100, 1100, 100)])
+                            new_bins = np.concatenate([np.arange(10, 80, 10), np.arange(80, 200, 20), np.arange(200, 500, 100), np.arange(500, 1000+0.1, 500)])
+                        else:
+                            min_pt_values = {
+                                "PbPb_00_10": {
+                                    0.2: 20,
+                                    0.4: 30,
+                                    0.6: 40,
+                                },
+                                "PbPb_30_50": {
+                                    0.2: 20,
+                                    0.4: 30,
+                                    0.6: 30,
+                                },
+                            }
+                            max_pt_values = {
+                                "PbPb_00_10": 140,
+                                "PbPb_30_50": 120,
+                            }
+                            new_bins = np.concatenate([np.arange(min_pt_values[system][jet_R], 70, 10),
+                                                       np.arange(70, 100, 15),
+                                                       # + 0.1 to make sure that we include the end point.
+                                                       np.arange(100, max_pt_values[system]+0.1, 20)])
+                        #original_bin_width = 10
+                        original_bin_width = 1
+
+                        print(f"jet_R: {jet_R}")
+                        h_RAA = RAA_hists[system][f"{jet_type}_R{format_R(jet_R)}"][:: new_bins]
+                        # Normalize by bin width
+                        h_RAA /= (h_RAA.axes[0].bin_widths / original_bin_width)
+
+                        # TG3 comparison
+                        #if jet_R_label == "_alice_comparison" and jet_R == 0.2:
+                        #    print("TG3 comparison")
+                        #    print(h_RAA[40j:140j].values)
+                        #    import IPython; IPython.embed()
+                        # PbPb paper comparison
+                        #if jet_R_label == "_alice_comparison" and jet_R == 0.4:
+                        #    print("PbPb comparison")
+                        #    print(h_RAA[60j:140j].values)
+                        #    import IPython; IPython.embed()
+
+                        p = ax.errorbar(
+                            h_RAA.axes[0].bin_centers,
+                            h_RAA.values,
+                            xerr=h_RAA.axes[0].bin_widths / 2,
+                            yerr=h_RAA.errors,
+                            label=fr"$R$ = {jet_R}",
+                            alpha=0.9,
+                            color=_okabe_ito_colors[_jet_R_to_color_index[jet_R]],
+                        )
+                        #p = ax.fill_between(
+                        #    h_RAA.axes[0].bin_centers,
+                        #    h_RAA.values - h_RAA.errors,
+                        #    h_RAA.values + h_RAA.errors,
+                        #    #h_RAA.values,
+                        #    #xerr=h_RAA.axes[0].bin_widths / 2,
+                        #    #yerr=h_RAA.errors,
+                        #    label=fr"$R$ = {jet_R}",
+                        #    alpha=0.9,
+                        #    color=_okabe_ito_colors[_jet_R_to_color_index[jet_R]],
+                        #)
+
+                    plot_config.apply(fig=fig, ax=ax)
+                    filename = f"{plot_config.name}{jet_R_label}"
+                    fig.savefig(output_dir / f"{filename}.pdf")
+                    plt.close(fig)
 
     # Write hists
     if write_hists:
