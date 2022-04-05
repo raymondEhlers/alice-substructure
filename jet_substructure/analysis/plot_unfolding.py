@@ -804,7 +804,7 @@ _models_styles = {
         color=_model_palette[3],
     ),
     "hybrid_moliere": dict(
-        label="Hybrid model (Pablos et al) w/ Moliere",
+        label="Hybrid w/ wake + Moliere",
         linewidth=3,
         linestyle="--",
         marker="D",
@@ -814,7 +814,7 @@ _models_styles = {
         color=_model_palette[5],
     ),
     "hybrid_without_moliere": dict(
-        label="Hybrid model (Pablos et al) w/o Moliere",
+        label="Hybrid w/ wake",
         linewidth=3,
         linestyle="--",
         marker="D",
@@ -1384,8 +1384,13 @@ def _plot_pp_PbPb_comparison(
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
     plot_config: pb.PlotConfig,
     output_dir: Path,
+    models: Mapping[str, Mapping[str, binned_data.BinnedData]] = None,
 ) -> None:
     """Plot PbPb with systematics compared to pp with systematics for a set of grooming methods."""
+    # Validations
+    if models is None:
+        models = {}
+
     logger.info("Plotting grooming method comparison for kt with systematics")
 
     # Setup
@@ -1421,6 +1426,30 @@ def _plot_pp_PbPb_comparison(
 
         "#FF8301",
 
+        ## Red, green from generation where the first two values are fixed
+        "#ca5c61",
+        ## TEMP: Teal
+        ##"#59c28c",
+        ## ENDTEMP
+        ## TEMP: Blue
+        #"#b1c2de",
+        ## ENDTEMP
+        #"#7ca153",
+
+        # Option #2
+        #"#85aa55",
+        # Blue
+        "#7385d9",
+
+        # Option #1
+        # I think I like these...
+        # A blue
+        # This first blue seems too smiilar
+        #"#7277cb",
+        "#4bafd0",
+        # A green
+        "#55a270",
+
         # Others from the original generation
         # Orange
         #"#c06835",
@@ -1440,7 +1469,7 @@ def _plot_pp_PbPb_comparison(
         )
 
         ax.set_prop_cycle(cycler.cycler(color=_p7))
-        ax_ratio.set_prop_cycle(cycler.cycler(color=_p7))
+        ax_ratio.set_prop_cycle(cycler.cycler(color=_p7[2:]))
 
         # Use pp as reference, but only in the range where the others are measured.
         ratio_reference_hist_unselected = hists["pp"].data
@@ -1558,6 +1587,28 @@ def _plot_pp_PbPb_comparison(
                 alpha=0.3,
             )
 
+        # Plot model comparison if available
+        for model_name, model_with_all_grooming_methods in models.items():
+            model = model_with_all_grooming_methods.get(grooming_method, None)
+            if not model:
+                logger.debug(
+                    f"Skipping model {model_name}, grooming method: {grooming_method} because predictions aren't available"
+                )
+                continue
+
+            # Fill between
+            temp_kwargs = dict(_models_styles[model_name])
+            temp_kwargs["label"] = temp_kwargs["label"]
+            temp_kwargs.pop("color")
+            temp_kwargs.pop("marker")
+            ax_ratio.fill_between(
+                model.axes[0].bin_centers,
+                model.values - model.errors,
+                model.values + model.errors,
+                alpha=0.7,
+                **temp_kwargs,
+            )
+
     # Reference value for ratio
     ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
 
@@ -1581,6 +1632,7 @@ def plot_pp_PbPb_comparison(
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
+    models: Mapping[str, Mapping[str, binned_data.BinnedData]] = None,
 ) -> None:
     """Plot PbPb unfolded results with systematics."""
     jet_pt_bin = next(iter(hists.values())).ranges[0]
@@ -1592,13 +1644,19 @@ def plot_pp_PbPb_comparison(
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+
+    name = f"unfolded_kt_pp_PbPb_comparison_{jet_R_str}"
+    if models:
+        name = f"unfolded_kt_pp_PbPb_models_comparison_{jet_R_str}"
+
     _plot_pp_PbPb_comparison(
         hists=hists,
+        models=models,
         grooming_method=grooming_method,
         set_zero_to_nan=False,
         event_activity_to_kt_range=event_activity_to_kt_range,
         plot_config=pb.PlotConfig(
-            name=f"unfolded_kt_pp_PbPb_comparison_{jet_R_str}",
+            name=name,
             panels=[
                 # Main panel
                 pb.Panel(
@@ -1624,6 +1682,7 @@ def plot_pp_PbPb_comparison(
                         pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
                         pb.AxisConfig("y", label=r"$\frac{\text{Pb--Pb}}{\text{pp}}$", range=(0.45, 1.55), font_size=text_font_size),
                     ],
+                    legend=pb.LegendConfig(location="upper right", font_size=24, anchor=(0.97, 0.97), marker_label_spacing=0.05, label_spacing=0.1),
                 ),
             ],
             figure=pb.Figure(edge_padding=dict(left=0.15, bottom=0.095, top=0.975)),
