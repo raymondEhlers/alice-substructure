@@ -12,6 +12,7 @@ import boost_histogram as bh
 import hist
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import pachyderm.plot
 import seaborn as sns
 import uproot
@@ -63,6 +64,30 @@ def combine_spectra_in_cent_bins(hists: Mapping[str, hist.Hist], jet_type: str, 
     #return ((a_jet_pt / a_n_events.values()[0]) + (b_jet_pt / b_n_events.values()[0])) / 2
     return (a_jet_pt + b_jet_pt) / (a_n_events.values()[0] + b_n_events.values()[0])
     #return ((a_jet_pt / np.sum(a_jet_pt.values())) + (b_jet_pt / np.sum(b_jet_pt.values()))) / 2
+
+
+def _ML_jet_binning(system: str, jet_R: float) -> npt.NDArray[np.float64]:
+    min_pt_values = {
+        "PbPb_00_10": {
+            0.2: 20,
+            0.4: 30,
+            0.6: 40,
+        },
+        "PbPb_30_50": {
+            0.2: 20,
+            0.4: 30,
+            0.6: 30,
+        },
+    }
+    max_pt_values = {
+        "PbPb_00_10": 140,
+        "PbPb_30_50": 120,
+    }
+    new_bins = np.concatenate([np.arange(min_pt_values[system][jet_R], 70, 10),
+                               np.arange(70, 100, 15),
+                               # + 0.1 to make sure that we include the end point.
+                               np.arange(100, max_pt_values[system]+0.1, 20)])
+    return new_bins
 
 
 def plot(output_dir: Path,
@@ -401,12 +426,101 @@ def plot(output_dir: Path,
                     fig.savefig(output_dir / f"{filename}.pdf")
                     plt.close(fig)
 
+    # RAA ratios
+    for jet_type in jet_types:
+        for system in ["PbPb_00_10", "PbPb_30_50"]:
+            for ratio_R in [0.4, 0.6]:
+                text = fr"{labels[system]}, {jet_type.capitalize()} jets"
+                # Just for some user feedback
+                print(text)
+
+                # Finish labeling
+                text += "\n" + r"JETSCAPE Work in Progress" + "\n" + "MATTER + LBT"
+                text += "\n" + r"$\alpha_{s} = 0.3$, $Q_{\text{switch}} = 2$ GeV"
+                jet_eta_range = 0.9 if jet_type == "charged" else 0.7
+                text += "\n" + r"anti-$k_{\text{T}}$ jets, $|\eta_{\text{jet}}| < " + str(jet_eta_range) + " - R$"
+
+                x_axis_kwargs = {"range": (15, 145)}
+
+                plot_config = pb.PlotConfig(
+                    name=f"jet_RAA_ratio_{jet_type}_{system}",
+                    panels=[
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "y",
+                                    label=r"$R_{\text{AA}}(R) / R_{\text{AA}} (R=0.2)$",
+                                    range=(0, 1.5),
+                                    font_size=22,
+                                ),
+                                pb.AxisConfig("x", label=r"$p_{\text{T,jet}}\:(\text{GeV}/c)$", font_size=22, **x_axis_kwargs),
+                            ],
+                            text=pb.TextConfig(x=0.97, y=0.03, text=text, font_size=22),
+                            legend=pb.LegendConfig(location="upper right", font_size=22),
+                        ),
+                    ],
+                    figure=pb.Figure(edge_padding=dict(left=0.10, bottom=0.09)),
+                )
+
+                fig, ax = plt.subplots(figsize=(10, 8))
+
+                for jet_R in [0.4, 0.6]:
+                    print(f"jet_R: {jet_R}")
+
+                    # Get the denominator (R = 0.2), but with the bins of the larger R so that they match.
+                    new_bins = _ML_jet_binning(system=system, jet_R=jet_R)
+                    h_RAA_denominator = RAA_hists[system][f"{jet_type}_R{format_R(0.2)}"][:: new_bins]
+
+                    h_RAA = RAA_hists[system][f"{jet_type}_R{format_R(jet_R)}"][:: new_bins]
+
+                    h_ratio = h_RAA / h_RAA_denominator
+
+                    # Normalize by bin width
+                    #h_RAA /= (h_RAA.axes[0].bin_widths / original_bin_width)
+
+                    # TG3 comparison
+                    #if jet_R_label == "_alice_comparison" and jet_R == 0.2:
+                    #    print("TG3 comparison")
+                    #    print(h_RAA[40j:140j].values)
+                    #    import IPython; IPython.embed()
+                    # PbPb paper comparison
+                    #if jet_R_label == "_alice_comparison" and jet_R == 0.4:
+                    #    print("PbPb comparison")
+                    #    print(h_RAA[60j:140j].values)
+                    #    import IPython; IPython.embed()
+
+                    p = ax.errorbar(
+                        h_ratio.axes[0].bin_centers,
+                        h_ratio.values,
+                        xerr=h_ratio.axes[0].bin_widths / 2,
+                        yerr=h_ratio.errors,
+                        label=fr"$R$ = {jet_R} / $R$=0.2",
+                        alpha=0.9,
+                        color=_okabe_ito_colors[_jet_R_to_color_index[jet_R]],
+                    )
+                    #p = ax.fill_between(
+                    #    h_RAA.axes[0].bin_centers,
+                    #    h_RAA.values - h_RAA.errors,
+                    #    h_RAA.values + h_RAA.errors,
+                    #    #h_RAA.values,
+                    #    #xerr=h_RAA.axes[0].bin_widths / 2,
+                    #    #yerr=h_RAA.errors,
+                    #    label=fr"$R$ = {jet_R}",
+                    #    alpha=0.9,
+                    #    color=_okabe_ito_colors[_jet_R_to_color_index[jet_R]],
+                    #)
+
+                plot_config.apply(fig=fig, ax=ax)
+                filename = f"{plot_config.name}{jet_R_label}"
+                fig.savefig(output_dir / f"{filename}.pdf")
+                plt.close(fig)
+
     # Write hists
     if write_hists:
         with uproot.recreate(output_dir / "raa_hists.root") as f:
             for jet_type in jet_types:
                 for system in ["PbPb_00_10", "PbPb_30_50"]:
-                    for jet_R in jet_R_values:
+                    for jet_R in [0.2, 0.4, 0.6]:
                         h_RAA = RAA_hists[system][f"{jet_type}_R{format_R(jet_R)}"]
                         # Convert to boost histogram by hand. We need to do this here because
                         # we don't hold onto overflow and underflow values, but uproot expects them
@@ -436,5 +550,5 @@ if __name__ == "__main__":
         write_hists=True,
         jet_R_values=[0.2, 0.4, 0.5, 0.6, 0.8],
         #jet_R_values=[0.2],
-        jet_types=["full"],
+        jet_types=["charged"],
     )
