@@ -1063,7 +1063,7 @@ def define_productions() -> List[ProductionSettings]:
             #     collision_system="embedPythia", number=63,
             # ),
             ProductionSettings.read_config(
-                collision_system="embed_thermal_model", number=2,
+                collision_system="embed_thermal_model", number=60,
             ),
         ]
     )
@@ -1083,13 +1083,13 @@ def run() -> None:
     # Job execution configuration
     task_config = job_utils.TaskConfig(name=task_name, n_cores_per_task=1)
     # n_cores_to_allocate = 120
-    #n_cores_to_allocate = 110
-    n_cores_to_allocate = 50
+    n_cores_to_allocate = 110
+    #n_cores_to_allocate = 50
     walltime = "24:00:00"
-    n_cores_to_allocate = 2
-    walltime = "1:59:00"
+    #n_cores_to_allocate = 2
+    #walltime = "1:59:00"
     #n_cores_to_allocate = 10
-    debug_mode = True
+    debug_mode = False
 
     # Basic setup: logging and parsl.
     # First, need to figure out if we need additional environments such as ROOT
