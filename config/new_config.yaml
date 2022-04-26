@@ -1027,6 +1027,7 @@ available_datasets:
         files:
             - "trains/PbPb/0062/AnalysisResults.*.repaired.root"
     # Embedded
+    # NOTE: This is missing the unsubtracted hybrid branch due to an error in the production!
     LHC20g4_embedded_into_LHC18qr_semi_central_R02_Rmax005_0060_0061: &LHC18qr_semi_central_R02_embedded_Rmax005
         name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_Rmax005_0060_0061"
         tree_name: "tree"
@@ -1061,6 +1062,7 @@ available_datasets:
         files:
             - "trains/PbPb/0063/AnalysisResults.*.repaired.root"
     # Embedded
+    # NOTE: This is missing the unsubtracted hybrid branch due to an error in the production!
     LHC20g4_embedded_into_LHC18qr_semi_central_R02_Rmax070_0062_0063: &LHC18qr_semi_central_R02_embedded_Rmax070
         name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_Rmax070_0062_0063"
         tree_name: "tree"
@@ -2011,6 +2013,9 @@ analysis_configurations:
                     closures: true
                     closure_settings:
                         split_MC_fraction_for_response: 0.75
+                        # TODO: Optimize factor.
+                        # It seems to be about 1 in 7200. Round to 1 in 1000
+                        #split_MC_fraction_for_response: 0.999
                         max_untagged_bin: 10
                     reweight_prior: false
                     datasets: "nominal"
