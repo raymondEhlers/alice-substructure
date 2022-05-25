@@ -29,6 +29,7 @@ from typing import (
 import attr
 import numpy as np
 import numpy.typing as npt
+from mammoth.framework.utils import ensure_and_expand_paths, expand_wildcards_in_filenames  # noqa: F401
 
 
 logger = logging.getLogger(__name__)
@@ -331,28 +332,6 @@ class RgRange(RangeSelector):
 class ZgRange(RangeSelector):
     _variable_name = "zg"
     _dispaly_name = r"z_{\text{g}}"
-
-
-def expand_wildcards_in_filenames(paths: Sequence[Path]) -> List[Path]:
-    return_paths: List[Path] = []
-    for path in paths:
-        p = str(path)
-        if "*" in p:
-            # Glob all associated filenames.
-            # NOTE: This assumes that the paths are relative to the execution directory. But that's
-            #       almost always the case.
-            return_paths.extend(list(Path(".").glob(p)))
-        else:
-            return_paths.append(path)
-
-    # Sort in the expected order (just according to alphabetical, which should handle numbers
-    # fine as long as they have leading 0s (ie. 03 instead of 3)).
-    return_paths = sorted(return_paths, key=lambda p: str(p))
-    return return_paths
-
-
-def ensure_and_expand_paths(paths: Sequence[Union[str, Path]]) -> List[Path]:
-    return expand_wildcards_in_filenames([Path(p) for p in paths])
 
 
 def _AliEmcalList_to_TList(
