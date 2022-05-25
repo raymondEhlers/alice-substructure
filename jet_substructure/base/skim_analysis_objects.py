@@ -5,62 +5,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Sequence, Type
+from typing import Dict, Sequence
 
 import attr
-from pachyderm import binned_data
-
-
-@attr.s
-class ScaleFactor:
-    """Store scale factors for a particular pt hard bin.
-
-    In the case of going event-by-event in pythia, we would scale by cross_section / n_trials
-    for that bin. However, if we're going by the single histograms per output file, it gets a
-    good deal more complicated. This calculation has evolved significantly once we thought about
-    this carefully and ran a bunch of tests. The right answer is simply cross_section / n_trials_total
-    where n_trials_total much be the n_trials for the _entire_ pt hard bin!
-
-    Attributes:
-        cross_section: Cross section.
-        n_trials_total: Total number of trials from the whole pt hard bin.
-    """
-
-    # float cast to ensure that we get a standard float instead of an np.float
-    cross_section: float = attr.ib(converter=float)
-    n_trials_total: int = attr.ib(converter=int)
-    n_entries: int = attr.ib(converter=int)
-    n_accepted_events: int = attr.ib(converter=int)
-
-    def value(self) -> float:
-        """Value of the scale factor.
-
-        Args:
-            None.
-        Returns:
-            Scale factor calculated based on the extracted values.
-        """
-        return self.cross_section / self.n_trials_total
-
-    @classmethod
-    def from_hists(
-        cls: Type["ScaleFactor"], n_accepted_events: int, n_entries: int, cross_section: Any, n_trials: Any
-    ) -> "ScaleFactor":
-        # Validation (ensure that hists are valid)
-        h_cross_section = binned_data.BinnedData.from_existing_data(cross_section)
-        h_n_trials = binned_data.BinnedData.from_existing_data(n_trials)
-
-        # Find the first non-zero values bin.
-        # argmax will return the index of the first instance of True.
-        # NOTE: This isn't the true value of the pt hard bin because of indexing from 0.
-        pt_hard_bin = (h_cross_section.values != 0).argmax(axis=0)
-
-        return cls(
-            cross_section=h_cross_section.values[pt_hard_bin],
-            n_trials_total=h_n_trials.values[pt_hard_bin],
-            n_entries=n_entries,
-            n_accepted_events=n_accepted_events,
-        )
+from mammoth.framework.analysis.objects import ScaleFactor  # noqa: F401
 
 
 def cross_check_task_branch_name_shim(grooming_method: str, input_branches: Sequence[str]) -> Dict[str, str]:

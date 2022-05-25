@@ -18,6 +18,7 @@ import IPython
 import attrs
 from mammoth import helpers, job_utils
 from mammoth.framework import sources
+from mammoth.framework.analysis import objects as analysis_objects
 from pachyderm import yaml
 from parsl.app.app import python_app
 from parsl.data_provider.files import File
@@ -25,7 +26,7 @@ from parsl.dataflow.futures import AppFuture
 from rich.progress import Progress
 
 import jet_substructure.base.helpers
-from jet_substructure.base import job_utils as substructure_job_utils, skim_analysis_objects
+from jet_substructure.base import skim_analysis_objects
 
 
 logger = logging.getLogger(__name__)
@@ -104,7 +105,7 @@ def read_full_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
     if config_path is None:
         config_path = Path("config/track_skim_config.yaml")
 
-    # Here, we use ruamel.yaml directly with the "safe" type because we the roundtrip
+    # Here, we use ruamel.yaml directly with the "safe" type because the roundtrip
     # types that we usually use don't play so nicely when we rewrite a subset of the data
     # (eg. anchors don't seem to resolve correctly because we only rewrite the subset, there
     # are some stray comments that we don't really want to keep, etc)
@@ -261,7 +262,7 @@ class ProductionSettings:
         if self.collision_system not in _collision_systems_with_scale_factors:
             raise ValueError(f"Invalid collision system for extracting scale factors: {self.collision_system}")
 
-        scale_factors = substructure_job_utils.read_extracted_scale_factors(
+        scale_factors = analysis_objects.read_extracted_scale_factors(
             self.scale_factors_filename
         )
         return scale_factors
