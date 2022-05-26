@@ -11,7 +11,9 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Tuple, Union
 import awkward as ak
 import numpy as np
 from mammoth import helpers
-from mammoth.framework import sources
+from mammoth.framework import load_data, sources
+from mammoth.framework.io import track_skim
+from mammoth.framework.analysis import objects as analysis_objects
 from mammoth.hardest_kt import analysis_alice
 
 from jet_substructure.analysis import new_skim_to_flat_tree
@@ -156,8 +158,9 @@ def hardest_kt_data_skim(
     if collision_system in ["pp", "PbPb"] or (collision_system in ["pythia"] and "data" in loading_data_rename_prefix):
         jets = analysis_alice.analysis_data(
             collision_system=collision_system,
-            arrays=analysis_alice.load_data(
-                filename=input_filename,
+            arrays=load_data.data(
+                data_input=input_filename,
+                data_source=track_skim.FileSource.create_deferred_source(collision_system=collision_system),
                 collision_system=collision_system,
                 rename_prefix=loading_data_rename_prefix,
             ),
@@ -172,8 +175,9 @@ def hardest_kt_data_skim(
         # and det level.
         # (ie. we want to analyze in exactly the same as would provided by the substructure analysis task)
         jets = analysis_alice.analysis_MC(
-            arrays=analysis_alice.load_data(
-                filename=input_filename,
+            arrays=load_data.data(
+                data_input=input_filename,
+                data_source=track_skim.FileSource.create_deferred_source(collision_system=collision_system),
                 collision_system=collision_system,
                 rename_prefix=loading_data_rename_prefix,
             ),
@@ -379,9 +383,11 @@ def hardest_kt_embedding_skim(
     if res[0]:
         return res
 
-    source_index_identifiers, arrays = analysis_alice.load_embedding(
+    source_index_identifiers, arrays = load_data.embedding(
         signal_input=signal_input_filenames,
-        background_filename=background_input_filename,
+        signal_source=track_skim.FileSource.create_deferred_source(collision_system="pythia"),
+        background_input=background_input_filename,
+        background_source=track_skim.FileSource.create_deferred_source(collision_system="PbPb"),
     )
 
     jets = analysis_alice.analysis_embedding(
@@ -467,9 +473,8 @@ if __name__ == "__main__":
     ###############
     # Thermal model
     ###############
-    from jet_substructure.base import job_utils as substructure_job_utils
     # In general, we're probably testing with this period, so good enough to hard code it here
-    scale_factors = substructure_job_utils.read_extracted_scale_factors(
+    scale_factors = analysis_objects.read_extracted_scale_factors(
         path=Path("trains/pythia/LHC20g4_AOD_2640/scale_factors.yaml")
     )
 
@@ -500,9 +505,8 @@ if __name__ == "__main__":
     ###########
     standalone_tests = False
 
-    from jet_substructure.base import job_utils as substructure_job_utils
     # In general, we're probably testing with this period, so good enough to hard code it here
-    scale_factors = substructure_job_utils.read_extracted_scale_factors(
+    scale_factors = analysis_objects.read_extracted_scale_factors(
         path=Path("trains/pythia/LHC20g4_AOD_2640/scale_factors.yaml")
     )
 

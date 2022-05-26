@@ -19,6 +19,7 @@ import IPython
 import numpy as np
 import parsl
 import uproot
+from mammoth.framework.analysis import objects as analysis_objects
 from pachyderm import yaml
 from parsl.addresses import address_by_hostname
 from parsl.app.app import python_app
@@ -31,7 +32,7 @@ from parsl.monitoring.monitoring import MonitoringHub
 from parsl.providers import SlurmProvider
 
 from jet_substructure.base import helpers, skim_analysis_objects
-from jet_substructure.base import unfolding as unfolding_base, job_utils as substructure_job_utils
+from jet_substructure.base import unfolding as unfolding_base
 
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,7 @@ def read_extracted_scale_factors(
     Returns:
         Normalized scaled factors
     """
-    return substructure_job_utils.read_extracted_scale_factors(
+    return analysis_objects.read_extracted_scale_factors(
         path=Path(f"trains/{collision_system}/{dataset_name}/scale_factors.yaml")
     )
 
