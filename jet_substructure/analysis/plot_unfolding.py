@@ -1682,7 +1682,7 @@ def plot_pp_PbPb_comparison(
                         pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
                         pb.AxisConfig("y", label=r"$\frac{\text{Pb--Pb}}{\text{pp}}$", range=(0.45, 1.55), font_size=text_font_size),
                     ],
-                    legend=pb.LegendConfig(location="upper right", font_size=24, anchor=(0.97, 0.97), marker_label_spacing=0.05, label_spacing=0.1),
+                    legend=pb.LegendConfig(location="lower left", font_size=24, anchor=(0.01, 0.01), marker_label_spacing=0.05, label_spacing=0.1),
                 ),
             ],
             figure=pb.Figure(edge_padding=dict(left=0.15, bottom=0.095, top=0.975)),
