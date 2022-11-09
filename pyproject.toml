@@ -18,7 +18,7 @@ processEmbeddingSkim = "jet_substructure.analysis.data_frame:process_embedding_s
 processEmbeddingSkimCpp = "jet_substructure.cpp.data_frame:embed_pythia_entry_point"
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.11"
+python = ">=3.8"
 numpy = ">=1.21"
 uproot3 = ">=3"
 uproot = ">=4.2"
@@ -36,7 +36,7 @@ seaborn = ">=0.11.1"
 awkward0 = ">=0"
 awkward = ">=1.7"
 pyarrow = ">=4.0"
-numba = ">=0.55"
+numba = ">=0.56.0"
 parsl = {git = "https://github.com/Parsl/parsl.git", rev = "6d1f9160d487b3265f6e9d65ebb357837a437c30", extras = ["monitoring"]}
 mplhep = ">=0.3.4"
 boost-histogram = ">=1.2"
@@ -51,7 +51,6 @@ pytest = ">=6.2.4"
 flake8-colors = ">=0.1.9"
 pre-commit = ">=2.0.1"
 yamllint = ">=1.20.0"
-isort = {extras = ["toml"], version = ">=5.6"}
 jupyter_nbextensions_configurator = ">=0.4.1"
 # Not explictily enabled because it needs graphviz to be install separately via apt, brew, etc.
 #pygraphviz = ">=1.5"
@@ -60,21 +59,18 @@ jupyterlab-widgets = ">=1.0.0"
 jupyterlab = ">=3.0.16"
 
 [tool.isort]
+# NOTE: isort isn't installed since it pins the maximum python version, which causes problems for poetry
+#       However, we leave the previous settings here as a reference if we decide to add it back later
+#       (most likely if the version issue is resolved)
+profile = "black"
 line_length = 120
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
-lines_after_imports = 2
-verbose = true
 skip = ["docs/conf.py"]
 skip_glob = ".*"
 
 [tool.black]
 line-length = 120
-target-version = ["py37"]
+target-version = ["py39"]
 
 [build-system]
-requires = ["poetry_core>=1.0.3"]
+requires = ["poetry-core>=1.1.0"]
 build-backend = "poetry.core.masonry.api"
