@@ -1429,7 +1429,7 @@ def _root_data_frame_embedded_pt_hard_scaling(
         jet_R=jet_R,
         main_jet_pt_range=main_jet_pt_range,
         output_filename=Path(outputs[0].filepath),
-        # Workaround for older pythia productions that we can't reskim so easily.
+        # Workaround for older pythia productions that we can't re-skim so easily.
         # We can remove this eventually when train 2110 is replaced.
         jet_pt_prefix_first=collision_system != "pythia",
         n_cores=n_cores,
