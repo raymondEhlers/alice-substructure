@@ -13,6 +13,8 @@ import numpy as np
 import numpy.typing as npt
 import uproot
 from pachyderm import binned_data
+from mammoth import helpers as mammoth_helpers
+from mammoth.framework import utils
 
 from jet_substructure.base import helpers, skim_analysis_objects
 from jet_substructure.base import unfolding as unfolding_base
@@ -25,11 +27,11 @@ RDF = Any
 RootHist = Any
 
 
-@attr.s(frozen=True)
+@attr.frozen
 class MatchingIndex:
-    measured_like_prefix: str = attr.ib()
-    generator_like_prefix: str = attr.ib()
-    matching_type: str = attr.ib()
+    measured_like_prefix: str
+    generator_like_prefix: str
+    matching_type: str
 
     @property
     def matching_level(self) -> str:
@@ -433,7 +435,7 @@ def run_embedded_pt_hard_scaling(  # noqa: C901
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
 
     # Setup
-    smeared_cut_prefix = "hybrid" if collision_system == "embedPythia" else "data"
+    smeared_cut_prefix = "hybrid" if "embed" in collision_system else "data"
     # Parameters
     jet_pt_column_format = "{prefix}_jet_pt" if jet_pt_prefix_first else "jet_pt_{prefix}"
 
@@ -476,7 +478,7 @@ def run_embedded_pt_hard_scaling(  # noqa: C901
 
     # Apply general cuts.
     # Double counting must be applied for embedding.
-    if collision_system == "embedPythia":
+    if "embed" in collision_system:
         double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
         df_original = df_original.Filter(double_counting_cut)
 
@@ -516,7 +518,7 @@ def run_embedded_pt_hard_scaling(  # noqa: C901
     )
 
     # Add the plots as a function of hybrid pt (if we can)
-    if collision_system == "embedPythia":
+    if "embed" in collision_system:
         hists.append(
             df_original.Histo1D(
                 ("hybrid_pt_spectra", "hybrid_pt_spectra", 200, 0, 200),
@@ -577,7 +579,7 @@ def run_create_closure_ratio(  # noqa: C901
         We are supposed to run this once for each dataset. So I ratio will require at least two calls to this function.
     """
     # Setup
-    prefix_for_ratio = "hybrid" if collision_system == "embedPythia" else "data"
+    prefix_for_ratio = "hybrid" if "embed" in collision_system else "data"
     # Parameters
     jet_pt_column_format = "{prefix}_jet_pt" if jet_pt_prefix_first else "jet_pt_{prefix}"
     # Retrieve the binning
@@ -679,7 +681,7 @@ def run_create_closure_ratio(  # noqa: C901
 
     # Apply general cuts.
     # Double counting must be applied for embedding.
-    if collision_system == "embedPythia":
+    if "embed" in collision_system:
         double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
         df_original = df_original.Filter(double_counting_cut)
 
@@ -755,7 +757,7 @@ def run_response(  # noqa: C901
     main_tree = ROOT.TChain(tree_name)
     for filename in input_filenames:
         main_tree.Add(str(filename))
-    # if collision_system == "embedPythia":
+    # if "embed" in collision_system:
     if cross_check_task:
         friend_tree = ROOT.TChain("tree")
         for filename in input_filenames:
@@ -786,8 +788,8 @@ def run_response(  # noqa: C901
 
     # Apply general cuts.
     # Double counting must be applied for embedding.
-    if collision_system == "embedPythia":
-        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
+    if "embed" in collision_system:
+        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt_sub) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
         df_original = df_original.Filter(double_counting_cut)
         smeared_cut_prefix = "hybrid"
     else:
@@ -1132,8 +1134,8 @@ def run(  # noqa: C901
 
     # Apply general cuts.
     # Double counting must be applied for embedding.
-    if collision_system == "embedPythia":
-        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
+    if "embed" in collision_system:
+        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt_sub) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
         # double_counting_cut = f"{jet_pt_column_format.format(prefix='true')} >= 10"
         df_original = df_original.Filter(double_counting_cut)
         smeared_cut_prefix = "hybrid"
@@ -1177,7 +1179,7 @@ def run(  # noqa: C901
             )
 
     # Some more specialized substructure variables.
-    if collision_system == "embedPythia":
+    if "embed" in collision_system:
         # Plot all substructure variables, but instead with a constant generator level pt cut.
         # Apply generator level jet pt cut
         jet_pt_cut = (
@@ -1239,7 +1241,7 @@ def run_standalone(
     # Determine the filenames based on the train numbers and predefined path here.
     #base_path = Path("trains/") / collision_system / "{train_number}/skim/AnalysisResults.*.root"
     base_path = Path("trains/") / collision_system / "00{train_number}/skim/*.root"
-    filenames = helpers.expand_wildcards_in_filenames(
+    filenames = utils.expand_wildcards_in_filenames(
         [Path(str(base_path).format(train_number=train_number)) for train_number in train_numbers]
     )
 
@@ -1247,7 +1249,7 @@ def run_standalone(
     # Add the train dir into the output path name if we're processing single pt hard bins for embed pythia.
     # It's frustrating that this is necessary, but so it's ROOT - what else is new?
     base_filename = Path("output") / collision_system / "RDF" / "standalone"
-    if len(train_numbers) == 1 and collision_system == "embedPythia":
+    if len(train_numbers) == 1 and "embed" in collision_system:
         base_filename = base_filename / str(train_numbers[0])
     base_filename.mkdir(parents=True, exist_ok=True)
     output_filename = base_filename / f"{grooming_method}_{'_'.join(prefixes)}_closure.root"
@@ -1272,7 +1274,7 @@ def embed_pythia_entry_point() -> None:
 
     Why? Because RDF has awful performance for jitted filter statements. See: https://root-forum.cern.ch/t/rdataframe-is-very-slow-for-many-histograms/37875/15
     """
-    helpers.setup_logging()
+    mammoth_helpers.setup_logging()
 
     parser = argparse.ArgumentParser(description="Skim cross-check task using ROOT RDF.")
 
@@ -1281,7 +1283,7 @@ def embed_pythia_entry_point() -> None:
     args = parser.parse_args()
 
     run_standalone(
-        collision_system="embedPythia",
+        collision_system="embed_pythia",
         # train_numbers=[args.trainNumber],
         train_numbers=list(range(5966, 5986)),
         # tree_name="AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
@@ -1297,7 +1299,7 @@ if __name__ == "__main__":
     helpers.setup_logging()
     prefixes = ["hybrid", "true", "det_level"]
     run_standalone(
-        collision_system="embedPythia",
+        collision_system="embed_pythia",
         # train_numbers=list(range(5791, 5792)),
         # train_numbers=list(range(5966, 5968)),
         # train_numbers=list(range(6338, 6339)),

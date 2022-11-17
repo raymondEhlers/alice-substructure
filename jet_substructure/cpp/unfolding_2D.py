@@ -363,7 +363,7 @@ def _branch_name_shim_to_map_for_ROOT(branch_renames: Mapping[str, str]) -> Any:
 def _collision_system_names(unfolding_for_pp: bool) -> Tuple[str, str]:
     if unfolding_for_pp:
         return "pp", "pythia"
-    return "PbPb", "embedPythia"
+    return "PbPb", "embed_pythia"
 
 
 def _get_reweighted_ratio(

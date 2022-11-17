@@ -736,13 +736,13 @@ def setup_extract_scale_factors(
         This is surprisingly fast.
     """
     # Validation
-    if collision_system not in ["pythia", "embedPythia"]:
+    if collision_system not in ["pythia", "embedPythia", "embed_pythia", "embed_thermal_model"]:
         raise ValueError(f"Invalid collision system for extracting scale factors: {collision_system}")
 
     # Setup
     scale_factors = {}
     logger.info("Determining input files for extracting scale factors.")
-    if collision_system == "embedPythia":
+    if "embed" in collision_system:
         input_files_per_pt_hard_bin = _determine_embedding_input_files_per_pt_hard_bin(
             dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
         )
@@ -875,12 +875,12 @@ def setup_extract_embedding_pt_hard_spectra(
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> AppFuture:
     # Validation
-    if collision_system not in ["pythia", "embedPythia"]:
+    if collision_system not in ["pythia", "embedPythia", "embed_pythia", "embed_thermal_model"]:
         raise ValueError(f"Invalid collision system for extracting scale factors: {collision_system}")
 
     # Input files
     logger.info("Determining input files")
-    if collision_system == "embedPythia":
+    if "embed" in collision_system:
         input_files_per_pt_hard_bin = _determine_embedding_input_files_per_pt_hard_bin(
             dataset_config=dataset_config, selected_train_numbers=selected_train_numbers
         )
@@ -890,6 +890,7 @@ def setup_extract_embedding_pt_hard_spectra(
         )
     else:
         raise ValueError(f"Invalid collision system for extracting scale factors: {collision_system}")
+
     # Need a hard dependency on the writing of the yaml output, so we ask for the result here.
     # We don't actually care about the result, but it avoids a race condition.
     _ = input_results[0].result()
@@ -1704,7 +1705,7 @@ def setup_all_unfolding(  # noqa: C901
     # Need the response collision system too.
     data_to_response_collision_system_name = {
         "pp": "pythia",
-        "PbPb": "embedPythia",
+        "PbPb": "embed_pythia",
     }
     response_collision_system = data_to_response_collision_system_name[data_collision_system]
 
@@ -1822,7 +1823,7 @@ def setup_all_unfolding(  # noqa: C901
                     # This avoids duplicate jobs, which could potentially overwriting outputs from each other.
                     _reweight_hist_name = unfolding_base.hist_name_for_ratio_2D(
                         grooming_method=grooming_method,
-                        prefix_for_ratio="hybrid" if _collision_system == "embedPythia" else "data",
+                        prefix_for_ratio="hybrid" if "embed" in _collision_system else "data",
                         smeared_substructure_variable_bins=_default_settings.substructure_variable.smeared_bins,
                         smeared_jet_pt_bins=_default_settings.jet_pt.smeared_bins,
                     )
