@@ -1,79 +1,141 @@
-[tool.poetry]
+[build-system]
+# pdm
+requires = ["pdm-pep517"]
+build-backend = "pdm.pep517.api"
+# hatch
+#requires = ["hatchling"]
+#build-backend = "hatchling.build"
+
+[project]
 name = "jet_substructure"
-version = "0.1.0"
 description = "Jet substructure analysis code"
-authors = ["Raymond Ehlers <raymond.ehlers@cern.ch>"]
-license = "BSD-3-Clause"
+license = {text = "BSD-3-Clause"}
+requires-python = ">=3.8"
+authors = [
+  { name = "Raymond Ehlers", email = "raymond.ehlers@cern.ch" },
+]
+# For hatch, need to remove the dependencies references here
+dynamic = ["dependencies", "optional-dependencies", "version"]
+dependencies = [
+    "awkward >=1.7",
+    "uproot >=4.2",
+    "uproot3 >=3",
+    "numpy >=1.21",
+    "pyarrow >=4",
+    "pandas >=1.3",
+    "attrs >=21.2.0",
+    "matplotlib >=3.4.2",
+    "particle >=0.15.1",
+    "numba >=0.56.0",
+    "hist[plot] >=2.5.0",
+    "seaborn >=0.11.2",
+    "vector >=0.8.5",
+    "parsl[monitoring] @ git+https://github.com/Parsl/parsl.git@6d1f9160d487b3265f6e9d65ebb357837a437c30",
+    # NOTE: Need the most recent version to avoid a python version cap. Once 13.0 is released, move to that.
+    "rich @ git+https://github.com/Textualize/rich.git@4001aa91790c5faf46d9fbca35d335d76de52376",
+    "h5py >=3.1",
+    "coloredlogs >=15.0.1",
+    "dask[dataframe] >= 2021.1.0",
+    "enlighten >=1.4.0",
+    "pathos >=0.2.5",
+    "awkward0 >=0",
+    "mplhep >=0.3.4",
+    "boost-histogram >=1.2",
+    # My packages last:
+    # - pachyderm
+    # For pdm: it's in the dev dependencies since we want it to be editable, but we can
+    # copy it twice, see here: https://github.com/pdm-project/pdm/discussions/1479
+    "pachyderm >= 3.0",
+    # For hatch: we can install it locally (but not editable) with:
+    #"pachyderm @ file://{root:uri}/external/pachyderm",
+    # - mammoth
+    # For pdm: it's in the dev dependencies since we want it to be editable, but we can
+    # copy it twice, see here: https://github.com/pdm-project/pdm/discussions/1479
+    "mammoth >= 0.1",
+    # For hatch: we can install it locally (but not editable) with:
+    #"mammoth @ file://{root:uri}/external/mammoth",
+]
+
+# NOTE: If moving to hatch, move this to "[project.optional-dependencies]"
+[tool.pdm.dev-dependencies]
+dev = [
+    "flake8 >=3.8.3",
+    "black >=22.1.0",
+    "mypy >=0.931",
+    "ipython >=8.0",
+    "pytest >=6.2.4",
+    "ipykernel >=6.15.1",
+    "pytest-sugar >=0.9.5",
+    "pre-commit >=2.0.1",
+    "yamllint >=1.20.0",
+    "jupyter_nbextensions_configurator >=0.4.1",
+    # Not explictily enabled because it needs graphviz to be install separately via apt, brew, etc.
+    #"pygraphviz >=1.5",
+    "networkx >=2.4",
+    "jupyterlab-widgets >=1.0.0",
+    "jupyterlab >=3.0.16",
+    # pachyderm
+    # pdm requires editable dependencies to be in the dev dependencies
+    "-e file:///${PROJECT_ROOT}/external/pachyderm#egg=pachyderm",
+    # mammoth
+    # pdm requires editable dependencies to be in the dev dependencies
+    "-e file:///${PROJECT_ROOT}/external/mammoth#egg=mammoth",
+]
+
+[tool.hatch]
+# NOTE: I didn't switch to a src layout yet since as of Nov 2022 it would be too painful updating scripts, etc
+version.path = "jet_substructure/__init__.py"
+build.include = [
+    "jet_substructure/py.typed",
+]
+
+[tool.pdm]
+# NOTE: I didn't switch to a src layout yet since as of Nov 2022 it would be too painful updating scripts, etc
+version = { source = "file", path = "jet_substructure/__init__.py" }
 include = [
     "jet_substructure/py.typed",
 ]
 
-[tool.poetry.scripts]
-embedPythia = "jet_substructure.analysis.analyze_tree:embed_pythia_entry_point"
-splitTree = "jet_substructure.base.helpers:split_tree_entry_point"
-mergeROOTFiles = "jet_substructure.base.helpers:merge_ROOT_files_entry_point"
-downloadTrainWithConfig = "jet_substructure.base.download_train_with_config:entry_point"
-skimDataset = "jet_substructure.analysis.skim_to_flat_tree:skim_entry_point"
-processEmbeddingSkim = "jet_substructure.analysis.data_frame:process_embedding_skim_entry_point"
-processEmbeddingSkimCpp = "jet_substructure.cpp.data_frame:embed_pythia_entry_point"
+[tool.pdm.scripts]
+embedPythia = { call = "jet_substructure.analysis.analyze_tree:embed_pythia_entry_point" }
+splitTree = { call = "jet_substructure.base.helpers:split_tree_entry_point" }
+mergeROOTFiles = { call = "jet_substructure.base.helpers:merge_ROOT_files_entry_point" }
+downloadTrainWithConfig = { call = "jet_substructure.base.download_train_with_config:entry_point" }
+skimDataset = { call = "jet_substructure.analysis.skim_to_flat_tree:skim_entry_point" }
+processEmbeddingSkim = { call = "jet_substructure.analysis.data_frame:process_embedding_skim_entry_point" }
+processEmbeddingSkimCpp = { call = "jet_substructure.cpp.data_frame:embed_pythia_entry_point" }
 
-[tool.poetry.dependencies]
-# Poetry fucks shit up if I don't keep <4 - it refuses to update urllib3, which then won't update to a version which supports 3.10. This is stupid.
-python = ">=3.8,<4"
-numpy = ">=1.21"
-uproot3 = ">=3"
-uproot = ">=4.2"
-pandas = ">=1.3"
-attrs = ">=21.2.0"
-matplotlib = ">=3.4.2"
-#pachyderm = {path = "/Users/REhlers/software/dev/substructure/external/pachyderm", develop = true}
-#mammoth = {path = "/Users/REhlers/software/dev/substructure/external/mammoth", develop = true}
-pachyderm = {path = "external/pachyderm", develop = true}
-mammoth = {path = "external/mammoth", develop = true}
-h5py = ">=3.1"
-coloredlogs = ">=15.0.1"
-dask = {version = ">=2021.1.0", extras = ["dataframe"]}
-enlighten = ">=1.4.0"
-pathos = ">=0.2.5"
-seaborn = ">=0.11.1"
-awkward0 = ">=0"
-awkward = ">=1.7"
-pyarrow = ">=4.0"
-numba = ">=0.56.0"
-parsl = {git = "https://github.com/Parsl/parsl.git", rev = "6d1f9160d487b3265f6e9d65ebb357837a437c30", extras = ["monitoring"]}
-mplhep = ">=0.3.4"
-boost-histogram = ">=1.2"
-hist = {version = ">=2.5.0", extras = ["plot"]}
+[tool.mypy]
+files = "src"
+python_version = "3.8"
+warn_unused_configs = true
+strict = true
+ignore_missing_imports = true
+show_error_codes = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+warn_unreachable = true
 
-[tool.poetry.dev-dependencies]
-flake8 = ">=3.8.3"
-black = ">=22.1.0"
-mypy = ">=0.931"
-ipython = ">=8.0"
-pytest = ">=6.2.4"
-flake8-colors = ">=0.1.9"
-pre-commit = ">=2.0.1"
-yamllint = ">=1.20.0"
-jupyter_nbextensions_configurator = ">=0.4.1"
-# Not explictily enabled because it needs graphviz to be install separately via apt, brew, etc.
-#pygraphviz = ">=1.5"
-networkx = ">=2.4"
-jupyterlab-widgets = ">=1.0.0"
-jupyterlab = ">=3.0.16"
+[tool.black]
+line-length = 120
+target-version = ["py38"]
 
 [tool.isort]
-# NOTE: isort isn't installed since it pins the maximum python version, which causes problems for poetry
-#       However, we leave the previous settings here as a reference if we decide to add it back later
-#       (most likely if the version issue is resolved)
 profile = "black"
 line_length = 120
 skip = ["docs/conf.py"]
 skip_glob = ".*"
 
-[tool.black]
-line-length = 120
-target-version = ["py39"]
+[tool.pylint]
+master.py-version = "3.8"
+master.ignore-paths= ["src/pachyderm/_version.py"]
+reports.output-format = "colorized"
+similarities.ignore-imports = "yes"
+messages_control.disable = [
+  "design",
+  "fixme",
+  "line-too-long",
+  "wrong-import-position",
+]
 
-[build-system]
-requires = ["poetry-core>=1.1.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.pytest.ini_options]
+log_cli_level = "info"
