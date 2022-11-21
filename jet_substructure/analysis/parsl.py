@@ -20,6 +20,8 @@ import numpy as np
 import parsl
 import uproot
 from mammoth.framework.analysis import objects as analysis_objects
+from mammoth.framework import utils as mammoth_utils
+from mammoth import helpers
 from pachyderm import yaml
 from parsl.addresses import address_by_hostname
 from parsl.app.app import python_app
@@ -31,7 +33,7 @@ from parsl.executors import HighThroughputExecutor
 from parsl.monitoring.monitoring import MonitoringHub
 from parsl.providers import SlurmProvider
 
-from jet_substructure.base import helpers, skim_analysis_objects
+from jet_substructure.base import helpers as jsub_helpers, skim_analysis_objects
 from jet_substructure.base import unfolding as unfolding_base
 
 
@@ -132,7 +134,7 @@ def setup_parsl_587(
     #       but then all the jobs will be on just one node, which is definitely not what we want.
 
     # Setup ROOT if necessary
-    slurm_kwargs = {}
+    slurm_kwargs: Dict[str, Any] = {}
     if any([use_root, use_aliphysics, use_roounfold]):
         software_to_load = []
         if use_root:
@@ -163,9 +165,7 @@ def setup_parsl_587(
     ]
     if use_root:
         # pc059 to avoid causing problems on the login node when using 8 cores for root data frame.
-        # machines_to_exclude.append("pc059")
-        # Seems to be resolved as of April 2021.
-        ...
+        machines_to_exclude.append("pc059")
 
     b587_executor = Config(
         executors=[
@@ -227,10 +227,10 @@ def _repair_root_files(
     """ Repair ROOT files app. """
     from pathlib import Path
 
-    from jet_substructure.base import helpers
+    from jet_substructure.base import helpers as jsub_helpers
 
     try:
-        res = helpers.split_tree(
+        res = jsub_helpers.split_tree(
             filenames=[Path(inputs[0].filepath)],
             tree_name=tree_name,
             number_of_chunks=1,
@@ -275,7 +275,7 @@ def setup_repair_root_files(
     # NOTE: This is susceptible to issues if "repaired." is in the path, but I think that's unlikely.
     filenames = sorted([Path(str(f).replace("repaired.", "")) for f in filenames])
     # Once we've initially filtered out the repaired filenames, we need to expand them
-    filenames = helpers.expand_wildcards_in_filenames(filenames)
+    filenames = mammoth_utils.expand_wildcards_in_filenames(filenames)
     # After the wild card expansions, we need to do another filter for possible repaired filenames.
     # NOTE: It's important that we take a set because if the dir already has both, we don't
     #       want to try to add files twice.
@@ -344,7 +344,7 @@ def _number_of_entries_per_file(
         Mapping between file and number of entries in the file.
     """
     # Validation
-    filenames = helpers.expand_wildcards_in_filenames([Path(f) for f in input_filenames])
+    filenames = mammoth_utils.expand_wildcards_in_filenames([Path(f) for f in input_filenames])
 
     # Setup
     y = yaml.yaml()
@@ -539,7 +539,7 @@ def setup_convert_to_parquet(
 
     # Determine filenames
     if input_results is None:
-        input_filenames = helpers.expand_wildcards_in_filenames([Path(f) for f in dataset_config["files"]])
+        input_filenames = mammoth_utils.expand_wildcards_in_filenames([Path(f) for f in dataset_config["files"]])
         input_files = [File(str(filename)) for filename in input_filenames]
     else:
         input_files = [r.outputs[0] for r in input_results]
@@ -665,7 +665,7 @@ def _determine_pythia_input_files_per_pt_hard_bin(
     all_filenames = []
     for filename_base in dataset_config["files"]:
         filename_base = Path(filename_base)
-        all_filenames.extend([Path(f) for f in helpers.expand_wildcards_in_filenames([filename_base])])
+        all_filenames.extend([Path(f) for f in mammoth_utils.expand_wildcards_in_filenames([filename_base])])
 
     # Sort by pt hard bins
     # We're in Run 2, so pretty safe to assume 20 pt hard bins
@@ -701,7 +701,7 @@ def _determine_embedding_input_files_per_pt_hard_bin(
 
         # Expand the filenames
         input_files_per_pt_hard_bin[pt_hard_bin] = [
-            Path(f) for f in helpers.expand_wildcards_in_filenames([filename_base])
+            Path(f) for f in mammoth_utils.expand_wildcards_in_filenames([filename_base])
         ]
 
     return input_files_per_pt_hard_bin
@@ -1201,7 +1201,7 @@ def setup_calculate_cross_check_task_skim(
     # File setup.
     logger.info("Determining input files independently.")
     # We'll always have to determine the input files ourselves.
-    input_filenames = helpers.expand_wildcards_in_filenames([Path(f) for f in dataset_config["files"]])
+    input_filenames = mammoth_utils.expand_wildcards_in_filenames([Path(f) for f in dataset_config["files"]])
     # Determine the train directories so we can skip over some of them if requested and map the scale factors.
     train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
 
@@ -1267,7 +1267,7 @@ def _root_data_frame(
     prefixes: Sequence[str],
     grooming_method: str,
     jet_R: float,
-    main_jet_pt_range: helpers.JetPtRange,
+    main_jet_pt_range: jsub_helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
     inputs: MutableSequence[File] = [],
@@ -1312,7 +1312,7 @@ def _root_data_frame_response(
     prefixes: Sequence[str],
     grooming_method: str,
     jet_R: float,
-    main_jet_pt_range: helpers.JetPtRange,
+    main_jet_pt_range: jsub_helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
     inputs: MutableSequence[File] = [],
@@ -1357,7 +1357,7 @@ def _root_data_frame_closure(
     prefixes: Sequence[str],
     grooming_method: str,
     jet_R: float,
-    main_jet_pt_range: helpers.JetPtRange,
+    main_jet_pt_range: jsub_helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
     base_unfolding_config: Mapping[str, Any],
@@ -1400,7 +1400,7 @@ def _root_data_frame_embedded_pt_hard_scaling(
     prefixes: Sequence[str],
     grooming_method: str,
     jet_R: float,
-    main_jet_pt_range: helpers.JetPtRange,
+    main_jet_pt_range: jsub_helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
     inputs: MutableSequence[File] = [],
@@ -1525,7 +1525,7 @@ def setup_root_data_frame(
     # nominal smeared jet pt binning, we just advantage of those values.
     # NOTE: We're okay using the default here because the smeared jet pt bins won't vary
     _nominal_smeared_jet_pt_bins = base_unfolding_config["nominal_binning"]["default"]["smeared_jet_pt"]
-    main_jet_pt_range = helpers.JetPtRange(_nominal_smeared_jet_pt_bins[0], _nominal_smeared_jet_pt_bins[-1])
+    main_jet_pt_range = jsub_helpers.JetPtRange(_nominal_smeared_jet_pt_bins[0], _nominal_smeared_jet_pt_bins[-1])
 
     # Setup optional args
     optional_kwargs = {}
