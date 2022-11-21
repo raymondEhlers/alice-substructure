@@ -85,7 +85,7 @@ class UprootArray(Collection[T]):
     def __getitem__(self, key: int) -> T:
         ...
 
-    def __getitem__(self, key):  # type: ignore
+    def __getitem__(self, key):  # type: ignore[no-untyped-def]
         raise NotImplementedError("Just typing information.")
 
     def __add__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
@@ -144,7 +144,7 @@ class UprootArray(Collection[T]):
         raise NotImplementedError("Just typing information.")
 
     def __and__(self, other: UprootArray[bool]) -> UprootArray[bool]:
-        ...
+        raise NotImplementedError("Just typing information.")
 
     def __or__(self, other: UprootArray[bool]) -> UprootArray[bool]:
         raise NotImplementedError("Just typing information.")
