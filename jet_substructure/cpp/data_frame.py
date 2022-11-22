@@ -44,9 +44,9 @@ def new_matching_hists(
     hist_suffix: str,
     matching_index: MatchingIndex,
     jet_pt_column_format: str,
-    kt_axis: npt.NDArray[np.float32],
-    jet_pt_axis: npt.NDArray[np.float32],
-    kt_selection_axis: npt.NDArray[np.float32],
+    kt_axis: npt.NDArray[np.float64],
+    jet_pt_axis: npt.NDArray[np.float64],
+    kt_selection_axis: npt.NDArray[np.float64],
     matching_jet_pt_prefix: Optional[str] = None,
     create_generator_subjet_in_measured_jet_hists: bool = False,
 ) -> List[RootHist]:
@@ -590,7 +590,7 @@ def run_create_closure_ratio(  # noqa: C901
     #       but we can't take advantage of that here because we need to pass just the config. Therefore, to have valid
     #       binning, we need to only take unique values. unique sorts, but this is fine because they must be strictly
     #       increasing anyway.
-    smeared_substructure_variable_bins = np.unique(  # type: ignore
+    smeared_substructure_variable_bins = np.unique(
         unfolding_base.get_binning(
             base_unfolding_config=base_unfolding_config,
             unfolding_settings=unfolding_settings,
@@ -709,6 +709,7 @@ def run_create_closure_ratio(  # noqa: C901
 
     logger.info(f"Creating ratio output file for {collision_system}, {grooming_method}, {prefixes}")
     logger.info(f"Writing to {output_filename}")
+    # NOTE: We want UPDATE rather than RECREATE here because we store different binning in the same output file.
     output = ROOT.TFile(str(output_filename), "UPDATE")
     output.cd()
     for h in hists:

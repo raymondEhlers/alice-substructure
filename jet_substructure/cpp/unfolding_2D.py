@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import numpy.typing as npt
 import uproot
 from pachyderm import binned_data
 
@@ -40,7 +41,7 @@ def _pass_filenames_to_ROOT(filenames: Sequence[Path]) -> List[str]:
     return [str(f) for f in filenames]
 
 
-def _array_to_ROOT(arr: Union[List[str], np.ndarray], type_name: str = "double") -> Any:
+def _array_to_ROOT(arr: Union[List[str], Union[npt.NDArray[np.float32], npt.NDArray[np.float64]]], type_name: str = "double") -> Any:
     """Convert numpy array to std::vector via ROOT.
 
     Because it apparently can't handle conversions directly. Which is really dumb...
@@ -248,7 +249,7 @@ def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path, additi
         #       the detection of the suffix to replace.
         output_filename = Path(f"{output_filename.parent / output_filename.stem}_{additional_tag}.root")
 
-    logger.debug(f"Writing hists to {output_filename}")
+    logger.info(f"Writing hists to {output_filename}")
     # Uproot3 also works, but it's far less space efficient. Since we already have to import ROOT,
     # we may as well just use it...
     # with uproot3.recreate(settings.output_filename.with_suffix(".uproot.root")) as f:
@@ -369,8 +370,8 @@ def _collision_system_names(unfolding_for_pp: bool) -> Tuple[str, str]:
 def _get_reweighted_ratio(
     data_dataset_name: str,
     response_dataset_name: str,
-    smeared_substructure_variable_bins: np.ndarray,
-    smeared_jet_pt_bins: np.ndarray,
+    smeared_substructure_variable_bins: npt.NDArray[np.float64],
+    smeared_jet_pt_bins: npt.NDArray[np.float64],
     grooming_method: str,
     unfolding_for_pp: bool,
     base_directory: Path = Path("output"),
@@ -699,10 +700,10 @@ def run_unfolding_closure_reweighting(
 def run_unfolding_tree(
     grooming_method: str,
     substructure_variable_name: str,
-    smeared_substructure_variable_bins: np.ndarray,
-    smeared_jet_pt_bins: np.ndarray,
-    true_substructure_variable_bins: np.ndarray,
-    true_jet_pt_bins: np.ndarray,
+    smeared_substructure_variable_bins: npt.NDArray[np.float64],
+    smeared_jet_pt_bins: npt.NDArray[np.float64],
+    true_substructure_variable_bins: npt.NDArray[np.float64],
+    true_jet_pt_bins: npt.NDArray[np.float64],
     # data_filenames: Sequence[Path],
     # embedded_filenames: Sequence[Path],
     # output_filename: Path,
@@ -817,10 +818,10 @@ def run_unfolding_tree(
 def run_unfolding_rdf(
     grooming_method: str,
     substructure_variable_name: str,
-    smeared_substructure_variable_bins: np.ndarray,
-    smeared_jet_pt_bins: np.ndarray,
-    true_substructure_variable_bins: np.ndarray,
-    true_jet_pt_bins: np.ndarray,
+    smeared_substructure_variable_bins: npt.NDArray[np.float64],
+    smeared_jet_pt_bins: npt.NDArray[np.float64],
+    true_substructure_variable_bins: npt.NDArray[np.float64],
+    true_jet_pt_bins: npt.NDArray[np.float64],
     # data_filenames: Sequence[Path],
     # embedded_filenames: Sequence[Path],
     # output_filename: Path,
