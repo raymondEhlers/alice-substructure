@@ -1087,17 +1087,17 @@ analysis_configurations:
         datasets:
             nominal:
                 PbPb: *LHC18qr_semi_central_R04_pass1
-                embedPythia: *LHC18qr_semi_central_R04_pass1_embedded
+                embed_pythia: *LHC18qr_semi_central_R04_pass1_embedded
             tracking_efficiency:
                 PbPb: *LHC18qr_semi_central_R04_pass1
-                embedPythia: *LHC18qr_semi_central_R04_pass1_embedded_tracking_efficiency
+                embed_pythia: *LHC18qr_semi_central_R04_pass1_embedded_tracking_efficiency
             rmax_005:
                 PbPb: null  #*LHC18qr_semi_central_R04_pass1_Rmax005
                 # For now, we don't fill this in because it's not really useful....
-                embedPythia: null  #*LHC18qr_semi_central_R04_pass1_embedded_Rmax005
+                embed_pythia: null  #*LHC18qr_semi_central_R04_pass1_embedded_Rmax005
             rmax_060:
                 PbPb: *LHC18qr_semi_central_R04_pass1_Rmax060
-                embedPythia: *LHC18qr_semi_central_R04_pass1_embedded_Rmax060
+                embed_pythia: *LHC18qr_semi_central_R04_pass1_embedded_Rmax060
         unfolding:
             nominal_binning:
                 true_jet_pt: [0, 30, 40, 60, 80, 100, 120, 160]
@@ -1112,16 +1112,16 @@ analysis_configurations:
         datasets:
             nominal:
                 PbPb: *LHC18qr_semi_central_R04
-                embedPythia: *LHC18qr_semi_central_R04_embedded
+                embed_pythia: *LHC18qr_semi_central_R04_embedded
             tracking_efficiency:
                 PbPb: *LHC18qr_semi_central_R04
-                embedPythia: *LHC18qr_semi_central_R04_embedded_tracking_efficiency
+                embed_pythia: *LHC18qr_semi_central_R04_embedded_tracking_efficiency
             rmax_005:
                 PbPb: *LHC18qr_semi_central_R04_Rmax005
-                embedPythia: *LHC18qr_semi_central_R04_embedded_Rmax005
+                embed_pythia: *LHC18qr_semi_central_R04_embedded_Rmax005
             rmax_070:
                 PbPb: *LHC18qr_semi_central_R04_Rmax070
-                embedPythia: *LHC18qr_semi_central_R04_embedded_Rmax070
+                embed_pythia: *LHC18qr_semi_central_R04_embedded_Rmax070
         unfolding:
             suffix: "semi_central_R04"
             nominal_binning:
@@ -1339,17 +1339,17 @@ analysis_configurations:
     PbPb_semi_central_R02_pass3:
         datasets:
             nominal:
-                PbPb: *LHC18qr_semi_central_R02
-                embedPythia: *LHC18qr_semi_central_R02_embedded
+                PbPb: *LHC18qr_semi_central_R02_test
+                embed_pythia: *LHC18qr_semi_central_R02_embedded_test
             tracking_efficiency:
                 PbPb: *LHC18qr_semi_central_R02
-                embedPythia: *LHC18qr_semi_central_R02_embedded_tracking_efficiency
+                embed_pythia: *LHC18qr_semi_central_R02_embedded_tracking_efficiency
             rmax_005:
                 PbPb: *LHC18qr_semi_central_R02_Rmax005
-                embedPythia: *LHC18qr_semi_central_R02_embedded_Rmax005
+                embed_pythia: *LHC18qr_semi_central_R02_embedded_Rmax005
             rmax_070:
                 PbPb: *LHC18qr_semi_central_R02_Rmax070
-                embedPythia: *LHC18qr_semi_central_R02_embedded_Rmax070
+                embed_pythia: *LHC18qr_semi_central_R02_embedded_Rmax070
         unfolding:
             suffix: "semi_central_R02_pass3"
             nominal_binning:
@@ -1619,16 +1619,16 @@ analysis_configurations:
             nominal:
                 PbPb: *LHC18qr_central_R02
                 # NOTE: Careful, this defines the grooming methods that are available!
-                embedPythia: *LHC18qr_central_R02_dynamical_core_embedded
+                embed_pythia: *LHC18qr_central_R02_dynamical_core_embedded
             tracking_efficiency:
                 PbPb: *LHC18qr_central_R02
-                embedPythia: null  #*LHC18qr_central_R02_embedded_tracking_efficiency
+                embed_pythia: null  #*LHC18qr_central_R02_embedded_tracking_efficiency
             rmax_005:
                 PbPb: null  #*LHC18qr_central_R02_Rmax005
-                embedPythia: null  #*LHC18qr_central_R02_embedded_Rmax005
+                embed_pythia: null  #*LHC18qr_central_R02_embedded_Rmax005
             rmax_070:
                 PbPb: null  #*LHC18qr_central_R02_Rmax070
-                embedPythia: null  #*LHC18qr_central_R02_embedded_Rmax070
+                embed_pythia: null  #*LHC18qr_central_R02_embedded_Rmax070
         unfolding:
             suffix: "central_R02_pass1"
             nominal_binning:
@@ -1818,16 +1818,16 @@ analysis_configurations:
         datasets:
             nominal:
                 PbPb: *LHC18qr_central_R02
-                embedPythia: *LHC18qr_central_R02_dynamical_kt_embedded
+                embed_pythia: *LHC18qr_central_R02_dynamical_kt_embedded
             tracking_efficiency:
                 PbPb: *LHC18qr_central_R02
-                embedPythia: null  #*LHC18qr_central_R02_embedded_tracking_efficiency
+                embed_pythia: null  #*LHC18qr_central_R02_embedded_tracking_efficiency
             rmax_005:
                 PbPb: null  #*LHC18qr_central_R02_Rmax005
-                embedPythia: null  #*LHC18qr_central_R02_embedded_Rmax005
+                embed_pythia: null  #*LHC18qr_central_R02_embedded_Rmax005
             rmax_070:
                 PbPb: null  #*LHC18qr_central_R02_Rmax070
-                embedPythia: null  #*LHC18qr_central_R02_embedded_Rmax070
+                embed_pythia: null  #*LHC18qr_central_R02_embedded_Rmax070
         unfolding:
             suffix: "central_R02_pass3"
             nominal_binning:
@@ -2077,7 +2077,7 @@ analysis_configurations:
         datasets:
             nominal:
                 PbPb: *LHC18qr_semi_central_R04_validation
-                embedPythia: *LHC18qr_semi_central_R04_embedded_validation
+                embed_pythia: *LHC18qr_semi_central_R04_embedded_validation
     pp_R04_validation:
         datasets:
             nominal:
