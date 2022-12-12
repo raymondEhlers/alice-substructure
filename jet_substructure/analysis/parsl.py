@@ -1927,12 +1927,23 @@ def setup_all_unfolding(  # noqa: C901
     return results
 
 
-if __name__ == "__main__":  # noqa: C901
+def _hours_in_walltime(walltime: str) -> int:
+    return int(walltime.split(":")[0])
+
+
+def run() -> None:  # noqa: C901
+    # Keep here for now until we decide how to proceed here...
+    from mammoth import job_utils
+    from mammoth.alice import job_utils as alice_job_utils
+
     # Settings
     # Base settings
     # base_dataset_name = "PbPb_central_R02_pass1"
+    # base_dataset_name = "PbPb_central_R02_pass3"
     base_dataset_name = "PbPb_semi_central_R02_pass3"
     # base_dataset_name = "pp_R02"
+    # base_dataset_name = "pp_R04_validation"
+    # base_dataset_name = "PbPb_semi_central_R04_validation"
     # dataset_type = "rmax_070"
     dataset_type = "nominal"
     collision_system = "PbPb"
@@ -1949,22 +1960,67 @@ if __name__ == "__main__":  # noqa: C901
         # "root_data_frame_response",
         "unfolding",
     ]
-    nodes_to_allocate = 8
-    jobs_per_node = 6
+    #nodes_to_allocate = 8
+    #nodes_to_allocate = 1
+    #jobs_per_node = 8
 
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
     grooming_methods = [
-        "leading_kt",
-        "leading_kt_z_cut_02",
-        "leading_kt_z_cut_04",
-        "dynamical_core",
-        "dynamical_z",
+        # "leading_kt",
+        # "leading_kt_z_cut_02",
+        # "leading_kt_z_cut_04",
+        # "dynamical_z",
+        # "dynamical_core",
         "dynamical_kt",
-        "dynamical_time",
-        "soft_drop_z_cut_02",
-        "soft_drop_z_cut_04",
+        # "dynamical_time",
+        # "soft_drop_z_cut_02",
+        # "soft_drop_z_cut_04",
     ]
-    max_cores_to_use_per_node = 12
+    #max_cores_to_use_per_node = 12
+
+    # Job execution parameters
+    #productions = define_productions()
+    task_name = "unfolding_hardest_kt"
+
+    # Job execution configuration
+    task_config = job_utils.TaskConfig(name=task_name, n_cores_per_task=1)
+    # n_cores_to_allocate = 120
+    # n_cores_to_allocate = 110
+    n_cores_to_allocate = 1
+    walltime = "24:00:00"
+    debug_mode = False
+    if debug_mode:
+        # Usually, we want to run in the short queue
+        n_cores_to_allocate = 2
+        walltime = "1:59:00"
+
+    # Basic setup: logging and parsl.
+    # First, need to figure out if we need additional environments such as ROOT
+    _additional_worker_init_script = alice_job_utils.determine_additional_worker_init_conda(
+        environment_name="substructure_c_24_06",
+        tasks_to_run=[jobs_to_execute],
+        tasks_requiring_root=["extract_scale_factors"],
+        tasks_requiring_aliphysics=[],
+        tasks_requiring_roounfold=["unfolding"],
+    )
+    # NOTE: Parsl's logger setup is broken, so we have to set it up before starting logging. Otherwise,
+    #       it's super verbose and a huge pain to turn off. Note that by passing on the storage messages,
+    #       we don't actually lose any info.
+    config, facility_config, stored_messages = job_utils.config(
+        #facility="ORNL_b587_long" if _hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
+        facility="rehlers_mbp_m1pro",
+        task_config=task_config,
+        n_tasks=n_cores_to_allocate,
+        walltime=walltime,
+        enable_monitoring=True,
+        additional_worker_init_script=_additional_worker_init_script,
+    )
+    # Keep track of the dfk to keep parsl alive
+    dfk = helpers.setup_logging_and_parsl(
+        parsl_config=config,
+        level=logging.INFO,
+        stored_messages=stored_messages,
+    )
 
     # Basic setup for jobs
     _possible_jobs = [
@@ -2075,13 +2131,13 @@ if __name__ == "__main__":  # noqa: C901
             # selected_train_numbers=list(range(6316, 6318)),
         )
         all_results.append(yaml_result)
-        results = setup_extract_embedding_pt_hard_spectra(
+        single_results = setup_extract_embedding_pt_hard_spectra(
             collision_system=collision_system,
             dataset_config=dataset_config,
             input_results=[yaml_result],
             # selected_train_numbers=list(range(6316, 6318)),
         )
-        all_results.append(results)
+        all_results.append(single_results)
     if "calculate_embedding_skim" in jobs_to_execute:
         # TODO: Devise an approach to retry.
         if not cross_check_task:
@@ -2170,7 +2226,15 @@ if __name__ == "__main__":  # noqa: C901
             grooming_methods=grooming_methods,
             n_cores_per_job=n_cores_per_job,
             selected_unfolding_settings=[
+                # TODO: Re-run pp with a different split MC fraction...
                 "default",
+                # Soft Drop z > 0.2 tests for min kt
+                # "default_z_cut_02_kt_0.5",
+                # "default_z_cut_02_kt_0.5_reweight_prior",
+                # "default_z_cut_02_kt_0.25",
+                # "default_z_cut_02_kt_0.25_reweight_prior",
+                # "default_z_cut_02_kt_0",
+                # "default_z_cut_02_kt_0_reweight_prior",
                 # "default_2_4_split",
                 # "default_2_4_split_reweight_prior",
                 # "default_kt_1.5",
@@ -2194,16 +2258,16 @@ if __name__ == "__main__":  # noqa: C901
                 # *[f"var_{i}" for i in range(1, 17) if i < 7 or i > 10] + ["default"],
                 # Systematics
                 # Unfolding
-                "truncation_low",
-                "truncation_high",
-                "random_binning",
+                #"truncation_low",
+                #"truncation_high",
+                #"random_binning",
                 # Unfolding PbPb
-                "reweight_prior",
+                #"reweight_prior",
                 # Tracking efficiency
-                # "tracking_efficiency",
+                #"tracking_efficiency",
                 # PbPb background
-                # "background_low",
-                # "background_high",
+                #"background_low",
+                #"background_high",
             ],
         )
         # results = setup_unfolding(
@@ -2215,6 +2279,22 @@ if __name__ == "__main__":  # noqa: C901
         all_results.extend(results)
 
     logger.info(f"Accumulated {len(all_results)} results")
+
+    IPython.start_ipython(user_ns={**locals(), **globals()})
+
+    # Process the futures, showing processing progress
+    # Since it returns the results, we can actually use this to accumulate results.
+    gen_results = job_utils.provide_results_as_completed(all_results, running_with_parsl=True)
+
+    # In order to support writing histograms from multiple systems, we need to index the output histograms
+    # by the collision system + centrality.
+    with helpers.progress_bar() as progress:
+        track_results = progress.add_task(total=len(all_results), description="Processing results...")
+        # for a in all_results:
+        for result in gen_results:
+            # r = a.result()
+            logger.info(f"result: {result}")
+            progress.update(track_results, advance=1)
 
     # As far as I can tell, jobs will start executing as soon as they can, regardless of
     # asking for the result. By embedded here, we can inspect results, etc in the meantime.
@@ -2231,3 +2311,7 @@ if __name__ == "__main__":  # noqa: C901
     logger.info(res)
 
     logger.info("Done")
+
+
+if __name__ == "__main__":
+    run()
