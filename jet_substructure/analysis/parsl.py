@@ -10,28 +10,20 @@ from __future__ import annotations
 import copy
 import functools
 import logging
-import math
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
 
 import attr
 import IPython
 import numpy as np
-import parsl
 import uproot
 from mammoth.framework.analysis import objects as analysis_objects
 from mammoth.framework import utils as mammoth_utils
 from mammoth import helpers
 from pachyderm import yaml
-from parsl.addresses import address_by_hostname
 from parsl.app.app import python_app
-from parsl.channels import LocalChannel
-from parsl.config import Config
 from parsl.data_provider.files import File
 from parsl.dataflow.futures import AppFuture
-from parsl.executors import HighThroughputExecutor
-from parsl.monitoring.monitoring import MonitoringHub
-from parsl.providers import SlurmProvider
 
 from jet_substructure.base import helpers as jsub_helpers, skim_analysis_objects
 from jet_substructure.base import unfolding as unfolding_base
@@ -92,132 +84,6 @@ def read_extracted_scale_factors(
     return analysis_objects.read_extracted_scale_factors(
         path=Path(f"trains/{collision_system}/{dataset_name}/scale_factors.yaml")
     )
-
-
-def setup_parsl_587(
-    nodes_to_allocate: int = 9,
-    jobs_per_node: int = 2,
-    partition: str = "short",
-    debug: bool = False,
-    use_root: bool = False,
-    use_aliphysics: bool = False,
-    use_roounfold: bool = False,
-) -> Config:
-    """Setup parsl for the 587 cluster.
-
-    The configuration that is defined here is loaded by parsl. We also setup monitoring infrastructure.
-
-    We default to allocating the entire node for simplicity. This helps address any possible memory issues.
-
-    Args:
-        nodes_to_allocate: Number of nodes to allocate. Default: 9.
-        jobs_per_node: Number of jobs to run per node. Default: 2.
-        partition: Partition to use with slurm. Default: "short".
-        debug: If True, enable debugging on the workers. Default: False.
-        use_root: If True, we intend to use ROOT in the worker jobs. In that case, we need to
-            initialize the worker environment. Default: False.
-        use_aliphysics: If True, we intend to use AliPhysics in the worker jobs. In that case, we need to
-            initialize the worker environment. Default: False.
-        use_roounfold: If True, we intend to use RooUnfold in the worker jobs. In that case, we need to
-            initialize the worker environment. Default: False.
-    Returns:
-        The parsl configuration for the 587 cluster. Note that it's already been loaded by parsl.
-    """
-    # Explanation of the parsl config:
-    # - Number of blocks is the number of nodes * nodes_per_block. We want one node per block
-    #   so we can use blocks as a proxy for nodes.
-    #   - Control the number of nodes via init_blocks and max_blocks (we don't use any elasticity).
-    # - If we want, for example, two jobs per node (one core per job), we need to set:
-    #   - max_workers = 2
-    #   - cores_per_node = 2
-    # NOTE: If we just try to scale with nodes_per_block, we'll allocate the appropriate nodes,
-    #       but then all the jobs will be on just one node, which is definitely not what we want.
-
-    # Setup ROOT if necessary
-    slurm_kwargs: Dict[str, Any] = {}
-    if any([use_root, use_aliphysics, use_roounfold]):
-        software_to_load = []
-        if use_root:
-            software_to_load.append("ROOT/latest")
-        if use_aliphysics:
-            # This is a little unconventional to redefine the list here, but ROOT is already
-            # a dependency of AliPhysics, so we redefine the list to remove ROOT.
-            software_to_load = [s for s in software_to_load if s != "ROOT/latest"]
-            software_to_load.append("AliPhysics/latest")
-        if use_roounfold:
-            # This is a little unconventional to redefine the list here, but ROOT is already
-            # a dependency of RooUnfold, so we redefine the list to remove ROOT.
-            software_to_load = [s for s in software_to_load if s != "ROOT/latest"]
-            software_to_load.append("RooUnfold/latest")
-        slurm_kwargs.update(
-            dict(
-                worker_init=f"eval `/usr/bin/alienv -w /software/rehlers/alice/sw --no-refresh printenv {','.join(software_to_load)}`",
-            )
-        )
-
-    machines_to_exclude: List[str] = [
-        # pc051 and pc075 have two OSDs, so they will always be short of memory. Better to avoid until we have more memory.
-        # "pc051",
-        # "pc075",
-        # pc147 is an mds server, and somehow load on it seems to cause problems in the ceph quorum. So we skip for now,
-        # by may be able to include later...
-        # "pc147",
-    ]
-    if use_root:
-        # pc059 to avoid causing problems on the login node when using 8 cores for root data frame.
-        machines_to_exclude.append("pc059")
-
-    b587_executor = Config(
-        executors=[
-            HighThroughputExecutor(
-                label="b587",
-                worker_debug=debug,
-                # Ensures two jobs per job.
-                max_workers=jobs_per_node,
-                provider=SlurmProvider(
-                    partition=partition,
-                    # Submitting from pc059, so we have local communication available.
-                    channel=LocalChannel(),
-                    # This is effectively how many sets of nodes to allocate (assuming nodes_per_block = 1).
-                    # See the description above.
-                    init_blocks=nodes_to_allocate,
-                    max_blocks=nodes_to_allocate,
-                    # This is how many jobs to put into a particular block.
-                    nodes_per_block=1,
-                    # Usually we want one core per task, so we want cores_per_node = max_workers.
-                    # NOTE: This must be set. Otherwise, the executor will assume that all cores
-                    #       are available on a given node.
-                    cores_per_node=jobs_per_node,
-                    # Ensures that the jobs are spread out. Also means that we need to be careful
-                    # when others are running to avoid running out of memory.
-                    exclusive=False,
-                    # Format: HH:MM:SS
-                    walltime="02:00:00",
-                    # walltime="00:21:00",
-                    # See notes on machines to exclude above.
-                    scheduler_options=f"#SBATCH --exclude={','.join(machines_to_exclude)}",
-                    # For root
-                    **slurm_kwargs,
-                ),
-            )
-        ],
-        # Monitoring information
-        monitoring=MonitoringHub(
-            hub_address=address_by_hostname(),
-            hub_port=55055,
-            monitoring_debug=False,
-            resource_monitoring_interval=10,
-        ),
-        # Disables resource scaling.
-        strategy=None,
-        # Enable some retries (but not too many).
-        # Unclear if it will help, but worth a try.
-        # Doesn't seem to help :-(
-        # retries=2,
-    )
-    parsl.load(b587_executor)
-
-    return b587_executor
 
 
 @python_app  # type: ignore
@@ -716,10 +582,11 @@ def _extract_scale_factors_from_hists(
 ) -> AppFuture:
     from pathlib import Path
 
-    from jet_substructure.base import skim_analysis_objects
+    from mammoth.framework.analysis.objects import ScaleFactor
+
     from jet_substructure.cpp import scale_factors as sf
 
-    res = skim_analysis_objects.ScaleFactor.from_hists(
+    res = ScaleFactor.from_hists(
         *sf.scale_factor_ROOT(filenames=[Path(i.filepath) for i in inputs])
     )
     return res
@@ -765,7 +632,7 @@ def setup_extract_scale_factors(
 
 @python_app  # type: ignore
 def _write_scale_factors_to_yaml(
-    scale_factors: Mapping[int, skim_analysis_objects.ScaleFactor],
+    scale_factors: Mapping[int, analysis_objects.ScaleFactor],
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> AppFuture:
@@ -773,10 +640,10 @@ def _write_scale_factors_to_yaml(
 
     from pachyderm import yaml
 
-    from jet_substructure.base import skim_analysis_objects
+    from mammoth.framework.analysis import objects as analysis_objects
 
     # Write them to YAML for later.
-    y = yaml.yaml(classes_to_register=[skim_analysis_objects.ScaleFactor])
+    y = yaml.yaml(classes_to_register=[analysis_objects.ScaleFactor])
     output_dir = Path(outputs[0].filepath)
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     with open(output_dir, "w") as f:
@@ -1606,7 +1473,7 @@ def _unfolding_standard(
     reweight_response_dataset_name: str,
     data_tree_name: str,
     response_tree_name: str,
-    inputs: Sequence[File] = [],
+    inputs: Tuple[Sequence[File], Sequence[File]] = ([], []),
     outputs: Sequence[File] = [],
 ) -> AppFuture:
     import random
@@ -1644,7 +1511,7 @@ def _unfolding_closure(
     reweight_data_dataset_name: str,
     reweight_response_dataset_name: str,
     response_tree_name: str,
-    inputs: Sequence[File] = [],
+    inputs: Tuple[Sequence[File], Sequence[File]] = ([], []),
     outputs: Sequence[File] = [],
 ) -> AppFuture:
     import random
@@ -1994,13 +1861,41 @@ def run() -> None:  # noqa: C901
         n_cores_to_allocate = 2
         walltime = "1:59:00"
 
+    # Basic setup for jobs
+    _possible_jobs = [
+        "repair_root_files",
+        "convert_to_parquet",
+        "extract_scale_factors",
+        "calculate_embedding_skim",
+        "calculate_data_skim",
+        "root_data_frame_embedded_pt_hard_scaling",
+        "root_data_frame",
+        "root_data_frame_response",
+        "root_data_frame_closure",
+        "unfolding",
+    ]
+    # Validation
+    for job_name in jobs_to_execute:
+        if job_name not in _possible_jobs:
+            raise RuntimeError(
+                f"Requested to run job {job_name}, but the name is invalid." f" Possible jobs: {_possible_jobs}"
+            )
+
     # Basic setup: logging and parsl.
     # First, need to figure out if we need additional environments such as ROOT
     _additional_worker_init_script = alice_job_utils.determine_additional_worker_init_conda(
         environment_name="substructure_c_24_06",
         tasks_to_run=[jobs_to_execute],
-        tasks_requiring_root=["extract_scale_factors"],
-        tasks_requiring_aliphysics=[],
+        tasks_requiring_root=[
+            "repair_root_files",
+            "extract_scale_factors",
+            "root_data_frame_embedded_pt_hard_scaling",
+            "root_data_frame",
+            "root_data_frame_response",
+            "root_data_frame_closure",
+            "unfolding",
+        ],
+        tasks_requiring_aliphysics=["repair_root_files", "extract_scale_factors"],
         tasks_requiring_roounfold=["unfolding"],
     )
     # NOTE: Parsl's logger setup is broken, so we have to set it up before starting logging. Otherwise,
@@ -2022,51 +1917,23 @@ def run() -> None:  # noqa: C901
         stored_messages=stored_messages,
     )
 
-    # Basic setup for jobs
-    _possible_jobs = [
-        "repair_root_files",
-        "convert_to_parquet",
-        "extract_scale_factors",
-        "calculate_embedding_skim",
-        "calculate_data_skim",
-        "root_data_frame_embedded_pt_hard_scaling",
-        "root_data_frame",
-        "root_data_frame_response",
-        "root_data_frame_closure",
-        "unfolding",
-    ]
-    _jobs_requiring_root = [
-        "repair_root_files",
-        "extract_scale_factors",
-        "root_data_frame_embedded_pt_hard_scaling",
-        "root_data_frame",
-        "root_data_frame_response",
-        "root_data_frame_closure",
-        "unfolding",
-    ]
-    # Validation
-    for job_name in jobs_to_execute:
-        if job_name not in _possible_jobs:
-            raise RuntimeError(
-                f"Requested to run job {job_name}, but the name is invalid." f" Possible jobs: {_possible_jobs}"
-            )
     # In principle, we actually have 6 cores per node + hyperthreading, so we assume 8 cores
     # at max to ensure that we minimize idle cores, while avoiding overloading everything.
     # This only matters for jobs which can use multiple cores for a single task. So this
     # basically means ROOT jobs.
-    n_cores_per_job = math.floor(max_cores_to_use_per_node / jobs_per_node)
+    n_cores_per_job = task_config.n_cores_per_task
 
     # Setup parsl
-    setup_parsl_587(
-        nodes_to_allocate=nodes_to_allocate,
-        jobs_per_node=jobs_per_node,
-        # partition="vip",
-        # partition="long",
-        use_root=any((job in _jobs_requiring_root for job in jobs_to_execute)),
-        # We need the AliPhysics definitions for the Substructure output classes and AliEmcalList.
-        use_aliphysics=any((job in ["repair_root_files", "extract_scale_factors"] for job in jobs_to_execute)),
-        use_roounfold=any((job == "unfolding" for job in jobs_to_execute)),
-    )
+    #setup_parsl_587(
+    #    nodes_to_allocate=nodes_to_allocate,
+    #    jobs_per_node=jobs_per_node,
+    #    # partition="vip",
+    #    # partition="long",
+    #    use_root=any((job in _jobs_requiring_root for job in jobs_to_execute)),
+    #    # We need the AliPhysics definitions for the Substructure output classes and AliEmcalList.
+    #    use_aliphysics=any((job in ["repair_root_files", "extract_scale_factors"] for job in jobs_to_execute)),
+    #    use_roounfold=any((job == "unfolding" for job in jobs_to_execute)),
+    #)
 
     # Setup logging. By doing it after parsl, we're able to keep it much quieter.
     # Oddly, I can't seem to select the parsl modules to change their loggers, so this seems
