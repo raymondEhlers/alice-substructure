@@ -21,11 +21,14 @@ from mammoth.framework.analysis import objects as analysis_objects
 from mammoth.framework import utils as mammoth_utils
 from mammoth import helpers
 from pachyderm import yaml
-from parsl.app.app import python_app
 from parsl.data_provider.files import File
 from parsl.dataflow.futures import AppFuture
 
-from jet_substructure.base import helpers as jsub_helpers, skim_analysis_objects
+from mammoth import job_utils
+from mammoth.job_utils import python_app
+from mammoth.alice import job_utils as alice_job_utils
+
+from jet_substructure.base import helpers as jsub_helpers
 from jet_substructure.base import unfolding as unfolding_base
 
 
@@ -352,7 +355,7 @@ def _entries_to_ranges_for_jobs(
     return splits
 
 
-@python_app  # type: ignore
+@python_app
 def _convert_to_parquet(
     tree_name: str,
     prefixes: Sequence[str],
@@ -361,7 +364,7 @@ def _convert_to_parquet(
     event_range: Optional[Tuple[Optional[int], Optional[int]]] = None,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
-) -> AppFuture:
+) -> Tuple[bool, Path]:
     """ Convert to parquet app. """
     from pathlib import Path
 
@@ -1321,6 +1324,7 @@ def setup_root_data_frame(
     dataset_config: Mapping[str, Any],
     base_unfolding_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
+    job_framework: job_utils.JobFramework,
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[AppFuture]] = None,
     unfolding_settings: Optional[Mapping[str, Any]] = None,
@@ -1424,6 +1428,7 @@ def setup_root_data_frame(
                 main_jet_pt_range=main_jet_pt_range,
                 n_cores=n_cores_per_job,
                 cross_check_task=cross_check_task,
+                job_framework=job_framework,
                 # Need to grab the outputs here to ensure that the dependencies are tracked properly.
                 inputs=[r.outputs[0] for r in input_results] if input_results else input_files,
                 outputs=[parsl_output_file],
@@ -1542,6 +1547,7 @@ def setup_all_unfolding(  # noqa: C901
     base_dataset_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
     n_cores_per_job: int,
+    job_framework: job_utils.JobFramework,
     selected_unfolding_settings: Optional[List[str]] = None,
 ) -> List[AppFuture]:
     """Setup unfolding jobs.
@@ -1564,7 +1570,7 @@ def setup_all_unfolding(  # noqa: C901
     logger.info(f"Unfolding settings: {selected_unfolding_settings}")
     # Setup
     base_unfolding_config = base_dataset_config["unfolding"]
-    output_dir = Path("output") / data_collision_system / "unfolding" / "parsl" / "2022-03-QM"
+    output_dir = Path("output") / data_collision_system / "unfolding" / "parsl" / "2022-12-dask"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Things are treated so different that it's better to be direct about the data collision system.
@@ -1711,6 +1717,7 @@ def setup_all_unfolding(  # noqa: C901
                             # particular case that we are considering.
                             dataset_config=base_dataset_config["datasets"]["nominal"][_collision_system],
                             grooming_methods=[grooming_method],
+                            job_framework=job_framework,
                             base_unfolding_config=base_unfolding_config,
                             unfolding_settings=unfolding_settings,
                         )
@@ -1758,6 +1765,7 @@ def setup_all_unfolding(  # noqa: C901
                         response_tree_name="tree",
                         # if not response_dataset_config.get("cross_check_task", False)
                         # else response_dataset_config["tree_name"],
+                        job_framework=job_framework,
                         inputs=job_input_files,
                         outputs=[parsl_output_file],
                     )
@@ -1786,6 +1794,7 @@ def setup_all_unfolding(  # noqa: C901
                                 response_tree_name="tree",
                                 # if not response_dataset_config.get("cross_check_task", False)
                                 # else response_dataset_config["tree_name"],
+                                job_framework=job_framework,
                                 inputs=job_input_files,
                                 outputs=[parsl_output_file],
                             )
@@ -1798,11 +1807,7 @@ def _hours_in_walltime(walltime: str) -> int:
     return int(walltime.split(":")[0])
 
 
-def run() -> None:  # noqa: C901
-    # Keep here for now until we decide how to proceed here...
-    from mammoth import job_utils
-    from mammoth.alice import job_utils as alice_job_utils
-
+def run(job_framework: job_utils.JobFramework) -> None:  # noqa: C901
     # Settings
     # Base settings
     # base_dataset_name = "PbPb_central_R02_pass1"
@@ -1898,49 +1903,40 @@ def run() -> None:  # noqa: C901
         tasks_requiring_aliphysics=["repair_root_files", "extract_scale_factors"],
         tasks_requiring_roounfold=["unfolding"],
     )
-    # NOTE: Parsl's logger setup is broken, so we have to set it up before starting logging. Otherwise,
-    #       it's super verbose and a huge pain to turn off. Note that by passing on the storage messages,
-    #       we don't actually lose any info.
-    config, facility_config, stored_messages = job_utils.config(
-        #facility="ORNL_b587_long" if _hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
-        facility="rehlers_mbp_m1pro",
-        task_config=task_config,
-        n_tasks=n_cores_to_allocate,
-        walltime=walltime,
-        enable_monitoring=True,
-        additional_worker_init_script=_additional_worker_init_script,
-    )
-    # Keep track of the dfk to keep parsl alive
-    dfk = helpers.setup_logging_and_parsl(
-        parsl_config=config,
-        level=logging.INFO,
-        stored_messages=stored_messages,
-    )
+    # Setup job frameworks
+    if job_framework == job_utils.JobFramework.parsl:
+        # NOTE: Parsl's logger setup is broken, so we have to set it up before starting logging. Otherwise,
+        #       it's super verbose and a huge pain to turn off. Note that by passing on the storage messages,
+        #       we don't actually lose any info.
+        config, facility_config, stored_messages = job_utils.config(
+            #facility="ORNL_b587_long" if _hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
+            facility="rehlers_mbp_m1pro",
+            task_config=task_config,
+            n_tasks=n_cores_to_allocate,
+            walltime=walltime,
+            enable_monitoring=True,
+            additional_worker_init_script=_additional_worker_init_script,
+        )
+        # Keep track of the dfk to keep parsl alive
+        dfk = helpers.setup_logging_and_parsl(
+            parsl_config=config,
+            level=logging.INFO,
+            stored_messages=stored_messages,
+        )
+
+        # Quiet down parsl
+        logging.getLogger("parsl").setLevel(logging.WARNING)
+    elif job_framework == job_utils.JobFramework.dask_delayed:
+        helpers.setup_logging(
+            level=logging.INFO,
+        )
+        logger.warning("Assuming that you've setup the dask cluster + client + environment separately!")
 
     # In principle, we actually have 6 cores per node + hyperthreading, so we assume 8 cores
     # at max to ensure that we minimize idle cores, while avoiding overloading everything.
     # This only matters for jobs which can use multiple cores for a single task. So this
     # basically means ROOT jobs.
     n_cores_per_job = task_config.n_cores_per_task
-
-    # Setup parsl
-    #setup_parsl_587(
-    #    nodes_to_allocate=nodes_to_allocate,
-    #    jobs_per_node=jobs_per_node,
-    #    # partition="vip",
-    #    # partition="long",
-    #    use_root=any((job in _jobs_requiring_root for job in jobs_to_execute)),
-    #    # We need the AliPhysics definitions for the Substructure output classes and AliEmcalList.
-    #    use_aliphysics=any((job in ["repair_root_files", "extract_scale_factors"] for job in jobs_to_execute)),
-    #    use_roounfold=any((job == "unfolding" for job in jobs_to_execute)),
-    #)
-
-    # Setup logging. By doing it after parsl, we're able to keep it much quieter.
-    # Oddly, I can't seem to select the parsl modules to change their loggers, so this seems
-    # to be the only reasonable way to configure logging.
-    helpers.setup_logging(logging.INFO)
-    # Quiet down parsl
-    logging.getLogger("parsl").setLevel(logging.WARNING)
 
     # Helpers
     base_dataset_config = read_dataset_config(base_dataset_name=base_dataset_name)
@@ -2042,6 +2038,7 @@ def run() -> None:  # noqa: C901
             dataset_config=dataset_config,
             base_unfolding_config=base_dataset_config["unfolding"],
             grooming_methods=grooming_methods,
+            job_framework=job_framework,
             # selected_train_numbers=list(range(5977, 5978)),
             input_results=results if results else None,
         )
@@ -2054,6 +2051,7 @@ def run() -> None:  # noqa: C901
             dataset_config=dataset_config,
             base_unfolding_config=base_dataset_config["unfolding"],
             grooming_methods=grooming_methods,
+            job_framework=job_framework,
             # selected_train_numbers=list(range(6338, 6339)),
             input_results=results if results else None,
         )
@@ -2092,6 +2090,7 @@ def run() -> None:  # noqa: C901
             base_dataset_config=base_dataset_config,
             grooming_methods=grooming_methods,
             n_cores_per_job=n_cores_per_job,
+            job_framework=job_framework,
             selected_unfolding_settings=[
                 # TODO: Re-run pp with a different split MC fraction...
                 "default",
@@ -2181,4 +2180,4 @@ def run() -> None:  # noqa: C901
 
 
 if __name__ == "__main__":
-    run()
+    run(job_framework=job_utils.JobFramework.dask_delayed)
