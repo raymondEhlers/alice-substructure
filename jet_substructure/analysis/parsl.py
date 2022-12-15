@@ -23,7 +23,6 @@ from mammoth.framework import utils as mammoth_utils
 from mammoth import helpers
 from pachyderm import yaml
 from parsl.data_provider.files import File
-from parsl.dataflow.futures import AppFuture
 
 from mammoth import job_utils
 from mammoth.job_utils import python_app
@@ -295,6 +294,7 @@ def _number_of_entries_per_file_app(
 @python_app
 def _write_number_of_entries_per_file_cache(
     number_of_entries_per_file: Dict[str, int],
+    job_framework: job_utils.JobFramework,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> bool:
@@ -329,6 +329,7 @@ def _write_number_of_entries_per_file_cache(
 def _entries_to_ranges_for_jobs(
     number_of_entries: int,
     entries_per_job: int,
+    job_framework: job_utils.JobFramework,
 ) -> List[Tuple[int, int]]:
     """Determine the event range for a job given a total number of entries.
 
@@ -362,6 +363,7 @@ def _convert_to_parquet(
     prefixes: Sequence[str],
     branches: Sequence[str],
     prefix_branches: Sequence[str],
+    job_framework: job_utils.JobFramework,
     event_range: Optional[Tuple[Optional[int], Optional[int]]] = None,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
@@ -388,6 +390,7 @@ def setup_convert_to_parquet(
     collision_system: str,
     entries_per_job: int,
     dataset_config: Mapping[str, Any],
+    job_framework: job_utils.JobFramework,
     input_results: Optional[MutableSequence[Future[Any]]] = None,
 ) -> Tuple[List[Future[Any]], List[Future[Any]]]:
     """Setup convert_to_parquet app for execution with parsl.
@@ -408,11 +411,12 @@ def setup_convert_to_parquet(
     results: List[Future[Any]] = []
 
     # Determine filenames
-    if input_results is None:
+    if input_results is None or job_framework != job_utils.JobFramework.parsl:
         input_filenames = mammoth_utils.expand_wildcards_in_filenames([Path(f) for f in dataset_config["files"]])
         input_files = [File(str(filename)) for filename in input_filenames]
     else:
-        input_files = [r.outputs[0] for r in input_results]
+        # Only works for parsl, since we explicitly need an app future
+        input_files = [r.outputs[0] for r in input_results]  # type: ignore[attr-defined]
 
     # Attempt to load the number of entries per file cache
     number_of_entries_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/entries_per_file.yaml")
@@ -452,6 +456,7 @@ def setup_convert_to_parquet(
         _job_ranges_result = _entries_to_ranges_for_jobs(
             number_of_entries=number_of_entries_per_file_result,  # type: ignore[arg-type]
             entries_per_job=entries_per_job,
+            job_framework=job_framework,
         )
         # Store the output in our overall results.
         results.append(_job_ranges_result)
@@ -483,6 +488,7 @@ def setup_convert_to_parquet(
                 # this approach. However, it's frustrating that it doesn't work as expected...
                 number_of_entries_per_file={k: v.result() for k, v in number_of_entries_per_file_results.items()},
                 # number_of_entries_per_file=number_of_entries_per_file_results,
+                job_framework=job_framework,
                 outputs=[File(str(number_of_entries_filename))],
             )
         )
@@ -515,6 +521,7 @@ def setup_convert_to_parquet(
                     branches=dataset_config["branches"],
                     prefix_branches=dataset_config["prefix_branches"],
                     event_range=event_range,
+                    job_framework=job_framework,
                     inputs=[input_file],
                     outputs=[output_file],
                 )
@@ -579,6 +586,7 @@ def _determine_embedding_input_files_per_pt_hard_bin(
 
 @python_app
 def _extract_scale_factors_from_hists(
+    job_framework: job_utils.JobFramework,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
     stdout: Optional[str] = None,
@@ -599,6 +607,7 @@ def _extract_scale_factors_from_hists(
 def setup_extract_scale_factors(
     collision_system: str,
     dataset_config: Mapping[str, Any],
+    job_framework: job_utils.JobFramework,
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> Dict[int, Future[analysis_objects.ScaleFactor]]:
     """Extract scale factors from embedding or pythia hists.
@@ -628,6 +637,7 @@ def setup_extract_scale_factors(
         logger.debug(f"pt_hard_bin: {pt_hard_bin}, filenames: {input_files}")
         if input_files:
             scale_factors[pt_hard_bin] = _extract_scale_factors_from_hists(
+                job_framework=job_framework,
                 inputs=[File(str(fname)) for fname in input_files],
             )
 
@@ -637,6 +647,7 @@ def setup_extract_scale_factors(
 @python_app
 def _write_scale_factors_to_yaml(
     scale_factors: Mapping[int, analysis_objects.ScaleFactor],
+    job_framework: job_utils.JobFramework,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> bool:
@@ -678,7 +689,8 @@ def _write_cross_check_task_scale_factor_trees(
 def setup_write_scale_factors(
     collision_system: str,
     dataset_config: Mapping[str, Any],
-    scale_factors: Mapping[int, AppFuture],
+    scale_factors: Mapping[int, Future[analysis_objects.ScaleFactor]],
+    job_framework: job_utils.JobFramework,
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> Future[bool]:
     """Write scale factors to YAML and to trees if necessary."""
@@ -692,6 +704,7 @@ def setup_write_scale_factors(
     #       but not both. So we just take the result.
     yaml_result = _write_scale_factors_to_yaml(
         scale_factors={k: v.result() for k, v in scale_factors.items()},
+        job_framework=job_framework,
         outputs=[parsl_output_file],
     )
 
@@ -710,6 +723,7 @@ def setup_write_scale_factors(
 def _extract_pt_hard_spectra(
     scale_factors: Mapping[int, float],
     offsets: Mapping[int, int],
+    job_framework: job_utils.JobFramework,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
     stdout: Optional[str] = None,
@@ -742,7 +756,8 @@ def _extract_pt_hard_spectra(
 def setup_extract_embedding_pt_hard_spectra(
     collision_system: str,
     dataset_config: Mapping[str, Any],
-    input_results: MutableSequence[AppFuture],
+    job_framework: job_utils.JobFramework,
+    input_results: MutableSequence[Future[bool]],
     selected_train_numbers: Optional[Sequence[int]] = None,
 ) -> Future[bool]:
     # Validation
@@ -777,12 +792,17 @@ def setup_extract_embedding_pt_hard_spectra(
         offsets[pt_hard_bin] = len(converted_filenames)
         parsl_files.extend(converted_filenames)
     # Add the dependency. We won't actually open the file in the task, but this will provide explicit dependence.
-    parsl_files.extend([i.outputs[0] for i in input_results])
+    if job_framework == job_utils.JobFramework.parsl:
+        parsl_files.extend([i.outputs[0] for i in input_results])  # type: ignore[attr-defined]
+    else:
+        # We lie about the typing here, but it's convenient
+        parsl_files.extend(input_results)  # type: ignore[arg-type]
 
     output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/pt_hard_spectra.yaml")
     results = _extract_pt_hard_spectra(
         scale_factors=scale_factors,
         offsets=offsets,
+        job_framework=job_framework,
         inputs=parsl_files,
         outputs=[File(str(output_filename))],
     )
@@ -796,6 +816,7 @@ def _calculate_embedding_skim(
     train_directory: Path,
     iterative_splittings: bool,
     scale_factors: Mapping[int, float],
+    job_framework: job_utils.JobFramework,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
     stdout: Optional[str] = None,
@@ -831,9 +852,10 @@ def setup_calculate_embedding_skim(
     collision_system: str,
     entries_per_job: int,
     dataset_config: Mapping[str, Any],
+    job_framework: job_utils.JobFramework,
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[AppFuture]] = None,
+    input_results: Optional[MutableSequence[Future[Any]]] = None,
 ) -> List[Future[Tuple[bool, Path, str]]]:
     """Setup to calculate embedding skim.
 
@@ -857,7 +879,7 @@ def setup_calculate_embedding_skim(
 
     # If input files aren't passed, then we need to determine them ourselves.
     input_files = []
-    if input_results is None:
+    if input_results is None or job_framework != job_utils.JobFramework.parsl:
         logger.info("Determining input files independently.")
         # First, determine the train directories so we can skip over some of them if requested.
         train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
@@ -872,7 +894,8 @@ def setup_calculate_embedding_skim(
             for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
                 input_files.append(File(str(filename)))
     else:
-        input_files = [r.outputs[0] for r in input_results]
+        # Only works for parsl, since we explicitly need an app future
+        input_files = [r.outputs[0] for r in input_results]  # type: ignore[attr-defined]
 
     # Create the Apps.
     for parsl_input_file in input_files:
@@ -896,6 +919,7 @@ def setup_calculate_embedding_skim(
                 iterative_splittings=iterative_splittings,
                 train_directory=train_directory,
                 scale_factors=scale_factors,
+                job_framework=job_framework,
                 inputs=[parsl_input_file],
                 outputs=[parsl_output_file],
                 # stdout=parsl.AUTO_LOGNAME,
@@ -912,6 +936,7 @@ def _calculate_data_skim(
     dataset_config: Mapping[str, Any],
     iterative_splittings: bool,
     scale_factors: Mapping[int, float],
+    job_framework: job_utils.JobFramework,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> Tuple[bool, Path, str]:
@@ -945,9 +970,10 @@ def setup_calculate_data_skim(
     collision_system: str,
     entries_per_job: int,
     dataset_config: Mapping[str, Any],
+    job_framework: job_utils.JobFramework,
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[AppFuture]] = None,
+    input_results: Optional[MutableSequence[Future[Any]]] = None,
 ) -> List[Future[Tuple[bool, Path, str]]]:
     """Setup to calculate data skim.
 
@@ -976,7 +1002,7 @@ def setup_calculate_data_skim(
 
     # If input files aren't passed, then we need to determine them ourselves.
     input_files = []
-    if input_results is None:
+    if input_results is None or job_framework != job_utils.JobFramework.parsl:
         logger.info("Determining input files independently.")
         # First, determine the train directories so we can skip over some of them if requested.
         train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
@@ -991,7 +1017,8 @@ def setup_calculate_data_skim(
             for filename in Path(f"{train_directory}/parquet/events_per_job_{entries_per_job}/").glob("*.parquet"):
                 input_files.append(File(str(filename)))
     else:
-        input_files = [r.outputs[0] for r in input_results]
+        # Only works for parsl, since we explicitly need an app future
+        input_files = [r.outputs[0] for r in input_results]  # type: ignore[attr-defined]
 
     # Create the Apps.
     for parsl_input_file in input_files:
@@ -1015,6 +1042,7 @@ def setup_calculate_data_skim(
                 collision_system=collision_system,
                 iterative_splittings=iterative_splittings,
                 scale_factors=scale_factors,
+                job_framework=job_framework,
                 inputs=[parsl_input_file],
                 outputs=[parsl_output_file],
                 # stdout=parsl.AUTO_LOGNAME,
@@ -1053,8 +1081,9 @@ def setup_calculate_cross_check_task_skim(
     collision_system: str,
     dataset_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
+    job_framework: job_utils.JobFramework,
     selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[AppFuture]] = None,
+    input_results: Optional[MutableSequence[Future[Any]]] = None,
     iterative_splittings: bool = True,
 ) -> List[Future[bool]]:
     # Validation
@@ -1327,7 +1356,7 @@ def setup_root_data_frame(
     grooming_methods: Sequence[str],
     job_framework: job_utils.JobFramework,
     selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[AppFuture]] = None,
+    input_results: Optional[MutableSequence[Future[Any]]] = None,
     unfolding_settings: Optional[Mapping[str, Any]] = None,
 ) -> List[Future[Tuple[bool, str]]]:
     # Validation
@@ -1431,7 +1460,7 @@ def setup_root_data_frame(
                 cross_check_task=cross_check_task,
                 job_framework=job_framework,
                 # Need to grab the outputs here to ensure that the dependencies are tracked properly.
-                inputs=[r.outputs[0] for r in input_results] if input_results else input_files,
+                inputs=[r.outputs[0] for r in input_results] if input_results and job_framework == job_utils.JobFramework.parsl else input_files,  # type: ignore[attr-defined]
                 outputs=[parsl_output_file],
                 **optional_kwargs,
             )
@@ -1813,7 +1842,7 @@ def _hours_in_walltime(walltime: str) -> int:
     return int(walltime.split(":")[0])
 
 
-def run(job_framework: job_utils.JobFramework) -> None:  # noqa: C901
+def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:  # noqa: C901
     # Settings
     # Base settings
     # base_dataset_name = "PbPb_central_R02_pass1"
@@ -1959,8 +1988,8 @@ def run(job_framework: job_utils.JobFramework) -> None:  # noqa: C901
     if cross_check_task:
         grooming_methods = dataset_config["grooming_methods"]
 
-    results = []
-    all_results = []
+    results: List[Future[Any]] = []
+    all_results: List[Future[Any]] = []
     logger.info(f"Jobs to execute: {jobs_to_execute}")
     if "repair_root_files" in jobs_to_execute:
         # NOTE: No input_results here because it's the first step.
@@ -1976,10 +2005,11 @@ def run(job_framework: job_utils.JobFramework) -> None:  # noqa: C901
             collision_system=collision_system,
             entries_per_job=entries_per_job,
             dataset_config=dataset_config,
+            job_framework=job_framework,
             input_results=results if results else None,
         )
         all_results.extend(_all_results)
-    yaml_result: Optional[AppFuture] = None
+    yaml_result: Optional[Future[bool]] = None
     if "extract_scale_factors" in jobs_to_execute:
         # NOTE: We don't take any input_results because we're super dependent on knowing the
         #       pt hard bins. We would have to reorganize the outputs heavily, so it's
@@ -1989,6 +2019,7 @@ def run(job_framework: job_utils.JobFramework) -> None:  # noqa: C901
         scale_factors = setup_extract_scale_factors(
             collision_system=collision_system,
             dataset_config=dataset_config,
+            job_framework=job_framework,
             # selected_train_numbers=list(range(6316, 6318)),
         )
 
@@ -1997,12 +2028,14 @@ def run(job_framework: job_utils.JobFramework) -> None:  # noqa: C901
             collision_system=collision_system,
             dataset_config=dataset_config,
             scale_factors=scale_factors,
+            job_framework=job_framework,
             # selected_train_numbers=list(range(6316, 6318)),
         )
         all_results.append(yaml_result)
         single_results = setup_extract_embedding_pt_hard_spectra(
             collision_system=collision_system,
             dataset_config=dataset_config,
+            job_framework=job_framework,
             input_results=[yaml_result],
             # selected_train_numbers=list(range(6316, 6318)),
         )
@@ -2014,6 +2047,7 @@ def run(job_framework: job_utils.JobFramework) -> None:  # noqa: C901
                 collision_system=collision_system,
                 entries_per_job=entries_per_job,
                 dataset_config=dataset_config,
+                job_framework=job_framework,
                 # selected_train_numbers=list(range(5966, 5967)),
                 input_results=results if results else None,
             )
@@ -2022,6 +2056,7 @@ def run(job_framework: job_utils.JobFramework) -> None:  # noqa: C901
                 collision_system=collision_system,
                 dataset_config=dataset_config,
                 grooming_methods=grooming_methods,
+                job_framework=job_framework,
                 # selected_train_numbers=list(range(5966, 5967)),
                 input_results=[yaml_result] if yaml_result else None,
             )
@@ -2032,6 +2067,7 @@ def run(job_framework: job_utils.JobFramework) -> None:  # noqa: C901
             collision_system=collision_system,
             entries_per_job=entries_per_job,
             dataset_config=dataset_config,
+            job_framework=job_framework,
             # selected_train_numbers=list(range(5977, 5978)),
             input_results=results if results else None,
         )
@@ -2071,6 +2107,7 @@ def run(job_framework: job_utils.JobFramework) -> None:  # noqa: C901
                 dataset_config=dataset_config,
                 base_unfolding_config=base_dataset_config["unfolding"],
                 grooming_methods=grooming_methods,
+                job_framework=job_framework,
             )
         )
     # if "root_data_frame_closure" in jobs_to_execute:
@@ -2188,6 +2225,8 @@ def run(job_framework: job_utils.JobFramework) -> None:  # noqa: C901
     logger.info(res)
 
     logger.info("Done")
+
+    return all_results
 
 
 if __name__ == "__main__":
