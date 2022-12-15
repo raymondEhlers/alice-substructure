@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import functools
 import logging
+from concurrent.futures import Future
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
 
@@ -89,10 +90,10 @@ def read_extracted_scale_factors(
     )
 
 
-@python_app  # type: ignore
+@python_app
 def _repair_root_files(
     tree_name: str, n_cores: int, inputs: Sequence[File] = [], outputs: Sequence[File] = []
-) -> AppFuture:
+) -> Dict[Path, List[Path]]:
     """ Repair ROOT files app. """
     from pathlib import Path
 
@@ -107,7 +108,7 @@ def _repair_root_files(
         )
     except SystemError as e:
         # ROOT fails this way sometimes. No clear reason, and it's too bad, but so it goes.
-        res = {Path(inputs[0].filepath): f"Failed due to ROOT internal issue...: {e}. Basically nothing to be done."}  # type: ignore
+        res = {Path(inputs[0].filepath): f"Failed due to ROOT internal issue...: {e}. Basically nothing to be done."}  # type: ignore[dict-item]
         logger.warning(res)
     return res
 
@@ -116,7 +117,7 @@ def setup_repair_root_files(
     n_cores_per_job: int,
     dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> List[AppFuture]:
+) -> List[Future[Dict[Path, List[Path]]]]:
     """Repair ROOT files.
 
     Settings will be taken out of the configuration file.
@@ -273,12 +274,12 @@ def _distribute_entries_to_jobs(
     return job_info
 
 
-@python_app  # type: ignore
+@python_app
 def _number_of_entries_per_file_app(
     tree_name: str,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
-) -> AppFuture:
+) -> int:
     from pathlib import Path
 
     import uproot
@@ -288,15 +289,15 @@ def _number_of_entries_per_file_app(
         logger.debug(filename)
         number_of_entries = f[tree_name].num_entries
 
-    return number_of_entries
+    return number_of_entries  # type: ignore[no-any-return]
 
 
-@python_app  # type: ignore
+@python_app
 def _write_number_of_entries_per_file_cache(
-    number_of_entries_per_file: Dict[str, AppFuture],
+    number_of_entries_per_file: Dict[str, int],
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
-) -> AppFuture:
+) -> bool:
     """Write the number of entries per file to a cache.
 
     Note:
@@ -324,11 +325,11 @@ def _write_number_of_entries_per_file_cache(
     return True
 
 
-@python_app  # type: ignore
+@python_app
 def _entries_to_ranges_for_jobs(
     number_of_entries: int,
     entries_per_job: int,
-) -> AppFuture:
+) -> List[Tuple[int, int]]:
     """Determine the event range for a job given a total number of entries.
 
     Args:
@@ -387,8 +388,8 @@ def setup_convert_to_parquet(
     collision_system: str,
     entries_per_job: int,
     dataset_config: Mapping[str, Any],
-    input_results: Optional[MutableSequence[AppFuture]] = None,
-) -> Tuple[List[AppFuture], List[AppFuture]]:
+    input_results: Optional[MutableSequence[Future[Any]]] = None,
+) -> Tuple[List[Future[Any]], List[Future[Any]]]:
     """Setup convert_to_parquet app for execution with parsl.
 
     This is a bit more involved than many of the other tasks because it requires some
@@ -404,7 +405,7 @@ def setup_convert_to_parquet(
         List of `AppFuture` created when defining the jobs.
     """
     # Setup
-    results = []
+    results: List[Future[Any]] = []
 
     # Determine filenames
     if input_results is None:
@@ -449,7 +450,7 @@ def setup_convert_to_parquet(
             number_of_entries_per_file_result = number_of_entries_per_file[input_file.filepath]
 
         _job_ranges_result = _entries_to_ranges_for_jobs(
-            number_of_entries=number_of_entries_per_file_result,
+            number_of_entries=number_of_entries_per_file_result,  # type: ignore[arg-type]
             entries_per_job=entries_per_job,
         )
         # Store the output in our overall results.
@@ -576,13 +577,13 @@ def _determine_embedding_input_files_per_pt_hard_bin(
     return input_files_per_pt_hard_bin
 
 
-@python_app  # type: ignore
+@python_app
 def _extract_scale_factors_from_hists(
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
     stdout: Optional[str] = None,
     stderr: Optional[str] = None,
-) -> AppFuture:
+) -> analysis_objects.ScaleFactor:
     from pathlib import Path
 
     from mammoth.framework.analysis.objects import ScaleFactor
@@ -599,7 +600,7 @@ def setup_extract_scale_factors(
     collision_system: str,
     dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> Dict[int, AppFuture]:
+) -> Dict[int, Future[analysis_objects.ScaleFactor]]:
     """Extract scale factors from embedding or pythia hists.
 
     Note:
@@ -633,12 +634,12 @@ def setup_extract_scale_factors(
     return scale_factors
 
 
-@python_app  # type: ignore
+@python_app
 def _write_scale_factors_to_yaml(
     scale_factors: Mapping[int, analysis_objects.ScaleFactor],
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
-) -> AppFuture:
+) -> bool:
     from pathlib import Path
 
     from pachyderm import yaml
@@ -655,14 +656,14 @@ def _write_scale_factors_to_yaml(
     return True
 
 
-@python_app  # type: ignore
+@python_app
 def _write_cross_check_task_scale_factor_trees(
     scale_factor: float,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
     stdout: Optional[str] = None,
     stderr: Optional[str] = None,
-) -> AppFuture:
+) -> bool:
     from pathlib import Path
 
     from jet_substructure.cpp import scale_factors as sf
@@ -679,7 +680,7 @@ def setup_write_scale_factors(
     dataset_config: Mapping[str, Any],
     scale_factors: Mapping[int, AppFuture],
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> AppFuture:
+) -> Future[bool]:
     """Write scale factors to YAML and to trees if necessary."""
     # First, we write to YAML.
     # We want to do this regardless of potentially writing the scale factor trees.
@@ -705,7 +706,7 @@ def setup_write_scale_factors(
     return yaml_result
 
 
-@python_app  # type: ignore
+@python_app
 def _extract_pt_hard_spectra(
     scale_factors: Mapping[int, float],
     offsets: Mapping[int, int],
@@ -713,7 +714,7 @@ def _extract_pt_hard_spectra(
     outputs: Sequence[File] = [],
     stdout: Optional[str] = None,
     stderr: Optional[str] = None,
-) -> AppFuture:
+) -> bool:
     from pathlib import Path
 
     from jet_substructure.cpp import scale_factors as sf
@@ -743,7 +744,7 @@ def setup_extract_embedding_pt_hard_spectra(
     dataset_config: Mapping[str, Any],
     input_results: MutableSequence[AppFuture],
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> AppFuture:
+) -> Future[bool]:
     # Validation
     if collision_system not in ["pythia", "embedPythia", "embed_pythia", "embed_thermal_model"]:
         raise ValueError(f"Invalid collision system for extracting scale factors: {collision_system}")
@@ -789,7 +790,7 @@ def setup_extract_embedding_pt_hard_spectra(
     return results
 
 
-@python_app  # type: ignore
+@python_app
 def _calculate_embedding_skim(
     dataset_config: Mapping[str, Any],
     train_directory: Path,
@@ -799,7 +800,7 @@ def _calculate_embedding_skim(
     outputs: Sequence[File] = [],
     stdout: Optional[str] = None,
     stderr: Optional[str] = None,
-) -> AppFuture:
+) -> Tuple[bool, Path, str]:
     """ Calculate embedding skim app. """
     import traceback
     from pathlib import Path
@@ -820,7 +821,7 @@ def _calculate_embedding_skim(
         # Skip any problems for now
         logger.warning(e)
         # Match the expected format if the calculation succeeded
-        res = (False, inputs[0].filepath, traceback.format_exc())
+        res = (False, Path(inputs[0].filepath), traceback.format_exc())
 
     logger.debug(outputs)
     return res
@@ -833,7 +834,7 @@ def setup_calculate_embedding_skim(
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[AppFuture]] = None,
-) -> List[AppFuture]:
+) -> List[Future[Tuple[bool, Path, str]]]:
     """Setup to calculate embedding skim.
 
     Args:
@@ -905,7 +906,7 @@ def setup_calculate_embedding_skim(
     return results
 
 
-@python_app  # type: ignore
+@python_app
 def _calculate_data_skim(
     collision_system: str,
     dataset_config: Mapping[str, Any],
@@ -913,7 +914,7 @@ def _calculate_data_skim(
     scale_factors: Mapping[int, float],
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
-) -> AppFuture:
+) -> Tuple[bool, Path, str]:
     """ Calculate data skim app. """
     import traceback
     from pathlib import Path
@@ -934,7 +935,7 @@ def _calculate_data_skim(
         # Skip any problems for now
         logger.warning(e)
         # Match the expected format if the calculation succeeded
-        res = (False, inputs[0].filepath, traceback.format_exc())
+        res = (False, Path(inputs[0].filepath), traceback.format_exc())
 
     logger.debug(outputs)
     return res
@@ -947,7 +948,7 @@ def setup_calculate_data_skim(
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[AppFuture]] = None,
-) -> List[AppFuture]:
+) -> List[Future[Tuple[bool, Path, str]]]:
     """Setup to calculate data skim.
 
     Args:
@@ -1024,14 +1025,14 @@ def setup_calculate_data_skim(
     return results
 
 
-@python_app  # type: ignore
+@python_app
 def _calculate_cross_check_task_skim(
     dataset_config: Mapping[str, Any],
     grooming_method: str,
     scale_factor: float,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
-) -> AppFuture:
+) -> bool:
     from pathlib import Path
 
     from jet_substructure.analysis import new_skim_to_flat_tree
@@ -1055,7 +1056,7 @@ def setup_calculate_cross_check_task_skim(
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[AppFuture]] = None,
     iterative_splittings: bool = True,
-) -> List[AppFuture]:
+) -> List[Future[bool]]:
     # Validation
     if selected_train_numbers is None:
         selected_train_numbers = []
@@ -1130,7 +1131,7 @@ def setup_calculate_cross_check_task_skim(
     return results
 
 
-@python_app  # type: ignore
+@python_app
 def _root_data_frame(
     collision_system: str,
     tree_name: str,
@@ -1142,7 +1143,7 @@ def _root_data_frame(
     cross_check_task: bool,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
-) -> AppFuture:
+) -> Tuple[bool, str]:
     """ROOT data frame app.
 
     We keep them separate even though they are quite similar so their app names will be different.
@@ -1175,7 +1176,7 @@ def _root_data_frame(
     return res
 
 
-@python_app  # type: ignore
+@python_app
 def _root_data_frame_response(
     collision_system: str,
     tree_name: str,
@@ -1187,7 +1188,7 @@ def _root_data_frame_response(
     cross_check_task: bool,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
-) -> AppFuture:
+) -> Tuple[bool, str]:
     """ROOT data frame response app.
 
     We keep them separate even though they are quite similar so their app names will be different.
@@ -1220,7 +1221,7 @@ def _root_data_frame_response(
     return res
 
 
-@python_app  # type: ignore
+@python_app
 def _root_data_frame_closure(
     collision_system: str,
     tree_name: str,
@@ -1234,7 +1235,7 @@ def _root_data_frame_closure(
     unfolding_settings: Mapping[str, Any],
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
-) -> AppFuture:
+) -> Tuple[bool, str]:
     """ROOT data frame closure app.
 
     We keep them separate even though they are quite similar so their app names will be different.
@@ -1263,7 +1264,7 @@ def _root_data_frame_closure(
     return res
 
 
-@python_app  # type: ignore
+@python_app
 def _root_data_frame_embedded_pt_hard_scaling(
     collision_system: str,
     tree_name: str,
@@ -1275,7 +1276,7 @@ def _root_data_frame_embedded_pt_hard_scaling(
     cross_check_task: bool,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
-) -> AppFuture:
+) -> Tuple[bool, str]:
     """ROOT data frame pt hard scaling app.
 
     We keep them separate even though they are quite similar so their app names will be different.
@@ -1314,7 +1315,7 @@ def _root_data_frame_embedded_pt_hard_scaling(
 class RootDataFrameProcessingMode:
     name: str = attr.ib()
     tag: str = attr.ib()
-    func: Callable[..., AppFuture] = attr.ib()
+    func: Callable[..., Future[Tuple[bool, str]]] = attr.ib()
 
 
 def setup_root_data_frame(
@@ -1328,7 +1329,7 @@ def setup_root_data_frame(
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[AppFuture]] = None,
     unfolding_settings: Optional[Mapping[str, Any]] = None,
-) -> List[AppFuture]:
+) -> List[Future[Tuple[bool, str]]]:
     # Validation
     # NOTE: I only compromised on specifying the function here because it loses the typing
     #       information from the `python_app` wrapper anyway.
@@ -1445,7 +1446,8 @@ def embedded_pt_hard_scaling_cross_check(
     dataset_config: Mapping[str, Any],
     base_unfolding_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
-) -> List[AppFuture]:
+    job_framework: job_utils.JobFramework,
+) -> List[Future[Tuple[bool, str]]]:
     results = []
 
     # Assume that we have on train per line. That's usually a pretty good assumption.
@@ -1462,6 +1464,7 @@ def embedded_pt_hard_scaling_cross_check(
                 # Take just the first grooming method - they'll all be the same because we don't care
                 # about the grooming method for this check.
                 grooming_methods=[grooming_methods[0]],
+                job_framework=job_framework,
                 selected_train_numbers=[int(train_directory.name)],
             )
         )
@@ -1469,7 +1472,7 @@ def embedded_pt_hard_scaling_cross_check(
     return results
 
 
-@python_app  # type: ignore
+@python_app
 def _unfolding_standard(
     settings: unfolding_base.Settings2D,
     unfolding_for_pp: bool,
@@ -1478,9 +1481,10 @@ def _unfolding_standard(
     reweight_response_dataset_name: str,
     data_tree_name: str,
     response_tree_name: str,
+    job_framework: job_utils.JobFramework,
     inputs: Tuple[Sequence[File], Sequence[File]] = ([], []),
     outputs: Sequence[File] = [],
-) -> AppFuture:
+) -> bool:
     import random
     from pathlib import Path
 
@@ -1507,7 +1511,7 @@ def _unfolding_standard(
     )
 
 
-@python_app  # type: ignore
+@python_app
 def _unfolding_closure(
     settings: unfolding_base.Settings2D,
     closure_variation: str,
@@ -1516,9 +1520,10 @@ def _unfolding_closure(
     reweight_data_dataset_name: str,
     reweight_response_dataset_name: str,
     response_tree_name: str,
+    job_framework: job_utils.JobFramework,
     inputs: Tuple[Sequence[File], Sequence[File]] = ([], []),
     outputs: Sequence[File] = [],
-) -> AppFuture:
+) -> bool:
     import random
     from pathlib import Path
 
@@ -1549,7 +1554,7 @@ def setup_all_unfolding(  # noqa: C901
     n_cores_per_job: int,
     job_framework: job_utils.JobFramework,
     selected_unfolding_settings: Optional[List[str]] = None,
-) -> List[AppFuture]:
+) -> List[Future[Any]]:
     """Setup unfolding jobs.
 
     Args:
@@ -1582,7 +1587,7 @@ def setup_all_unfolding(  # noqa: C901
     }
     response_collision_system = data_to_response_collision_system_name[data_collision_system]
 
-    results = []
+    results: List[Future[Any]] = []
     # Maps from the reweight hist name to the task.
     _reweight_prior_results = {}
     for unfolding_settings_name in selected_unfolding_settings:
@@ -1739,7 +1744,8 @@ def setup_all_unfolding(  # noqa: C901
             # the task has already returned... So instead, we pass the AppFuture to make the dependency.
             # That means our typing information is a little fudged, but it works fine anyway since we don't
             # actually care about the value of the result - just that the file was created.
-            job_input_files.extend([r for r in reweight_prior_results])
+            # Note that we have to lie with the typing here...
+            job_input_files.extend([r for r in reweight_prior_results])  # type: ignore[misc]
 
             # Standard unfolding
             for s in settings.values():
@@ -1766,7 +1772,7 @@ def setup_all_unfolding(  # noqa: C901
                         # if not response_dataset_config.get("cross_check_task", False)
                         # else response_dataset_config["tree_name"],
                         job_framework=job_framework,
-                        inputs=job_input_files,
+                        inputs=job_input_files,  # type: ignore[arg-type]
                         outputs=[parsl_output_file],
                     )
                 )
@@ -1795,7 +1801,7 @@ def setup_all_unfolding(  # noqa: C901
                                 # if not response_dataset_config.get("cross_check_task", False)
                                 # else response_dataset_config["tree_name"],
                                 job_framework=job_framework,
-                                inputs=job_input_files,
+                                inputs=job_input_files,  # type: ignore[arg-type]
                                 outputs=[parsl_output_file],
                             )
                         )
