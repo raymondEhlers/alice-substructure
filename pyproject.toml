@@ -36,6 +36,7 @@ dependencies = [
     "h5py >=3.1",
     "coloredlogs >=15.0.1",
     "dask[dataframe,distributed] >= 2021.1.0",
+    "dask-jobqueue>=0.8.1",
     "enlighten >=1.4.0",
     "pathos >=0.2.5",
     "awkward0 >=0",
