@@ -15,8 +15,10 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
 
 import attr
+import dask.distributed
 import IPython
 import numpy as np
+import parsl
 import uproot
 from mammoth.framework.analysis import objects as analysis_objects
 from mammoth.framework import utils as mammoth_utils
@@ -1842,64 +1844,123 @@ def _hours_in_walltime(walltime: str) -> int:
     return int(walltime.split(":")[0])
 
 
-def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:  # noqa: C901
-    # Settings
-    # Base settings
-    # base_dataset_name = "PbPb_central_R02_pass1"
-    # base_dataset_name = "PbPb_central_R02_pass3"
-    base_dataset_name = "PbPb_semi_central_R02_pass3"
-    # base_dataset_name = "pp_R02"
-    # base_dataset_name = "pp_R04_validation"
-    # base_dataset_name = "PbPb_semi_central_R04_validation"
-    # dataset_type = "rmax_070"
-    dataset_type = "nominal"
-    collision_system = "PbPb"
+def setup_job_framework(
+    job_framework: job_utils.JobFramework,
+    jobs_to_execute: Sequence[str],
+    task_config: job_utils.TaskConfig,
+    facility: job_utils.FACILITIES,
+    walltime: str,
+    n_cores_to_allocate: int,
+) -> Union[parsl.DataFlowKernel, dask.distributed.Client]:
 
-    # Job settings
-    jobs_to_execute = [
-        # "repair_root_files",
-        # "convert_to_parquet",
-        # "extract_scale_factors",
-        # "calculate_embedding_skim",
-        # "calculate_data_skim",
-        # "root_data_frame",
-        # "root_data_frame_embedded_pt_hard_scaling",
-        # "root_data_frame_response",
-        "unfolding",
-    ]
+    # Basic setup: logging and parsl.
+    # First, need to figure out if we need additional environments such as ROOT
+    _additional_worker_init_script = alice_job_utils.determine_additional_worker_init_conda(
+        environment_name="substructure_c_24_06",
+        tasks_to_run=[jobs_to_execute],
+        tasks_requiring_root=[
+            "repair_root_files",
+            "extract_scale_factors",
+            "root_data_frame_embedded_pt_hard_scaling",
+            "root_data_frame",
+            "root_data_frame_response",
+            "root_data_frame_closure",
+            "unfolding",
+        ],
+        tasks_requiring_aliphysics=["repair_root_files", "extract_scale_factors"],
+        tasks_requiring_roounfold=["unfolding"],
+    )
+    # Setup job frameworks
+    if job_framework == job_utils.JobFramework.dask_delayed:
+        helpers.setup_logging(
+            level=logging.INFO,
+        )
+        if facility == "rehlers_mbp_m1pro":
+            logger.warning("Providing a basic dask distributed client!")
+            return dask.distributed.Client(dask.distributed.LocalCluster(n_workers=n_cores_to_allocate))  # type: ignore[no-untyped-call]
+        else:
+            # TODO: This should be configurable via the facilities config, as usual
+            n_cores_to_allocate_per_block = 1
+            memory_to_allocate_per_block = 2
+            additional_worker_init_script = ""
+            facility_config = job_utils._facilities_configs[facility]
+
+            import dask_jobqueue
+            cluster = dask_jobqueue.SLURMCluster(
+                account=facility_config.allocation_account,
+                queue=facility_config.partition_name,
+                cores=n_cores_to_allocate_per_block,
+                # To be tuned...
+                # processes=n_cores_to_allocate,
+                # job_cpu=n_cores_to_allocate,
+                memory=str(memory_to_allocate_per_block),
+                # string to prepend to #SBATCH blocks in the submit
+                # Can add additional options directly to scheduler.
+                job_extra_directives=[f"#SBATCH --exclude={','.join(facility_config.nodes_to_exclude)}" if facility_config.nodes_to_exclude else ""],
+                # Command to be run before starting a worker, such as:
+                # 'module load Anaconda; source activate parsl_env'.
+                job_script_prologue=[f"{facility_config.worker_init_script}; {additional_worker_init_script}"] if facility_config.worker_init_script else [additional_worker_init_script],
+                walltime=walltime,
+            )
+            cluster.adapt(maximum_jobs=n_cores_to_allocate)
+            dask.distributed.Client(cluster)  # type: ignore[no-untyped-call]
+
+    # NOTE: Parsl's logger setup is broken, so we have to set it up before starting logging. Otherwise,
+    #       it's super verbose and a huge pain to turn off. Note that by passing on the storage messages,
+    #       we don't actually lose any info.
+    config, facility_config, stored_messages = job_utils.config(
+        #facility="ORNL_b587_long" if _hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
+        facility=facility,
+        task_config=task_config,
+        n_tasks=n_cores_to_allocate,
+        walltime=walltime,
+        enable_monitoring=True,
+        additional_worker_init_script=_additional_worker_init_script,
+    )
+    # Keep track of the dfk to keep parsl alive
+    dfk = helpers.setup_logging_and_parsl(
+        parsl_config=config,
+        level=logging.INFO,
+        stored_messages=stored_messages,
+    )
+
+    # Quiet down parsl
+    logging.getLogger("parsl").setLevel(logging.WARNING)
+
+    return dfk
+
+def setup_and_submit_tasks(  # noqa: C901
+    job_framework: job_utils.JobFramework,
+    base_dataset_name: str,
+    dataset_type: str,
+    collision_system: str,
+    jobs_to_execute: Sequence[str],
+    input_grooming_methods: Optional[Sequence[str]] = None,
+    dask_client: Optional[dask.distributed.Client] = None,
+) -> List[Future[Any]]:
+    # Validation
+    if dask_client is None and job_framework == job_utils.JobFramework.dask_delayed:
+        raise ValueError("Must provide dask client if running with dask_delayed job framework!")
+
     #nodes_to_allocate = 8
     #nodes_to_allocate = 1
     #jobs_per_node = 8
 
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
-    grooming_methods = [
-        # "leading_kt",
-        # "leading_kt_z_cut_02",
-        # "leading_kt_z_cut_04",
-        # "dynamical_z",
-        # "dynamical_core",
-        "dynamical_kt",
-        # "dynamical_time",
-        # "soft_drop_z_cut_02",
-        # "soft_drop_z_cut_04",
-    ]
-    #max_cores_to_use_per_node = 12
-
-    # Job execution parameters
-    #productions = define_productions()
-    task_name = "unfolding_hardest_kt"
-
-    # Job execution configuration
-    task_config = job_utils.TaskConfig(name=task_name, n_cores_per_task=1)
-    # n_cores_to_allocate = 120
-    # n_cores_to_allocate = 110
-    n_cores_to_allocate = 1
-    walltime = "24:00:00"
-    debug_mode = False
-    if debug_mode:
-        # Usually, we want to run in the short queue
-        n_cores_to_allocate = 2
-        walltime = "1:59:00"
+    if input_grooming_methods is None:
+        grooming_methods = [
+            # "leading_kt",
+            # "leading_kt_z_cut_02",
+            # "leading_kt_z_cut_04",
+            # "dynamical_z",
+            # "dynamical_core",
+            "dynamical_kt",
+            # "dynamical_time",
+            # "soft_drop_z_cut_02",
+            # "soft_drop_z_cut_04",
+        ]
+    else:
+        grooming_methods = list(input_grooming_methods)
 
     # Basic setup for jobs
     _possible_jobs = [
@@ -1920,58 +1981,6 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:  # noqa: C9
             raise RuntimeError(
                 f"Requested to run job {job_name}, but the name is invalid." f" Possible jobs: {_possible_jobs}"
             )
-
-    # Basic setup: logging and parsl.
-    # First, need to figure out if we need additional environments such as ROOT
-    _additional_worker_init_script = alice_job_utils.determine_additional_worker_init_conda(
-        environment_name="substructure_c_24_06",
-        tasks_to_run=[jobs_to_execute],
-        tasks_requiring_root=[
-            "repair_root_files",
-            "extract_scale_factors",
-            "root_data_frame_embedded_pt_hard_scaling",
-            "root_data_frame",
-            "root_data_frame_response",
-            "root_data_frame_closure",
-            "unfolding",
-        ],
-        tasks_requiring_aliphysics=["repair_root_files", "extract_scale_factors"],
-        tasks_requiring_roounfold=["unfolding"],
-    )
-    # Setup job frameworks
-    if job_framework == job_utils.JobFramework.parsl:
-        # NOTE: Parsl's logger setup is broken, so we have to set it up before starting logging. Otherwise,
-        #       it's super verbose and a huge pain to turn off. Note that by passing on the storage messages,
-        #       we don't actually lose any info.
-        config, facility_config, stored_messages = job_utils.config(
-            #facility="ORNL_b587_long" if _hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
-            facility="rehlers_mbp_m1pro",
-            task_config=task_config,
-            n_tasks=n_cores_to_allocate,
-            walltime=walltime,
-            enable_monitoring=True,
-            additional_worker_init_script=_additional_worker_init_script,
-        )
-        # Keep track of the dfk to keep parsl alive
-        dfk = helpers.setup_logging_and_parsl(
-            parsl_config=config,
-            level=logging.INFO,
-            stored_messages=stored_messages,
-        )
-
-        # Quiet down parsl
-        logging.getLogger("parsl").setLevel(logging.WARNING)
-    elif job_framework == job_utils.JobFramework.dask_delayed:
-        helpers.setup_logging(
-            level=logging.INFO,
-        )
-        logger.warning("Assuming that you've setup the dask cluster + client + environment separately!")
-
-    # In principle, we actually have 6 cores per node + hyperthreading, so we assume 8 cores
-    # at max to ensure that we minimize idle cores, while avoiding overloading everything.
-    # This only matters for jobs which can use multiple cores for a single task. So this
-    # basically means ROOT jobs.
-    n_cores_per_job = task_config.n_cores_per_task
 
     # Helpers
     base_dataset_config = read_dataset_config(base_dataset_name=base_dataset_name)
@@ -1994,7 +2003,7 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:  # noqa: C9
     if "repair_root_files" in jobs_to_execute:
         # NOTE: No input_results here because it's the first step.
         results = setup_repair_root_files(
-            n_cores_per_job=n_cores_per_job,
+            n_cores_per_job=task_config.n_cores_per_task,
             dataset_config=dataset_config,
             # selected_train_numbers=list(range(6296, 6297)),
         )
@@ -2076,7 +2085,7 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:  # noqa: C9
         rdf_results = setup_root_data_frame(
             processing_mode="standard",
             collision_system=collision_system,
-            n_cores_per_job=n_cores_per_job,
+            n_cores_per_job=task_config.n_cores_per_task,
             dataset_config=dataset_config,
             base_unfolding_config=base_dataset_config["unfolding"],
             grooming_methods=grooming_methods,
@@ -2089,7 +2098,7 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:  # noqa: C9
         rdf_results = setup_root_data_frame(
             processing_mode="response",
             collision_system=collision_system,
-            n_cores_per_job=n_cores_per_job,
+            n_cores_per_job=task_config.n_cores_per_task,
             dataset_config=dataset_config,
             base_unfolding_config=base_dataset_config["unfolding"],
             grooming_methods=grooming_methods,
@@ -2103,7 +2112,7 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:  # noqa: C9
         all_results.extend(
             embedded_pt_hard_scaling_cross_check(
                 collision_system=collision_system,
-                n_cores_per_job=n_cores_per_job,
+                n_cores_per_job=task_config.n_cores_per_task,
                 dataset_config=dataset_config,
                 base_unfolding_config=base_dataset_config["unfolding"],
                 grooming_methods=grooming_methods,
@@ -2118,7 +2127,7 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:  # noqa: C9
     #             setup_root_data_frame(
     #                 processing_mode="closure",
     #                 collision_system=_collision_system,
-    #                 n_cores_per_job=n_cores_per_job,
+    #                 n_cores_per_job=task_config.n_cores_per_task,
     #                 dataset_config=dataset_config,
     #                 base_unfolding_config=base_dataset_config["unfolding"],
     #                 grooming_methods=grooming_methods,
@@ -2132,7 +2141,7 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:  # noqa: C9
             data_collision_system=collision_system,
             base_dataset_config=base_dataset_config,
             grooming_methods=grooming_methods,
-            n_cores_per_job=n_cores_per_job,
+            n_cores_per_job=task_config.n_cores_per_task,
             job_framework=job_framework,
             selected_unfolding_settings=[
                 # TODO: Re-run pp with a different split MC fraction...
@@ -2189,21 +2198,23 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:  # noqa: C9
 
     logger.info(f"Accumulated {len(all_results)} results")
 
-    # TEMP: Return early for testing with dask
     if job_framework == job_utils.JobFramework.dask_delayed:
-        return all_results
-    # ENDTEMP
+        assert dask_client is not None
+        return dask_client.compute(all_results)  # type: ignore[no-any-return,no-untyped-call]
+    return all_results
 
+
+def follow_progress_of_futures(futures: List[Future[Any]]) -> None:
     IPython.start_ipython(user_ns={**locals(), **globals()})
 
     # Process the futures, showing processing progress
     # Since it returns the results, we can actually use this to accumulate results.
-    gen_results = job_utils.provide_results_as_completed(all_results, running_with_parsl=True)
+    gen_results = job_utils.provide_results_as_completed(futures, running_with_parsl=True)
 
     # In order to support writing histograms from multiple systems, we need to index the output histograms
     # by the collision system + centrality.
     with helpers.progress_bar() as progress:
-        track_results = progress.add_task(total=len(all_results), description="Processing results...")
+        track_results = progress.add_task(total=len(futures), description="Processing results...")
         # for a in all_results:
         for result in gen_results:
             # r = a.result()
@@ -2221,13 +2232,77 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:  # noqa: C9
     # print ("Job Status: {}".format([r.done() for r in results]))
     # Wait for all apps to complete
     # res = [r.result() for r in results]
-    res = [r.result() for r in all_results]
+    res = [r.result() for r in futures]
     logger.info(res)
 
     logger.info("Done")
 
-    return all_results
-
 
 if __name__ == "__main__":
-    run(job_framework=job_utils.JobFramework.dask_delayed)
+    # Settings
+    # Base settings
+    job_framework = job_utils.JobFramework.dask_delayed
+    # base_dataset_name = "PbPb_central_R02_pass1"
+    # base_dataset_name = "PbPb_central_R02_pass3"
+    base_dataset_name = "PbPb_semi_central_R02_pass3"
+    # base_dataset_name = "pp_R02"
+    # base_dataset_name = "pp_R04_validation"
+    # base_dataset_name = "PbPb_semi_central_R04_validation"
+    # dataset_type = "rmax_070"
+    dataset_type = "nominal"
+    collision_system = "PbPb"
+
+    # Job settings
+    jobs_to_execute = [
+        # "repair_root_files",
+        # "convert_to_parquet",
+        # "extract_scale_factors",
+        # "calculate_embedding_skim",
+        # "calculate_data_skim",
+        # "root_data_frame",
+        # "root_data_frame_embedded_pt_hard_scaling",
+        # "root_data_frame_response",
+        "unfolding",
+    ]
+    grooming_methods = [
+        # "leading_kt",
+        # "leading_kt_z_cut_02",
+        # "leading_kt_z_cut_04",
+        # "dynamical_z",
+        # "dynamical_core",
+        "dynamical_kt",
+        # "dynamical_time",
+        # "soft_drop_z_cut_02",
+        # "soft_drop_z_cut_04",
+    ]
+
+    # Job execution configuration
+    task_name = "unfolding_hardest_kt"
+    task_config = job_utils.TaskConfig(name=task_name, n_cores_per_task=1)
+    # n_cores_to_allocate = 120
+    # n_cores_to_allocate = 110
+    n_cores_to_allocate = 1
+    walltime = "24:00:00"
+    debug_mode = False
+    if debug_mode:
+        # Usually, we want to run in the short queue
+        n_cores_to_allocate = 2
+        walltime = "1:59:00"
+
+    # Keep the job executor just to keep it alive
+    job_executor = setup_job_framework(
+        job_framework=job_framework,
+        jobs_to_execute=jobs_to_execute,
+        task_config=task_config,
+        facility="rehlers_mbp_m1pro",
+        walltime=walltime,
+        n_cores_to_allocate=n_cores_to_allocate,
+    )
+    futures = setup_and_submit_tasks(
+        job_framework=job_framework,
+        base_dataset_name=base_dataset_name,
+        dataset_type=dataset_type,
+        collision_system=collision_system,
+        jobs_to_execute=jobs_to_execute,
+        input_grooming_methods=grooming_methods,
+    )
