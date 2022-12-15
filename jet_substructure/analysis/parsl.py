@@ -2146,6 +2146,11 @@ def run(job_framework: job_utils.JobFramework) -> None:  # noqa: C901
 
     logger.info(f"Accumulated {len(all_results)} results")
 
+    # TEMP: Return early for testing with dask
+    if job_framework == job_utils.JobFramework.dask_delayed:
+        return all_results
+    # ENDTEMP
+
     IPython.start_ipython(user_ns={**locals(), **globals()})
 
     # Process the futures, showing processing progress
