@@ -1851,12 +1851,13 @@ def setup_job_framework(
     facility: job_utils.FACILITIES,
     walltime: str,
     n_cores_to_allocate: int,
+    conda_environment_name: Optional[str] = None,
 ) -> Union[parsl.DataFlowKernel, dask.distributed.Client]:
 
     # Basic setup: logging and parsl.
     # First, need to figure out if we need additional environments such as ROOT
-    _additional_worker_init_script = alice_job_utils.determine_additional_worker_init_conda(
-        environment_name="substructure_c_24_06",
+    _additional_worker_init_script = alice_job_utils.determine_additional_worker_init(
+        conda_environment_name=conda_environment_name,
         tasks_to_run=[jobs_to_execute],
         tasks_requiring_root=[
             "repair_root_files",
