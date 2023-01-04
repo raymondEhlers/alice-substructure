@@ -1607,7 +1607,7 @@ def setup_all_unfolding(  # noqa: C901
     logger.info(f"Unfolding settings: {selected_unfolding_settings}")
     # Setup
     base_unfolding_config = base_dataset_config["unfolding"]
-    output_dir = Path("output") / data_collision_system / "unfolding" / "parsl" / "2022-12-dask"
+    output_dir = Path("output") / data_collision_system / "unfolding" / "parsl" / "2023-01-dask"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Things are treated so different that it's better to be direct about the data collision system.
@@ -1884,6 +1884,7 @@ def setup_job_framework(
 
 def setup_and_submit_tasks(  # noqa: C901
     job_framework: job_utils.JobFramework,
+    task_config: job_utils.TaskConfig,
     base_dataset_name: str,
     dataset_type: str,
     collision_system: str,
@@ -2158,8 +2159,6 @@ def setup_and_submit_tasks(  # noqa: C901
 
 
 def follow_progress_of_futures(futures: List[Future[Any]]) -> None:
-    IPython.start_ipython(user_ns={**locals(), **globals()})
-
     # Process the futures, showing processing progress
     # Since it returns the results, we can actually use this to accumulate results.
     gen_results = job_utils.provide_results_as_completed(futures, running_with_parsl=True)
@@ -2191,10 +2190,9 @@ def follow_progress_of_futures(futures: List[Future[Any]]) -> None:
     logger.info("Done")
 
 
-if __name__ == "__main__":
+def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
     # Settings
     # Base settings
-    job_framework = job_utils.JobFramework.dask_delayed
     facility: job_utils.FACILITIES = "rehlers_mbp_m1pro"
     conda_environment_name = "substructure_c_24_06"
     # base_dataset_name = "PbPb_central_R02_pass1"
@@ -2236,7 +2234,7 @@ if __name__ == "__main__":
     task_config = job_utils.TaskConfig(name=task_name, n_cores_per_task=1)
     # n_cores_to_allocate = 120
     # n_cores_to_allocate = 110
-    n_cores_to_allocate = 1
+    n_cores_to_allocate = 8
     walltime = "24:00:00"
     log_level = logging.INFO
     debug_mode = False
@@ -2249,7 +2247,7 @@ if __name__ == "__main__":
     #facility="ORNL_b587_long" if _hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
 
     # Keep the job executor just to keep it alive
-    job_executor = setup_job_framework(
+    job_executor, _job_framework_config = setup_job_framework(
         job_framework=job_framework,
         jobs_to_execute=jobs_to_execute,
         task_config=task_config,
@@ -2261,9 +2259,16 @@ if __name__ == "__main__":
     )
     futures = setup_and_submit_tasks(
         job_framework=job_framework,
+        task_config=task_config,
         base_dataset_name=base_dataset_name,
         dataset_type=dataset_type,
         collision_system=collision_system,
         jobs_to_execute=jobs_to_execute,
         input_grooming_methods=grooming_methods,
+        dask_client=job_executor if job_framework == job_utils.JobFramework.dask_delayed else None,  # type: ignore[arg-type]
     )
+    return futures
+
+
+if __name__ == "__main__":
+    run(job_framework=job_utils.JobFramework.dask_delayed)
