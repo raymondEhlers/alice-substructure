@@ -10,6 +10,7 @@ toyInput
 # Mazama specific (with copies on slow and fast drives)
 trains_HD
 trains_SSD
+pc059/
 
 # Virtualenv
 env/
