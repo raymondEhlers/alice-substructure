@@ -2196,6 +2196,7 @@ if __name__ == "__main__":
     # Base settings
     job_framework = job_utils.JobFramework.dask_delayed
     facility: job_utils.FACILITIES = "rehlers_mbp_m1pro"
+    conda_environment_name = "substructure_c_24_06"
     # base_dataset_name = "PbPb_central_R02_pass1"
     # base_dataset_name = "PbPb_central_R02_pass3"
     base_dataset_name = "PbPb_semi_central_R02_pass3"
@@ -2256,6 +2257,7 @@ if __name__ == "__main__":
         walltime=walltime,
         n_cores_to_allocate=n_cores_to_allocate,
         log_level=log_level,
+        conda_environment_name=conda_environemnt_name,
     )
     futures = setup_and_submit_tasks(
         job_framework=job_framework,
