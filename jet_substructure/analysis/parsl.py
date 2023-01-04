@@ -2257,7 +2257,7 @@ if __name__ == "__main__":
         walltime=walltime,
         n_cores_to_allocate=n_cores_to_allocate,
         log_level=log_level,
-        conda_environment_name=conda_environemnt_name,
+        conda_environment_name=conda_environment_name,
     )
     futures = setup_and_submit_tasks(
         job_framework=job_framework,
