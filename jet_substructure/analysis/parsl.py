@@ -10,9 +10,10 @@ from __future__ import annotations
 import copy
 import functools
 import logging
+import typing
 from concurrent.futures import Future
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Literal, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
 
 import attr
 import dask.distributed
@@ -1851,10 +1852,9 @@ def setup_job_framework(
     facility: job_utils.FACILITIES,
     walltime: str,
     n_cores_to_allocate: int,
+    log_level: int,
     conda_environment_name: Optional[str] = None,
-) -> Union[parsl.DataFlowKernel, dask.distributed.Client]:
-
-    # Basic setup: logging and parsl.
+) -> Tuple[parsl.DataFlowKernel, parsl.Config] | Tuple[dask.distributed.Client, dask.distributed.SpecCluster]:
     # First, need to figure out if we need additional environments such as ROOT
     _additional_worker_init_script = alice_job_utils.determine_additional_worker_init(
         conda_environment_name=conda_environment_name,
@@ -1871,64 +1871,16 @@ def setup_job_framework(
         tasks_requiring_aliphysics=["repair_root_files", "extract_scale_factors"],
         tasks_requiring_roounfold=["unfolding"],
     )
-    # Setup job frameworks
-    if job_framework == job_utils.JobFramework.dask_delayed:
-        helpers.setup_logging(
-            level=logging.INFO,
-        )
-        if facility == "rehlers_mbp_m1pro":
-            logger.warning("Providing a basic dask distributed client!")
-            return dask.distributed.Client(dask.distributed.LocalCluster(n_workers=n_cores_to_allocate))  # type: ignore[no-untyped-call]
-        else:
-            # TODO: This should be configurable via the facilities config, as usual
-            n_cores_to_allocate_per_block = 1
-            memory_to_allocate_per_block = 2
-            additional_worker_init_script = ""
-            facility_config = job_utils._facilities_configs[facility]
-
-            import dask_jobqueue
-            cluster = dask_jobqueue.SLURMCluster(
-                account=facility_config.allocation_account,
-                queue=facility_config.partition_name,
-                cores=n_cores_to_allocate_per_block,
-                # To be tuned...
-                # processes=n_cores_to_allocate,
-                # job_cpu=n_cores_to_allocate,
-                memory=str(memory_to_allocate_per_block),
-                # string to prepend to #SBATCH blocks in the submit
-                # Can add additional options directly to scheduler.
-                job_extra_directives=[f"#SBATCH --exclude={','.join(facility_config.nodes_to_exclude)}" if facility_config.nodes_to_exclude else ""],
-                # Command to be run before starting a worker, such as:
-                # 'module load Anaconda; source activate parsl_env'.
-                job_script_prologue=[f"{facility_config.worker_init_script}; {additional_worker_init_script}"] if facility_config.worker_init_script else [additional_worker_init_script],
-                walltime=walltime,
-            )
-            cluster.adapt(maximum_jobs=n_cores_to_allocate)
-            dask.distributed.Client(cluster)  # type: ignore[no-untyped-call]
-
-    # NOTE: Parsl's logger setup is broken, so we have to set it up before starting logging. Otherwise,
-    #       it's super verbose and a huge pain to turn off. Note that by passing on the storage messages,
-    #       we don't actually lose any info.
-    config, facility_config, stored_messages = job_utils.config(
-        #facility="ORNL_b587_long" if _hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
-        facility=facility,
+    return job_utils.setup_job_framework(
+        job_framework=job_framework,
         task_config=task_config,
-        n_tasks=n_cores_to_allocate,
+        facility=facility,
         walltime=walltime,
-        enable_monitoring=True,
+        n_cores_to_allocate=n_cores_to_allocate,
+        log_level=log_level,
         additional_worker_init_script=_additional_worker_init_script,
     )
-    # Keep track of the dfk to keep parsl alive
-    dfk = helpers.setup_logging_and_parsl(
-        parsl_config=config,
-        level=logging.INFO,
-        stored_messages=stored_messages,
-    )
 
-    # Quiet down parsl
-    logging.getLogger("parsl").setLevel(logging.WARNING)
-
-    return dfk
 
 def setup_and_submit_tasks(  # noqa: C901
     job_framework: job_utils.JobFramework,
@@ -2243,6 +2195,7 @@ if __name__ == "__main__":
     # Settings
     # Base settings
     job_framework = job_utils.JobFramework.dask_delayed
+    facility: job_utils.FACILITIES = "rehlers_mbp_m1pro"
     # base_dataset_name = "PbPb_central_R02_pass1"
     # base_dataset_name = "PbPb_central_R02_pass3"
     base_dataset_name = "PbPb_semi_central_R02_pass3"
@@ -2284,20 +2237,25 @@ if __name__ == "__main__":
     # n_cores_to_allocate = 110
     n_cores_to_allocate = 1
     walltime = "24:00:00"
+    log_level = logging.INFO
     debug_mode = False
+
     if debug_mode:
         # Usually, we want to run in the short queue
         n_cores_to_allocate = 2
         walltime = "1:59:00"
+
+    #facility="ORNL_b587_long" if _hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
 
     # Keep the job executor just to keep it alive
     job_executor = setup_job_framework(
         job_framework=job_framework,
         jobs_to_execute=jobs_to_execute,
         task_config=task_config,
-        facility="rehlers_mbp_m1pro",
+        facility=facility,
         walltime=walltime,
         n_cores_to_allocate=n_cores_to_allocate,
+        log_level=log_level,
     )
     futures = setup_and_submit_tasks(
         job_framework=job_framework,
