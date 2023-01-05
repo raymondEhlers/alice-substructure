@@ -87,7 +87,7 @@ import os, sys
 import tempfile
 
 # This didn't immediately work on macOS. I didn't dig further..
-#libc = ctypes.CDLL(None)
+libc = ctypes.CDLL(None)
 #c_stdout = ctypes.c_void_p.in_dll(libc, 'stdout')
 
 @contextmanager
@@ -156,5 +156,13 @@ if __name__ == "__main__":
         h.Print()
     logger.info(b.getvalue().decode('utf-8'))
     print("done")
+
+    f = io.BytesIO()
+    with stdout_redirector(f):
+        print('foobar')
+        print(12)
+        #libc.puts(b'this comes from C')
+        os.system('echo and this is from echo')
+    print("fully done")
 
     #import IPython; IPython.embed()
