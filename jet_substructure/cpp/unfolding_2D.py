@@ -165,7 +165,6 @@ def unfolding_2D(
         unfold = ROOT.RooUnfoldBayes(response, input_spectra, n_iter)
         # And then unfold.
         h_unfold = unfold.Hreco(error_treatment)
-
         # Refold the truth (ie. fold back).
         h_fold = response.ApplyToTruth(h_unfold, "")
 
@@ -174,6 +173,19 @@ def unfolding_2D(
         output_hists[name] = h_unfold.Clone(name)
         name = f"{tag}bayesian_folded_iter_{n_iter}"
         output_hists[name] = h_fold.Clone(name)
+
+        # Cleanup intermediate objects
+        # NOTE: We need to take explicit ownership in python because the hists are created in RooUnfold,
+        #       but it appears that ROOT doesn't own them either (or at least they leak from one round
+        #       of calling this function to the next). So by taking ownership, we can actually delete them
+        #       ourselves, preventing them from leaking to the next time this function is called.
+        # NOTE: Since they're named the same each iteration, this argument should apply for each iteration
+        #       of the loop. However, they seem to be at different memory addresses despite having the same
+        #       name and title, so ROOT doesn't complain (not entirely clear why as of Jan 2023).
+        ROOT.SetOwnership(h_unfold, True)
+        ROOT.SetOwnership(h_fold, True)
+        del h_unfold
+        del h_fold
 
         # Retrieve the covariance matrix. Only for a selected iteration.
         if n_iter == n_iter_for_covariance:
@@ -188,7 +200,7 @@ def unfolding_2D(
                     true_spectra.GetNbinsY(),
                     k,
                 )
-                name = f"{tag}pearsonmatrix_iter{n_iter}_bin_substructure_var{k}"
+                name = f"{tag}pearson_matrix_iter{n_iter}_bin_substructure_var{k}"
                 cov_substructure_var = h_corr.Clone(name)
                 cov_substructure_var.SetDrawOption("colz")
                 # Save
@@ -204,11 +216,14 @@ def unfolding_2D(
                     true_spectra.GetNbinsY(),
                     k,
                 )
-                name = f"{tag}pearsonmatrix_iter{n_iter}_bin_pt{k}"
+                name = f"{tag}pearson_matrix_iter{n_iter}_bin_pt{k}"
                 cov_pt = h_corr.Clone(name)
                 cov_pt.SetDrawOption("colz")
                 # Save
                 output_hists[name] = cov_pt
+
+        # Further cleanup
+        del unfold
 
     logger.info("Finished unfolding!")
     logger.info("=======================================================")
@@ -476,7 +491,7 @@ def _create_branch_rename_shim(
     """Create cross check task branch rename shim.
 
     Used to standardize the output of the cross check task. However, ROOT makes
-    this wayyyyyyy to difficult to do sustainably, so we eventually ended up
+    this way too difficult to do sustainably, so we eventually ended up
     just skimming the cross check task output.
 
     Args:
@@ -565,6 +580,11 @@ def run_unfolding(
     )
     # Write the output before we move onto the next case.
     _write_hists([hists, output_hists], settings.output_filename)
+    # Cleanup output_hists so they don't leak
+    # Apparently we aren't attached to the file directory, so we need to do this manually.
+    # (We wouldn't want to be attached because we would lose the input hists that we want in the file).
+    if output_hists:
+        del output_hists
 
     # Next, the trivial closure test where the input is the smeared hybrid spectra.
     output_hists = unfolding_2D(
@@ -576,12 +596,22 @@ def run_unfolding(
     _write_hists(
         [hists, output_hists], settings.output_filename, additional_tag="closure_trivial_hybrid_smeared_as_input"
     )
+    # NOTE: Skip cleanup for a moment to grab an input spectra. See below.
 
-    # For instance, closure test 5 should be trivial
+    # Closure test 5:
+    # This closure should be trivial
+    # First, we want to cleanup the previous output_hists so they don't leak.
+    # However, for this closure check, we need iter 5 for the input spectra,
+    # so we need to pop this input spectra before we delete the rest...
     selected_iter_for_closure = 5
+    _input_spectra_for_iter_5_closure = output_hists.pop(f"bayesian_folded_iter_{selected_iter_for_closure}")
+    # Finally, we can actually do the cleanup
+    if output_hists:
+        del output_hists
+    # And then perform the unfolding for the closure check
     output_hists = unfolding_2D(
         response=responses.response,
-        input_spectra=output_hists[f"bayesian_folded_iter_{selected_iter_for_closure}"],
+        input_spectra=_input_spectra_for_iter_5_closure,
         # The true spectra doesn't matter here...
         true_spectra=hists["h2_true"],
     )
@@ -589,14 +619,21 @@ def run_unfolding(
     _write_hists(
         [hists, output_hists], settings.output_filename, additional_tag=f"closure_5_iter_{selected_iter_for_closure}"
     )
+    # Cleanup output_hists so they don't leak.
+    # Apparently we aren't attached to the file directory, so we need to do this manually.
+    # (We wouldn't want to be attached because we would lose the input hists that we want in the file).
+    if output_hists:
+        del output_hists
 
-    # Try out ROOT based unfolding. Based on my tests, this doesn't matter...
-    # fOut = ROOT.TFile(str(settings.output_dir / "test_unfolding_cpp.root"), "RECREATE")
-    # ROOT.Unfold2D(responses.response, hists["h2_true"], hists["h2_raw"], ROOT.RooUnfold.ErrorTreatment.kCovariance, fOut, "", 20)
-    # for v in hists.values():
-    #    v.Write()
-    ##fOut.Write()
-    # fOut.Close()
+    # And cleanup the rest of our input hists.
+    del _input_spectra_for_iter_5_closure
+    # NOTE: I haven't confirmed if the ordered matters here, but I think it's probably safer to delete the
+    #       std::map first since I suspect that python will handle deleted objects better than ROOT.
+    if hists_map_for_root:
+        del hists_map_for_root
+    if hists:
+        del hists
+    # NOTE: Can verify that everything has been deleted by now by checking `ROOT.gROOT.ls()`
 
     return True
 
@@ -693,6 +730,20 @@ def run_unfolding_closure_reweighting(
 
     # Store the output hists.
     _write_hists([hists, output_hists], settings.output_filename, additional_tag=f"closure_{closure_variation}")
+    # Cleanup output_hists so they don't leak.
+    # Apparently we aren't attached to the file directory, so we need to do this manually.
+    # (We wouldn't want to be attached because we would lose the input hists that we want in the file).
+    if output_hists:
+        del output_hists
+
+    # And cleanup the rest of our input hists.
+    # NOTE: I haven't confirmed if the ordered matters here, but I think it's probably safer to delete the
+    #       std::map first since I suspect that python will handle deleted objects better than ROOT.
+    if hists_map_for_root:
+        del hists_map_for_root
+    if hists:
+        del hists
+    # NOTE: Can verify that everything has been deleted by now by checking `ROOT.gROOT.ls()`
 
     return True
 
