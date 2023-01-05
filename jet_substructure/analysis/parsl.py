@@ -1173,6 +1173,7 @@ def _root_data_frame(
     main_jet_pt_range: jsub_helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
+    job_framework: job_utils.JobFramework,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
 ) -> Tuple[bool, str]:
@@ -1218,6 +1219,7 @@ def _root_data_frame_response(
     main_jet_pt_range: jsub_helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
+    job_framework: job_utils.JobFramework,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
 ) -> Tuple[bool, str]:
@@ -1265,6 +1267,7 @@ def _root_data_frame_closure(
     cross_check_task: bool,
     base_unfolding_config: Mapping[str, Any],
     unfolding_settings: Mapping[str, Any],
+    job_framework: job_utils.JobFramework,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
 ) -> Tuple[bool, str]:
@@ -1306,6 +1309,7 @@ def _root_data_frame_embedded_pt_hard_scaling(
     main_jet_pt_range: jsub_helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
+    job_framework: job_utils.JobFramework,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
 ) -> Tuple[bool, str]:
