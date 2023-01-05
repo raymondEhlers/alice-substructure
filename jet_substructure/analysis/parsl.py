@@ -2158,7 +2158,7 @@ def setup_and_submit_tasks(  # noqa: C901
 
     if job_framework == job_utils.JobFramework.dask_delayed:
         assert dask_client is not None
-        return dask_client.compute(all_results)  # type: ignore[no-any-return,no-untyped-call]
+        return dask_client.compute(all_results, resources={"n_cores": task_config.n_cores_per_task})  # type: ignore[no-any-return,no-untyped-call]
     return all_results
 
 
