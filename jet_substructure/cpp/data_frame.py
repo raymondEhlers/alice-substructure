@@ -331,6 +331,41 @@ def _substructure_hists(
             f"{grooming_method}_{prefix}_kt",
         )
         hists.append(kt_stats)
+    ##########
+    # kt / pt
+    ##########
+    # TODO: Still need to figure this out. Don't forget about untagged!
+    kt_over_pt_axis = np.linspace(0, 0.4, 40 + 1, dtype=np.float64)
+    kt_over_pt_axis = np.insert(kt_over_pt_axis, 0, [-0.05])
+    kt_pt = df.Histo2D(
+        (
+            f"{grooming_method}_{prefix}_kt_over_pt{tag}",
+            f"{grooming_method}_{prefix}_kt_over_pt{tag}",
+            *jet_pt_axis,
+            len(kt_over_pt_axis) - 1,
+            kt_over_pt_axis,
+        ),
+        jet_pt_column,
+        f"{grooming_method}_{prefix}_kt_over_pt",
+        "scale_factor",
+    )
+    hists.append(kt_pt)
+    if include_stats_hist:
+        # Determine the statistics that are available by not scaling according to the scale factor.
+        # In data, this will be trivially the same, but for the response, this is quite helpful.
+        kt_over_pt_stats = df.Histo2D(
+            (
+                f"{grooming_method}_{prefix}_kt_over_pt_stats{tag}",
+                f"{grooming_method}_{prefix}_kt_over_pt_stats{tag}",
+                *jet_pt_axis,
+                len(kt_over_pt_axis) - 1,
+                kt_over_pt_axis,
+            ),
+            jet_pt_column,
+            f"{grooming_method}_{prefix}_kt_over_pt",
+        )
+        hists.append(kt_over_pt_stats)
+
     # Use 0.02 for the bin width.
     n_bins_delta_R = round((jet_R + 0.02) / 0.02)
     delta_R = df.Histo2D(
@@ -1142,6 +1177,16 @@ def run(  # noqa: C901
         smeared_cut_prefix = "hybrid"
     else:
         smeared_cut_prefix = "data"
+
+    # Enable looking at kt_over_pt, which may be more constant as a function of pt
+    for prefix in prefixes:
+        df_original = df_original.Define(
+            f"{grooming_method}_{prefix}_kt_over_pt",
+            (
+                f"{grooming_method}_{prefix}_kt / "
+                f"{grooming_method}_{prefix}_{jet_pt_column_format.format(prefix=prefix)}",
+            )
+        )
 
     # For the substructure variables, we also apply a jet pt cut at the measured level (ie. data or hybrid).
     jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= {main_jet_pt_range.min} && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < {main_jet_pt_range.max}"
