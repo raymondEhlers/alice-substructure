@@ -790,7 +790,7 @@ def run_response(  # noqa: C901
     # Apply general cuts.
     # Double counting must be applied for embedding.
     if "embed" in collision_system:
-        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt_sub) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
+        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
         df_original = df_original.Filter(double_counting_cut)
         smeared_cut_prefix = "hybrid"
     else:
@@ -1136,7 +1136,7 @@ def run(  # noqa: C901
     # Apply general cuts.
     # Double counting must be applied for embedding.
     if "embed" in collision_system:
-        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt_sub) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
+        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
         # double_counting_cut = f"{jet_pt_column_format.format(prefix='true')} >= 10"
         df_original = df_original.Filter(double_counting_cut)
         smeared_cut_prefix = "hybrid"
