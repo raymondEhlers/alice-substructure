@@ -3,6 +3,8 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+from __future__ import annotations
+
 import argparse
 import logging
 from pathlib import Path
@@ -15,6 +17,7 @@ import uproot
 from pachyderm import binned_data
 from mammoth import helpers as mammoth_helpers
 from mammoth.framework import utils
+from mammoth.framework.analysis import jet_substructure as jet_substructure_analysis
 
 from jet_substructure.base import helpers, skim_analysis_objects
 from jet_substructure.base import unfolding as unfolding_base
@@ -454,6 +457,39 @@ def _substructure_hists(
     return hists
 
 
+def _apply_double_counting_cut_to_data_frame(
+    df: RDF, jet_pt_column_format: str, name: str | None = None
+) -> RDF:
+    # Validation
+    assert name is not None
+    dcc_settings = jet_substructure_analysis.double_counting_cuts[name]
+
+    # Accumulate cuts
+    dc_cuts = []
+    if dcc_settings.det_level_leading_track_pt_cut:
+        dc_cuts.append(
+            f"det_level_leading_track_pt >= hybrid_leading_track_pt"
+        )
+    if dcc_settings.min_true_pt:
+        dc_cuts.append(
+            f"{jet_pt_column_format.format(prefix='true')} >= {dcc_settings.min_true_pt}"
+        )
+    # NOTE: We can't implement the min_pt_hat_bin cut because we don't have it available here.
+    #       Instead, we need to implement it via restrictions on the input files.
+    if dcc_settings.min_pt_hat_bin:
+        # Just remind the user
+        logger.warning(
+            "Need to implement the double counting min pt hat bin via restricted input files!"
+            " Not necessarily indicative of a problem - just a reminder!"
+        )
+
+    # Validation: We need to wrap each cut in parenthesis to ensure that they're interpreted correctly
+    dc_cuts = [f"({s})" for s in dc_cuts]
+    # And write out the full cuts and apply
+    double_counting_cut = " && ".join(dc_cuts)
+    return df.Filter(double_counting_cut)
+
+
 def run_embedded_pt_hard_scaling(  # noqa: C901
     collision_system: str,
     input_filenames: Sequence[Path],
@@ -466,6 +502,7 @@ def run_embedded_pt_hard_scaling(  # noqa: C901
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
+    double_counting_cut_name: str | None = None,
 ) -> Tuple[bool, str]:
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
 
@@ -514,8 +551,11 @@ def run_embedded_pt_hard_scaling(  # noqa: C901
     # Apply general cuts.
     # Double counting must be applied for embedding.
     if "embed" in collision_system:
-        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
-        df_original = df_original.Filter(double_counting_cut)
+        df_original = _apply_double_counting_cut_to_data_frame(
+            df=df_original,
+            jet_pt_column_format=jet_pt_column_format,
+            name=double_counting_cut_name,
+        )
 
     # Emulate the double counting cut
     if collision_system == "pythia":
@@ -600,6 +640,7 @@ def run_create_closure_ratio(  # noqa: C901
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
+    double_counting_cut_name: str | None = None,
 ) -> Tuple[bool, str]:
     """Create the histogram necessary to create the closure ratio.
 
@@ -716,9 +757,13 @@ def run_create_closure_ratio(  # noqa: C901
 
     # Apply general cuts.
     # Double counting must be applied for embedding.
+    # FIXME: Closure depends on double counting, so needs to be embedded in name!
     if "embed" in collision_system:
-        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
-        df_original = df_original.Filter(double_counting_cut)
+        df_original = _apply_double_counting_cut_to_data_frame(
+            df=df_original,
+            jet_pt_column_format=jet_pt_column_format,
+            name=double_counting_cut_name,
+        )
 
     hists = []
     hists.append(
@@ -772,6 +817,7 @@ def run_response(  # noqa: C901
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
+    double_counting_cut_name: str | None = None,
 ) -> Tuple[bool, str]:
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
 
@@ -825,8 +871,11 @@ def run_response(  # noqa: C901
     # Apply general cuts.
     # Double counting must be applied for embedding.
     if "embed" in collision_system:
-        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
-        df_original = df_original.Filter(double_counting_cut)
+        df_original = _apply_double_counting_cut_to_data_frame(
+            df=df_original,
+            jet_pt_column_format=jet_pt_column_format,
+            name=double_counting_cut_name,
+        )
         smeared_cut_prefix = "hybrid"
     else:
         smeared_cut_prefix = "data"
@@ -1126,6 +1175,7 @@ def run(  # noqa: C901
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
+    double_counting_cut_name: str | None = None,
 ) -> Tuple[bool, str]:
     # Delay ROOT import so we don't explicitly rely on it.
     import ROOT
@@ -1171,9 +1221,11 @@ def run(  # noqa: C901
     # Apply general cuts.
     # Double counting must be applied for embedding.
     if "embed" in collision_system:
-        double_counting_cut = f"(det_level_leading_track_pt >= hybrid_leading_track_pt) && ({jet_pt_column_format.format(prefix='true')} >= 10)"
-        # double_counting_cut = f"{jet_pt_column_format.format(prefix='true')} >= 10"
-        df_original = df_original.Filter(double_counting_cut)
+        df_original = _apply_double_counting_cut_to_data_frame(
+            df=df_original,
+            jet_pt_column_format=jet_pt_column_format,
+            name=double_counting_cut_name,
+        )
         smeared_cut_prefix = "hybrid"
     else:
         smeared_cut_prefix = "data"
@@ -1283,6 +1335,7 @@ def run_standalone(
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
+    double_counting_cut_name: str | None = None,
 ) -> Tuple[bool, str]:
     # Determine the filenames based on the train numbers and predefined path here.
     #base_path = Path("trains/") / collision_system / "{train_number}/skim/AnalysisResults.*.root"
@@ -1312,6 +1365,7 @@ def run_standalone(
         jet_pt_prefix_first=jet_pt_prefix_first,
         n_cores=n_cores,
         cross_check_task=cross_check_task,
+        double_counting_cut_name=double_counting_cut_name,
     )
 
 
