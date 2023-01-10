@@ -1670,6 +1670,12 @@ def setup_all_unfolding(  # noqa: C901
         for grooming_method in grooming_methods:
             settings = {}
 
+            # Grab the double counting cut setting.
+            # We want to protect against accidentally forgetting this in PbPb!
+            _double_counting_cut_name = unfolding_settings.get("double_counting_cut", "")
+            if not unfolding_for_pp and _double_counting_cut_name == "":
+                raise ValueError("Must specify a double counting cut setting in PbPb! You can disable it with 'disabled'.")
+
             # First, define the default settings.
             _default_settings = unfolding_base.Settings2D(
                 grooming_method=grooming_method,
@@ -1692,6 +1698,7 @@ def setup_all_unfolding(  # noqa: C901
                     variable_name="kt",
                     untagged_bin_below_range=True,
                 ),
+                double_counting_cut_name=_double_counting_cut_name,
                 suffix=base_unfolding_config["suffix"],
                 label=unfolding_settings.get("label", ""),
                 output_dir=output_dir,
@@ -1740,6 +1747,7 @@ def setup_all_unfolding(  # noqa: C901
                         prefix_for_ratio="hybrid" if "embed" in _collision_system else "data",
                         smeared_substructure_variable_bins=_default_settings.substructure_variable.smeared_bins,
                         smeared_jet_pt_bins=_default_settings.jet_pt.smeared_bins,
+                        double_counting_cut_name=_default_settings.double_counting_cut_name,
                     )
                     # Add collision system to make it 100% unique (it already is for PbPb due to the prefix_for_ratio,
                     # but it's not for pp).

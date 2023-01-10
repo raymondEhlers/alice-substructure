@@ -389,6 +389,7 @@ def _get_reweighted_ratio(
     smeared_jet_pt_bins: npt.NDArray[np.float64],
     grooming_method: str,
     unfolding_for_pp: bool,
+    double_counting_cut_name: str,
     base_directory: Path = Path("output"),
 ) -> TH2D:
     # Delayed import to avoid direct dependence.
@@ -414,6 +415,7 @@ def _get_reweighted_ratio(
         prefix_for_ratio=response_prefix,
         smeared_substructure_variable_bins=smeared_substructure_variable_bins,
         smeared_jet_pt_bins=smeared_jet_pt_bins,
+        double_counting_cut_name=double_counting_cut_name,
     )
     h_response = f_response.Get(h_response_name)
     # Retrieve data hist
@@ -429,6 +431,7 @@ def _get_reweighted_ratio(
         prefix_for_ratio="data",
         smeared_substructure_variable_bins=smeared_substructure_variable_bins,
         smeared_jet_pt_bins=smeared_jet_pt_bins,
+        double_counting_cut_name=double_counting_cut_name,
     )
     h_data = f_data.Get(h_data_name)
 
@@ -473,6 +476,7 @@ def _get_reweighting_ratio(
         smeared_jet_pt_bins=settings.jet_pt.smeared_bins,
         grooming_method=settings.grooming_method,
         unfolding_for_pp=unfolding_for_pp,
+        double_counting_cut_name=settings.double_counting_cut_name,
     )
 
     # Validate the reweighting ratio

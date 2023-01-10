@@ -141,16 +141,17 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
         )
 
 
-@attr.s
+@attr.define
 class Settings2D:
-    grooming_method: str = attr.ib()
-    jet_pt: JetPtSettings2D = attr.ib()
-    substructure_variable: SubstructureVariableSettings2D = attr.ib()
-    suffix: str = attr.ib()
-    output_dir: Path = attr.ib()
-    label: str = attr.ib(default="")
-    use_pure_matches: bool = attr.ib(default=False)
-    filename_padding_factor: int = attr.ib(default=0)
+    grooming_method: str
+    jet_pt: JetPtSettings2D
+    substructure_variable: SubstructureVariableSettings2D
+    suffix: str
+    output_dir: Path
+    double_counting_cut_name: str = attr.field(default="")
+    label: str = attr.field(default="")
+    use_pure_matches: bool = attr.field(default=False)
+    filename_padding_factor: int = attr.field(default=0)
 
     @property
     def output_tag(self) -> str:
@@ -161,6 +162,9 @@ class Settings2D:
         base_filename += self.substructure_variable.encode_for_filename()
         # Jet pt
         base_filename += self.jet_pt.encode_for_filename()
+        # Double counting cut (if applicable)
+        if self.double_counting_cut_name:
+            base_filename += f"__double_counting_cut_{self.double_counting_cut_name}_"
         # And then the required suffix
         base_filename += f"_{self.suffix}"
         # Additional options
@@ -199,10 +203,11 @@ def _encode_binning_in_str(array: npt.NDArray[np.generic]) -> str:
 def hist_name_for_ratio_2D(
     grooming_method: str,
     prefix_for_ratio: str,
-    smeared_substructure_variable_bins: np.ndarray,
-    smeared_jet_pt_bins: np.ndarray,
+    smeared_substructure_variable_bins: npt.NDArray[np.generic],
+    smeared_jet_pt_bins: npt.NDArray[np.generic],
+    double_counting_cut_name: str,
 ) -> str:
-    return f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt_binning_smeared_kt_{_encode_binning_in_str(smeared_substructure_variable_bins)}_smeared_jet_pt_{_encode_binning_in_str(smeared_jet_pt_bins)}"
+    return f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt_binning_smeared_kt_{_encode_binning_in_str(smeared_substructure_variable_bins)}_smeared_jet_pt_{_encode_binning_in_str(smeared_jet_pt_bins)}__double_counting_cut_{double_counting_cut_name}"
 
 
 def get_binning(

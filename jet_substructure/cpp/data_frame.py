@@ -684,11 +684,13 @@ def run_create_closure_ratio(  # noqa: C901
     # It encodes the binning so we can have multiple hists stored in a single file, which
     # makes variations in binning easier (since we don't have to start from scratch).
     # Since we use this in many places, it's better to define it immediately.
+    assert double_counting_cut_name is not None
     hist_name = unfolding_base.hist_name_for_ratio_2D(
         grooming_method=grooming_method,
         prefix_for_ratio=prefix_for_ratio,
         smeared_substructure_variable_bins=smeared_substructure_variable_bins,
         smeared_jet_pt_bins=smeared_jet_pt_bins,
+        double_counting_cut_name=double_counting_cut_name,
     )
 
     # Check for existing file. If it exists, check that the binning is the same.
@@ -757,8 +759,8 @@ def run_create_closure_ratio(  # noqa: C901
 
     # Apply general cuts.
     # Double counting must be applied for embedding.
-    # FIXME: Closure depends on double counting, so needs to be embedded in name!
     if "embed" in collision_system:
+        # NOTE: This will change the input to the embedding, so we've added the particular setting into the hist name.
         df_original = _apply_double_counting_cut_to_data_frame(
             df=df_original,
             jet_pt_column_format=jet_pt_column_format,

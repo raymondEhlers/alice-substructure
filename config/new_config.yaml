@@ -1411,6 +1411,7 @@ analysis_configurations:
                         split_MC_fraction_for_response: 0.75
                         max_untagged_bin: 10
                     reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
                     datasets: "nominal"
                 default_kt_1:
                     label: ""
