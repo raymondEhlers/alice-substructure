@@ -3,6 +3,8 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any, Mapping, Type
 
@@ -13,7 +15,7 @@ import numpy.typing as npt
 from jet_substructure.base import helpers
 
 
-def _np_array_converter(value: Any, dtype: npt.DTypeLike = np.float64) -> np.ndarray:
+def _np_array_converter(value: Any, dtype: npt.DTypeLike = np.float64) -> npt.NDArray[np.float64]:
     """Convert the given value to a numpy array.
 
     Normally, we would just use np.array directly as the converter function. However, mypy will complain if
@@ -40,8 +42,8 @@ class ParameterSettings2D:
         smeared_bins: Smeared bins.
     """
 
-    true_bins: np.ndarray = attr.ib(converter=_np_array_converter)
-    smeared_bins: np.ndarray = attr.ib(converter=_np_array_converter)
+    true_bins: npt.NDArray[np.float64]= attr.ib(converter=_np_array_converter)
+    smeared_bins: npt.NDArray[np.float64] = attr.ib(converter=_np_array_converter)
 
 
 class JetPtSettings2D(ParameterSettings2D):
@@ -96,8 +98,8 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
     @classmethod
     def from_binning(
         cls: Type["SubstructureVariableSettings2D"],
-        true_bins: np.ndarray,
-        smeared_bins: np.ndarray,
+        true_bins: npt.NDArray[np.float64],
+        smeared_bins: npt.NDArray[np.float64],
         name: str,
         variable_name: str,
         untagged_bin_below_range: bool = True,
@@ -177,7 +179,7 @@ class Settings2D:
         return Path(f"{self.output_dir / self.output_tag}.root")
 
 
-def _encode_binning_in_str(array: np.ndarray) -> str:
+def _encode_binning_in_str(array: npt.NDArray[np.generic]) -> str:
     """Encode numpy array in safe string for a histogram name.
 
     Here, we put "_" between entries, leave "_" signs as is, and encode
@@ -208,7 +210,7 @@ def get_binning(
     base_unfolding_config: Mapping[str, Any],
     name: str,
     grooming_method: str,
-) -> np.ndarray:
+) -> npt.NDArray[np.float64]:
     """Get unfolding binning for a particular axis name.
 
     If a axis isn't specified, we fall back to the nominal binning.
