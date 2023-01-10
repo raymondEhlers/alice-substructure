@@ -334,8 +334,8 @@ def _substructure_hists(
     ##########
     # kt / pt
     ##########
-    # TODO: Still need to figure this out. Don't forget about untagged!
     kt_over_pt_axis = np.linspace(0, 0.4, 40 + 1, dtype=np.float64)
+    # Add in the untagged bin
     kt_over_pt_axis = np.insert(kt_over_pt_axis, 0, [-0.05])
     kt_pt = df.Histo2D(
         (
