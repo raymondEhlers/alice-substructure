@@ -87,7 +87,7 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
         """If the untagged bin min and max are the same, we want to disable it."""
         return self.untagged_bin.min == self.untagged_bin.max
 
-    def encocde_for_filename(self) -> str:
+    def encode_for_filename(self) -> str:
         """ Encode the variable settings for a filename. """
         # First, the substructure edges.
         description = f"_smeared_{self.smeared_range}"
@@ -158,7 +158,7 @@ class Settings2D:
         base_filename = f"unfolding_{self.substructure_variable.name}_grooming_method_{self.grooming_method}"
         # Then add the binning information.
         # Substructure
-        base_filename += self.substructure_variable.encocde_for_filename()
+        base_filename += self.substructure_variable.encode_for_filename()
         # Jet pt
         base_filename += self.jet_pt.encode_for_filename()
         # And then the required suffix
