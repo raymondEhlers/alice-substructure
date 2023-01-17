@@ -1234,11 +1234,12 @@ def run(  # noqa: C901
 
     # Enable looking at kt_over_pt, which may be more constant as a function of pt
     for prefix in prefixes:
+        logger.info(f"Defining kt_over_pt column for prefix {prefix}")
         df_original = df_original.Define(
             f"{grooming_method}_{prefix}_kt_over_pt",
             (
                 f"{grooming_method}_{prefix}_kt / "
-                f"{grooming_method}_{prefix}_{jet_pt_column_format.format(prefix=prefix)}",
+                f"{jet_pt_column_format.format(prefix=prefix)}",
             )
         )
 
