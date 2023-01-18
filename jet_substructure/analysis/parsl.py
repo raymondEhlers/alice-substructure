@@ -1863,7 +1863,7 @@ def setup_job_framework(
     task_config: job_utils.TaskConfig,
     facility: job_utils.FACILITIES,
     walltime: str,
-    n_cores_to_allocate: int,
+    target_n_tasks_to_run_simultaneously: int,
     log_level: int,
     conda_environment_name: Optional[str] = None,
 ) -> Tuple[parsl.DataFlowKernel, parsl.Config] | Tuple[dask.distributed.Client, dask.distributed.SpecCluster]:
@@ -1888,7 +1888,7 @@ def setup_job_framework(
         task_config=task_config,
         facility=facility,
         walltime=walltime,
-        n_cores_to_allocate=n_cores_to_allocate,
+        target_n_tasks_to_run_simultaneously=target_n_tasks_to_run_simultaneously,
         log_level=log_level,
         additional_worker_init_script=_additional_worker_init_script,
     )
@@ -2246,7 +2246,8 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
     task_config = job_utils.TaskConfig(name=task_name, n_cores_per_task=1)
     # n_cores_to_allocate = 120
     # n_cores_to_allocate = 110
-    n_cores_to_allocate = 8
+    # Formerly n_cores_to_allocate (and they're equal if n_cores_per_task==1)
+    target_n_tasks_to_run_simultaneously = 8
     walltime = "24:00:00"
     log_level = logging.INFO
     debug_mode = False
@@ -2265,7 +2266,7 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
         task_config=task_config,
         facility=facility,
         walltime=walltime,
-        n_cores_to_allocate=n_cores_to_allocate,
+        target_n_tasks_to_run_simultaneously=target_n_tasks_to_run_simultaneously,
         log_level=log_level,
         conda_environment_name=conda_environment_name,
     )
