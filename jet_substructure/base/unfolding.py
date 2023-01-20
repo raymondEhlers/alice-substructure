@@ -59,6 +59,36 @@ class JetPtSettings2D(ParameterSettings2D):
         description = f"_smeared_{smeared_jet_pt}"
         return description
 
+    @classmethod
+    def from_binning(
+        cls: Type[JetPtSettings2D],
+        true_bins: npt.NDArray[np.float64],
+        smeared_bins: npt.NDArray[np.float64],
+        true_min_pt: float | None = None,
+    ) -> JetPtSettings2D:
+        """
+
+        Note:
+            We'll rewrite the true_bins array if true_min_pt is set. This is solely a convenience function
+            since we need to potentially make such a requirement for the double counting cut.
+
+        Args:
+            true_bins: True pt bins
+            smeared_bins: Smeared pt bins
+            true_min_pt: Optional min true pt cut to apply to the true_pt_bins. Default: None.
+        """
+        if true_min_pt is not None:
+            m = true_bins > true_min_pt
+            true_bins = true_bins[m]
+            # If there we some values that we less than the true_min_pt value, we need to add in new true_min_pt value
+            if not np.all(m):
+                true_bins = np.insert(true_bins, 0, true_min_pt)
+
+        return cls(
+            true_bins=true_bins,
+            smeared_bins=smeared_bins,
+        )
+
 
 @attr.s
 class SubstructureVariableSettings2D(ParameterSettings2D):
@@ -97,13 +127,13 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
 
     @classmethod
     def from_binning(
-        cls: Type["SubstructureVariableSettings2D"],
+        cls: Type[SubstructureVariableSettings2D],
         true_bins: npt.NDArray[np.float64],
         smeared_bins: npt.NDArray[np.float64],
         name: str,
         variable_name: str,
         untagged_bin_below_range: bool = True,
-    ) -> "SubstructureVariableSettings2D":
+    ) -> SubstructureVariableSettings2D:
         # Determine the appropriate range class.
         # Either "Kt", "Rg", or "Zg"
         range_class_name = variable_name
@@ -148,8 +178,8 @@ class Settings2D:
     substructure_variable: SubstructureVariableSettings2D
     suffix: str
     output_dir: Path
-    double_counting_cut_name: str = attr.field(default="")
     label: str = attr.field(default="")
+    double_counting_cut_name: str = attr.field(default="disabled")
     use_pure_matches: bool = attr.field(default=False)
     filename_padding_factor: int = attr.field(default=0)
 
@@ -162,15 +192,15 @@ class Settings2D:
         base_filename += self.substructure_variable.encode_for_filename()
         # Jet pt
         base_filename += self.jet_pt.encode_for_filename()
-        # Double counting cut (if applicable)
-        if self.double_counting_cut_name:
-            base_filename += f"__double_counting_cut_{self.double_counting_cut_name}_"
         # And then the required suffix
         base_filename += f"_{self.suffix}"
         # Additional options
         # Optional tag
         if self.label:
             base_filename += f"_{self.label}"
+        # Double counting cut (if applicable)
+        if self.double_counting_cut_name != "disabled":
+            base_filename += f"__double_counting_cut_{self.double_counting_cut_name}_"
         # Put other possible options after the tag so we can sort by tag if it exists.
         if self.use_pure_matches:
             base_filename += "_pure_matches"

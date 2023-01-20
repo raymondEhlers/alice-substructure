@@ -13,7 +13,7 @@ import logging
 import typing
 from concurrent.futures import Future
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
 
 import attr
 import dask.distributed
@@ -22,6 +22,7 @@ import numpy as np
 import parsl
 import uproot
 from mammoth.framework.analysis import objects as analysis_objects
+from mammoth.framework.analysis import jet_substructure as analysis_jet_substructure
 from mammoth.framework import utils as mammoth_utils
 from mammoth import helpers
 from pachyderm import yaml
@@ -1675,13 +1676,19 @@ def setup_all_unfolding(  # noqa: C901
             _double_counting_cut_name = unfolding_settings.get("double_counting_cut", "")
             if not unfolding_for_pp and _double_counting_cut_name == "":
                 raise ValueError("Must specify a double counting cut setting in PbPb! You can disable it with 'disabled'.")
+            # We want this to be disabled in pp. To ensure that's the case, let's set it explicitly here!
+            if unfolding_for_pp:
+                _double_counting_cut_name = "disabled"
+            # We'll need the settings below to determine the right range for the true_min_pt
+            _double_counting_cut_settings = analysis_jet_substructure.double_counting_cuts[_double_counting_cut_name]
 
             # First, define the default settings.
             _default_settings = unfolding_base.Settings2D(
                 grooming_method=grooming_method,
-                jet_pt=unfolding_base.JetPtSettings2D(
+                jet_pt=unfolding_base.JetPtSettings2D.from_binning(
                     true_bins=_get_bins(name="true_jet_pt", grooming_method=grooming_method),
                     smeared_bins=_get_bins(name="smeared_jet_pt", grooming_method=grooming_method),
+                    true_min_pt=_double_counting_cut_settings.min_true_pt,
                     # true_bins=np.array([0, 40, 60, 80, 100, 120, 160], dtype=np.float64),
                     # smeared_bins=np.array([40, 50, 60, 80, 100, 120], dtype=np.float64),
                 ),

@@ -475,7 +475,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
   TTreeReaderValue<float> trueSubstructureVariable(
    mcReader, (groomingMethod + "_" + responseTruePrefix + "_" + substructureVariableName).c_str());
   // These values are only conditionally defined (ie. they are for embedding, but not for pythia)
-  // It's kind of awkward to have a pointer to a TTreeReaderValue, but it's  the only way that I can
+  // It's kind of awkward to have a pointer to a TTreeReaderValue, but it's the only way that I can
   // see to conditionally define them. So I just suck it up.
   std::unique_ptr<TTreeReaderValue<int16_t>> matchingLeading = nullptr;
   std::unique_ptr<TTreeReaderValue<int16_t>> matchingSubleading = nullptr;
@@ -505,6 +505,9 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
     }
     // Ensure that we are in the right true pt and substructure variable range.
     if (*trueJetPt > trueJetPtBins.back()) {
+      continue;
+    }
+    if (*trueJetPt < trueJetPtBins.front()) {
       continue;
     }
     if (*trueSubstructureVariable > trueSplittingVariableBins.back()) {
