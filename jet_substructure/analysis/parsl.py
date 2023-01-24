@@ -1404,6 +1404,22 @@ def setup_root_data_frame(
     output_dir.mkdir(parents=True, exist_ok=True)
     prefixes = dataset_config["prefixes"]
 
+    # Grab the double counting cut setting
+    # We want to protect against accidentally forgetting this in PbPb!
+    # NOTE: We use the default double counting cut here by default, but we can configure it by
+    #       passing some selected unfolding_settings. We should still be a bit careful with this!
+    _config_for_double_counting_cut = unfolding_settings if unfolding_settings is not None else base_unfolding_config["nominal_binning"]["default"]
+    _double_counting_cut_name = _config_for_double_counting_cut.get("double_counting_cut", "")
+    # Things are treated so different that it's better to be direct about the data collision system.
+    _analyzing_pp = collision_system == "pp"
+    if not _analyzing_pp and _double_counting_cut_name == "":
+        raise ValueError("Must specify a double counting cut setting in PbPb! You can disable it with 'disabled'.")
+    # We want this to be disabled in pp. To ensure that's the case, let's set it explicitly here!
+    if _analyzing_pp:
+        _double_counting_cut_name = "disabled"
+    # We'll need the settings below to determine the right range for the true_min_pt
+    _double_counting_cut_settings = analysis_jet_substructure.double_counting_cuts[_double_counting_cut_name]
+
     # If input files aren't passed, then we need to determine them ourselves.
     input_files = []
     if input_results is None:
@@ -1419,6 +1435,13 @@ def setup_root_data_frame(
 
             # Then iterate over the directories.
             for filename in Path(f"{train_directory}/skim/").glob("*.root"):
+                # Filter out pt hat bins based on the double counting cut settings
+                # NOTE: This won't work if not produced by mammoth...
+                if _double_counting_cut_settings.min_pt_hat_bin > 0 and collision_system == "embed_pythia":
+                    _extracted_pt_hat_bin = _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filename=filename)
+                    if _extracted_pt_hat_bin <= _double_counting_cut_settings.min_pt_hat_bin:
+                        logger.debug(f"Due to double counting cut of min pt hat bin of {_double_counting_cut_settings.min_pt_hat_bin}, skipping pt hat bin {_extracted_pt_hat_bin} file {filename}")
+                        continue
                 input_files.append(File(str(filename)))
 
     # logger.info(f"Input files (len: {len(input_files)}: {input_files}")
