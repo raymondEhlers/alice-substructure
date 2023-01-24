@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import functools
 import logging
+import re
 import typing
 from concurrent.futures import Future
 from pathlib import Path
@@ -1509,6 +1510,20 @@ def embedded_pt_hard_scaling_cross_check(
     return results
 
 
+# Matches pt hat values 1-20 in format of __1__ used in mammoth productions
+# Based on https://stackoverflow.com/a/39138675/12907985
+_match_pt_hat_bin_from_embed_pythia_mammoth_production = re.compile("__(0?[1-9]|1[0-9]|20)__")
+
+def _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filename: Path) -> int:
+    # Example: `pythia__2640__run_by_run__LHC20g4__295612__1__AnalysisResults_20g4_007`
+    possible_pt_hat_bins = _match_pt_hat_bin_from_embed_pythia_mammoth_production.findall(str(filename))
+    if len(possible_pt_hat_bins) == 0:
+        raise ValueError(f"Extracted no pt hat bins from filename {filename}")
+    if len(possible_pt_hat_bins) > 1:
+        raise ValueError(f"Extracted multiple pt hat bins: ({possible_pt_hat_bins}) bin from filename {filename}")
+    return int(possible_pt_hat_bins[0])
+
+
 @python_app
 def _unfolding_standard(
     settings: unfolding_base.Settings2D,
@@ -1637,6 +1652,17 @@ def setup_all_unfolding(  # noqa: C901
             unfolding_settings=unfolding_settings,
         )
 
+        # Grab the double counting cut setting.
+        # We want to protect against accidentally forgetting this in PbPb!
+        _double_counting_cut_name = unfolding_settings.get("double_counting_cut", "")
+        if not unfolding_for_pp and _double_counting_cut_name == "":
+            raise ValueError("Must specify a double counting cut setting in PbPb! You can disable it with 'disabled'.")
+        # We want this to be disabled in pp. To ensure that's the case, let's set it explicitly here!
+        if unfolding_for_pp:
+            _double_counting_cut_name = "disabled"
+        # We'll need the settings below to determine the right range for the true_min_pt
+        _double_counting_cut_settings = analysis_jet_substructure.double_counting_cuts[_double_counting_cut_name]
+
         # Datasets config and input files.
         data_dataset_config = base_dataset_config["datasets"][datasets_name][data_collision_system]
         data_train_directories = set([Path(filename).parent for filename in data_dataset_config["files"]])
@@ -1655,6 +1681,13 @@ def setup_all_unfolding(  # noqa: C901
 
                 # Then iterate over the directories.
                 for filename in Path(f"{train_directory}/skim/").glob("*.root"):
+                    # Filter out pt hat bins based on the double counting cut settings
+                    # NOTE: This won't work if not produced by mammoth...
+                    if _double_counting_cut_settings.min_pt_hat_bin > 0 and response_collision_system == "embed_pythia":
+                        _extracted_pt_hat_bin = _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filename=filename)
+                        if _extracted_pt_hat_bin <= _double_counting_cut_settings.min_pt_hat_bin:
+                            logger.debug(f"Due to double counting cut of min pt hat bin of {_double_counting_cut_settings.min_pt_hat_bin}, skipping pt hat bin {_extracted_pt_hat_bin} file {filename}")
+                            continue
                     files.append(File(str(filename)))
 
         # For parsl to keep track of the data and response files
@@ -1670,17 +1703,6 @@ def setup_all_unfolding(  # noqa: C901
         # Then we determine the settings.
         for grooming_method in grooming_methods:
             settings = {}
-
-            # Grab the double counting cut setting.
-            # We want to protect against accidentally forgetting this in PbPb!
-            _double_counting_cut_name = unfolding_settings.get("double_counting_cut", "")
-            if not unfolding_for_pp and _double_counting_cut_name == "":
-                raise ValueError("Must specify a double counting cut setting in PbPb! You can disable it with 'disabled'.")
-            # We want this to be disabled in pp. To ensure that's the case, let's set it explicitly here!
-            if unfolding_for_pp:
-                _double_counting_cut_name = "disabled"
-            # We'll need the settings below to determine the right range for the true_min_pt
-            _double_counting_cut_settings = analysis_jet_substructure.double_counting_cuts[_double_counting_cut_name]
 
             # First, define the default settings.
             _default_settings = unfolding_base.Settings2D(
