@@ -1631,6 +1631,7 @@ def setup_all_unfolding(  # noqa: C901
     n_cores_per_job: int,
     job_framework: job_utils.JobFramework,
     selected_unfolding_settings: Optional[List[str]] = None,
+    debug_cpp_code: bool = False,
 ) -> List[Future[Any]]:
     """Setup unfolding jobs.
 
@@ -1869,7 +1870,7 @@ def setup_all_unfolding(  # noqa: C901
                         response_tree_name="tree",
                         # if not response_dataset_config.get("cross_check_task", False)
                         # else response_dataset_config["tree_name"],
-                        debug_cpp_code=False,
+                        debug_cpp_code=debug_cpp_code,
                         job_framework=job_framework,
                         inputs=job_input_files,  # type: ignore[arg-type]
                         outputs=[parsl_output_file],
@@ -1897,6 +1898,7 @@ def setup_all_unfolding(  # noqa: C901
                                 ]["name"],
                                 # Since we skim everything now, we should have uniform input names here.
                                 response_tree_name="tree",
+                                debug_cpp_code=debug_cpp_code,
                                 # if not response_dataset_config.get("cross_check_task", False)
                                 # else response_dataset_config["tree_name"],
                                 job_framework=job_framework,
