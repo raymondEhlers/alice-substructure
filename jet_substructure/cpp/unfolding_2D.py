@@ -566,7 +566,7 @@ def run_unfolding(
     _setup_unfolding()
     _double_counting_cut_settings = analysis_jet_substructure.double_counting_cuts[settings.double_counting_cut_name]
     # Setup ROOT logging (only used inside cpp functions that we call!)
-    root_stdout, root_stderr = _setup_root_logging(debug_cpp_code=debug_cpp_code)
+    _root_stdout, _root_stderr = _setup_root_logging(debug_cpp_code=debug_cpp_code)
 
     # Define hists (and the map to pass them into ROOT for unfolding)
     hists = _default_hists(settings=settings)
@@ -584,7 +584,7 @@ def run_unfolding(
     # Configure arguments
     # We define this objects since the number of unfolding arguments is becoming untenable, and I'm worried
     # about putting them in the wrong order or being unable to add arguments with default values.
-    root_unfolding_settings = ROOT.unfolding.Settings2D(
+    _root_unfolding_settings = ROOT.unfolding.Settings2D(
         settings.grooming_method,
         settings.substructure_variable.variable_name,
         _array_to_ROOT(settings.jet_pt.smeared_bins, "double"),
@@ -599,18 +599,18 @@ def run_unfolding(
         unfolding_for_pp,
         h_reweighting_response_ratio,
     )
-    root_double_counting_cut = ROOT.unfolding.DoubleCountingCut(
+    _root_double_counting_cut = ROOT.unfolding.DoubleCountingCut(
         _double_counting_cut_settings.det_level_leading_track_pt_cut
     )
-    root_input_filenames = ROOT.unfolding.InputFilenames(
+    _root_input_filenames = ROOT.unfolding.InputFilenames(
         _array_to_ROOT(_pass_filenames_to_ROOT(data_filenames), "std::string"),
         _array_to_ROOT(_pass_filenames_to_ROOT(response_filenames), "std::string"),
     )
-    root_tree_names = ROOT.unfolding.TreeNames(
+    _root_tree_names = ROOT.unfolding.TreeNames(
         data_tree_name,
         response_tree_name,
     )
-    root_prefixes = ROOT.unfolding.Prefixes(
+    _root_prefixes = ROOT.unfolding.Prefixes(
         "data",
         "hybrid" if not unfolding_for_pp else "data",
     )
@@ -619,16 +619,16 @@ def run_unfolding(
     # They should generally be reasonable, but may require tweaks from time to time.
     responses = ROOT.create_response_2D(
         hists_map_for_root,
-        root_unfolding_settings,
-        root_double_counting_cut,
-        root_input_filenames,
-        root_tree_names,
-        root_prefixes,
-        root_stdout,
-        root_stderr,
+        _root_unfolding_settings,
+        _root_double_counting_cut,
+        _root_input_filenames,
+        _root_tree_names,
+        _root_prefixes,
+        _root_stdout,
+        _root_stderr,
     )
     # Actually log
-    _log_root_cpp_logs(root_stdout=root_stdout, root_stderr=root_stderr)
+    _log_root_cpp_logs(root_stdout=_root_stdout, root_stderr=_root_stderr)
 
     logger.debug(responses)
 
@@ -731,7 +731,7 @@ def run_unfolding_closure_reweighting(
     _setup_unfolding()
     _double_counting_cut_settings = analysis_jet_substructure.double_counting_cuts[settings.double_counting_cut_name]
     # Setup ROOT logging (only used inside cpp functions that we call!)
-    root_stdout, root_stderr = _setup_root_logging(debug_cpp_code=debug_cpp_code)
+    _root_stdout, _root_stderr = _setup_root_logging(debug_cpp_code=debug_cpp_code)
     # Validate variations.
     _variations = {
         "split_MC": ROOT.unfolding.ClosureVariation_t.splitMC,
@@ -761,7 +761,7 @@ def run_unfolding_closure_reweighting(
     # Configure arguments
     # We define this objects since the number of unfolding arguments is becoming untenable, and I'm worried
     # about putting them in the wrong order or being unable to add arguments with default values.
-    root_unfolding_settings = ROOT.unfolding.Settings2D(
+    _root_unfolding_settings = ROOT.unfolding.Settings2D(
         settings.grooming_method,
         settings.substructure_variable.variable_name,
         _array_to_ROOT(settings.jet_pt.smeared_bins, "double"),
@@ -776,22 +776,22 @@ def run_unfolding_closure_reweighting(
         unfolding_for_pp,
         h_reweighting_ratio,
     )
-    root_closure_settings = ROOT.unfolding.ClosureSettings(
+    _root_closure_settings = ROOT.unfolding.ClosureSettings(
         variation,
         fraction_for_response,
     )
-    root_double_counting_cut = ROOT.unfolding.DoubleCountingCut(
+    _root_double_counting_cut = ROOT.unfolding.DoubleCountingCut(
         _double_counting_cut_settings.det_level_leading_track_pt_cut
     )
-    root_input_filenames = ROOT.unfolding.InputFilenames(
+    _root_input_filenames = ROOT.unfolding.InputFilenames(
         _array_to_ROOT(_pass_filenames_to_ROOT([]), "std::string"),
         _array_to_ROOT(_pass_filenames_to_ROOT(response_filenames), "std::string"),
     )
-    root_tree_names = ROOT.unfolding.TreeNames(
+    _root_tree_names = ROOT.unfolding.TreeNames(
         "tree",  # NOTE: The "data" argument doesn't matter for this closure!
         response_tree_name,
     )
-    root_prefixes = ROOT.unfolding.Prefixes(
+    _root_prefixes = ROOT.unfolding.Prefixes(
         "data",  # NOTE: The "data" argument doesn't matter for this closure!
         "hybrid" if not unfolding_for_pp else "data",
     )
@@ -800,17 +800,17 @@ def run_unfolding_closure_reweighting(
     # They should generally be reasonable, but may require tweaks from time to time.
     responses = ROOT.create_closure_response_2D(
         hists_map_for_root,
-        root_unfolding_settings,
-        root_closure_settings,
-        root_double_counting_cut,
-        root_input_filenames,
-        root_tree_names,
-        root_prefixes,
-        root_stdout,
-        root_stderr,
+        _root_unfolding_settings,
+        _root_closure_settings,
+        _root_double_counting_cut,
+        _root_input_filenames,
+        _root_tree_names,
+        _root_prefixes,
+        _root_stdout,
+        _root_stderr,
     )
     # Actually log
-    _log_root_cpp_logs(root_stdout=root_stdout, root_stderr=root_stderr)
+    _log_root_cpp_logs(root_stdout=_root_stdout, root_stderr=_root_stderr)
 
     # Perform the actual unfolding.
     # First, the standard split MC closure
