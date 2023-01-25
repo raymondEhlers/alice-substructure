@@ -22,6 +22,8 @@ import numpy.typing as npt
 import uproot
 from pachyderm import binned_data
 
+from mammoth.framework.analysis import jet_substructure as analysis_jet_substructure
+
 from jet_substructure.base import helpers, skim_analysis_objects
 from jet_substructure.base import unfolding as unfolding_base
 
@@ -520,6 +522,31 @@ def _create_branch_rename_shim(
     return branch_renames
 
 
+def _setup_root_logging(debug_cpp_code: bool = False) -> Tuple[Any, Any]:
+    """Setup ROOT logging via streams
+
+    The main downside is that I'll only see output after it's done. But this way, I'll capture the logs
+    (It may not be especially convenient if it segfaults though, as I may not get the output. Thus the debug
+    option). Approach based on: https://stackoverflow.com/a/75088979/12907985
+    and https://bitbucket.org/wlav/cppyy/issues/256/issue-capturing-stdout-stderr
+    """
+    # Delayed import to avoid direct dependence.
+    import ROOT
+
+    if debug_cpp_code:
+        return ROOT.std.cout, ROOT.std.cerr
+    else:
+        return ROOT.std.ostringstream(), ROOT.std.ostringstream()
+
+
+def _log_root_logs(root_stdout: Any, root_stderr: Any) -> None:
+    logger.info(root_stdout.str())
+    # Take an extra step to avoid writing an empty line
+    _stderr_output = root_stderr.str()
+    if _stderr_output:
+        logger.warning(_stderr_output)
+
+
 def run_unfolding(
     settings: unfolding_base.Settings2D,
     data_filenames: Sequence[Path],
@@ -530,12 +557,14 @@ def run_unfolding(
     reweight_prior: bool = False,
     reweight_data_dataset_name: str = "",
     reweight_response_dataset_name: str = "",
+    debug_cpp_code: bool = False,
 ) -> bool:
     # Delayed import to avoid direct dependence.
     import ROOT
 
     # Setup
     _setup_unfolding()
+    _double_counting_cut_settings = analysis_jet_substructure.double_counting_cuts[settings.double_counting_cut_name]
 
     # Define hists (and the map to pass them into ROOT for unfolding)
     hists = _default_hists(settings=settings)
@@ -550,10 +579,10 @@ def run_unfolding(
             unfolding_for_pp=unfolding_for_pp,
         )
 
-    # Create the responses. We assume some conventions about column names.
-    # They should generally be reasonable, but may require tweaks from time to time.
-    responses = ROOT.create_response_2D(
-        hists_map_for_root,
+    # Configure arguments
+    # We define this objects since the number of unfolding arguments is becoming untenable, and I'm worried
+    # about putting them in the wrong order or being unable to add arguments with default values.
+    root_unfolding_settings = ROOT.unfolding.Settings2D(
         settings.grooming_method,
         settings.substructure_variable.variable_name,
         _array_to_ROOT(settings.jet_pt.smeared_bins, "double"),
@@ -564,23 +593,52 @@ def run_unfolding(
         settings.substructure_variable.disable_untagged_bin,
         settings.substructure_variable.smeared_range.min,
         settings.substructure_variable.smeared_range.max,
-        _array_to_ROOT(_pass_filenames_to_ROOT(data_filenames), "std::string"),
-        _array_to_ROOT(_pass_filenames_to_ROOT(response_filenames), "std::string"),
         settings.use_pure_matches,
         unfolding_for_pp,
         h_reweighting_response_ratio,
+    )
+    root_double_counting_cut = ROOT.unfolding.DoubleCountingCut(
+        _double_counting_cut_settings.det_level_leading_track_pt_cut
+    )
+    root_input_filenames = ROOT.unfolding.InputFilenames(
+        _array_to_ROOT(_pass_filenames_to_ROOT(data_filenames), "std::string"),
+        _array_to_ROOT(_pass_filenames_to_ROOT(response_filenames), "std::string"),
+    )
+    root_tree_names = ROOT.unfolding.TreeNames(
         data_tree_name,
         response_tree_name,
+    )
+    root_prefixes = ROOT.unfolding.Prefixes(
         "data",
         "hybrid" if not unfolding_for_pp else "data",
     )
+
+    # Setup logging
+    root_stdout, root_stderr = _setup_root_logging(debug_cpp_code=debug_cpp_code)
+
+    # Create the responses. We assume some conventions about column names.
+    # They should generally be reasonable, but may require tweaks from time to time.
+    responses = ROOT.create_response_2D(
+        hists_map_for_root,
+        root_unfolding_settings,
+        root_double_counting_cut,
+        root_input_filenames,
+        root_tree_names,
+        root_prefixes,
+        root_stdout,
+        root_stderr,
+    )
+    # Actually log
+    _log_root_logs(root_stdout=root_stdout, root_stderr=root_stderr)
 
     logger.debug(responses)
 
     # Perform the actual unfolding.
     # First, the standard unfolding.
     output_hists = unfolding_2D(
-        response=responses.response, input_spectra=hists["h2_raw"], true_spectra=hists["h2_true"]
+        response=responses.response,
+        input_spectra=hists["h2_raw"],
+        true_spectra=hists["h2_true"]
     )
     # Write the output before we move onto the next case.
     _write_hists([hists, output_hists], settings.output_filename)
