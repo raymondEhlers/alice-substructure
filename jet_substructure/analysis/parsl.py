@@ -1597,6 +1597,7 @@ def _unfolding_closure(
     reweight_data_dataset_name: str,
     reweight_response_dataset_name: str,
     response_tree_name: str,
+    debug_cpp_code: bool,
     job_framework: job_utils.JobFramework,
     inputs: Tuple[Sequence[File], Sequence[File]] = ([], []),
     outputs: Sequence[File] = [],
@@ -1621,6 +1622,7 @@ def _unfolding_closure(
         fraction_for_response=fraction_for_response,
         reweight_data_dataset_name=reweight_data_dataset_name,
         reweight_response_dataset_name=reweight_response_dataset_name,
+        debug_cpp_code=debug_cpp_code,
     )
 
 
