@@ -415,37 +415,37 @@ unfolding::ResponseResult create_response_2D(
   const unfolding::InputFilenames inputFilenames,
   const unfolding::TreeNames treeNames,
   const unfolding::Prefixes prefixes,
-  std::ostream & stdout = std::cout,
-  std::ostream & stderr = std::cerr
+  std::ostream & stdoutStream = std::cout,
+  std::ostream & stderrStream = std::cerr
 ) {
   // Print out the status.
-  stdout << "Binning and values:\n";
-  stdout << "Grooming method: " << settings.groomingMethod << "\n";
-  stdout << "Smeared jet pt bins:";
+  stdoutStream << "Binning and values:\n";
+  stdoutStream << "Grooming method: " << settings.groomingMethod << "\n";
+  stdoutStream << "Smeared jet pt bins:";
   for (auto v : settings.smearedJetPtBins) {
-      stdout << " " << v;
+      stdoutStream << " " << v;
   }
-  stdout << "\nTrue pt bins:";
+  stdoutStream << "\nTrue pt bins:";
   for (auto v : settings.trueJetPtBins) {
-      stdout << " " << v;
+      stdoutStream << " " << v;
   }
-  stdout << "\nSmeared substructure variable bins:";
+  stdoutStream << "\nSmeared substructure variable bins:";
   for (auto v : settings.smearedSplittingVariableBins) {
-      stdout << " " << v;
+      stdoutStream << " " << v;
   }
-  stdout << "\nTrue substructure variable bins:";
+  stdoutStream << "\nTrue substructure variable bins:";
   for (auto v : settings.trueSplittingVariableBins) {
-      stdout << " " << v;
+      stdoutStream << " " << v;
   }
-  stdout << "\n";
-  stdout << "Smeared untagged bin value: " << settings.smearedUntaggedBinValue << "\n";
-  stdout << std::boolalpha << "Disable untagged bin: " << settings.disableUntaggedBin << "\n";
-  stdout << "Min smeared substructure variable: " << settings.minSmearedSplittingVariable << "\n";
-  stdout << "Max smeared substructure variable: " << settings.maxSmearedSplittingVariable << "\n";
-  stdout << std::boolalpha << "Use pure matches: " << settings.usePureMatches << "\n";
-  stdout << std::boolalpha << "Unfolding for pp: " << settings.unfoldingForPP << "\n";
+  stdoutStream << "\n";
+  stdoutStream << "Smeared untagged bin value: " << settings.smearedUntaggedBinValue << "\n";
+  stdoutStream << std::boolalpha << "Disable untagged bin: " << settings.disableUntaggedBin << "\n";
+  stdoutStream << "Min smeared substructure variable: " << settings.minSmearedSplittingVariable << "\n";
+  stdoutStream << "Max smeared substructure variable: " << settings.maxSmearedSplittingVariable << "\n";
+  stdoutStream << std::boolalpha << "Use pure matches: " << settings.usePureMatches << "\n";
+  stdoutStream << std::boolalpha << "Unfolding for pp: " << settings.unfoldingForPP << "\n";
   // Add some space before the filename printouts.
-  stdout << "\n";
+  stdoutStream << "\n";
 
   // General setup
   double untaggedBelowThisValue = 0.;
@@ -458,9 +458,9 @@ unfolding::ResponseResult create_response_2D(
 
   // First, we handle the data. Setup the Reader, the columns, and store the data in the appropriate hists.
   TChain dataChain(treeNames.data.c_str());
-  stdout << "Data filenames:\n";
+  stdoutStream << "Data filenames:\n";
   for (auto filename : inputFilenames.data) {
-    stdout << " - " << filename << "\n";
+    stdoutStream << " - " << filename << "\n";
     dataChain.Add(filename.c_str());
   }
   TTreeReader dataReader(&dataChain);
@@ -499,9 +499,9 @@ unfolding::ResponseResult create_response_2D(
 
   // Next, we setup the Reader, the columns, and store the data in the appropriate hists.
   TChain responseChain(treeNames.response.c_str());
-  stdout << "Embedded filenames:\n";
+  stdoutStream << "Embedded filenames:\n";
   for (auto filename : inputFilenames.response) {
-    stdout << " - " << filename << "\n";
+    stdoutStream << " - " << filename << "\n";
     responseChain.Add(filename.c_str());
   }
   // NOTE: We have no more need for friend trees because we skim everything. But we'll
@@ -670,8 +670,8 @@ unfolding::ResponseResult create_closure_response_2D(
   const unfolding::InputFilenames inputFilenames,
   const unfolding::TreeNames treeNames,
   const unfolding::Prefixes prefixes,
-  std::ostream & stdout = std::cout,
-  std::ostream & stderr = std::cerr
+  std::ostream & stdoutStream = std::cout,
+  std::ostream & stderrStream = std::cerr
 ) {
   // NOTE: We rely on the user to validate that the binning matches the reweighting hist.
   // Setup
