@@ -381,29 +381,6 @@ struct ClosureSettings {
 
 } /* namespace unfolding */
 
-/*
-ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std::string groomingMethod,
-                 const std::string substructureVariableName, std::vector<double> smearedJetPtBins,
-                 std::vector<double> trueJetPtBins, std::vector<double> smearedSplittingVariableBins,
-                 std::vector<double> trueSplittingVariableBins, double smearedUntaggedBinValue,
-                 bool disableUntaggedBin,
-                 double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
-                 const std::vector<std::string>& dataFilenames,
-                 const std::vector<std::string>& responseFilenames,
-                 const bool usePureMatches = false,
-                 const bool unfoldingForPP = false,
-                 TH2D* hReweightingResponse = nullptr,
-                 const std::string& dataTreeName = "tree",
-                 const std::string& responseTreeName = "tree",
-                 const std::string& dataPrefix = "data",
-                 const std::string& responseSmearedPrefix = "hybrid",
-                 const std::string& responseTruePrefix = "true",
-                 const std::string& responseDetLevelPrefix = "det_level",
-                 bool doubleCountingUseDetLevelTrackPtCut = false
-) {
-}
-*/
-
 /**
  * Interface to 2D unfolding with python.
  *
@@ -640,28 +617,6 @@ unfolding::ResponseResult create_response_2D(
  * NOTE: We rely on the user to validate that the binning matches the reweighting hist.
  *
  */
-unfolding::ResponseResult create_closure_response_2D(
- std::map<std::string, TH2D*> hists,
- const std::string groomingMethod,
- const std::string substructureVariableName,
- std::vector<double> smearedJetPtBins,
- std::vector<double> trueJetPtBins,
- std::vector<double> smearedSplittingVariableBins,
- std::vector<double> trueSplittingVariableBins,
- double smearedUntaggedBinValue, bool disableUntaggedBin, double minSmearedSplittingVariable, double maxSmearedSplittingVariable,
- const std::vector<std::string>& responseFilenames, const unfolding::ClosureVariation_t closureVariation,
- const double fractionForResponse = 0.75, const bool usePureMatches = false,
- const bool unfoldingForPP = false,
- TH2D* hReweighting = nullptr,
- const std::string& responseTreeName = "tree",
- const std::string& responseSmearedPrefix = "hybrid",
- const std::string& responseTruePrefix = "true",
- const std::string& responseDetLevelPrefix = "det_level")
-{
-  // ...
-  return unfolding::ResponseResult{};
-}
-
 unfolding::ResponseResult create_closure_response_2D(
   std::map<std::string, TH2D*> hists,
   const unfolding::Settings2D settings,
