@@ -539,7 +539,7 @@ def _setup_root_logging(debug_cpp_code: bool = False) -> Tuple[Any, Any]:
         return ROOT.std.ostringstream(), ROOT.std.ostringstream()
 
 
-def _log_root_logs(root_stdout: Any, root_stderr: Any) -> None:
+def _log_root_cpp_logs(root_stdout: Any, root_stderr: Any) -> None:
     logger.info(root_stdout.str())
     # Take an extra step to avoid writing an empty line
     _stderr_output = root_stderr.str()
@@ -565,6 +565,8 @@ def run_unfolding(
     # Setup
     _setup_unfolding()
     _double_counting_cut_settings = analysis_jet_substructure.double_counting_cuts[settings.double_counting_cut_name]
+    # Setup ROOT logging (only used inside cpp functions that we call!)
+    root_stdout, root_stderr = _setup_root_logging(debug_cpp_code=debug_cpp_code)
 
     # Define hists (and the map to pass them into ROOT for unfolding)
     hists = _default_hists(settings=settings)
@@ -613,9 +615,6 @@ def run_unfolding(
         "hybrid" if not unfolding_for_pp else "data",
     )
 
-    # Setup logging
-    root_stdout, root_stderr = _setup_root_logging(debug_cpp_code=debug_cpp_code)
-
     # Create the responses. We assume some conventions about column names.
     # They should generally be reasonable, but may require tweaks from time to time.
     responses = ROOT.create_response_2D(
@@ -629,7 +628,7 @@ def run_unfolding(
         root_stderr,
     )
     # Actually log
-    _log_root_logs(root_stdout=root_stdout, root_stderr=root_stderr)
+    _log_root_cpp_logs(root_stdout=root_stdout, root_stderr=root_stderr)
 
     logger.debug(responses)
 
@@ -709,6 +708,7 @@ def run_unfolding_closure_reweighting(
     fraction_for_response: float = 0.75,
     reweight_data_dataset_name: str = "",
     reweight_response_dataset_name: str = "",
+    debug_cpp_code: bool = False,
 ) -> bool:
     """Run unfolding closure with reweighting.
 
@@ -729,11 +729,14 @@ def run_unfolding_closure_reweighting(
 
     # Setup
     _setup_unfolding()
+    _double_counting_cut_settings = analysis_jet_substructure.double_counting_cuts[settings.double_counting_cut_name]
+    # Setup ROOT logging (only used inside cpp functions that we call!)
+    root_stdout, root_stderr = _setup_root_logging(debug_cpp_code=debug_cpp_code)
     # Validate variations.
     _variations = {
-        "split_MC": ROOT.ClosureVariation_t.splitMC,
-        "reweight_pseudo_data": ROOT.ClosureVariation_t.reweightPseudoData,
-        "reweight_response": ROOT.ClosureVariation_t.reweightResponse,
+        "split_MC": ROOT.unfolding.ClosureVariation_t.splitMC,
+        "reweight_pseudo_data": ROOT.unfolding.ClosureVariation_t.reweightPseudoData,
+        "reweight_response": ROOT.unfolding.ClosureVariation_t.reweightResponse,
     }
     variation = _variations[closure_variation]
 
@@ -747,7 +750,7 @@ def run_unfolding_closure_reweighting(
 
     # Load hists for reweighting and calculate ratio.
     h_reweighting_ratio = ROOT.nullptr
-    if variation != ROOT.ClosureVariation_t.splitMC:
+    if variation != ROOT.unfolding.ClosureVariation_t.splitMC:
         h_reweighting_ratio = _get_reweighting_ratio(
             reweight_data_dataset_name=reweight_data_dataset_name,
             reweight_response_dataset_name=reweight_response_dataset_name,
@@ -755,10 +758,10 @@ def run_unfolding_closure_reweighting(
             unfolding_for_pp=unfolding_for_pp,
         )
 
-    # Create the responses. We assume some conventions about column names.
-    # They should generally be reasonable, but may require tweaks from time to time.
-    responses = ROOT.create_closure_response_2D(
-        hists_map_for_root,
+    # Configure arguments
+    # We define this objects since the number of unfolding arguments is becoming untenable, and I'm worried
+    # about putting them in the wrong order or being unable to add arguments with default values.
+    root_unfolding_settings = ROOT.unfolding.Settings2D(
         settings.grooming_method,
         settings.substructure_variable.variable_name,
         _array_to_ROOT(settings.jet_pt.smeared_bins, "double"),
@@ -769,15 +772,45 @@ def run_unfolding_closure_reweighting(
         settings.substructure_variable.disable_untagged_bin,
         settings.substructure_variable.smeared_range.min,
         settings.substructure_variable.smeared_range.max,
-        _array_to_ROOT(_pass_filenames_to_ROOT(response_filenames), "std::string"),
-        variation,
-        fraction_for_response,
         settings.use_pure_matches,
         unfolding_for_pp,
         h_reweighting_ratio,
+    )
+    root_closure_settings = ROOT.unfolding.ClosureSettings(
+        variation,
+        fraction_for_response,
+    )
+    root_double_counting_cut = ROOT.unfolding.DoubleCountingCut(
+        _double_counting_cut_settings.det_level_leading_track_pt_cut
+    )
+    root_input_filenames = ROOT.unfolding.InputFilenames(
+        _array_to_ROOT(_pass_filenames_to_ROOT([]), "std::string"),
+        _array_to_ROOT(_pass_filenames_to_ROOT(response_filenames), "std::string"),
+    )
+    root_tree_names = ROOT.unfolding.TreeNames(
+        "tree",  # NOTE: The "data" argument doesn't matter for this closure!
         response_tree_name,
+    )
+    root_prefixes = ROOT.unfolding.Prefixes(
+        "data",  # NOTE: The "data" argument doesn't matter for this closure!
         "hybrid" if not unfolding_for_pp else "data",
     )
+
+    # Create the responses. We assume some conventions about column names.
+    # They should generally be reasonable, but may require tweaks from time to time.
+    responses = ROOT.create_closure_response_2D(
+        hists_map_for_root,
+        root_unfolding_settings,
+        root_closure_settings,
+        root_double_counting_cut,
+        root_input_filenames,
+        root_tree_names,
+        root_prefixes,
+        root_stdout,
+        root_stderr,
+    )
+    # Actually log
+    _log_root_cpp_logs(root_stdout=root_stdout, root_stderr=root_stderr)
 
     # Perform the actual unfolding.
     # First, the standard split MC closure
