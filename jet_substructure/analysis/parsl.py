@@ -1556,6 +1556,7 @@ def _unfolding_standard(
     reweight_response_dataset_name: str,
     data_tree_name: str,
     response_tree_name: str,
+    debug_cpp_code: bool,
     job_framework: job_utils.JobFramework,
     inputs: Tuple[Sequence[File], Sequence[File]] = ([], []),
     outputs: Sequence[File] = [],
@@ -1583,6 +1584,7 @@ def _unfolding_standard(
         reweight_prior=reweight_prior,
         reweight_data_dataset_name=reweight_data_dataset_name,
         reweight_response_dataset_name=reweight_response_dataset_name,
+        debug_cpp_code=debug_cpp_code,
     )
 
 
@@ -1867,6 +1869,7 @@ def setup_all_unfolding(  # noqa: C901
                         response_tree_name="tree",
                         # if not response_dataset_config.get("cross_check_task", False)
                         # else response_dataset_config["tree_name"],
+                        debug_cpp_code=False,
                         job_framework=job_framework,
                         inputs=job_input_files,  # type: ignore[arg-type]
                         outputs=[parsl_output_file],
