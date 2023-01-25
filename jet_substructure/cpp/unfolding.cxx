@@ -351,7 +351,7 @@ struct Settings2D {
   TH2D* hReweightingResponse = nullptr;
 };
 
-struct DoubleCountingCuts {
+struct DoubleCountingCut {
   bool useDetLevelTrackPtCut = false;
 };
 
@@ -411,7 +411,7 @@ ResponseResult create_response_2D(std::map<std::string, TH2D*> hists, const std:
 unfolding::ResponseResult create_response_2D(
   std::map<std::string, TH2D*> hists,
   const unfolding::Settings2D settings,
-  const unfolding::DoubleCountingCuts doubleCountingCuts,
+  const unfolding::DoubleCountingCut doubleCountingCut,
   const unfolding::InputFilenames inputFilenames,
   const unfolding::TreeNames treeNames,
   const unfolding::Prefixes prefixes,
@@ -546,7 +546,7 @@ unfolding::ResponseResult create_response_2D(
                             (settings.groomingMethod + "_hybrid_det_level_matching_leading").c_str());
       matchingSubleading = std::make_unique<TTreeReaderValue<int16_t>>(mcReader,
                               (settings.groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
-      // For the double counting cut.
+      // Potentially useful for the double counting cut.
       responseSmearedUnsubLeadingTrackPt = std::make_unique<TTreeReaderValue<float>>(mcReader, (prefixes.responseSmeared + "_leading_track_pt").c_str());
       detLevelLeadingTrackPt = std::make_unique<TTreeReaderValue<float>>(mcReader, (prefixes.responseDetLevel + "_leading_track_pt").c_str());
   }
@@ -575,9 +575,9 @@ unfolding::ResponseResult create_response_2D(
     if (settings.disableUntaggedBin && *trueSubstructureVariable < settings.trueSplittingVariableBins.front()) {
       continue;
     }
-    // Double counting cut
-    if (!settings.unfoldingForPP) {
-      if (!((**detLevelLeadingTrackPt >= **responseSmearedUnsubLeadingTrackPt) && (*trueJetPt > 10))) {
+    // Finish up possible double counting cut selections (other aspects of the cut are implemented earlier)
+    if (!settings.unfoldingForPP && doubleCountingCut.useDetLevelTrackPtCut) {
+      if (**detLevelLeadingTrackPt < **responseSmearedUnsubLeadingTrackPt) {
         continue;
       }
     }
@@ -666,7 +666,7 @@ unfolding::ResponseResult create_closure_response_2D(
   std::map<std::string, TH2D*> hists,
   const unfolding::Settings2D settings,
   const unfolding::ClosureSettings closureSettings,
-  const unfolding::DoubleCountingCuts doubleCountingCuts,
+  const unfolding::DoubleCountingCut doubleCountingCut,
   const unfolding::InputFilenames inputFilenames,
   const unfolding::TreeNames treeNames,
   const unfolding::Prefixes prefixes,
@@ -724,7 +724,7 @@ unfolding::ResponseResult create_closure_response_2D(
                             (settings.groomingMethod + "_hybrid_det_level_matching_leading").c_str());
       matchingSubleading = std::make_unique<TTreeReaderValue<int16_t>>(mcReader,
                               (settings.groomingMethod + "_hybrid_det_level_matching_subleading").c_str());
-      // For the double counting cut.
+      // Potentially useful for the double counting cut.
       responseSmearedUnsubLeadingTrackPt = std::make_unique<TTreeReaderValue<float>>(mcReader, (prefixes.responseSmeared + "_leading_track_pt").c_str());
       detLevelLeadingTrackPt = std::make_unique<TTreeReaderValue<float>>(mcReader, (prefixes.responseDetLevel + "_leading_track_pt").c_str());
   }
@@ -750,10 +750,11 @@ unfolding::ResponseResult create_closure_response_2D(
     if (settings.disableUntaggedBin && *trueSubstructureVariable < settings.trueSplittingVariableBins.front()) {
       continue;
     }
-    // Double counting cut
-    // TODO: Fully implement double counting here. See the standard response
-    if (!settings.unfoldingForPP && !((**detLevelLeadingTrackPt >= **responseSmearedUnsubLeadingTrackPt) && (*trueJetPt > 10))) {
-      continue;
+    // Finish up possible double counting cut selections (other aspects of the cut are implemented earlier)
+    if (!settings.unfoldingForPP && doubleCountingCut.useDetLevelTrackPtCut) {
+      if (**detLevelLeadingTrackPt < **responseSmearedUnsubLeadingTrackPt) {
+        continue;
+      }
     }
 
     // Full efficiency hists (and response).
