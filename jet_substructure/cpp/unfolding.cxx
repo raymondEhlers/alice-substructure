@@ -197,24 +197,6 @@ double GetScaleFactor(TFile* f)
 }
 
 /**
- * Determine if we have a pure match.
- *
- * @param[in] matchingLeading Matching status for the leading subjet.
- * @param[in] matchingSubleading Matching status for the subleading subjet.
- * @param[in] responseSmearedSubstructureVariableValue Substructure variable value.
- * @param[in] smearedUntaggedBinValue Value that will be assigned to the untagged bin for checking if we have this
- * value.
- *
- * @returns True if we have a pure match.
- */
-inline bool isPureMatch(int matchingLeading, int matchingSubleading, double responseSmearedSubstructureVariableValue,
-            double smearedUntaggedBinValue)
-{
-  return (((std::abs(matchingLeading - 1) < 0.001) && (std::abs(matchingSubleading - 1) < 0.001)) ||
-      (std::abs(responseSmearedSubstructureVariableValue - smearedUntaggedBinValue) < 0.001));
-}
-
-/**
  * Find reweighting bin, ensuring that we take the last good bin if we're out of range.
  *
  * For example, if we're below the lowest bin, then we take the first bin. Effectively,
@@ -330,6 +312,24 @@ void Unfold2D(RooUnfoldResponse& response, const TH2D& h2true, TH2D& inputSpectr
  */
 namespace unfolding {
 
+/**
+ * Determine if we have a pure match.
+ *
+ * @param[in] matchingLeading Matching status for the leading subjet.
+ * @param[in] matchingSubleading Matching status for the subleading subjet.
+ * @param[in] responseSmearedSubstructureVariableValue Substructure variable value.
+ * @param[in] smearedUntaggedBinValue Value that will be assigned to the untagged bin for checking if we have this
+ * value.
+ *
+ * @returns True if we have a pure match.
+ */
+inline bool isPureMatch(int matchingLeading, int matchingSubleading,
+                        double responseSmearedSubstructureVariableValue, double smearedUntaggedBinValue)
+{
+  return (((std::abs(matchingLeading - 1) < 0.001) && (std::abs(matchingSubleading - 1) < 0.001)) ||
+      (std::abs(responseSmearedSubstructureVariableValue - smearedUntaggedBinValue) < 0.001));
+}
+
 struct ResponseResult {
   std::shared_ptr<RooUnfoldResponse> response;
   std::shared_ptr<RooUnfoldResponse> response_no_trunc;
@@ -349,6 +349,7 @@ struct Settings2D {
   const bool usePureMatches = false;
   const bool unfoldingForPP = false;
   TH2D* hReweightingResponse = nullptr;
+  const bool normalizeSubstructureVariableByJetPt = false;
 };
 
 struct DoubleCountingCut {
@@ -461,6 +462,10 @@ unfolding::ResponseResult create_response_2D(
         continue;
       }
     }
+    // Option to normalize by jet pt
+    if (settings.normalizeSubstructureVariableByJetPt) {
+      dataSubstructureVariableValue /= *dataJetPt;
+    }
     hists["h2_raw"]->Fill(dataSubstructureVariableValue, *dataJetPt);
   }
 
@@ -546,10 +551,17 @@ unfolding::ResponseResult create_response_2D(
     if (*trueJetPt < settings.trueJetPtBins.front()) {
       continue;
     }
-    if (*trueSubstructureVariable > settings.trueSplittingVariableBins.back()) {
+    // To preserve the option to normalize the true substructure variable, we need to store the value here
+    double trueSubstructureVariableValue = *trueSubstructureVariable;
+    if (settings.normalizeSubstructureVariableByJetPt) {
+      trueSubstructureVariableValue /= *trueJetPt;
+    }
+    // TODO: Does this work if I moved the untagged bin to the high side?
+    //       I think this needs a flag about where the untagged is located...
+    if (trueSubstructureVariableValue > settings.trueSplittingVariableBins.back()) {
       continue;
     }
-    if (settings.disableUntaggedBin && *trueSubstructureVariable < settings.trueSplittingVariableBins.front()) {
+    if (settings.disableUntaggedBin && trueSubstructureVariableValue < settings.trueSplittingVariableBins.front()) {
       continue;
     }
     // Finish up possible double counting cut selections (other aspects of the cut are implemented earlier)
@@ -564,15 +576,21 @@ unfolding::ResponseResult create_response_2D(
     if (settings.hReweightingResponse) {
         // NOTE: We intentionally look at the true values even though it's binned at detector level.
         // We need to handle the binning carefully, so we use a dedicated function.
-        int ktBin = findReweightingBin(*trueSubstructureVariable, settings.smearedSplittingVariableBins);
+        int ktBin = findReweightingBin(trueSubstructureVariableValue, settings.smearedSplittingVariableBins);
         int jetPtBin = findReweightingBin(*trueJetPt, settings.smearedJetPtBins);
         reweightFactor = settings.hReweightingResponse->GetBinContent(ktBin, jetPtBin);
     }
 
+    // To preserve the option to normalize the true substructure variable, we need to store the value here
+    double responseSmearedSubstructureVariableValue = *responseSmearedSubstructureVariable;
+    if (settings.normalizeSubstructureVariableByJetPt) {
+      responseSmearedSubstructureVariableValue /= *responseSmearedJetPt;
+    }
+
     // Full efficiency hists (and response).
-    hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * reweightFactor);
-    hists["h2_smeared_no_cuts"]->Fill(*responseSmearedSubstructureVariable, *responseSmearedJetPt, *scaleFactor * reweightFactor);
-    responsenotrunc->Fill(*responseSmearedSubstructureVariable, *responseSmearedJetPt, *trueSubstructureVariable, *trueJetPt,
+    hists["h2_full_eff"]->Fill(trueSubstructureVariableValue, *trueJetPt, *scaleFactor * reweightFactor);
+    hists["h2_smeared_no_cuts"]->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, *scaleFactor * reweightFactor);
+    responsenotrunc->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, trueSubstructureVariableValue, *trueJetPt,
                *scaleFactor * reweightFactor);
 
     // Now start making cuts on the response smeared level.
@@ -581,7 +599,6 @@ unfolding::ResponseResult create_response_2D(
       continue;
     }
     // Also cut on smeared substructure variable.
-    double responseSmearedSubstructureVariableValue = *responseSmearedSubstructureVariable;
     if (responseSmearedSubstructureVariableValue < untaggedBelowThisValue) {
       // Assign to the untagged bin.
       responseSmearedSubstructureVariableValue = settings.smearedUntaggedBinValue;
@@ -592,17 +609,20 @@ unfolding::ResponseResult create_response_2D(
       }
     }
     // Matching cuts: Requiring a pure match.
-    if (!settings.unfoldingForPP && settings.usePureMatches && !isPureMatch(**matchingLeading, **matchingSubleading, responseSmearedSubstructureVariableValue,
-                      settings.smearedUntaggedBinValue)) {
+    if (!settings.unfoldingForPP &&
+         settings.usePureMatches &&
+         !unfolding::isPureMatch(**matchingLeading, **matchingSubleading,
+                                 responseSmearedSubstructureVariableValue, settings.smearedUntaggedBinValue)
+        ) {
       continue;
     }
 
     // At this point, we've passed all of our cuts, so we store the result.
     hists["h2_smeared"]->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, *scaleFactor * reweightFactor);
-    hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * reweightFactor);
-    hists["h2_substructure_variable"]->Fill(responseSmearedSubstructureVariableValue, *trueSubstructureVariable,
+    hists["h2_true"]->Fill(trueSubstructureVariableValue, *trueJetPt, *scaleFactor * reweightFactor);
+    hists["h2_substructure_variable"]->Fill(responseSmearedSubstructureVariableValue, trueSubstructureVariableValue,
                         *scaleFactor * reweightFactor);
-    response->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, *trueSubstructureVariable, *trueJetPt,
+    response->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, trueSubstructureVariableValue, *trueJetPt,
             *scaleFactor * reweightFactor);
   }
 
@@ -699,10 +719,16 @@ unfolding::ResponseResult create_closure_response_2D(
     if (*trueJetPt > settings.trueJetPtBins.back()) {
       continue;
     }
-    if (*trueSubstructureVariable > settings.trueSplittingVariableBins.back()) {
+    // To preserve the option to normalize the true substructure variable, we need to store the value here
+    double trueSubstructureVariableValue = *trueSubstructureVariable;
+    if (settings.normalizeSubstructureVariableByJetPt) {
+      trueSubstructureVariableValue /= *trueJetPt;
+    }
+    // TODO: Does this work properly?
+    if (trueSubstructureVariableValue > settings.trueSplittingVariableBins.back()) {
       continue;
     }
-    if (settings.disableUntaggedBin && *trueSubstructureVariable < settings.trueSplittingVariableBins.front()) {
+    if (settings.disableUntaggedBin && trueSubstructureVariableValue < settings.trueSplittingVariableBins.front()) {
       continue;
     }
     // Finish up possible double counting cut selections (other aspects of the cut are implemented earlier)
@@ -712,10 +738,16 @@ unfolding::ResponseResult create_closure_response_2D(
       }
     }
 
+    // To preserve the option to normalize the true substructure variable, we need to store the value here
+    double responseSmearedSubstructureVariableValue = *responseSmearedSubstructureVariable;
+    if (settings.normalizeSubstructureVariableByJetPt) {
+      responseSmearedSubstructureVariableValue /= *responseSmearedJetPt;
+    }
+
     // Full efficiency hists (and response).
-    hists["h2_full_eff"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor);
-    hists["h2_smeared_no_cuts"]->Fill(*responseSmearedSubstructureVariable, *responseSmearedJetPt, *scaleFactor);
-    responsenotrunc->Fill(*responseSmearedSubstructureVariable, *responseSmearedJetPt, *trueSubstructureVariable, *trueJetPt,
+    hists["h2_full_eff"]->Fill(trueSubstructureVariableValue, *trueJetPt, *scaleFactor);
+    hists["h2_smeared_no_cuts"]->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, *scaleFactor);
+    responsenotrunc->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, trueSubstructureVariableValue, *trueJetPt,
                *scaleFactor);
 
     // Now start making cuts on the hybrid level.
@@ -724,7 +756,6 @@ unfolding::ResponseResult create_closure_response_2D(
       continue;
     }
     // Also cut on hybrid substructure variable.
-    double responseSmearedSubstructureVariableValue = *responseSmearedSubstructureVariable;
     if (responseSmearedSubstructureVariableValue < untaggedBelowThisValue) {
       // Assign to the untagged bin.
       responseSmearedSubstructureVariableValue = settings.smearedUntaggedBinValue;
@@ -738,7 +769,7 @@ unfolding::ResponseResult create_closure_response_2D(
     // Potentially Reweight
     // NOTE: We intentionally look at the true values even though it's binned at detector level.
     // We need to handle the binning carefully, so we use a dedicated function.
-    int ktBin = findReweightingBin(*trueSubstructureVariable, settings.smearedSplittingVariableBins);
+    int ktBin = findReweightingBin(trueSubstructureVariableValue, settings.smearedSplittingVariableBins);
     int jetPtBin = findReweightingBin(*trueJetPt, settings.smearedJetPtBins);
     // NOTE: In the case of the split MC, both reweight factors will automatically be 1.
     //       However, we set the factor to 1 here just to be safe.
@@ -753,11 +784,11 @@ unfolding::ResponseResult create_closure_response_2D(
        closureSettings.variation == unfolding::ClosureVariation_t::reweightPseudoData ? reweightFactor : 1;
       hists["h2_pseudo_data"]->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt,
                      *scaleFactor * pseudoReweightFactor);
-      hists["h2_pseudo_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * pseudoReweightFactor);
+      hists["h2_pseudo_true"]->Fill(trueSubstructureVariableValue, *trueJetPt, *scaleFactor * pseudoReweightFactor);
     }
 
     // Matching cuts: Requiring a pure match.
-    if (!settings.unfoldingForPP && settings.usePureMatches && !isPureMatch(**matchingLeading, **matchingSubleading, responseSmearedSubstructureVariableValue,
+    if (!settings.unfoldingForPP && settings.usePureMatches && !unfolding::isPureMatch(**matchingLeading, **matchingSubleading, responseSmearedSubstructureVariableValue,
                       settings.smearedUntaggedBinValue)) {
       continue;
     }
@@ -771,14 +802,14 @@ unfolding::ResponseResult create_closure_response_2D(
     // Note that they will always get the full stats and correspond to the response, as is the convention for the
     // others.
     hists["h2_smeared"]->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, *scaleFactor * responseReweightFactor);
-    hists["h2_true"]->Fill(*trueSubstructureVariable, *trueJetPt, *scaleFactor * responseReweightFactor);
-    hists["h2_substructure_variable"]->Fill(responseSmearedSubstructureVariableValue, *trueSubstructureVariable,
+    hists["h2_true"]->Fill(trueSubstructureVariableValue, *trueJetPt, *scaleFactor * responseReweightFactor);
+    hists["h2_substructure_variable"]->Fill(responseSmearedSubstructureVariableValue, trueSubstructureVariableValue,
                         *scaleFactor * responseReweightFactor);
 
     // We've filled the pseudo data above (before the pure matches requirement), but we still
     // need to fill the response when appropriate.
     if (randomValue < closureSettings.fractionForResponse) {
-      response->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, *trueSubstructureVariable, *trueJetPt,
+      response->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, trueSubstructureVariableValue, *trueJetPt,
               *scaleFactor * responseReweightFactor);
     }
   }
