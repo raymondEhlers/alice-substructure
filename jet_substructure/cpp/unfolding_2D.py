@@ -247,9 +247,9 @@ def _setup_unfolding() -> None:
     # This just assumes that this file is in the same directory as the unfolding.cxx file, which should
     # usually be a reasonable assumption.
     unfolding_cxx = Path(__file__).resolve().parent / "unfolding.cxx"
-    # We only want to load it if it hasn't been already, so we use the `create_response_2D` function
+    # We only want to load it if it hasn't been already, so we use the `unfolding` namespace
     # as a proxy for this. Loading it twice appears to cause segfaults in some cases.
-    if not hasattr(ROOT, "create_response_2D"):
+    if not hasattr(ROOT, "unfolding"):
         # ROOT.gInterpreter.ProcessLine(f"""#include "{str(unfolding_cxx)}" """)
         ROOT.gInterpreter.ProcessLine(f""".L {str(unfolding_cxx)} """)
 
@@ -617,7 +617,7 @@ def run_unfolding(
 
     # Create the responses. We assume some conventions about column names.
     # They should generally be reasonable, but may require tweaks from time to time.
-    responses = ROOT.create_response_2D(
+    responses = ROOT.unfolding.create_response_2D(
         hists_map_for_root,
         _root_unfolding_settings,
         _root_double_counting_cut,
@@ -798,7 +798,7 @@ def run_unfolding_closure_reweighting(
 
     # Create the responses. We assume some conventions about column names.
     # They should generally be reasonable, but may require tweaks from time to time.
-    responses = ROOT.create_closure_response_2D(
+    responses = ROOT.unfolding.create_closure_response_2D(
         hists_map_for_root,
         _root_unfolding_settings,
         _root_closure_settings,
