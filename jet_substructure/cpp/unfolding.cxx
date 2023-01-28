@@ -28,6 +28,8 @@
 
 namespace unfolding {
 
+constexpr double DISABLE_UNTAGGED_BIN_VALUE = -1e5;
+
 /**
  * Determine if we have a pure match.
  *
@@ -174,7 +176,7 @@ ResponseResult create_response_2D(
       // Select a very large negative value. We'll never have such a large negative value, so
       // practically this means that we'll never mark a value as untagged. This means that everything
       // will have to be encapsulated in the standard binning or it will be cut.
-      untaggedBelowThisValue = -1e5;
+      untaggedBelowThisValue = DISABLE_UNTAGGED_BIN_VALUE;
   }
 
   // First, we handle the data. Setup the Reader, the columns, and store the data in the appropriate hists.
@@ -312,6 +314,22 @@ ResponseResult create_response_2D(
       trueSubstructureVariableValue /= *trueJetPt;
     }
     // Ensure that we are in the right substructure variable range.
+    // NOTE: For the enabled vs disabled untagged case, we have:
+    //       disabled: We want to require that the min value is within the bin range
+    //       enabled: We want to require that the min value is within the bin range, but
+    //                the bins include the untagged on the lower side (it won't move, unlike
+    //                smeared, which is why the true is handled more simply). This cut will
+    //                require that the value is within the lower range of the untagged bin,
+    //                which means that it will trivially be within the actual unfolding range
+    //                (and thus, this cut won't necessarily address that requirement). To use
+    //                this cut to have a gap between the untagged bin and the true bin range,
+    //                we would have to change our binning convention. (We could also try to increase
+    //                the upper range of the untagged to match whatever min true value we would want,
+    //                but then we would still have to cut on that front + 1 value of the binning,
+    //                which we don't currently do. As of 27 Jan 2023, I don't want to add the complexity
+    //                for something that we don't use - it would require changing a similar but slightly
+    //                different condition for the untagged bin being enabled vs disabled - so we skip
+    //                it for now).
     if (trueSubstructureVariableValue < settings.trueSplittingVariableBins.front() ||
         trueSubstructureVariableValue > settings.trueSplittingVariableBins.back()) {
       continue;
@@ -366,6 +384,8 @@ ResponseResult create_response_2D(
         responseSmearedSubstructureVariableValue /= *responseSmearedJetPt;
       }*/
     } else {
+      // NOTE: These min and max values take into account the location of the untagged, so they're
+      //       filtering the "main" variable range (ie. not including the untagged)
       if (responseSmearedSubstructureVariableValue < settings.minSmearedSplittingVariable ||
         responseSmearedSubstructureVariableValue > settings.maxSmearedSplittingVariable) {
         continue;
@@ -374,11 +394,11 @@ ResponseResult create_response_2D(
     // Matching cuts: Requiring a pure match.
     if (!settings.unfoldingForPP &&
          settings.usePureMatches &&
-         !isPureMatch(**matchingLeading, **matchingSubleading,
-                      responseSmearedSubstructureVariableValue,
-                      settings.smearedUntaggedBinValue)
-                      // TODO: As of 27 Jan, we try to skip this. If it doesn't work, return it, but then pure matches needs some help!
-                      //responseSmearedSubstructureVariableValue < 0 ? settings.smearedUntaggedBinValue : settings.smearedUntaggedBinValue / *responseSmearedJetPt)
+        !isPureMatch(**matchingLeading, **matchingSubleading,
+                     responseSmearedSubstructureVariableValue,
+                     settings.smearedUntaggedBinValue)
+                     // TODO: As of 27 Jan, we try to skip this. If it doesn't work, return it, but then pure matches needs some help!
+                     //responseSmearedSubstructureVariableValue < 0 ? settings.smearedUntaggedBinValue : settings.smearedUntaggedBinValue / *responseSmearedJetPt)
         ) {
       continue;
     }
@@ -423,7 +443,7 @@ ResponseResult create_closure_response_2D(
       // Select a very large negative value. We'll never have such a large negative value, so
       // practically this means that we'll never mark a value as untagged. This means that everything
       // will have to be encapsulated in the standard binning or it will be cut.
-      untaggedBelowThisValue = -1e5;
+      untaggedBelowThisValue = DISABLE_UNTAGGED_BIN_VALUE;
   }
 
   // We don't have to deal with data for this closure test. It's all based around the response data.
@@ -481,30 +501,38 @@ ResponseResult create_closure_response_2D(
       // Update the tree number so we hold onto the scale factor until the next time we need to update.
       treeNumber = responseChain.GetTreeNumber();
     }
-    // Ensure that we are in the right true pt and substructure variable range.
-    if (*trueJetPt > settings.trueJetPtBins.back()) {
+    // Ensure that we are in the right true pt (and substructure variable) range.
+    if (*trueJetPt < settings.trueJetPtBins.front() ||
+        *trueJetPt > settings.trueJetPtBins.back()) {
       continue;
     }
     // To preserve the option to normalize the true substructure variable, we need to store the value here
     double trueSubstructureVariableValue = *trueSubstructureVariable;
+    // Normalize by jet pt if requested.
+    // NOTE: It's okay to normalize here, even if value is the untagged value because it's less than 0 and
+    //       we don't move it around. Thus, dividing by pt will always keep the same sign, and therefore
+    //       it will always go into the right position.
     if (settings.normalizeSubstructureVariableByJetPt) {
       trueSubstructureVariableValue /= *trueJetPt;
     }
-    // TODO: Does this work properly? Match to the other function!
-    if (trueSubstructureVariableValue > settings.trueSplittingVariableBins.back()) {
-      continue;
-    }
-    if (settings.disableUntaggedBin && trueSubstructureVariableValue < settings.trueSplittingVariableBins.front()) {
+    // Ensure that we are in the right substructure variable range.
+    // NOTE: See the long note around this cut in the standard create_response_2D function,
+    //       which explains why this is the right cut given our binning conventions. It's
+    //       trickier than would be expected from the first glance.
+    if (trueSubstructureVariableValue < settings.trueSplittingVariableBins.front() ||
+        trueSubstructureVariableValue > settings.trueSplittingVariableBins.back()) {
       continue;
     }
     // Finish up possible double counting cut selections (other aspects of the cut are implemented earlier)
     if (!settings.unfoldingForPP && doubleCountingCut.useDetLevelTrackPtCut) {
+      // NOTE: We use less than because if the leading track pt is the same in both jets (which is most likely
+      //       what we would want), then the pt will be equal.
       if (**detLevelLeadingTrackPt < **responseSmearedUnsubLeadingTrackPt) {
         continue;
       }
     }
 
-    // To preserve the option to normalize the true substructure variable, we need to store the value here
+    // To preserve the option to normalize the smeared substructure variable, we need to store the value here
     double responseSmearedSubstructureVariableValue = *responseSmearedSubstructureVariable;
     if (settings.normalizeSubstructureVariableByJetPt) {
       responseSmearedSubstructureVariableValue /= *responseSmearedJetPt;
@@ -516,16 +544,27 @@ ResponseResult create_closure_response_2D(
     responsenotrunc->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt, trueSubstructureVariableValue, *trueJetPt,
                *scaleFactor);
 
-    // Now start making cuts on the hybrid level.
+    // Now start making cuts on the response smeared level.
     // Jet pt
-    if (*responseSmearedJetPt < settings.smearedJetPtBins.front() || *responseSmearedJetPt > settings.smearedJetPtBins.back()) {
+    if (*responseSmearedJetPt < settings.smearedJetPtBins.front() ||
+        *responseSmearedJetPt > settings.smearedJetPtBins.back()) {
       continue;
     }
     // Also cut on hybrid substructure variable.
     if (responseSmearedSubstructureVariableValue < untaggedBelowThisValue) {
       // Assign to the untagged bin.
       responseSmearedSubstructureVariableValue = settings.smearedUntaggedBinValue;
+      // If we have the high bin (for the systematic), then we need to normalize in
+      // order to match the binning (which will shift depending on whether it is normalized or not).
+      // NOTE: This is not necessarily for the lower range, and in fact is preferable
+      //       to not touch it to make it easier to detect for pure matches.
+      // TODO: As of 27 Jan, we try to skip this. If it doesn't work, return it, but then pure matches needs some help!
+      /*if (responseSmearedSubstructureVariableValue > 0) {
+        responseSmearedSubstructureVariableValue /= *responseSmearedJetPt;
+      }*/
     } else {
+      // NOTE: These min and max values take into account the location of the untagged, so they're
+      //       filtering the "main" variable range (ie. not including the untagged)
       if (responseSmearedSubstructureVariableValue < settings.minSmearedSplittingVariable ||
         responseSmearedSubstructureVariableValue > settings.maxSmearedSplittingVariable) {
         continue;
@@ -549,13 +588,20 @@ ResponseResult create_closure_response_2D(
       double pseudoReweightFactor =
        closureSettings.variation == ClosureVariation_t::reweightPseudoData ? reweightFactor : 1;
       hists["h2_pseudo_data"]->Fill(responseSmearedSubstructureVariableValue, *responseSmearedJetPt,
-                     *scaleFactor * pseudoReweightFactor);
-      hists["h2_pseudo_true"]->Fill(trueSubstructureVariableValue, *trueJetPt, *scaleFactor * pseudoReweightFactor);
+                                    *scaleFactor * pseudoReweightFactor);
+      hists["h2_pseudo_true"]->Fill(trueSubstructureVariableValue, *trueJetPt,
+                                    *scaleFactor * pseudoReweightFactor);
     }
 
     // Matching cuts: Requiring a pure match.
-    if (!settings.unfoldingForPP && settings.usePureMatches && !isPureMatch(**matchingLeading, **matchingSubleading, responseSmearedSubstructureVariableValue,
-                      settings.smearedUntaggedBinValue)) {
+    if (!settings.unfoldingForPP &&
+         settings.usePureMatches &&
+        !isPureMatch(**matchingLeading, **matchingSubleading,
+                     responseSmearedSubstructureVariableValue,
+                     settings.smearedUntaggedBinValue)
+                     // TODO: As of 27 Jan, we try to skip this. If it doesn't work, return it, but then pure matches needs some help!
+                     //responseSmearedSubstructureVariableValue < 0 ? settings.smearedUntaggedBinValue : settings.smearedUntaggedBinValue / *responseSmearedJetPt)
+      ) {
       continue;
     }
 
