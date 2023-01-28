@@ -211,10 +211,14 @@ ResponseResult create_response_2D(
       // order to match the binning (which will shift depending on whether it is normalized or not).
       // NOTE: This is not necessarily for the lower range, and in fact is preferable
       //       to not touch it to make it easier to detect for pure matches.
-      // TODO: As of 27 Jan, we try to skip this. If it doesn't work, return it, but then pure matches needs some help!
+      // TODO: As of 27 Jan, we try to skip this and always normalize if requested.
+      //       If it doesn't work, return it, but then pure matches needs some help!
       /*if (dataSubstructureVariableValue > 0) {
         dataSubstructureVariableValue /= *dataJetPt;
       }*/
+      if (settings.normalizeSubstructureVariableByJetPt) {
+        dataSubstructureVariableValue /= *dataJetPt;
+      }
     } else {
       if (dataSubstructureVariableValue < settings.minSmearedSplittingVariable ||
         dataSubstructureVariableValue > settings.maxSmearedSplittingVariable) {
@@ -379,10 +383,14 @@ ResponseResult create_response_2D(
       // order to match the binning (which will shift depending on whether it is normalized or not).
       // NOTE: This is not necessarily for the lower range, and in fact is preferable
       //       to not touch it to make it easier to detect for pure matches.
-      // TODO: As of 27 Jan, we try to skip this. If it doesn't work, return it, but then pure matches needs some help!
+      // TODO: As of 27 Jan, we try to skip this and always normalize if requested.
+      //       If it doesn't work, return it, but then pure matches needs some help!
       /*if (responseSmearedSubstructureVariableValue > 0) {
         responseSmearedSubstructureVariableValue /= *responseSmearedJetPt;
       }*/
+      if (settings.normalizeSubstructureVariableByJetPt) {
+        responseSmearedSubstructureVariableValue /= *responseSmearedJetPt;
+      }
     } else {
       // NOTE: These min and max values take into account the location of the untagged, so they're
       //       filtering the "main" variable range (ie. not including the untagged)
@@ -396,7 +404,7 @@ ResponseResult create_response_2D(
          settings.usePureMatches &&
         !isPureMatch(**matchingLeading, **matchingSubleading,
                      responseSmearedSubstructureVariableValue,
-                     settings.smearedUntaggedBinValue)
+                     settings.smearedUntaggedBinValue / *responseSmearedJetPt)
                      // TODO: As of 27 Jan, we try to skip this. If it doesn't work, return it, but then pure matches needs some help!
                      //responseSmearedSubstructureVariableValue < 0 ? settings.smearedUntaggedBinValue : settings.smearedUntaggedBinValue / *responseSmearedJetPt)
         ) {
@@ -558,10 +566,14 @@ ResponseResult create_closure_response_2D(
       // order to match the binning (which will shift depending on whether it is normalized or not).
       // NOTE: This is not necessarily for the lower range, and in fact is preferable
       //       to not touch it to make it easier to detect for pure matches.
-      // TODO: As of 27 Jan, we try to skip this. If it doesn't work, return it, but then pure matches needs some help!
+      // TODO: As of 27 Jan, we try to skip this and always normalize if requested.
+      //       If it doesn't work, return it, but then pure matches needs some help!
       /*if (responseSmearedSubstructureVariableValue > 0) {
         responseSmearedSubstructureVariableValue /= *responseSmearedJetPt;
       }*/
+      if (settings.normalizeSubstructureVariableByJetPt) {
+        responseSmearedSubstructureVariableValue /= *responseSmearedJetPt;
+      }
     } else {
       // NOTE: These min and max values take into account the location of the untagged, so they're
       //       filtering the "main" variable range (ie. not including the untagged)
@@ -598,7 +610,7 @@ ResponseResult create_closure_response_2D(
          settings.usePureMatches &&
         !isPureMatch(**matchingLeading, **matchingSubleading,
                      responseSmearedSubstructureVariableValue,
-                     settings.smearedUntaggedBinValue)
+                     settings.smearedUntaggedBinValue / *responseSmearedJetPt)
                      // TODO: As of 27 Jan, we try to skip this. If it doesn't work, return it, but then pure matches needs some help!
                      //responseSmearedSubstructureVariableValue < 0 ? settings.smearedUntaggedBinValue : settings.smearedUntaggedBinValue / *responseSmearedJetPt)
       ) {
