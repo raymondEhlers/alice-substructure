@@ -33,7 +33,7 @@ def _np_array_converter(value: Any, dtype: npt.DTypeLike = np.float64) -> npt.ND
     return np.array(value, dtype=dtype)
 
 
-@attr.s
+@attr.define
 class ParameterSettings2D:
     """Parameter settings
 
@@ -42,10 +42,11 @@ class ParameterSettings2D:
         smeared_bins: Smeared bins.
     """
 
-    true_bins: npt.NDArray[np.float64]= attr.ib(converter=_np_array_converter)
-    smeared_bins: npt.NDArray[np.float64] = attr.ib(converter=_np_array_converter)
+    true_bins: npt.NDArray[np.float64]= attr.field(converter=_np_array_converter)
+    smeared_bins: npt.NDArray[np.float64] = attr.field(converter=_np_array_converter)
 
 
+@attr.define
 class JetPtSettings2D(ParameterSettings2D):
     """Jet pt parameter settings in 2D.
 
@@ -77,6 +78,7 @@ class JetPtSettings2D(ParameterSettings2D):
             smeared_bins: Smeared pt bins
             true_min_pt: Optional min true pt cut to apply to the true_pt_bins. Default: None.
         """
+        # NOTE: This is for pt, so no accounting for untagged is needed (obvious, but I've gotten confused at times!)
         if true_min_pt is not None:
             m = true_bins > true_min_pt
             true_bins = true_bins[m]
@@ -90,7 +92,7 @@ class JetPtSettings2D(ParameterSettings2D):
         )
 
 
-@attr.s
+@attr.define
 class SubstructureVariableSettings2D(ParameterSettings2D):
     """Settings specific to the substructure variable.
 
@@ -103,10 +105,10 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
         untagged_bin: Untagged bin min and max.
     """
 
-    name: str = attr.ib()
-    variable_name: str = attr.ib()
-    smeared_range: helpers.RangeSelector = attr.ib()
-    untagged_bin: helpers.RangeSelector = attr.ib()
+    name: str
+    variable_name: str
+    smeared_range: helpers.RangeSelector
+    untagged_bin: helpers.RangeSelector
 
     @property
     def untagged_value(self) -> float:
