@@ -17,29 +17,29 @@ nominal_binning:
     default:
         jet_pt:
             "true": [0, 20, 40, 60, 80, 100]
-            smeared: [30, 40, 60, 80, 100]
+            "smeared": [30, 40, 60, 80, 100]
         kt:
             "true": [1, 1.5, 2, 3, 4, 5, 6]
-            smeared: [1, 2, 3, 4, 5, 6]
+            "smeared": [1, 2, 3, 4, 5, 6]
             jet_pt:
                 # NOTE: 3x default
                 "true": [  0.,  60., 120., 180., 240., 300.]
-                smeared: [ 90., 120., 180., 240., 300.]
+                "smeared": [ 90., 120., 180., 240., 300.]
             var_over_pt:
                 "true": [...]
-                smeared: [...]
+                "smeared": [...]
         delta_R:
             # NOTE: -1 x default (just for convenience)
             "true": [-0.5, -1, -1.5, -2, -3, -4, -5, -6]
-            smeared: [-0.25, -1, -2, -3, -4, -5, -6]
+            "smeared": [-0.25, -1, -2, -3, -4, -5, -6]
     soft_drop_z_cut_02:
         # NOTE: 2x default!
         kt:
             "true": [ 2.,  3.,  4.,  6.,  8., 10., 12.]
-            smeared: [ 2.,  4.,  6.,  8., 10., 12.]
+            "smeared": [ 2.,  4.,  6.,  8., 10., 12.]
             jet_pt:
                 "true": [  0.,  40.,  80., 120., 160., 200.]
-                smeared: [ 60.,  80., 120., 160., 200.]
+                "smeared": [ 60.,  80., 120., 160., 200.]
 settings:
     some_new_settings:
         binning:
@@ -47,25 +47,25 @@ settings:
                 kt:
                     # NOTE: 4x default
                     "true": [ 4.,  6.,  8., 12., 16., 20., 24.]
-                    smeared: [ 4.,  8., 12., 16., 20., 24.]
+                    "smeared": [ 4.,  8., 12., 16., 20., 24.]
                     jet_pt:
                         "true": [  0.,  80., 160., 240., 320., 400.]
-                        smeared: [120., 160., 240., 320., 400.]
+                        "smeared": [120., 160., 240., 320., 400.]
                 delta_R:
                     NOTE: -2x default
                     "true": [ -1.0, -2.,  -3.,  -4.,  -6.,  -8., -10., -12.]
-                    smeared: [ -0.5, -2.,  -4.,  -6.,  -8., -10., -12.]
+                    "smeared": [ -0.5, -2.,  -4.,  -6.,  -8., -10., -12.]
                     jet_pt:
                         "true": [  -0.,  -40.,  -80., -120., -160., -200.]
-                        smeared: [ -60.,  -80., -120., -160., -200.]
+                        "smeared": [ -60.,  -80., -120., -160., -200.]
             soft_drop_z_cut_02:
                 # NOTE: 5x default
                 kt:
                     "true": [ 5. ,  7.5, 10. , 15. , 20. , 25. , 30. ]
-                    smeared: [ 5., 10., 15., 20., 25., 30.]
+                    "smeared": [ 5., 10., 15., 20., 25., 30.]
                     jet_pt:
                         "true": [  0., 100., 200., 300., 400., 500.]
-                        smeared: [150., 200., 300., 400., 500.]
+                        "smeared": [150., 200., 300., 400., 500.]
     new_settings_without_specialized_binning:
         value: "some"
 """
