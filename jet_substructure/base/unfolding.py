@@ -5,14 +5,19 @@
 
 from __future__ import annotations
 
+import functools
+import logging
 from pathlib import Path
-from typing import Any, Mapping, Type
+from typing import Any, List, Literal, Mapping, Sequence, Type
 
 import attr
 import numpy as np
 import numpy.typing as npt
 
 from jet_substructure.base import helpers
+
+
+logger = logging.getLogger(__name__)
 
 
 def _np_array_converter(value: Any, dtype: npt.DTypeLike = np.float64) -> npt.NDArray[np.float64]:
@@ -96,7 +101,7 @@ class JetPtSettings2D(ParameterSettings2D):
 class SubstructureVariableSettings2D(ParameterSettings2D):
     """Settings specific to the substructure variable.
 
-    Supports z, Rg, and kt.
+    Supports zg, Rg, and kt.
 
     Args:
         name: Name of the substructure variable.
@@ -235,18 +240,58 @@ def _encode_binning_in_str(array: npt.NDArray[np.generic]) -> str:
 def hist_name_for_ratio_2D(
     grooming_method: str,
     prefix_for_ratio: str,
+    #substructure_variable_name: str,
     smeared_substructure_variable_bins: npt.NDArray[np.generic],
     smeared_jet_pt_bins: npt.NDArray[np.generic],
     double_counting_cut_name: str,
 ) -> str:
+    # NOTE: This substructure binning implicitly encode the kt/pt because the binning will be dramatically different!
+    #return f"{grooming_method}_{prefix_for_ratio}_{substructure_variable_name}_jet_pt_binning_smeared_kt_{_encode_binning_in_str(smeared_substructure_variable_bins)}_smeared_jet_pt_{_encode_binning_in_str(smeared_jet_pt_bins)}__double_counting_cut_{double_counting_cut_name}"
     return f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt_binning_smeared_kt_{_encode_binning_in_str(smeared_substructure_variable_bins)}_smeared_jet_pt_{_encode_binning_in_str(smeared_jet_pt_bins)}__double_counting_cut_{double_counting_cut_name}"
+
+
+BinningType = Literal["true", "smeared"]
+
+
+def _getitem_for_dict_with_default(d: Mapping[str, Any], key: str) -> Any:
+    return d.get(key, {})
+
+
+def _get_possible_binning_from_settings(
+    settings: Mapping[str, Any],
+    parameter_path: Sequence[str],
+    binning_type: BinningType
+) -> List[float] | None:
+    # Setup
+    binning = None
+    parameter_path = list(parameter_path)
+
+    while len(parameter_path) > 1:
+        logger.info(f"Checking {parameter_path}")
+        possible_binning = functools.reduce(_getitem_for_dict_with_default, parameter_path, settings)
+        binning = possible_binning.get(binning_type, [])
+        if binning:
+            break
+        else:
+            # We need to remove the second to last element because the last element identifies the
+            # field that we actually want to retrieve!
+            # NOTE: We can't use pop because we want to preserve the last element.
+            #       Instead, we assign the previous two elements to the last element,
+            #       thereby deleting the second to last element. It's the same as directly
+            #       deleting the second to last element, but somehow I find it clearer conceptually.
+            parameter_path[-2:] = parameter_path[-1:]
+            #del parameter_path[-2]
+
+    return binning
 
 
 def get_binning(
     unfolding_settings: Mapping[str, Any],
     base_unfolding_config: Mapping[str, Any],
-    name: str,
+    binning_type: BinningType,
     grooming_method: str,
+    substructure_variable_to_analyze: str,
+    variable_to_retrieve: str | None = None,
 ) -> npt.NDArray[np.float64]:
     """Get unfolding binning for a particular axis name.
 
@@ -255,24 +300,42 @@ def get_binning(
     Args:
         unfolding_settings: Unfolding settings for a particular case.
         base_unfolding_config: Base unfolding config for the system.
-        name: Name of the axis to retrieve such as "smeared_jet_pt", etc.
+        binning_type: Type of binning to retrieve - either "smeared" or "true".
         grooming_method: Name of the grooming method to allow for specialization
-            of the binning based on the grooming method.
+            of the binning based on the grooming method (if specified)
+        substructure_variable_to_analyze: Name of the substructure variable to specialize with.
+            This will implicitly be the field we attempt to retrieve unless the
+            `variable_to_retrieve` is specified
+        variable_to_retrieve: Particular name of variable to retrieve as stored inside
+            of the substructure_variable
+            Another option is `jet_pt` or `var_over_pt`.
     Returns:
         Binning for that axis.
     """
+    # Validation
+    parameter_path = [grooming_method, substructure_variable_to_analyze]
+    # If we need to retrieve a particular parameter beyond the substructure variable (eg. jet_pt)
+    if variable_to_retrieve:
+        parameter_path.append(variable_to_retrieve)
+    parameter_path_for_default = list(parameter_path)
+    parameter_path_for_default[0] = "default"
 
     binning = None
     specialized_binning = unfolding_settings.get("binning", {})
     if specialized_binning:
-        binning = specialized_binning.get(grooming_method, {}).get(name, [])
+        binning = _get_possible_binning_from_settings(settings=specialized_binning, parameter_path=parameter_path, binning_type=binning_type)
         if not binning:
-            binning = specialized_binning.get("default", {}).get(name, [])
+            # Try again, but this time with default binning...
+            binning = _get_possible_binning_from_settings(settings=specialized_binning, parameter_path=parameter_path_for_default, binning_type=binning_type)
     # If not available in the specialized unfolding config, then grab it from the base config.
     if not binning:
         nominal_binning = base_unfolding_config["nominal_binning"]
-        binning = nominal_binning.get(grooming_method, {}).get(name, [])
+        binning = _get_possible_binning_from_settings(settings=nominal_binning, parameter_path=parameter_path, binning_type=binning_type)
         if not binning:
-            binning = nominal_binning["default"][name]
+            binning = _get_possible_binning_from_settings(settings=nominal_binning, parameter_path=parameter_path_for_default, binning_type=binning_type)
+
+    # Final validation. We must find binning somewhere!
+    if not binning:
+        raise ValueError(f"Unable to find binning for parameter path: {parameter_path}, binning_type: {binning_type}")
 
     return np.array(binning, dtype=np.float64)
