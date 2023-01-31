@@ -9,7 +9,7 @@ import pytest  # noqa: F401
 from jet_substructure.analysis import unfolding_base
 
 
-def test_two_value_asymmetric_error_calcuation() -> None:
+def test_two_value_asymmetric_error_calculation() -> None:
     one = np.array([1.0, -1.0, 0.1, -0.1])
     two = np.array([0.5, -1.5, -0.5, 0.5])
 
