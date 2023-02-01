@@ -114,6 +114,7 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
     variable_name: str
     smeared_range: helpers.RangeSelector
     untagged_bin: helpers.RangeSelector
+    normalize_by_jet_pt: bool = attr.field(default=False)
 
     @property
     def untagged_value(self) -> float:
@@ -140,6 +141,7 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
         name: str,
         variable_name: str,
         untagged_bin_below_range: bool = True,
+        normalize_by_jet_pt: bool = False,
     ) -> SubstructureVariableSettings2D:
         # Determine the appropriate range class.
         # Either "Kt", "Rg", or "Zg"
@@ -149,6 +151,10 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
         range_class_name = range_class_name.capitalize()
         range_class_name += "Range"
         range_class: Type[helpers.RangeSelector] = getattr(helpers, range_class_name)
+
+        # Modify name when needed
+        if normalize_by_jet_pt:
+            name = f"{name}_over_pt"
 
         # Determine the binning
         if untagged_bin_below_range:
@@ -175,6 +181,7 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
             variable_name=variable_name,
             smeared_range=smeared_range,
             untagged_bin=untagged_bin,
+            normalize_by_jet_pt=normalize_by_jet_pt,
         )
 
 
@@ -240,14 +247,14 @@ def _encode_binning_in_str(array: npt.NDArray[np.generic]) -> str:
 def hist_name_for_ratio_2D(
     grooming_method: str,
     prefix_for_ratio: str,
-    #substructure_variable_name: str,
+    substructure_variable_name: str,
     smeared_substructure_variable_bins: npt.NDArray[np.generic],
     smeared_jet_pt_bins: npt.NDArray[np.generic],
     double_counting_cut_name: str,
 ) -> str:
-    # NOTE: This substructure binning implicitly encode the kt/pt because the binning will be dramatically different!
-    #return f"{grooming_method}_{prefix_for_ratio}_{substructure_variable_name}_jet_pt_binning_smeared_kt_{_encode_binning_in_str(smeared_substructure_variable_bins)}_smeared_jet_pt_{_encode_binning_in_str(smeared_jet_pt_bins)}__double_counting_cut_{double_counting_cut_name}"
-    return f"{grooming_method}_{prefix_for_ratio}_kt_jet_pt_binning_smeared_kt_{_encode_binning_in_str(smeared_substructure_variable_bins)}_smeared_jet_pt_{_encode_binning_in_str(smeared_jet_pt_bins)}__double_counting_cut_{double_counting_cut_name}"
+    # NOTE: This substructure binning implicitly encodes the kt/pt as a separate name because
+    #       the binning will be different!
+    return f"{grooming_method}_{prefix_for_ratio}_{substructure_variable_name}_jet_pt_binning_smeared_kt_{_encode_binning_in_str(smeared_substructure_variable_bins)}_smeared_jet_pt_{_encode_binning_in_str(smeared_jet_pt_bins)}__double_counting_cut_{double_counting_cut_name}"
 
 
 BinningType = Literal["true", "smeared"]

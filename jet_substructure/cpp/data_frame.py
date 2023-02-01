@@ -637,6 +637,7 @@ def run_create_closure_ratio(  # noqa: C901
     #       the other run functions.
     base_unfolding_config: Mapping[str, Any],
     unfolding_settings: Mapping[str, Any],
+    substructure_variable_name: str,
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
@@ -670,15 +671,18 @@ def run_create_closure_ratio(  # noqa: C901
         unfolding_base.get_binning(
             base_unfolding_config=base_unfolding_config,
             unfolding_settings=unfolding_settings,
-            name="smeared_kt",
+            binning_type="smeared",
             grooming_method=grooming_method,
+            substructure_variable_to_analyze=substructure_variable_name,
         )
     )
     smeared_jet_pt_bins = unfolding_base.get_binning(
         base_unfolding_config=base_unfolding_config,
         unfolding_settings=unfolding_settings,
-        name="smeared_jet_pt",
+        binning_type="smeared",
         grooming_method=grooming_method,
+        substructure_variable_to_analyze=substructure_variable_name,
+        variable_to_retrieve="jet_pt",
     )
     # Ratio hist name
     # It encodes the binning so we can have multiple hists stored in a single file, which
@@ -688,6 +692,7 @@ def run_create_closure_ratio(  # noqa: C901
     hist_name = unfolding_base.hist_name_for_ratio_2D(
         grooming_method=grooming_method,
         prefix_for_ratio=prefix_for_ratio,
+        substructure_variable_name=substructure_variable_name,
         smeared_substructure_variable_bins=smeared_substructure_variable_bins,
         smeared_jet_pt_bins=smeared_jet_pt_bins,
         double_counting_cut_name=double_counting_cut_name,

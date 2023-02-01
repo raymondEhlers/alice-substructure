@@ -387,6 +387,7 @@ def _collision_system_names(unfolding_for_pp: bool) -> Tuple[str, str]:
 def _get_reweighted_ratio(
     data_dataset_name: str,
     response_dataset_name: str,
+    substructure_variable_name: str,
     smeared_substructure_variable_bins: npt.NDArray[np.float64],
     smeared_jet_pt_bins: npt.NDArray[np.float64],
     grooming_method: str,
@@ -415,6 +416,7 @@ def _get_reweighted_ratio(
     h_response_name = unfolding_base.hist_name_for_ratio_2D(
         grooming_method=grooming_method,
         prefix_for_ratio=response_prefix,
+        substructure_variable_name=substructure_variable_name,
         smeared_substructure_variable_bins=smeared_substructure_variable_bins,
         smeared_jet_pt_bins=smeared_jet_pt_bins,
         double_counting_cut_name=double_counting_cut_name,
@@ -431,6 +433,7 @@ def _get_reweighted_ratio(
     h_data_name = unfolding_base.hist_name_for_ratio_2D(
         grooming_method=grooming_method,
         prefix_for_ratio="data",
+        substructure_variable_name=substructure_variable_name,
         smeared_substructure_variable_bins=smeared_substructure_variable_bins,
         smeared_jet_pt_bins=smeared_jet_pt_bins,
         double_counting_cut_name=double_counting_cut_name,
@@ -474,6 +477,7 @@ def _get_reweighting_ratio(
     h_reweighting_ratio = _get_reweighted_ratio(
         data_dataset_name=reweight_data_dataset_name,
         response_dataset_name=reweight_response_dataset_name,
+        substructure_variable_name=settings.substructure_variable.variable_name,
         smeared_substructure_variable_bins=settings.substructure_variable.smeared_bins,
         smeared_jet_pt_bins=settings.jet_pt.smeared_bins,
         grooming_method=settings.grooming_method,
@@ -598,6 +602,7 @@ def run_unfolding(
         settings.use_pure_matches,
         unfolding_for_pp,
         h_reweighting_response_ratio,
+        settings.substructure_variable.normalize_by_jet_pt,
     )
     _root_double_counting_cut = ROOT.unfolding.DoubleCountingCut(
         _double_counting_cut_settings.det_level_leading_track_pt_cut

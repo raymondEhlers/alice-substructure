@@ -1268,6 +1268,7 @@ def _root_data_frame_closure(
     cross_check_task: bool,
     base_unfolding_config: Mapping[str, Any],
     unfolding_settings: Mapping[str, Any],
+    substructure_variable_name: str,
     job_framework: job_utils.JobFramework,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
@@ -1292,6 +1293,7 @@ def _root_data_frame_closure(
         output_filename=Path(outputs[0].filepath),
         base_unfolding_config=base_unfolding_config,
         unfolding_settings=unfolding_settings,
+        substructure_variable_name=substructure_variable_name,
         jet_pt_prefix_first=True,
         n_cores=n_cores,
         cross_check_task=cross_check_task,
@@ -1366,6 +1368,7 @@ def setup_root_data_frame(
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[Future[Any]]] = None,
     unfolding_settings: Optional[Mapping[str, Any]] = None,
+    substructure_variable_name: str | None = None,
 ) -> List[Future[Tuple[bool, str]]]:
     # Validation
     # NOTE: I only compromised on specifying the function here because it loses the typing
@@ -1466,6 +1469,7 @@ def setup_root_data_frame(
         optional_kwargs = {
             "base_unfolding_config": base_unfolding_config,
             "unfolding_settings": unfolding_settings,
+            "substructure_variable_name": substructure_variable_name,
         }
 
     results = []
@@ -1625,10 +1629,17 @@ def _unfolding_closure(
     )
 
 
+@attr.define
+class UnfoldingRuntimeSettings:
+    variable_to_unfold: str = attr.field(default="kt")
+    normalize_variable_by_pt: bool = attr.field(default=False)
+
+
 def setup_all_unfolding(  # noqa: C901
     data_collision_system: str,
     base_dataset_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
+    unfolding_runtime_settings: UnfoldingRuntimeSettings,
     n_cores_per_job: int,
     job_framework: job_utils.JobFramework,
     selected_unfolding_settings: Optional[List[str]] = None,
@@ -1735,24 +1746,39 @@ def setup_all_unfolding(  # noqa: C901
             _default_settings = unfolding_base.Settings2D(
                 grooming_method=grooming_method,
                 jet_pt=unfolding_base.JetPtSettings2D.from_binning(
-                    true_bins=_get_bins(name="true_jet_pt", grooming_method=grooming_method),
-                    smeared_bins=_get_bins(name="smeared_jet_pt", grooming_method=grooming_method),
+                    true_bins=_get_bins(
+                        grooming_method=grooming_method, substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
+                        binning_type="true", variable_to_retrieve="jet_pt",
+                    ),
+                    smeared_bins=_get_bins(
+                        grooming_method=grooming_method, substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
+                        binning_type="smeared", variable_to_retrieve="jet_pt",
+                    ),
                     true_min_pt=_double_counting_cut_settings.min_true_pt,
                     # true_bins=np.array([0, 40, 60, 80, 100, 120, 160], dtype=np.float64),
                     # smeared_bins=np.array([40, 50, 60, 80, 100, 120], dtype=np.float64),
                 ),
                 substructure_variable=unfolding_base.SubstructureVariableSettings2D.from_binning(
-                    true_bins=_get_bins(name="true_kt", grooming_method=grooming_method),
-                    smeared_bins=_get_bins(name="smeared_kt", grooming_method=grooming_method),
+                    true_bins=_get_bins(
+                        binning_type="true",
+                        grooming_method=grooming_method,
+                        substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
+                    ),
+                    smeared_bins=_get_bins(
+                        binning_type="smeared",
+                        grooming_method=grooming_method,
+                        substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
+                    ),
                     # true_bins=np.array(
                     #    # NOTE: (-0.05, 0) is the untagged bin.
                     #    [-0.05, 0, 2, 3, 4, 8, 100],
                     #    dtype=np.float64,
                     # ),
                     # smeared_bins=np.array([1, 2, 3, 4, 8], dtype=np.float64),
-                    name="kt",
-                    variable_name="kt",
+                    name=unfolding_runtime_settings.variable_to_unfold,
+                    variable_name=unfolding_runtime_settings.variable_to_unfold,
                     untagged_bin_below_range=True,
+                    normalize_by_jet_pt=unfolding_settings.get("normalize_by_jet_pt", False),
                 ),
                 double_counting_cut_name=_double_counting_cut_name,
                 suffix=base_unfolding_config["suffix"],
@@ -1801,6 +1827,7 @@ def setup_all_unfolding(  # noqa: C901
                     _reweight_hist_name = unfolding_base.hist_name_for_ratio_2D(
                         grooming_method=grooming_method,
                         prefix_for_ratio="hybrid" if "embed" in _collision_system else "data",
+                        substructure_variable_name=_default_settings.substructure_variable.variable_name,
                         smeared_substructure_variable_bins=_default_settings.substructure_variable.smeared_bins,
                         smeared_jet_pt_bins=_default_settings.jet_pt.smeared_bins,
                         double_counting_cut_name=_default_settings.double_counting_cut_name,
@@ -1825,6 +1852,7 @@ def setup_all_unfolding(  # noqa: C901
                             job_framework=job_framework,
                             base_unfolding_config=base_unfolding_config,
                             unfolding_settings=unfolding_settings,
+                            substructure_variable_name=_default_settings.substructure_variable.variable_name,
                         )
                         # And add to final outputs
                         # We only want to add here - otherwise it can show up multiple times, which is
@@ -1960,6 +1988,7 @@ def setup_and_submit_tasks(  # noqa: C901
     collision_system: str,
     jobs_to_execute: Sequence[str],
     input_grooming_methods: Optional[Sequence[str]] = None,
+    unfolding_runtime_settings: UnfoldingRuntimeSettings = UnfoldingRuntimeSettings(),
     dask_client: Optional[dask.distributed.Client] = None,
 ) -> List[Future[Any]]:
     # Validation
@@ -2165,6 +2194,7 @@ def setup_and_submit_tasks(  # noqa: C901
             data_collision_system=collision_system,
             base_dataset_config=base_dataset_config,
             grooming_methods=grooming_methods,
+            unfolding_runtime_settings=unfolding_runtime_settings,
             n_cores_per_job=task_config.n_cores_per_task,
             job_framework=job_framework,
             selected_unfolding_settings=[
