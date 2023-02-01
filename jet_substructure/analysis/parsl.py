@@ -1632,7 +1632,7 @@ def _unfolding_closure(
 @attr.define
 class UnfoldingRuntimeSettings:
     variable_to_unfold: str = attr.field(default="kt")
-    normalize_variable_by_pt: bool = attr.field(default=False)
+    normalize_variable_by_jet_pt: bool = attr.field(default=False)
 
 
 def setup_all_unfolding(  # noqa: C901
@@ -1763,11 +1763,13 @@ def setup_all_unfolding(  # noqa: C901
                         binning_type="true",
                         grooming_method=grooming_method,
                         substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
+                        variable_to_retrieve=f"var_over_pt" if unfolding_runtime_settings.normalize_variable_by_jet_pt else None,
                     ),
                     smeared_bins=_get_bins(
                         binning_type="smeared",
                         grooming_method=grooming_method,
                         substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
+                        variable_to_retrieve=f"var_over_pt" if unfolding_runtime_settings.normalize_variable_by_jet_pt else None,
                     ),
                     # true_bins=np.array(
                     #    # NOTE: (-0.05, 0) is the untagged bin.
@@ -1778,7 +1780,7 @@ def setup_all_unfolding(  # noqa: C901
                     name=unfolding_runtime_settings.variable_to_unfold,
                     variable_name=unfolding_runtime_settings.variable_to_unfold,
                     untagged_bin_below_range=True,
-                    normalize_by_jet_pt=unfolding_settings.get("normalize_by_jet_pt", False),
+                    normalize_by_jet_pt=unfolding_runtime_settings.normalize_variable_by_jet_pt,
                 ),
                 double_counting_cut_name=_double_counting_cut_name,
                 suffix=base_unfolding_config["suffix"],
