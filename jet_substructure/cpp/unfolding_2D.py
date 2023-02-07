@@ -601,8 +601,8 @@ def run_unfolding(
         settings.substructure_variable.smeared_range.max,
         settings.use_pure_matches,
         unfolding_for_pp,
-        h_reweighting_response_ratio,
         settings.substructure_variable.normalize_by_jet_pt,
+        h_reweighting_response_ratio,
     )
     _root_double_counting_cut = ROOT.unfolding.DoubleCountingCut(
         _double_counting_cut_settings.det_level_leading_track_pt_cut
@@ -779,6 +779,7 @@ def run_unfolding_closure_reweighting(
         settings.substructure_variable.smeared_range.max,
         settings.use_pure_matches,
         unfolding_for_pp,
+        settings.substructure_variable.normalize_by_jet_pt,
         h_reweighting_ratio,
     )
     _root_closure_settings = ROOT.unfolding.ClosureSettings(
