@@ -274,7 +274,7 @@ def _get_possible_binning_from_settings(
     parameter_path = list(parameter_path)
 
     while len(parameter_path) > 1:
-        logger.info(f"Checking {parameter_path}")
+        logger.debug(f"Checking {parameter_path}")
         possible_binning = functools.reduce(_getitem_for_dict_with_default, parameter_path, settings)
         binning = possible_binning.get(binning_type, [])
         if binning:
