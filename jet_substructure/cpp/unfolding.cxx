@@ -97,20 +97,75 @@ struct Settings2D {
   const bool unfoldingForPP = false;
   TH2D* hReweightingResponse = nullptr;
   const bool normalizeSubstructureVariableByJetPt = false;
+
+  // NOTE: Can't do brace construction from python :-(
+  Settings2D(
+    const std::string _groomingMethod,
+    const std::string _substructureVariableName,
+    std::vector<double> _smearedJetPtBins,
+    std::vector<double> _trueJetPtBins,
+    std::vector<double> _smearedSplittingVariableBins,
+    std::vector<double> _trueSplittingVariableBins,
+    double _smearedUntaggedBinValue,
+    bool _disableUntaggedBin,
+    double _minSmearedSplittingVariable,
+    double _maxSmearedSplittingVariable,
+    const bool _usePureMatches = false,
+    const bool _unfoldingForPP = false,
+    const bool _normalizeSubstructureVariableByJetPt = false,
+    TH2D* _hReweightingResponse = nullptr
+  ):
+    groomingMethod(_groomingMethod),
+    substructureVariableName(_substructureVariableName),
+    smearedJetPtBins(_smearedJetPtBins),
+    trueJetPtBins(_trueJetPtBins),
+    smearedSplittingVariableBins(_smearedSplittingVariableBins),
+    trueSplittingVariableBins(_trueSplittingVariableBins),
+    smearedUntaggedBinValue(_smearedUntaggedBinValue),
+    disableUntaggedBin(_disableUntaggedBin),
+    minSmearedSplittingVariable(_minSmearedSplittingVariable),
+    maxSmearedSplittingVariable(_maxSmearedSplittingVariable),
+    usePureMatches(_usePureMatches),
+    unfoldingForPP(_unfoldingForPP),
+    normalizeSubstructureVariableByJetPt(_normalizeSubstructureVariableByJetPt),
+    hReweightingResponse(_hReweightingResponse)
+  {}
 };
 
 struct DoubleCountingCut {
   bool useDetLevelTrackPtCut = false;
+
+  DoubleCountingCut(
+    bool _useDetLevelTrackPtCut = false
+  ):
+    useDetLevelTrackPtCut(_useDetLevelTrackPtCut)
+  {}
 };
 
 struct InputFilenames {
   const std::vector<std::string> data;
   const std::vector<std::string> response;
+
+  InputFilenames(
+    const std::vector<std::string> _data,
+    const std::vector<std::string> _response
+  ):
+    data(_data),
+    response(_response)
+  {}
 };
 
 struct TreeNames {
   const std::string data = "tree";
   const std::string response = "tree";
+
+  TreeNames(
+    const std::string _data = "tree",
+    const std::string _response = "tree"
+  ):
+    data(_data),
+    response(_response)
+  {}
 };
 
 struct Prefixes {
@@ -118,6 +173,18 @@ struct Prefixes {
   const std::string responseSmeared = "hybrid";
   const std::string responseTrue = "true";
   const std::string responseDetLevel = "det_level";
+
+  Prefixes(
+    const std::string _data = "data",
+    const std::string _responseSmeared = "hybrid",
+    const std::string _responseTrue = "true",
+    const std::string _responseDetLevel = "det_level"
+  ):
+    data(_data),
+    responseSmeared(_responseSmeared),
+    responseTrue(_responseTrue),
+    responseDetLevel(_responseDetLevel)
+  {}
 };
 
 enum ClosureVariation_t { splitMC = 0, reweightPseudoData = 1, reweightResponse = 2 };
@@ -125,6 +192,14 @@ enum ClosureVariation_t { splitMC = 0, reweightPseudoData = 1, reweightResponse 
 struct ClosureSettings {
   const ClosureVariation_t variation;
   const double fractionForResponse = 0.75;
+
+  ClosureSettings(
+    const ClosureVariation_t _variation,
+    const double _fractionForResponse = 0.75
+  ):
+    variation(_variation),
+    fractionForResponse(_fractionForResponse)
+  {}
 };
 
 /**
