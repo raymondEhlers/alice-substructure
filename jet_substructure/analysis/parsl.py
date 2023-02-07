@@ -1174,6 +1174,7 @@ def _root_data_frame(
     main_jet_pt_range: jsub_helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
+    double_counting_cut_name: str,
     job_framework: job_utils.JobFramework,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
@@ -1205,6 +1206,7 @@ def _root_data_frame(
         jet_pt_prefix_first=True,
         n_cores=n_cores,
         cross_check_task=cross_check_task,
+        double_counting_cut_name=double_counting_cut_name,
     )
 
     return res
@@ -1220,6 +1222,7 @@ def _root_data_frame_response(
     main_jet_pt_range: jsub_helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
+    double_counting_cut_name: str,
     job_framework: job_utils.JobFramework,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
@@ -1251,6 +1254,7 @@ def _root_data_frame_response(
         jet_pt_prefix_first=True,
         n_cores=n_cores,
         cross_check_task=cross_check_task,
+        double_counting_cut_name=double_counting_cut_name,
     )
 
     return res
@@ -1269,6 +1273,7 @@ def _root_data_frame_closure(
     base_unfolding_config: Mapping[str, Any],
     unfolding_settings: Mapping[str, Any],
     substructure_variable_name: str,
+    double_counting_cut_name: str,
     job_framework: job_utils.JobFramework,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
@@ -1297,6 +1302,7 @@ def _root_data_frame_closure(
         jet_pt_prefix_first=True,
         n_cores=n_cores,
         cross_check_task=cross_check_task,
+        double_counting_cut_name=double_counting_cut_name,
     )
 
     return res
@@ -1312,6 +1318,7 @@ def _root_data_frame_embedded_pt_hard_scaling(
     main_jet_pt_range: jsub_helpers.JetPtRange,
     n_cores: int,
     cross_check_task: bool,
+    double_counting_cut_name: str,
     job_framework: job_utils.JobFramework,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
@@ -1345,6 +1352,7 @@ def _root_data_frame_embedded_pt_hard_scaling(
         jet_pt_prefix_first=collision_system != "pythia",
         n_cores=n_cores,
         cross_check_task=cross_check_task,
+        double_counting_cut_name=double_counting_cut_name,
     )
 
     return res
@@ -1455,13 +1463,6 @@ def setup_root_data_frame(
     # cross_check_task = dataset_config.get("cross_check_task", False)
     # logger.info(f"Cross check task: {cross_check_task}")
 
-    # Determine the broad smeared jet pt range. We basically want this to cover our
-    # entire range of interest. Since this will usually correspond with our unfolding
-    # nominal smeared jet pt binning, we just advantage of those values.
-    # NOTE: We're okay using the default here because the smeared jet pt bins won't vary
-    _nominal_smeared_jet_pt_bins = base_unfolding_config["nominal_binning"]["default"]["smeared_jet_pt"]
-    main_jet_pt_range = jsub_helpers.JetPtRange(_nominal_smeared_jet_pt_bins[0], _nominal_smeared_jet_pt_bins[-1])
-
     # Setup optional args
     optional_kwargs = {}
     # We only want to pass the entire configuration for the closure.
@@ -1474,6 +1475,24 @@ def setup_root_data_frame(
 
     results = []
     for grooming_method in grooming_methods:
+        # Determine the broad smeared jet pt range. We basically want this to cover our
+        # entire range of interest. Since this will usually correspond with our unfolding
+        # nominal smeared jet pt binning, we just advantage of those values.
+        # NOTE: We're okay using the default here because the smeared jet pt bins won't vary
+        _nominal_smeared_jet_pt_bins = unfolding_base.get_binning(
+            # By passing an empty config here, we should only retrieve from the "default",
+            # which is what we want here.
+            unfolding_settings={},
+            base_unfolding_config=base_unfolding_config,
+            binning_type="smeared",
+            grooming_method=grooming_method,
+            # NOTE: We are hard coding this assumption. It shouldn't vary much better
+            #       different substructure variables, so this should be okay
+            substructure_variable_to_analyze="kt",
+            variable_to_retrieve="jet_pt",
+        )
+        main_jet_pt_range = jsub_helpers.JetPtRange(_nominal_smeared_jet_pt_bins[0], _nominal_smeared_jet_pt_bins[-1])
+
         # Setup file IO
         tag = f"_{mode.tag}" if mode.tag else ""
         # If we have a single train, then append the train number to the tag.
@@ -1494,6 +1513,7 @@ def setup_root_data_frame(
                 n_cores=n_cores_per_job,
                 cross_check_task=cross_check_task,
                 job_framework=job_framework,
+                double_counting_cut_name=_double_counting_cut_name,
                 # Need to grab the outputs here to ensure that the dependencies are tracked properly.
                 inputs=[r.outputs[0] for r in input_results] if input_results and job_framework == job_utils.JobFramework.parsl else input_files,  # type: ignore[attr-defined]
                 outputs=[parsl_output_file],
@@ -2375,6 +2395,8 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
         input_grooming_methods=grooming_methods,
         dask_client=job_executor if job_framework == job_utils.JobFramework.dask_delayed else None,  # type: ignore[arg-type]
     )
+    follow_progress_of_futures(futures=futures)
+
     return futures
 
 
