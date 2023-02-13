@@ -1081,10 +1081,9 @@ available_datasets:
             - "trains/embedPythia/0062/AnalysisResults.*.repaired.root"
             - "trains/embedPythia/0063/AnalysisResults.*.repaired.root"
 
-    # Testing for mammoth productions...
     # Nominal: Rmax = 0.1
-    # Data
-    LHC18qr_semi_central_R02_0064: &LHC18qr_semi_central_R02_test
+    # semi-central data
+    LHC18qr_semi_central_R02_0064:
         name: "LHC18qr_semi_central_R02_0064"
         tree_name: "tree"
         # Map for the uniform prefix name to the analysis task prefix.
@@ -1098,9 +1097,95 @@ available_datasets:
         entries_per_job: 1.5e5
         files:
             - "trains/PbPb/0064/production.yaml"
+    # Added new grooming methods, including z_cut to DyG
+    LHC18qr_semi_central_R02_0067: &LHC18qr_semi_central_R02_mammoth
+        name: "LHC18qr_semi_central_R02_0067"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't exist for all prefixes
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/PbPb/0067/production.yaml"
+    LHC18qr_semi_central_R02_0068: &LHC18qr_semi_central_R02_mammoth_Rmax005
+        name: "LHC18qr_semi_central_R02_Rmax005_0068"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't exist for all prefixes
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/PbPb/0068/production.yaml"
+    LHC18qr_semi_central_R02_0069: &LHC18qr_semi_central_R02_mammoth_Rmax005
+        name: "LHC18qr_semi_central_R02_max050_0069"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't exist for all prefixes
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/PbPb/0069/production.yaml"
+    # Added new grooming methods, including z_cut to DyG
+    # Central data
+    LHC18qr_central_R02_0070: &LHC18qr_central_R02_mammoth
+        name: "LHC18qr_central_02_0070"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't exist for all prefixes
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/PbPb/0070/production.yaml"
+    LHC18qr_central_R02_0071: &LHC18qr_central_R02_mammoth_Rmax005
+        name: "LHC18qr_central_R02_Rmax005_0071"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't exist for all prefixes
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/PbPb/0071/production.yaml"
+    LHC18qr_central_R02_0072: &LHC18qr_central_R02_mammoth_Rmax005
+        name: "LHC18qr_central_R02_Rmax050_0072"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't exist for all prefixes
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/PbPb/0072/production.yaml"
     # Embedded
-    # NOTE: This is missing the unsubtracted hybrid branch due to an error in the production!
-    LHC20g4_embedded_into_LHC18qr_semi_central_R02_0064: &LHC18qr_semi_central_R02_embedded_test
+    LHC20g4_embedded_into_LHC18qr_semi_central_R02_0064:
         name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_0064"
         tree_name: "tree"
         # Map for the uniform prefix name to the analysis task prefix.
@@ -1116,6 +1201,88 @@ available_datasets:
         entries_per_job: 1.5e5
         files:
             - "trains/embed_pythia/0064/production.yaml"
+    # Added new grooming methods, including z_cut to DyG
+    LHC20g4_embedded_into_LHC18qr_semi_central_R02_0067: &LHC18qr_semi_central_R02_mammoth_embedded
+        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_0067"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "hybrid"
+            "true": "true"
+            det_level: "det_level"
+        # Branches which don't exist for all prefixes
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/embed_pythia/0067/production.yaml"
+    LHC20g4_embedded_into_LHC18qr_semi_central_R02_0068: &LHC18qr_semi_central_R02_mammoth_embedded_Rmax005
+        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_Rmax005_0068"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "hybrid"
+            "true": "true"
+            det_level: "det_level"
+        # Branches which don't exist for all prefixes
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/embed_pythia/0068/production.yaml"
+    LHC20g4_embedded_into_LHC18qr_semi_central_R02_0069: &LHC18qr_semi_central_R02_mammoth_embedded_Rmax050
+        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_Rmax050_0069"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "hybrid"
+            "true": "true"
+            det_level: "det_level"
+        # Branches which don't exist for all prefixes
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/embed_pythia/0069/production.yaml"
+    # LHC20g4_embedded_into_LHC18qr_semi_central_R02_0070: &LHC18qr_semi_central_R02_mammoth_embedded_tracking_efficiency
+    #     name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_tracking_efficiency_0070"
+    #     tree_name: "tree"
+    #     # Map for the uniform prefix name to the analysis task prefix.
+    #     prefixes:
+    #         hybrid: "hybrid"
+    #         "true": "true"
+    #         det_level: "det_level"
+    #     # Branches which don't exist for all prefixes
+    #     branches: ["data_leading_track_pt"]
+    #     # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+    #     prefix_branches: *prefix_branches
+    #     jet_R: 0.2
+    #     entries_per_job: 1.5e5
+    #     files:
+    #         - "trains/embed_pythia/0070/production.yaml"
+    # Added new grooming methods, including z_cut to DyG
+    LHC20g4_embedded_into_LHC18qr_central_R02_0071: &LHC18qr_central_R02_mammoth_embedded
+        name: "LHC20g4_embedded_into_LHC18qr_central_R02_0071"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "hybrid"
+            "true": "true"
+            det_level: "det_level"
+        # Branches which don't exist for all prefixes
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/embed_pythia/0071/production.yaml"
 
 
 analysis_configurations:
@@ -1405,17 +1572,18 @@ analysis_configurations:
     PbPb_semi_central_R02_pass3:
         datasets:
             nominal:
-                PbPb: *LHC18qr_semi_central_R02_test
-                embed_pythia: *LHC18qr_semi_central_R02_embedded_test
+                PbPb: *LHC18qr_semi_central_R02_mammoth
+                embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded
             tracking_efficiency:
-                PbPb: *LHC18qr_semi_central_R02
+                PbPb: *LHC18qr_semi_central_R02_mammoth
                 embed_pythia: *LHC18qr_semi_central_R02_embedded_tracking_efficiency
+                #embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_tracking_efficiency
             rmax_005:
                 PbPb: *LHC18qr_semi_central_R02_Rmax005
-                embed_pythia: *LHC18qr_semi_central_R02_embedded_Rmax005
-            rmax_070:
+                embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_Rmax005
+            rmax_050:
                 PbPb: *LHC18qr_semi_central_R02_Rmax070
-                embed_pythia: *LHC18qr_semi_central_R02_embedded_Rmax070
+                embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_Rmax070
         unfolding:
             suffix: "semi_central_R02_pass3"
             nominal_binning:
@@ -1657,10 +1825,10 @@ analysis_configurations:
                     reweight_prior: false
                     datasets: "rmax_005"
                 background_high:
-                    label: "Rmax070"
+                    label: "Rmax050"
                     closures: false
                     reweight_prior: false
-                    datasets: "rmax_070"
+                    datasets: "rmax_050"
                 # Soft Drop z = 0.2 variations
                 # Starting at 0.5
                 default_z_cut_02_kt_0.5:
@@ -1952,17 +2120,18 @@ analysis_configurations:
     PbPb_central_R02_pass3:
         datasets:
             nominal:
-                PbPb: *LHC18qr_central_R02
-                embed_pythia: *LHC18qr_central_R02_dynamical_kt_embedded
+                PbPb: *LHC18qr_central_R02_mammoth
+                #embed_pythia: *LHC18qr_central_R02_dynamical_kt_embedded
+                embed_pythia: *LHC18qr_central_R02_mammoth_embedded
             tracking_efficiency:
-                PbPb: *LHC18qr_central_R02
-                embed_pythia: null  #*LHC18qr_central_R02_embedded_tracking_efficiency
+                PbPb: *LHC18qr_central_R02_mammoth
+                embed_pythia: null  #*LHC18qr_central_R02_mammoth_embedded_tracking_efficiency
             rmax_005:
-                PbPb: null  #*LHC18qr_central_R02_Rmax005
-                embed_pythia: null  #*LHC18qr_central_R02_embedded_Rmax005
+                PbPb: null  #*LHC18qr_central_R02_mammoth_Rmax005
+                embed_pythia: null  #*LHC18qr_central_R02_mammoth_embedded_Rmax005
             rmax_070:
-                PbPb: null  #*LHC18qr_central_R02_Rmax070
-                embed_pythia: null  #*LHC18qr_central_R02_embedded_Rmax070
+                PbPb: null  #*LHC18qr_central_R02_mammoth_Rmax070
+                embed_pythia: null  #*LHC18qr_central_R02_mammoth_embedded_Rmax070
         unfolding:
             suffix: "central_R02_pass3"
             nominal_binning:
