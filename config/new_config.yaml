@@ -1284,6 +1284,42 @@ available_datasets:
         files:
             - "trains/embed_pythia/0071/production.yaml"
 
+    ###############
+    # Thermal model
+    ###############
+    LHC20g4_embedded_into_thermal_model_semi_central_R02_0061: &LHC18qr_semi_central_R02_mammoth_embedded_thermal_model
+        name: "LHC20g4_embedded_into_thermal_model_semi_central_R02_0061"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "hybrid"
+            "true": "true"
+            det_level: "det_level"
+        # Branches which don't exist for all prefixes
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/embed_pythia/0061/production.yaml"
+    LHC20g4_embedded_into_thermal_model_central_R02_0062: &LHC18qr_central_R02_mammoth_embedded_thermal_model
+        name: "LHC20g4_embedded_into_thermal_model_central_R02_0062"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "hybrid"
+            "true": "true"
+            det_level: "det_level"
+        # Branches which don't exist for all prefixes
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/embed_pythia/0062/production.yaml"
+
 
 analysis_configurations:
     PbPb_semi_central_R04_pass1:
@@ -1582,8 +1618,11 @@ analysis_configurations:
                 PbPb: *LHC18qr_semi_central_R02_Rmax005
                 embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_Rmax005
             rmax_050:
-                PbPb: *LHC18qr_semi_central_R02_Rmax070
-                embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_Rmax070
+                PbPb: *LHC18qr_semi_central_R02_Rmax050
+                embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_Rmax050
+            thermal_model:
+                PbPb: *LHC18qr_semi_central_R02_mammoth
+                embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_thermal_model
         unfolding:
             suffix: "semi_central_R02_pass3"
             nominal_binning:
@@ -2129,9 +2168,12 @@ analysis_configurations:
             rmax_005:
                 PbPb: null  #*LHC18qr_central_R02_mammoth_Rmax005
                 embed_pythia: null  #*LHC18qr_central_R02_mammoth_embedded_Rmax005
-            rmax_070:
-                PbPb: null  #*LHC18qr_central_R02_mammoth_Rmax070
-                embed_pythia: null  #*LHC18qr_central_R02_mammoth_embedded_Rmax070
+            rmax_050:
+                PbPb: null  #*LHC18qr_central_R02_mammoth_Rmax050
+                embed_pythia: null  #*LHC18qr_central_R02_mammoth_embedded_Rmax050
+            thermal_model:
+                PbPb: *LHC18qr_central_R02_mammoth
+                embed_pythia: null  #*LHC18qr_central_R02_mammoth_embedded_thermal_model
         unfolding:
             suffix: "central_R02_pass3"
             nominal_binning:
@@ -2201,10 +2243,10 @@ analysis_configurations:
                     reweight_prior: false
                     datasets: "rmax_005"
                 background_high:
-                    label: "Rmax070"
+                    label: "Rmax050"
                     closures: false
                     reweight_prior: false
-                    datasets: "rmax_070"
+                    datasets: "rmax_050"
 
     pp_R04:
         datasets:
