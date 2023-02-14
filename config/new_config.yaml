@@ -1029,7 +1029,7 @@ available_datasets:
         jet_R: 0.2
         entries_per_job: 1.5e5
         files:
-            - "trains/PbPb/0067/production.yaml"
+            - "trains/pp/0060/production.yaml"
     ########
     # pythia
     ########
@@ -1049,8 +1049,8 @@ available_datasets:
         entries_per_job: 2e5
         files:
             - "trains/pythia/0060/production.yaml"
-    LHC18b8_pythia_R02_tracking_efficiency_0061: &LHC18b8_pythia_R02_mammoth_tracking_efficiency
-        name: "LHC18b8_pythia_R02_tracking_efficiency_0061"
+    LHC18b8_pythia_R02_tracking_efficiency_pt_dep_0061: &LHC18b8_pythia_R02_mammoth_tracking_efficiency_pt_dep
+        name: "LHC18b8_pythia_R02_tracking_efficiency_pt_dep_0061"
         tree_name: "tree"
         # Map for the uniform prefix name to the analysis task prefix.
         prefixes:
@@ -1064,6 +1064,21 @@ available_datasets:
         entries_per_job: 2e5
         files:
             - "trains/pythia/0061/production.yaml"
+    LHC18b8_pythia_R02_tracking_efficiency_0062: &LHC18b8_pythia_R02_mammoth_tracking_efficiency
+        name: "LHC18b8_pythia_R02_tracking_efficiency_0062"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+            "true": "matched"
+        # Branches which don't exist for all prefixes
+        branches: ["ptHard", "ptHardBin"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 2e5
+        files:
+            - "trains/pythia/0062/production.yaml"
 
     ######
     # PbPb
@@ -2408,11 +2423,11 @@ analysis_configurations:
     pp_R02:
         datasets:
             nominal:
-                pp: *LHC17pq_pp_R02
-                pythia: *LHC18b8_pythia_R02
+                pp: *LHC17pq_pp_R02_mammoth
+                pythia: *LHC18b8_pythia_R02_mammoth
             tracking_efficiency:
-                pp: *LHC17pq_pp_R02
-                pythia: *LHC18b8_pythia_R02_tracking_efficiency
+                pp: *LHC17pq_pp_R02_mammoth
+                pythia: *LHC18b8_pythia_R02_mammoth_tracking_efficiency
         unfolding:
             suffix: "pp_R02"
             nominal_binning:
