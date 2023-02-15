@@ -220,9 +220,11 @@ class UnfoldingOutput:
     smeared_jet_pt_range: helpers.JetPtRange = attr.ib()
     collision_system: str = attr.ib()
     base_dir: Path = attr.ib(converter=Path)
+    input_dir_tag: str = attr.ib(converter=Path, default="")
     pure_matches: bool = attr.ib(default=False)
     suffix: str = attr.ib(default="")
     label: str = attr.ib(default="")
+    double_counting_cut: str = attr.ib(default="")
     n_iter_compare: int = attr.ib(default=4)
     raw_hist_name: str = attr.ib(default="raw")
     smeared_hist_name: str = attr.ib(default="smeared")
@@ -234,11 +236,14 @@ class UnfoldingOutput:
         # NOTE: Added "parsl" for the newer output results.
         # self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "feb2021_test"
         #self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2021-04"
-        # TEMP - changed for pp vs PbPb
-        if self.collision_system == "pp":
-            self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2022-03-QM"
-        else:
-            self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2023-01-dask"
+        # For convenience, I needed to split these results up momentarily
+        #if self.collision_system == "pp":
+        #    self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2022-03-QM"
+        #else:
+        #    self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2023-01-dask"
+        self.base_dir = self.base_dir / self.collision_system / "unfolding"
+        if self.input_dir_tag:
+            self.base_dir = self.base_dir / self.input_dir_tag
 
         # Initialize the file if the histograms aren't specified.
         if not self.hists:
@@ -254,9 +259,14 @@ class UnfoldingOutput:
         name += f"_smeared_{self.smeared_jet_pt_range}"
         if self.suffix:
             name += f"_{self.suffix}"
+        if self.label and "closure_" not in self.label:
+            name += f"_{self.label}"
+        if self.double_counting_cut:
+            name += f"__double_counting_cut_{self.double_counting_cut}_"
         if self.pure_matches:
             name += "_pure_matches"
-        if self.label:
+        # FIXME: the "closure_" condition is a huge hack!
+        if self.label and "closure_" in self.label:
             name += f"_{self.label}"
         return name
 
@@ -2029,6 +2039,8 @@ def setup_unfolding_closures(
     collision_system: str,
     n_iter_compare: int,
     suffix: str,
+    double_counting_cut: str,
+    input_dir_tag: str,
     output_dir: Path,
     pure_matches: bool = False,
 ) -> Dict[str, UnfoldingOutput]:
@@ -2045,6 +2057,8 @@ def setup_unfolding_closures(
         n_iter_compare=n_iter_compare,
         pure_matches=pure_matches,
         suffix=suffix,
+        input_dir_tag=input_dir_tag,
+        double_counting_cut=double_counting_cut,
     )
 
     # These should always exist.
@@ -2059,6 +2073,8 @@ def setup_unfolding_closures(
         n_iter_compare=n_iter_compare,
         pure_matches=pure_matches,
         suffix=suffix,
+        input_dir_tag=input_dir_tag,
+        double_counting_cut=double_counting_cut,
         label="closure_trivial_hybrid_smeared_as_input",
         raw_hist_name="smeared",
     )
@@ -2074,6 +2090,8 @@ def setup_unfolding_closures(
         n_iter_compare=n_iter_compare,
         pure_matches=pure_matches,
         suffix=suffix,
+        input_dir_tag=input_dir_tag,
+        double_counting_cut=double_counting_cut,
         label="closure_5_iter_5",
     )
 
@@ -2089,6 +2107,8 @@ def setup_unfolding_closures(
             n_iter_compare=n_iter_compare,
             pure_matches=pure_matches,
             suffix=suffix,
+            input_dir_tag=input_dir_tag,
+            double_counting_cut=double_counting_cut,
             label="closure_split_MC",
             raw_hist_name="h2_pseudo_data",
             true_hist_name="h2_pseudo_true",
@@ -2108,6 +2128,8 @@ def setup_unfolding_closures(
             n_iter_compare=n_iter_compare,
             pure_matches=pure_matches,
             suffix=suffix,
+            input_dir_tag=input_dir_tag,
+            double_counting_cut=double_counting_cut,
             label="closure_reweight_pseudo_data",
             raw_hist_name="h2_pseudo_data",
             true_hist_name="h2_pseudo_true",
@@ -2127,6 +2149,8 @@ def setup_unfolding_closures(
             n_iter_compare=n_iter_compare,
             pure_matches=pure_matches,
             suffix=suffix,
+            input_dir_tag=input_dir_tag,
+            double_counting_cut=double_counting_cut,
             label="closure_reweight_response",
             raw_hist_name="h2_pseudo_data",
             true_hist_name="h2_pseudo_true",
@@ -2146,6 +2170,8 @@ def setup_unfolding_outputs(  # noqa: C901
     collision_system: str,
     n_iter_compare: int,
     suffix: str,
+    double_counting_cut: str,
+    input_dir_tag: str,
     output_dir: Path,
     truncation_shift: float = 5,
     displaced_untagged_above_range: bool = True,
@@ -2174,6 +2200,8 @@ def setup_unfolding_outputs(  # noqa: C901
         n_iter_compare=n_iter_compare,
         pure_matches=False,
         suffix=suffix,
+        input_dir_tag=input_dir_tag,
+        double_counting_cut=double_counting_cut,
     )
     logger.info(f"default: {unfolding_outputs['default'].identifier}")
 
@@ -2189,6 +2217,8 @@ def setup_unfolding_outputs(  # noqa: C901
             n_iter_compare=n_iter_compare,
             pure_matches=False,
             suffix=suffix,
+            input_dir_tag=input_dir_tag,
+            double_counting_cut=double_counting_cut,
             label="tracking_efficiency",
         )
     except FileNotFoundError:
@@ -2208,6 +2238,8 @@ def setup_unfolding_outputs(  # noqa: C901
             n_iter_compare=n_iter_compare,
             pure_matches=False,
             suffix=suffix,
+            input_dir_tag=input_dir_tag,
+            double_counting_cut=double_counting_cut,
             label="truncation",
         )
         unfolding_outputs["truncation_high"] = UnfoldingOutput(
@@ -2223,10 +2255,12 @@ def setup_unfolding_outputs(  # noqa: C901
             n_iter_compare=n_iter_compare,
             pure_matches=False,
             suffix=suffix,
+            input_dir_tag=input_dir_tag,
+            double_counting_cut=double_counting_cut,
             label="truncation",
         )
     except FileNotFoundError:
-        logger.debug("Skipping truncation because the output file doesn't exist.")
+        logger.debug(f"Skipping truncation because the output file doesn't exist.")
 
     try:
         unfolding_outputs["random_binning"] = UnfoldingOutput(
@@ -2240,6 +2274,8 @@ def setup_unfolding_outputs(  # noqa: C901
             n_iter_compare=n_iter_compare,
             pure_matches=False,
             suffix=suffix,
+            input_dir_tag=input_dir_tag,
+            double_counting_cut=double_counting_cut,
             label="random_binning",
         )
     except FileNotFoundError:
@@ -2263,7 +2299,9 @@ def setup_unfolding_outputs(  # noqa: C901
                 base_dir=output_dir,
                 n_iter_compare=n_iter_compare,
                 pure_matches=False,
+                input_dir_tag=input_dir_tag,
                 suffix=suffix,
+                double_counting_cut=double_counting_cut,
             )
             logger.debug(f"untagged_bin: {unfolding_outputs['untagged_bin'].identifier}")
         else:
@@ -2285,6 +2323,8 @@ def setup_unfolding_outputs(  # noqa: C901
                 n_iter_compare=n_iter_compare,
                 pure_matches=False,
                 suffix=suffix,
+                input_dir_tag=input_dir_tag,
+                double_counting_cut=double_counting_cut,
                 label="reweight_prior",
             )
         except FileNotFoundError:
@@ -2308,6 +2348,8 @@ def setup_unfolding_outputs(  # noqa: C901
             n_iter_compare=n_iter_compare,
             pure_matches=False,
             suffix=suffix,
+            input_dir_tag=input_dir_tag,
+            double_counting_cut=double_counting_cut,
             label="model_dependence",
         )
     except FileNotFoundError:
@@ -2327,6 +2369,8 @@ def setup_unfolding_outputs(  # noqa: C901
                 n_iter_compare=n_iter_compare,
                 pure_matches=False,
                 suffix=suffix,
+                input_dir_tag=input_dir_tag,
+                double_counting_cut=double_counting_cut,
                 label=f"{background_setting}",
             )
         except FileNotFoundError:
@@ -2347,7 +2391,9 @@ def _load_unfolded_outputs(
     n_iter_compare: int,
     truncation_shift: int,
     displaced_extremum: float,
+    input_dir_tag: str,
     output_dir: Path,
+    double_counting_cut: str = "",
     tag_after_suffix: str = "",
     displaced_untagged_above_range: bool = True,
     skip_reweighted_prior_in_systematics: bool = False,
@@ -2366,7 +2412,9 @@ def _load_unfolded_outputs(
         collision_system=collision_system,
         n_iter_compare=n_iter_compare,
         suffix=suffix,
+        input_dir_tag=input_dir_tag,
         output_dir=output_dir,
+        double_counting_cut=double_counting_cut,
     )
     try:
         unfolding_closure_pure_matches_outputs = setup_unfolding_closures(
@@ -2378,7 +2426,9 @@ def _load_unfolded_outputs(
             collision_system=collision_system,
             n_iter_compare=n_iter_compare,
             suffix=suffix,
+            input_dir_tag=input_dir_tag,
             output_dir=output_dir,
+            double_counting_cut=double_counting_cut,
             pure_matches=True,
         )
     except KeyError as e:
@@ -2394,6 +2444,8 @@ def _load_unfolded_outputs(
         collision_system=collision_system,
         n_iter_compare=n_iter_compare,
         suffix=suffix,
+        double_counting_cut=double_counting_cut,
+        input_dir_tag=input_dir_tag,
         output_dir=output_dir,
         truncation_shift=truncation_shift,
         displaced_untagged_above_range=displaced_untagged_above_range,
@@ -2416,8 +2468,10 @@ def load_unfolded_outputs(
     n_iter_compare: Union[int, Mapping[str, int]],
     truncation_shift: int,
     displaced_extremum: float,
+    input_dir_tag: str,
     output_dir: Path,
     tag_after_suffix: Union[str, Mapping[str, str]] = "",
+    double_counting_cut: str = "",
     displaced_untagged_above_range: bool = True,
     skip_reweighted_prior_in_systematics: bool = False,
 ) -> Tuple[
@@ -2456,8 +2510,10 @@ def load_unfolded_outputs(
             n_iter_compare=n_iter_compare[grooming_method],
             truncation_shift=truncation_shift,
             displaced_extremum=displaced_extremum,
+            input_dir_tag=input_dir_tag,
             output_dir=output_dir,
             tag_after_suffix=tag_after_suffix[grooming_method],
+            double_counting_cut=double_counting_cut,
             displaced_untagged_above_range=displaced_untagged_above_range,
             skip_reweighted_prior_in_systematics=skip_reweighted_prior_in_systematics,
         )
@@ -2641,7 +2697,9 @@ def calculate_systematics(  # noqa: C901
 
     # Background subtraction systematics.
     background_systematics = {}
-    for background_setting in ["Rmax070", "Rmax005"]:
+    # FIXME: Something more elegant for defining the possible background values
+    #        would be preferred here, but fine for now...
+    for background_setting in ["Rmax070", "Rmax050", "Rmax005"]:
         try:
             background_systematics[background_setting] = (
                 unfolded[background_setting].data.values - unfolded["default"].data.values
@@ -2650,20 +2708,25 @@ def calculate_systematics(  # noqa: C901
             logger.debug(f"Skipping background systematic {background_setting} because of {e!r}")
 
     if len(background_systematics) > 0:
-        first_background_sub = next(iter(background_systematics.values()))
+        if len(background_systematics) >= 3:
+            raise ValueError(
+                f"Found too many background sub systematics - it's ambiguous. Please check! {list(background_systematics.keys())=}"
+            )
+        _background_subtraction_values = list(background_systematics.values())
+        if len(_background_subtraction_values ) == 1:
+            _background_subtraction_values.append(*_background_subtraction_values)
         unfolded["default"].data.metadata["y_systematic"][
             "background_sub"
         ] = unfolding_base.AsymmetricErrors.calculate_errors(
-            background_systematics.get("Rmax005", first_background_sub),
-            background_systematics.get("Rmax070", first_background_sub),
+            *_background_subtraction_values
         )
         #] = unfolding_base.AsymmetricErrors(
         #    background_systematics.get("Rmax005", first_background_sub),
         #    background_systematics.get("Rmax070", first_background_sub),
         #)
         logger.warning(f"Bin centers: {unfolded['default'].data.axes[0].bin_centers}")
-        logger.warning(f"RMax005: {background_systematics.get('Rmax005') / unfolded['default'].data.values}")
-        logger.warning(f"RMax070: {background_systematics.get('Rmax070') / unfolded['default'].data.values}")
+        for _bkg_label, _bkg_value in background_systematics.items():
+            logger.warning(f"{_bkg_label}: {_bkg_value / unfolded['default'].data.values}")
     else:
         logger.debug("Skipping background subtraction systematic because no values are available")
 
