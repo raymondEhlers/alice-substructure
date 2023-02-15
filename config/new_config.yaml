@@ -1838,13 +1838,21 @@ analysis_configurations:
                             "true": [0, 20, 40, 60, 80, 100, 140, 160]
                             "smeared": [40, 50, 60, 70, 80, 90, 120]
                 soft_drop_z_cut_02:
-                    kt:
+                    kt: &_semi_central_kt_binning_with_untagged_bin
                         "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 100]
                         "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
                 soft_drop_z_cut_04:
                     kt:
-                        "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 100]
-                        "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
+                        <<: *_semi_central_kt_binning_with_untagged_bin
+                dynamical_core_z_cut_02:
+                    kt:
+                        <<: *_semi_central_kt_binning_with_untagged_bin
+                dynamical_kt_z_cut_02:
+                    kt:
+                        <<: *_semi_central_kt_binning_with_untagged_bin
+                dynamical_time_z_cut_02:
+                    kt:
+                        <<: *_semi_central_kt_binning_with_untagged_bin
             settings:
                 default:
                     label: ""
@@ -1988,11 +1996,13 @@ analysis_configurations:
                     label: "tracking_efficiency"
                     closures: false
                     reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
                     datasets: "tracking_efficiency"
                 truncation_low:
                     label: "truncation"
                     closures: false
                     reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
                     datasets: "nominal"
                     binning:
                         default:
@@ -2002,6 +2012,7 @@ analysis_configurations:
                     label: "truncation"
                     closures: false
                     reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
                     datasets: "nominal"
                     binning:
                         default:
@@ -2011,6 +2022,7 @@ analysis_configurations:
                     label: "random_binning"
                     closures: false
                     reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
                     datasets: "nominal"
                     binning:
                         default:
@@ -2022,26 +2034,41 @@ analysis_configurations:
                                 # array([1.45, 1.94, 2.87, 4.07, 6.05])
                                 "smeared": [0, 1, 1.45, 1.94, 2.87, 4.07, 6.05, 8]
                         soft_drop_z_cut_02:
-                            kt:
+                            kt: &_semi_central_kt_random_binning_with_untagged_bin
                                 # >>> r = np.random.random_sample(7) / 10 + 0.95
                                 # >>> r
                                 # array([1.03659548, 0.98692702, 1.00371711, 0.97114479, 1.01570655, 0.9780861, 1.00131525])
                                 # >>> np.round(r * [0.5, 1, 1.5, 2, 3, 4, 6], 2)
                                 "smeared": [0, 0.25, 0.52, 0.99, 1.51, 1.94, 3.05, 3.91, 6.01, 8]
+                        soft_drop_z_cut_04:
+                            kt:
+                                <<: *_semi_central_kt_random_binning_with_untagged_bin
+                        dynamical_core_z_cut_02:
+                            kt:
+                                <<: *_semi_central_kt_random_binning_with_untagged_bin
+                        dynamical_kt_z_cut_02:
+                            kt:
+                                <<: *_semi_central_kt_random_binning_with_untagged_bin
+                        dynamical_time_z_cut_02:
+                            kt:
+                                <<: *_semi_central_kt_random_binning_with_untagged_bin
                 reweight_prior:
                     label: "reweight_prior"
                     closures: false
                     reweight_prior: true
+                    double_counting_cut: "traditional_det_level_track_pt"
                     datasets: "nominal"
                 background_low:
                     label: "Rmax005"
                     closures: false
                     reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
                     datasets: "rmax_005"
                 background_high:
                     label: "Rmax050"
                     closures: false
                     reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
                     datasets: "rmax_050"
                 # Soft Drop z = 0.2 variations
                 # Starting at 0.5
