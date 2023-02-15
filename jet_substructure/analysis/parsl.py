@@ -1421,7 +1421,7 @@ def setup_root_data_frame(
     _config_for_double_counting_cut = unfolding_settings if unfolding_settings is not None else base_unfolding_config["nominal_binning"]["default"]
     _double_counting_cut_name = _config_for_double_counting_cut.get("double_counting_cut", "")
     # Things are treated so different that it's better to be direct about the data collision system.
-    _analyzing_pp = collision_system == "pp"
+    _analyzing_pp = (collision_system == "pp" or collision_system == "pythia")
     if not _analyzing_pp and _double_counting_cut_name == "":
         raise ValueError("Must specify a double counting cut setting in PbPb! You can disable it with 'disabled'.")
     # We want this to be disabled in pp. To ensure that's the case, let's set it explicitly here!
