@@ -2,7 +2,7 @@
 
 Defines utilizes and settings.
 
-.. codeuathor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
+.. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
 from __future__ import annotations
@@ -104,6 +104,31 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
                 color=oranges[1], marker=markers[2], fillstyle="full",
                 label=r"Dynamical grooming $a = 0.5$",
                 label_short=r"DyG $a = 0.5$",
+                zorder=10,
+            ),
+            # With zcut
+            f"dynamical_kt_z_cut_02{label}": GroomingMethodStyle(
+                color=greens[1],
+                marker=markers[0],
+                fillstyle="none",
+                label=f"Dynamical grooming $a = 1.0$, $z > 0.2$",
+                label_short=r"DyG $a = 1.0$, $z > 0.2$",
+                zorder=10,
+            ),
+            f"dynamical_time_z_cut_02{label}": GroomingMethodStyle(
+                color=reds[1],
+                marker=markers[2],
+                fillstyle="none",
+                label=r"Dynamical grooming $a = 2.0$, $z > 0.2$",
+                label_short=r"DyG $a = 2.0$, $z > 0.2$",
+                zorder=10,
+            ),
+            f"dynamical_core_z_cut_02{label}": GroomingMethodStyle(
+                color=oranges[1],
+                marker=markers[2],
+                fillstyle="none",
+                label=r"Dynamical grooming $a = 0.5$, $z > 0.2$",
+                label_short=r"DyG $a = 0.5$, $z > 0.2$",
                 zorder=10,
             ),
             f"leading_kt{label}": GroomingMethodStyle(
