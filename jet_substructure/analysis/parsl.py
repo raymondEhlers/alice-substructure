@@ -15,7 +15,7 @@ from concurrent.futures import Future
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
 
-import attr
+import attrs
 import dask.distributed
 import IPython
 import numpy as np
@@ -1358,11 +1358,11 @@ def _root_data_frame_embedded_pt_hard_scaling(
     return res
 
 
-@attr.s
+@attrs.define
 class RootDataFrameProcessingMode:
-    name: str = attr.ib()
-    tag: str = attr.ib()
-    func: Callable[..., Future[Tuple[bool, str]]] = attr.ib()
+    name: str
+    tag: str
+    func: Callable[..., Future[Tuple[bool, str]]]
 
 
 def setup_root_data_frame(
@@ -1649,11 +1649,18 @@ def _unfolding_closure(
     )
 
 
-@attr.define
+@attrs.define
 class UnfoldingRuntimeSettings:
-    variable_to_unfold: str = attr.field(default="kt")
-    normalize_variable_by_jet_pt: bool = attr.field(default=False)
-    selected_settings: List[str] = attr.field(factory=lambda: ["default"])
+    variable_to_unfold: str = attrs.field(default="kt")
+    normalize_variable_by_jet_pt: bool = attrs.field(default=False)
+    selected_settings: List[str] = attrs.field(factory=lambda: ["default"])
+    _output_dir_tag: str = attrs.field(default="")
+
+    def output_dir(self, data_collision_system: str) -> Path:
+        _path = Path("output") / data_collision_system / "unfolding"
+        if self._output_dir_tag:
+            _path = _path / self._output_dir_tag
+        return _path
 
 
 def setup_all_unfolding(  # noqa: C901
@@ -1683,7 +1690,7 @@ def setup_all_unfolding(  # noqa: C901
     logger.info(f"Unfolding settings: {selected_unfolding_settings}")
     # Setup
     base_unfolding_config = base_dataset_config["unfolding"]
-    output_dir = Path("output") / data_collision_system / "unfolding" / "parsl" / "2023-01-dask"
+    output_dir = unfolding_runtime_settings.output_dir(data_collision_system=data_collision_system)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Things are treated so different that it's better to be direct about the data collision system.
