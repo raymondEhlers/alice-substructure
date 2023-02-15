@@ -3,10 +3,12 @@
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
+from __future__ import annotations
+
 import itertools
 import logging
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
 
 import attr
 import boost_histogram as bh
@@ -232,7 +234,11 @@ class UnfoldingOutput:
         # NOTE: Added "parsl" for the newer output results.
         # self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "feb2021_test"
         #self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2021-04"
-        self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2022-03-QM"
+        # TEMP - changed for pp vs PbPb
+        if self.collision_system == "pp":
+            self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2022-03-QM"
+        else:
+            self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2023-01-dask"
 
         # Initialize the file if the histograms aren't specified.
         if not self.hists:
@@ -446,8 +452,8 @@ def plot_relative_individual_systematics(
     plt.close(fig)
 
 
-def _load_analytical_calculations(filename: Path, bin_edges: np.ndarray) -> binned_data.BinnedData:
-    """Load analytical calcuations for a given jet R, as determined by the filename."""
+def _load_analytical_calculations(filename: Path, bin_edges: npt.NDArray[np.float64]) -> binned_data.BinnedData:
+    """Load analytical calculations for a given jet R, as determined by the filename."""
     # May not be terribly efficient, but it works automatically and it's a small amount of data, so it's good enough.
     arr = np.loadtxt(filename)
     central_values = arr[:, 0]
@@ -470,9 +476,9 @@ def _load_analytical_calculations(filename: Path, bin_edges: np.ndarray) -> binn
 
 
 def load_analytical_calculations(
-    path_to_calculations: Path, bin_edges: Dict[str, np.ndarray]
+    path_to_calculations: Path, bin_edges: Dict[str, npt.NDArray[np.float64]]
 ) -> Dict[str, Dict[str, binned_data.BinnedData]]:
-    """Load analytical calcuations for a collection of jet R, as determined by the bin edges dict."""
+    """Load analytical calculations for a collection of jet R, as determined by the bin edges dict."""
     _grooming_methods_to_files = {
         "dynamical_kt": "1",
         "dynamical_time": "2",
@@ -563,7 +569,7 @@ def load_sherpa_predictions(
 
 @attr.define
 class ModelInfo:
-    # TODO: Impelemtn this to wrap model predictions...
+    # TODO: Implement this to wrap model predictions...
     label: str
     needs_normalization: bool = attr.field(default=False)
     metadata: Dict[str, Any] = attr.field(factory=dict)
@@ -578,7 +584,7 @@ def _load_hybrid_model(
     jet_pt_bin: helpers.JetPtRange,
     quantity_to_retrieve: str = "ratio",
 ) -> Dict[str, Dict[str, binned_data.BinnedData]]:
-    output = {}
+    output: Dict[str, Dict[str, binned_data.BinnedData]] = {}
 
     # Encode the file specification below
     # First, the options in the filename
@@ -651,7 +657,7 @@ def _load_hybrid_model(
             # Assuming these all match up, we can just use the provided bin centers
             if _bin_center != _bin_centers[i_kt]:
                 raise ValueError(
-                    f"Mismatch betweeng file bin center {_bin_center} and provided bin center: {_bin_centers[i_kt]}"
+                    f"Mismatch between file bin center {_bin_center} and provided bin center: {_bin_centers[i_kt]}"
                 )
 
             _pt_bin_offset = _pt_bin_index[jet_pt_bin] * 6
@@ -727,7 +733,7 @@ def load_hybrid_model(
 #_model_palette = sns.color_palette("colorblind", n_colors=10)
 #_model_palette = sns.color_palette("dark", n_colors=6)
 
-_model_palette = [
+_model_palette: List[Tuple[float, float, float]] = [
     (53, 73, 222),
     (170, 52, 222),
     (223, 82, 87),
@@ -1067,7 +1073,7 @@ def plot_grooming_model_comparisons_for_single_system(
                 ),
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=text_font_size),  # type: ignore
+                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=text_font_size),  # type: ignore[arg-type]
                         pb.AxisConfig(
                             "y",
                             label=r"$\frac{\text{Model}}{\text{Data}}$",
@@ -1221,7 +1227,7 @@ def _plot_single_system_comparison(
             # TODO: Refactor when more awake...
             kt_range_for_current_grooming_method = kt_range[grooming_method]
             kt_range_for_reference = kt_range[reference_grooming_method]
-            kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)  # type: ignore
+            kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)  # type: ignore[arg-type, var-annotated]
             if kt_range_min < kt_range_for_reference.min:
                 kt_range_min = kt_range_for_reference.min
             if kt_range_max > kt_range_for_reference.max:
@@ -1359,7 +1365,7 @@ def plot_grooming_comparisons_for_single_system(
                 ),
                 pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=text_font_size),  # type: ignore
+                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=text_font_size),  # type: ignore[arg-type]
                         pb.AxisConfig(
                             "y",
                             label=r"$\frac{\text{Method}}{\text{"
@@ -1384,7 +1390,7 @@ def _plot_pp_PbPb_comparison(
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
     plot_config: pb.PlotConfig,
     output_dir: Path,
-    models: Mapping[str, Mapping[str, binned_data.BinnedData]] = None,
+    models: Mapping[str, Mapping[str, binned_data.BinnedData]] | None = None,
 ) -> None:
     """Plot PbPb with systematics compared to pp with systematics for a set of grooming methods."""
     # Validations
@@ -1444,7 +1450,7 @@ def _plot_pp_PbPb_comparison(
         # Option #1
         # I think I like these...
         # A blue
-        # This first blue seems too smiilar
+        # This first blue seems too similar
         #"#7277cb",
         "#4bafd0",
         # A green
@@ -1632,7 +1638,7 @@ def plot_pp_PbPb_comparison(
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
-    models: Mapping[str, Mapping[str, binned_data.BinnedData]] = None,
+    models: Mapping[str, Mapping[str, binned_data.BinnedData]] | None = None,
 ) -> None:
     """Plot PbPb unfolded results with systematics."""
     jet_pt_bin = next(iter(hists.values())).ranges[0]
@@ -2587,14 +2593,14 @@ def calculate_systematics(  # noqa: C901
         unfolded["default"].data.values
         - unfolding_outputs["default"]
         .unfolded_substructure(
-            n_iter=unfolding_outputs["default"].n_iter_compare - truncation_iter.min,  # type: ignore
+            n_iter=unfolding_outputs["default"].n_iter_compare - truncation_iter.min,  # type: ignore[arg-type]
             true_jet_pt_range=true_jet_pt_range,
         )
         .values,
         unfolded["default"].data.values
         - unfolding_outputs["default"]
         .unfolded_substructure(
-            n_iter=unfolding_outputs["default"].n_iter_compare + truncation_iter.max,  # type: ignore
+            n_iter=unfolding_outputs["default"].n_iter_compare + truncation_iter.max,  # type: ignore[arg-type]
             true_jet_pt_range=true_jet_pt_range,
         )
         .values,
@@ -3536,7 +3542,7 @@ def plot_kt_unfolding(
         )
         # Since our smeared and true kt ranges usually match, we'll restrict it here.
         # NOTE: Careful here, this doesn't actually apply for the main semi-central and central ranges...
-        true_substructure_variable_range = unfolding_output.smeared_var_range  # type: ignore
+        true_substructure_variable_range = unfolding_output.smeared_var_range  # type: ignore[assignment]
         text = f"${true_substructure_variable_range.display_str(label='true')}$"
         plot_unfolded(
             unfolding_output=unfolding_output,
@@ -3690,7 +3696,7 @@ def plot_kt_unfolding(
                 # Drop the lowest bin, since it's outside of our smeared jet pt range.
                 _small_jet_pt_bins = _small_jet_pt_bins[1:]
                 # Set the lowest bin lower edge to the smallest smeared value. This way,
-                # it will work for tuncation systematics.
+                # it will work for truncation systematics.
                 # _small_jet_pt_bins[0] = unfolding_output.smeared_jet_pt_range.min
         else:
             # Effectively, a proxy for pp
@@ -3807,7 +3813,7 @@ def plot_kt_unfolding(
         text = f"${true_jet_pt_range.display_str(label='true')}$"
         plot_select_iteration(
             unfolding_output=unfolding_output,
-            projection_func=UnfoldingOutput.unfolded_substructure,  # type: ignore
+            projection_func=UnfoldingOutput.unfolded_substructure,  # type: ignore[arg-type]
             max_iter=unfolding_output.max_n_iter,
             true_bin=true_jet_pt_range,
             plot_config=pb.PlotConfig(
@@ -4602,7 +4608,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
     text = f"${jet_pt_for_text.display_str(label='true')}$"
     plot_select_iteration(
         unfolding_output=unfolding_output,
-        projection_func=UnfoldingOutput.unfolded_substructure,  # type: ignore
+        projection_func=UnfoldingOutput.unfolded_substructure,  # type: ignore[arg-type]
         max_iter=unfolding_output.max_n_iter,
         true_bin=helpers.JetPtRange(60, 80),
         plot_config=pb.PlotConfig(
