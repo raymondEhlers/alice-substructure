@@ -1790,10 +1790,10 @@ analysis_configurations:
                 embed_pythia: *LHC18qr_semi_central_R02_embedded_tracking_efficiency
                 #embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_tracking_efficiency
             rmax_005:
-                PbPb: *LHC18qr_semi_central_R02_Rmax005
+                PbPb: *LHC18qr_semi_central_R02_mammoth_Rmax005
                 embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_Rmax005
             rmax_050:
-                PbPb: *LHC18qr_semi_central_R02_Rmax050
+                PbPb: *LHC18qr_semi_central_R02_mammoth_Rmax050
                 embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_Rmax050
             thermal_model:
                 PbPb: *LHC18qr_semi_central_R02_mammoth
