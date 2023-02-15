@@ -1653,6 +1653,7 @@ def _unfolding_closure(
 class UnfoldingRuntimeSettings:
     variable_to_unfold: str = attr.field(default="kt")
     normalize_variable_by_jet_pt: bool = attr.field(default=False)
+    selected_settings: List[str] = attr.field(factory=lambda: ["default"])
 
 
 def setup_all_unfolding(  # noqa: C901
@@ -1662,7 +1663,6 @@ def setup_all_unfolding(  # noqa: C901
     unfolding_runtime_settings: UnfoldingRuntimeSettings,
     n_cores_per_job: int,
     job_framework: job_utils.JobFramework,
-    selected_unfolding_settings: Optional[List[str]] = None,
     debug_cpp_code: bool = False,
 ) -> List[Future[Any]]:
     """Setup unfolding jobs.
@@ -1673,15 +1673,13 @@ def setup_all_unfolding(  # noqa: C901
         grooming_methods: Grooming methods to unfold.
         n_cores_per_job: N cores to make available for ROOT. This is of limited utility for RooUnfold,
             but anecdotally, it seems to still hope a bit with I/O.
-        selected_unfolding_settings: Subset of unfolding settings to run. Default: all defined in the config.
     Returns:
         List of `AppFuture` created when defining the jobs.
     """
     # Validation
     if data_collision_system not in ["pp", "PbPb"]:
         raise ValueError(f"Collision must be either pp or PbPb for unfolding. Passed: {data_collision_system}")
-    if selected_unfolding_settings is None:
-        selected_unfolding_settings = list(base_dataset_config["unfolding"]["settings"].keys())
+    selected_unfolding_settings = unfolding_runtime_settings.selected_settings
     logger.info(f"Unfolding settings: {selected_unfolding_settings}")
     # Setup
     base_unfolding_config = base_dataset_config["unfolding"]
@@ -2219,50 +2217,6 @@ def setup_and_submit_tasks(  # noqa: C901
             unfolding_runtime_settings=unfolding_runtime_settings,
             n_cores_per_job=task_config.n_cores_per_task,
             job_framework=job_framework,
-            selected_unfolding_settings=[
-                # TODO: Re-run pp with a different split MC fraction...
-                "default",
-                # Soft Drop z > 0.2 tests for min kt
-                # "default_z_cut_02_kt_0.5",
-                # "default_z_cut_02_kt_0.5_reweight_prior",
-                # "default_z_cut_02_kt_0.25",
-                # "default_z_cut_02_kt_0.25_reweight_prior",
-                # "default_z_cut_02_kt_0",
-                # "default_z_cut_02_kt_0_reweight_prior",
-                # "default_2_4_split",
-                # "default_2_4_split_reweight_prior",
-                # "default_kt_1.5",
-                # "default_kt_1.5_reweight_prior",
-                # "default_kt_1",
-                # "default_kt_1_reweight_prior",
-                # Semi-central
-                # "default_kt_1_var2",
-                # "default_kt_1_var2_reweight_prior",
-                # "default_kt_1_var3",
-                # "default_kt_1_var3_reweight_prior",
-                # "default_kt_1_6",
-                # "default_kt_1_6_reweight_prior",
-                # "default_kt_1_6_var4",
-                # "default_kt_1_6_var4_reweight_prior",
-                # Central
-                # "default_kt_1.5_6",
-                # "default_kt_1.5_6_reweight_prior",
-                # "default_kt_1.5_6_var2",
-                # "default_kt_1.5_6_var2_reweight_prior",
-                # *[f"var_{i}" for i in range(1, 17) if i < 7 or i > 10] + ["default"],
-                # Systematics
-                # Unfolding
-                #"truncation_low",
-                #"truncation_high",
-                #"random_binning",
-                # Unfolding PbPb
-                #"reweight_prior",
-                # Tracking efficiency
-                #"tracking_efficiency",
-                # PbPb background
-                #"background_low",
-                #"background_high",
-            ],
         )
         # results = setup_unfolding(
         #     grooming_methods=grooming_methods,
@@ -2355,6 +2309,52 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
         # "soft_drop_z_cut_02",
         # "soft_drop_z_cut_04",
     ]
+    unfolding_runtime_settings = UnfoldingRuntimeSettings(
+        selected_settings=[
+            # TODO: Re-run pp with a different split MC fraction...
+            "default",
+            # Soft Drop z > 0.2 tests for min kt
+            # "default_z_cut_02_kt_0.5",
+            # "default_z_cut_02_kt_0.5_reweight_prior",
+            # "default_z_cut_02_kt_0.25",
+            # "default_z_cut_02_kt_0.25_reweight_prior",
+            # "default_z_cut_02_kt_0",
+            # "default_z_cut_02_kt_0_reweight_prior",
+            # "default_2_4_split",
+            # "default_2_4_split_reweight_prior",
+            # "default_kt_1.5",
+            # "default_kt_1.5_reweight_prior",
+            # "default_kt_1",
+            # "default_kt_1_reweight_prior",
+            # Semi-central
+            # "default_kt_1_var2",
+            # "default_kt_1_var2_reweight_prior",
+            # "default_kt_1_var3",
+            # "default_kt_1_var3_reweight_prior",
+            # "default_kt_1_6",
+            # "default_kt_1_6_reweight_prior",
+            # "default_kt_1_6_var4",
+            # "default_kt_1_6_var4_reweight_prior",
+            # Central
+            # "default_kt_1.5_6",
+            # "default_kt_1.5_6_reweight_prior",
+            # "default_kt_1.5_6_var2",
+            # "default_kt_1.5_6_var2_reweight_prior",
+            # *[f"var_{i}" for i in range(1, 17) if i < 7 or i > 10] + ["default"],
+            # Systematics
+            # Unfolding
+            #"truncation_low",
+            #"truncation_high",
+            #"random_binning",
+            # Unfolding PbPb
+            #"reweight_prior",
+            # Tracking efficiency
+            #"tracking_efficiency",
+            # PbPb background
+            #"background_low",
+            #"background_high",
+        ],
+    )
 
     # Job execution configuration
     task_name = "unfolding_hardest_kt"
@@ -2393,6 +2393,7 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
         collision_system=collision_system,
         jobs_to_execute=jobs_to_execute,
         input_grooming_methods=grooming_methods,
+        unfolding_runtime_settings=unfolding_runtime_settings,
         dask_client=job_executor if job_framework == job_utils.JobFramework.dask_delayed else None,  # type: ignore[arg-type]
     )
     follow_progress_of_futures(futures=futures)
