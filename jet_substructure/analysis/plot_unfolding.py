@@ -2314,7 +2314,7 @@ def setup_unfolding_outputs(  # noqa: C901
         logger.debug("Skipping model dependence because the output file doesn't exist.")
 
     # Background subtraction
-    for background_setting in ["Rmax070", "Rmax005"]:
+    for background_setting in ["Rmax070", "Rmax050", "Rmax005"]:
         try:
             unfolding_outputs[background_setting] = UnfoldingOutput(
                 substructure_variable=substructure_variable,
