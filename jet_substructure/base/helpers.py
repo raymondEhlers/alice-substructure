@@ -331,7 +331,7 @@ class RgRange(RangeSelector):
 @attr.s(frozen=True)
 class ZgRange(RangeSelector):
     _variable_name = "zg"
-    _dispaly_name = r"z_{\text{g}}"
+    _display_name = r"z_{\text{g}}"
 
 
 def _AliEmcalList_to_TList(
