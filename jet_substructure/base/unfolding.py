@@ -145,10 +145,12 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
     ) -> SubstructureVariableSettings2D:
         # Determine the appropriate range class.
         # Either "Kt", "Rg", or "Zg"
-        range_class_name = variable_name
-        if variable_name != "kt" and "g" not in variable_name:
-            range_class_name += "g"
-        range_class_name = range_class_name.capitalize()
+        _variable_to_range_class_name = {
+            "kt": "kt",
+            "delta_R": "Rg",
+            "z": "zg",
+        }
+        range_class_name = _variable_to_range_class_name[variable_name]
         range_class_name += "Range"
         range_class: Type[helpers.RangeSelector] = getattr(helpers, range_class_name)
 
