@@ -1787,8 +1787,7 @@ analysis_configurations:
                 embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded
             tracking_efficiency:
                 PbPb: *LHC18qr_semi_central_R02_mammoth
-                embed_pythia: *LHC18qr_semi_central_R02_embedded_tracking_efficiency
-                #embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_tracking_efficiency
+                embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_tracking_efficiency
             rmax_005:
                 PbPb: *LHC18qr_semi_central_R02_mammoth_Rmax005
                 embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_Rmax005
