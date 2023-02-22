@@ -258,7 +258,7 @@ class UnfoldingOutput:
         name += f"_untagged_{self.smeared_untagged_var}"
         name += f"_smeared_{self.smeared_jet_pt_range}"
         if self.double_counting_cut and self.double_counting_cut != "disabled":
-            name += f"__double_counting_cut_{self.double_counting_cut}_"
+            name += f"__DCC_{self.double_counting_cut}_"
         if self.suffix:
             name += f"_{self.suffix}"
         if self.pure_matches:
