@@ -2431,8 +2431,8 @@ def _load_unfolded_outputs(
             double_counting_cut=double_counting_cut,
             pure_matches=True,
         )
-    except KeyError as e:
-        logger.warning(f"Could not find pure matches output '{e}'. Skipping")
+    except FileNotFoundError as e:
+        logger.debug("Skipping pure matches because the output file doesn't exist.")
         unfolding_closure_pure_matches_outputs = {}
 
     unfolding_systematics_outputs = setup_unfolding_outputs(
