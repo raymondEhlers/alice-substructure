@@ -1746,7 +1746,7 @@ def setup_all_unfolding(  # noqa: C901
                 for filename in Path(f"{train_directory}/skim/").glob("*.root"):
                     # Filter out pt hat bins based on the double counting cut settings
                     # NOTE: This won't work if not produced by mammoth...
-                    if _double_counting_cut_settings.min_pt_hat_bin > 0 and response_collision_system == "embed_pythia":
+                    if _double_counting_cut_settings.min_pt_hat_bin > 0 and label == "embed_pythia":
                         _extracted_pt_hat_bin = _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filename=filename)
                         if _extracted_pt_hat_bin <= _double_counting_cut_settings.min_pt_hat_bin:
                             logger.debug(f"Due to double counting cut of min pt hat bin of {_double_counting_cut_settings.min_pt_hat_bin}, skipping pt hat bin {_extracted_pt_hat_bin} file {filename}")
