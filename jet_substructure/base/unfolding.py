@@ -146,7 +146,7 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
         # Determine the appropriate range class.
         # Either "Kt", "Rg", or "Zg"
         _variable_to_range_class_name = {
-            "kt": "kt",
+            "kt": "Kt",
             "delta_R": "Rg",
             "z": "zg",
         }
