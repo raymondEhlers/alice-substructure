@@ -1994,35 +1994,6 @@ analysis_configurations:
                             kt:
                                 "true": [-0.05, 0, 2, 3, 4, 8, 100]
                                 "smeared": [1, 2, 3, 4, 8]
-                peter_binning:
-                    label: "peter_binning"
-                    closures: false
-                    reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
-                    datasets: "nominal"
-                    binning:
-                        default:
-                            kt:
-                                # Merge Peter's binning with kt cut
-                                "true": [-0.05, 0, 1, 1.5, 2.25, 3.5, 6, 100]
-                                "smeared": [0, 1, 1.5, 2.25, 3.5, 6, 8]
-                        soft_drop_z_cut_02:
-                            kt: &_semi_central_R02_kt_binning_with_untagged_bin_Peter_suggested
-                                # 0.5, 0.5, 0.75, 1.25, 2.50
-                                "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2.25, 3.5, 6, 100]
-                                "smeared": [0, 0.25, 0.5, 1, 1.5, 2.25, 3.5, 6, 8]
-                        soft_drop_z_cut_04:
-                            kt:
-                                <<: *_semi_central_R02_kt_binning_with_untagged_bin_Peter_suggested
-                        dynamical_core_z_cut_02:
-                            kt:
-                                <<: *_semi_central_R02_kt_binning_with_untagged_bin_Peter_suggested
-                        dynamical_kt_z_cut_02:
-                            kt:
-                                <<: *_semi_central_R02_kt_binning_with_untagged_bin_Peter_suggested
-                        dynamical_time_z_cut_02:
-                            kt:
-                                <<: *_semi_central_R02_kt_binning_with_untagged_bin_Peter_suggested
                 # Systematics
                 tracking_efficiency:
                     label: "tracking_efficiency"
@@ -2102,6 +2073,137 @@ analysis_configurations:
                     reweight_prior: false
                     double_counting_cut: "traditional_det_level_track_pt"
                     datasets: "rmax_050"
+                # Peter's binning
+                peter_binning:
+                    label: "peter_binning"
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
+                    datasets: "nominal"
+                    binning: &_semi_central_R02_kt_binning_Peter_suggested
+                        default: &_semi_central_R02_kt_binning_default_block_Peter_suggested
+                            kt:
+                                # Merge Peter's binning with kt cut
+                                "true": [-0.05, 0, 1, 1.5, 2.25, 3.5, 6, 100]
+                                "smeared": [0, 1, 1.5, 2.25, 3.5, 6, 8]
+                        soft_drop_z_cut_02:
+                            kt: &_semi_central_R02_kt_binning_with_untagged_bin_Peter_suggested
+                                # 0.5, 0.5, 0.75, 1.25, 2.50
+                                "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2.25, 3.5, 6, 100]
+                                "smeared": [0, 0.25, 0.5, 1, 1.5, 2.25, 3.5, 6, 8]
+                        soft_drop_z_cut_04:
+                            kt:
+                                <<: *_semi_central_R02_kt_binning_with_untagged_bin_Peter_suggested
+                        dynamical_core_z_cut_02:
+                            kt:
+                                <<: *_semi_central_R02_kt_binning_with_untagged_bin_Peter_suggested
+                        dynamical_kt_z_cut_02:
+                            kt:
+                                <<: *_semi_central_R02_kt_binning_with_untagged_bin_Peter_suggested
+                        dynamical_time_z_cut_02:
+                            kt:
+                                <<: *_semi_central_R02_kt_binning_with_untagged_bin_Peter_suggested
+                peter_binning_tracking_efficiency:
+                    label: "peter_binning_tracking_efficiency"
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
+                    datasets: "tracking_efficiency"
+                    binning:
+                        <<: *_semi_central_R02_kt_binning_Peter_suggested
+                peter_binning_truncation_low:
+                    label: "peter_binning_truncation"
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
+                    datasets: "nominal"
+                    binning:
+                        <<: *_semi_central_R02_kt_binning_Peter_suggested
+                        default:
+                            <<: *_semi_central_R02_kt_binning_default_block_Peter_suggested
+                            jet_pt:
+                                "smeared": [35, 50, 60, 80, 100, 120]
+                peter_binning_truncation_high:
+                    label: "peter_binning_truncation"
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
+                    datasets: "nominal"
+                    binning:
+                        <<: *_semi_central_R02_kt_binning_Peter_suggested
+                        default:
+                            <<: *_semi_central_R02_kt_binning_default_block_Peter_suggested
+                            jet_pt:
+                                "smeared": [45, 50, 60, 80, 100, 120]
+                peter_binning_random_binning:
+                    label: "peter_binning_random_binning"
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
+                    datasets: "nominal"
+                    binning:
+                        default:
+                            kt:
+                                # NOTE: We need to copy this down because we're redefining this block
+                                "true": [-0.05, 0, 1, 1.5, 2.25, 3.5, 6, 100]
+                                # Now, determine the smeared
+                                # >>> In [6]: arr = [1.5, 2.25, 3.5, 6]
+                                # >>> In [7]: r = np.random.random_sample(len(arr)) / 10 + 0.95
+                                # >>> In [8]: r
+                                # >>> Out[8]: array([1.0036152 , 0.95856209, 1.00915539, 0.96301701])
+                                # >>> In [9]: np.round(r * arr, 2)
+                                # >>> Out[9]: array([1.51, 2.16, 3.53, 5.78])
+                                "smeared": [0, 1, 1.51, 2.16, 3.53, 5.78, 8]
+                        soft_drop_z_cut_02:
+                            kt: &_semi_central_R02_kt_random_binning_with_untagged_bin_Peter_suggested
+                                # NOTE: We need to copy this down because we're redefining this block
+                                "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2.25, 3.5, 6, 100]
+                                # Now, determine the smeared
+                                # >>> In [10]: arr = [0.5, 1, 1.5, 2.25, 3.5, 6]
+                                # >>> In [11]: r = np.random.random_sample(len(arr)) / 10 + 0.95
+                                # >>> In [12]: r
+                                # >>> Out[12]:
+                                # >>> array([0.99142287, 1.04406432, 0.97038874, 0.9835055 , 1.0301842 , 1.04248346])
+                                # >>> In [13]: np.round(r * arr, 2)
+                                # >>> Out[13]: array([0.5 , 1.04, 1.46, 2.21, 3.61, 6.25])
+                                "smeared": [0, 0.25, 0.5 , 1.04, 1.46, 2.21, 3.61, 6.25, 8]
+                        soft_drop_z_cut_04:
+                            kt:
+                                <<: *_semi_central_R02_kt_random_binning_with_untagged_bin_Peter_suggested
+                        dynamical_core_z_cut_02:
+                            kt:
+                                <<: *_semi_central_R02_kt_random_binning_with_untagged_bin_Peter_suggested
+                        dynamical_kt_z_cut_02:
+                            kt:
+                                <<: *_semi_central_R02_kt_random_binning_with_untagged_bin_Peter_suggested
+                        dynamical_time_z_cut_02:
+                            kt:
+                                <<: *_semi_central_R02_kt_random_binning_with_untagged_bin_Peter_suggested
+                peter_binning_reweight_prior:
+                    label: "peter_binning_reweight_prior"
+                    closures: false
+                    reweight_prior: true
+                    double_counting_cut: "traditional_det_level_track_pt"
+                    datasets: "nominal"
+                    binning:
+                        <<: *_semi_central_R02_kt_binning_Peter_suggested
+                peter_binning_background_low:
+                    label: "peter_binning_Rmax005"
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
+                    datasets: "rmax_005"
+                    binning:
+                        <<: *_semi_central_R02_kt_binning_Peter_suggested
+                peter_binning_background_high:
+                    label: "peter_binning_Rmax050"
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "traditional_det_level_track_pt"
+                    datasets: "rmax_050"
+                    binning:
+                        <<: *_semi_central_R02_kt_binning_Peter_suggested
+
                 # Soft Drop z = 0.2 variations
                 # Starting at 0.5
                 default_z_cut_02_kt_0.5:
