@@ -302,9 +302,9 @@ def get_config_property_stored_in_binning(
     substructure_variable_to_analyze: str,
     variable_to_retrieve: str | None = None,
 ) -> Any:
-    """Get unfolding binning for a particular axis name.
+    """Get unfolding binning property for a particular variable name.
 
-    If a axis isn't specified, we fall back to the nominal binning.
+    If a variable isn't specified, we fall back to the nominal binning.
 
     Args:
         unfolding_settings: Unfolding settings for a particular case.
@@ -316,8 +316,7 @@ def get_config_property_stored_in_binning(
             This will implicitly be the field we attempt to retrieve unless the
             `variable_to_retrieve` is specified
         variable_to_retrieve: Particular name of variable to retrieve as stored inside
-            of the substructure_variable
-            Another option is `jet_pt` or `var_over_pt`.
+            of the substructure_variable. An option is `jet_pt` or `var_over_pt`.
     Returns:
         Binning for that axis.
     """
@@ -328,6 +327,8 @@ def get_config_property_stored_in_binning(
         parameter_path.append(variable_to_retrieve)
     parameter_path_for_default = list(parameter_path)
     parameter_path_for_default[0] = "default"
+    # Further setup
+    additional_settings_names_for_property_lookups = unfolding_settings.get("additional_settings_names_for_property_lookup", [])
 
     parameter = None
     specialized_binning = unfolding_settings.get("binning", {})
@@ -336,7 +337,16 @@ def get_config_property_stored_in_binning(
         if not parameter:
             # Try again, but this time with default binning...
             parameter = _get_possible_parameter_from_settings(settings=specialized_binning, parameter_path=parameter_path_for_default, binning_type=binning_type)
-    # If not available in the specialized unfolding config, then grab it from the base config.
+    # If not available in the selected specialized unfolding config, then try to grab it from other
+    # options for specified settings.
+    for additional_settings_name in additional_settings_names_for_property_lookups:
+        if not parameter:
+            logger.debug(f"Looking in additional settings \"{additional_settings_name}\"")
+            additional_settings_binning = base_unfolding_config["settings"][additional_settings_name].get("binning", {})
+            parameter = _get_possible_parameter_from_settings(settings=additional_settings_binning, parameter_path=parameter_path, binning_type=binning_type)
+            if not parameter:
+                parameter = _get_possible_parameter_from_settings(settings=additional_settings_binning, parameter_path=parameter_path_for_default, binning_type=binning_type)
+    # Lastly, if not available in the any specialized unfolding config, then grab it from the base config.
     if not parameter:
         nominal_binning = base_unfolding_config["nominal_binning"]
         parameter = _get_possible_parameter_from_settings(settings=nominal_binning, parameter_path=parameter_path, binning_type=binning_type)
@@ -372,8 +382,7 @@ def get_binning(
             This will implicitly be the field we attempt to retrieve unless the
             `variable_to_retrieve` is specified
         variable_to_retrieve: Particular name of variable to retrieve as stored inside
-            of the substructure_variable
-            Another option is `jet_pt` or `var_over_pt`.
+            of the substructure_variable. An option is `jet_pt` or `var_over_pt`.
     Returns:
         Binning for that axis.
     """

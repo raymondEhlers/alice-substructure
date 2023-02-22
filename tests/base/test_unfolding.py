@@ -68,6 +68,14 @@ settings:
                         "smeared": [150., 200., 300., 400., 500.]
     new_settings_without_specialized_binning:
         value: "some"
+    new_settings_with_additional_lookup:
+        additional_settings_names_for_property_lookup: ["some_new_settings"]
+        binning:
+            default:
+                kt:
+                    # NOTE: 6x default
+                    "smeared": [6., 12., 18., 24., 30., 36.]
+                    # "true" is 4x
 """
 
 @pytest.fixture
@@ -77,7 +85,7 @@ def binning_in_unfolding_config() -> Dict[str, Any]:
 
 
 @pytest.mark.parametrize(
-    "specialized_settings", ["some_new_settings", "new_settings_without_specialized_binning"]
+    "specialized_settings", ["some_new_settings", "new_settings_without_specialized_binning", "new_settings_with_additional_lookup"]
 )
 @pytest.mark.parametrize(
     "binning_type", ["smeared", "true"],
@@ -110,7 +118,6 @@ def test_loading_binning_from_unfolding_config(
         substructure_variable_to_analyze=substructure_variable_to_analyze,
         variable_to_retrieve=variable_to_retrieve,
     )
-
 
     # Determine the expected value
     _base_true_values = {
@@ -145,6 +152,10 @@ def test_loading_binning_from_unfolding_config(
         ("new_settings_without_specialized_binning", "dynamical_core", "kt", "jet_pt"): 3,
         ("new_settings_without_specialized_binning", "soft_drop_z_cut_02", "kt", "kt"): 2,
         ("new_settings_without_specialized_binning", "soft_drop_z_cut_02", "kt", "jet_pt"): 2,
+        ("new_settings_with_additional_lookup", "dynamical_core", "kt", "kt"): 6 if binning_type == "smeared" else 4,
+        ("new_settings_with_additional_lookup", "dynamical_core", "kt", "jet_pt"): 4,
+        ("new_settings_with_additional_lookup", "soft_drop_z_cut_02", "kt", "kt"): 6 if binning_type == "smeared" else 5,
+        ("new_settings_with_additional_lookup", "soft_drop_z_cut_02", "kt", "jet_pt"): 5,
         # delta_R
         ("some_new_settings", "dynamical_core", "delta_R", "delta_R"): -2,
         ("some_new_settings", "dynamical_core", "delta_R", "jet_pt"): -2,
@@ -154,6 +165,11 @@ def test_loading_binning_from_unfolding_config(
         ("new_settings_without_specialized_binning", "dynamical_core", "delta_R", "jet_pt"): 1,
         ("new_settings_without_specialized_binning", "soft_drop_z_cut_02", "delta_R", "delta_R"): -1,
         ("new_settings_without_specialized_binning", "soft_drop_z_cut_02", "delta_R", "jet_pt"): 1,
+        # Direct copy of "new_settings_without_specialized_binning" - just filling out tbe matrix
+        ("new_settings_with_additional_lookup", "dynamical_core", "delta_R", "delta_R"): -2,
+        ("new_settings_with_additional_lookup", "dynamical_core", "delta_R", "jet_pt"): -2,
+        ("new_settings_with_additional_lookup", "soft_drop_z_cut_02", "delta_R", "delta_R"): -2,
+        ("new_settings_with_additional_lookup", "soft_drop_z_cut_02", "delta_R", "jet_pt"): -2,
     }
     _expected_values *= _multiplicative_factors[
         (specialized_settings, grooming_method, substructure_variable_to_analyze, _expected_variable_name)
