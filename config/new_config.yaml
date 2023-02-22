@@ -2756,33 +2756,6 @@ analysis_configurations:
                     closures: false
                     reweight_prior: true
                     datasets: "nominal"
-                peter_binning:
-                    label: "peter_binning"
-                    closures: false
-                    reweight_prior: false
-                    datasets: "nominal"
-                    binning:
-                        default:
-                            kt:
-                                # Merge Peter's binning with kt cut
-                                "true": [0., 0.25, 0.5, 1, 1.5, 2.25, 3.5, 6, 10]
-                                "smeared": [0.25, 0.25, 0.5, 1., 1.5, 2.25, 3.5, 6]
-                        soft_drop_z_cut_02:
-                            kt: &_pp_R02_kt_binning_with_untagged_bin_Peter_suggested
-                                "true": [-0.05, 0., 0.25, 0.5, 1, 1.5, 2.25, 3.5, 6, 10]
-                                "smeared": [0, 0.25, 0.5, 1., 1.5, 2.25, 3.5, 6]
-                        soft_drop_z_cut_04:
-                            kt:
-                                <<: *_pp_R02_kt_binning_with_untagged_bin_Peter_suggested
-                        dynamical_core_z_cut_02:
-                            kt:
-                                <<: *_pp_R02_kt_binning_with_untagged_bin_Peter_suggested
-                        dynamical_kt_z_cut_02:
-                            kt:
-                                <<: *_pp_R02_kt_binning_with_untagged_bin_Peter_suggested
-                        dynamical_time_z_cut_02:
-                            kt:
-                                <<: *_pp_R02_kt_binning_with_untagged_bin_Peter_suggested
                 # Systematics
                 tracking_efficiency:
                     label: "tracking_efficiency"
@@ -2844,6 +2817,108 @@ analysis_configurations:
                         dynamical_time_z_cut_02:
                             kt:
                                 <<: *_pp_R02_kt_random_binning_with_untagged_bin
+                # Peter's binning
+                peter_binning:
+                    label: "peter_binning"
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        # TODO: Optimize factor.
+                        # It seems to be about 1 in 7200. Round to 1 in 1000
+                        #split_MC_fraction_for_response: 0.999
+                        max_untagged_bin: 10
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        default:
+                            kt:
+                                # Merge Peter's binning with kt cut
+                                "true": [0., 0.25, 0.5, 1, 1.5, 2.25, 3.5, 6, 10]
+                                "smeared": [0.25, 0.25, 0.5, 1., 1.5, 2.25, 3.5, 6]
+                        soft_drop_z_cut_02:
+                            kt: &_pp_R02_kt_binning_with_untagged_bin_Peter_suggested
+                                "true": [-0.05, 0., 0.25, 0.5, 1, 1.5, 2.25, 3.5, 6, 10]
+                                "smeared": [0, 0.25, 0.5, 1., 1.5, 2.25, 3.5, 6]
+                        soft_drop_z_cut_04:
+                            kt:
+                                <<: *_pp_R02_kt_binning_with_untagged_bin_Peter_suggested
+                        dynamical_core_z_cut_02:
+                            kt:
+                                <<: *_pp_R02_kt_binning_with_untagged_bin_Peter_suggested
+                        dynamical_kt_z_cut_02:
+                            kt:
+                                <<: *_pp_R02_kt_binning_with_untagged_bin_Peter_suggested
+                        dynamical_time_z_cut_02:
+                            kt:
+                                <<: *_pp_R02_kt_binning_with_untagged_bin_Peter_suggested
+                # NOTE: We skip reweighting the prior for pp. Instead, we use HERWIG for model dependence.
+                #       However, we still create the configuration, because it can useful as a stand in for some cases.
+                peter_binning_reweight_prior:
+                    label: "peter_binning_reweight_prior"
+                    additional_settings_names_for_property_lookup: ["peter_binning"]
+                    closures: false
+                    reweight_prior: true
+                    datasets: "nominal"
+                # Systematics
+                peter_binning_tracking_efficiency:
+                    label: "peter_binning_tracking_efficiency"
+                    additional_settings_names_for_property_lookup: ["peter_binning"]
+                    closures: false
+                    reweight_prior: false
+                    datasets: "tracking_efficiency"
+                peter_binning_truncation_low:
+                    label: "peter_binning_truncation"
+                    additional_settings_names_for_property_lookup: ["peter_binning"]
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        default:
+                            jet_pt:
+                                "smeared": [17, 30, 40, 50, 60, 85]
+                peter_binning_truncation_high:
+                    label: "peter_binning_truncation"
+                    additional_settings_names_for_property_lookup: ["peter_binning"]
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        default:
+                            jet_pt:
+                                "smeared": [23, 30, 40, 50, 60, 85]
+                peter_binning_random_binning:
+                    label: "peter_binning_random_binning"
+                    additional_settings_names_for_property_lookup: ["peter_binning"]
+                    closures: false
+                    reweight_prior: false
+                    datasets: "nominal"
+                    binning:
+                        default:
+                            kt:
+                                # Determine the smeared
+                                # >>> In [2]: arr = np.array([0.5, 1., 1.5, 2.25, 3.5,], dtype=np.float64)
+                                # >>> In [3]: r = np.random.random_sample(len(arr)) / 10 + 0.95
+                                # >>> In [4]: r
+                                # >>> Out[4]: array([1.04810758, 0.95562291, 1.02056738, 0.98783673, 0.98574269])
+                                # >>> In [5]: np.round(r * arr, 2)
+                                # >>> Out[5]: array([0.52, 0.96, 1.53, 2.22, 3.45])
+                                "smeared": [0.25, 0.25, 0.52, 0.96, 1.53, 2.22, 3.45, 6]
+                        soft_drop_z_cut_02:
+                            kt: &_pp_R02_kt_random_binning_with_untagged_bin_Peter_suggested
+                                # Same as above, but including the untagged bin.
+                                "smeared": [0, 0.25, 0.52, 0.96, 1.53, 2.22, 3.45, 6]
+                        soft_drop_z_cut_04:
+                            kt:
+                                <<: *_pp_R02_kt_random_binning_with_untagged_bin_Peter_suggested
+                        dynamical_core_z_cut_02:
+                            kt:
+                                <<: *_pp_R02_kt_random_binning_with_untagged_bin_Peter_suggested
+                        dynamical_kt_z_cut_02:
+                            kt:
+                                <<: *_pp_R02_kt_random_binning_with_untagged_bin_Peter_suggested
+                        dynamical_time_z_cut_02:
+                            kt:
+                                <<: *_pp_R02_kt_random_binning_with_untagged_bin_Peter_suggested
 
 
     PbPb_semi_central_R04_validation:
