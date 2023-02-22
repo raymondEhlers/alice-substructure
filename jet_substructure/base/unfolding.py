@@ -266,11 +266,11 @@ def _getitem_for_dict_with_default(d: Mapping[str, Any], key: str) -> Any:
     return d.get(key, {})
 
 
-def _get_possible_binning_from_settings(
+def _get_possible_parameter_from_settings(
     settings: Mapping[str, Any],
     parameter_path: Sequence[str],
     binning_type: BinningType
-) -> List[float] | None:
+) -> List[float] | Any | None:
     # Setup
     binning = None
     parameter_path = list(parameter_path)
@@ -278,7 +278,7 @@ def _get_possible_binning_from_settings(
     while len(parameter_path) > 1:
         logger.debug(f"Checking {parameter_path}")
         possible_binning = functools.reduce(_getitem_for_dict_with_default, parameter_path, settings)
-        binning = possible_binning.get(binning_type, [])
+        binning = possible_binning.get(binning_type, None)
         if binning:
             break
         else:
@@ -292,6 +292,62 @@ def _get_possible_binning_from_settings(
             #del parameter_path[-2]
 
     return binning
+
+
+def get_config_property_stored_in_binning(
+    unfolding_settings: Mapping[str, Any],
+    base_unfolding_config: Mapping[str, Any],
+    binning_type: BinningType,
+    grooming_method: str,
+    substructure_variable_to_analyze: str,
+    variable_to_retrieve: str | None = None,
+) -> Any:
+    """Get unfolding binning for a particular axis name.
+
+    If a axis isn't specified, we fall back to the nominal binning.
+
+    Args:
+        unfolding_settings: Unfolding settings for a particular case.
+        base_unfolding_config: Base unfolding config for the system.
+        binning_type: Type of binning to retrieve - either "smeared" or "true".
+        grooming_method: Name of the grooming method to allow for specialization
+            of the binning based on the grooming method (if specified)
+        substructure_variable_to_analyze: Name of the substructure variable to specialize with.
+            This will implicitly be the field we attempt to retrieve unless the
+            `variable_to_retrieve` is specified
+        variable_to_retrieve: Particular name of variable to retrieve as stored inside
+            of the substructure_variable
+            Another option is `jet_pt` or `var_over_pt`.
+    Returns:
+        Binning for that axis.
+    """
+    # Validation
+    parameter_path = [grooming_method, substructure_variable_to_analyze]
+    # If we need to retrieve a particular parameter beyond the substructure variable (eg. jet_pt)
+    if variable_to_retrieve:
+        parameter_path.append(variable_to_retrieve)
+    parameter_path_for_default = list(parameter_path)
+    parameter_path_for_default[0] = "default"
+
+    parameter = None
+    specialized_binning = unfolding_settings.get("binning", {})
+    if specialized_binning:
+        parameter = _get_possible_parameter_from_settings(settings=specialized_binning, parameter_path=parameter_path, binning_type=binning_type)
+        if not parameter:
+            # Try again, but this time with default binning...
+            parameter = _get_possible_parameter_from_settings(settings=specialized_binning, parameter_path=parameter_path_for_default, binning_type=binning_type)
+    # If not available in the specialized unfolding config, then grab it from the base config.
+    if not parameter:
+        nominal_binning = base_unfolding_config["nominal_binning"]
+        parameter = _get_possible_parameter_from_settings(settings=nominal_binning, parameter_path=parameter_path, binning_type=binning_type)
+        if not parameter:
+            parameter = _get_possible_parameter_from_settings(settings=nominal_binning, parameter_path=parameter_path_for_default, binning_type=binning_type)
+
+    # Final validation. We must find the parameter somewhere!
+    if not parameter:
+        raise ValueError(f"Unable to find parameter for parameter path: {parameter_path}, binning_type: {binning_type}")
+
+    return parameter
 
 
 def get_binning(
@@ -321,30 +377,12 @@ def get_binning(
     Returns:
         Binning for that axis.
     """
-    # Validation
-    parameter_path = [grooming_method, substructure_variable_to_analyze]
-    # If we need to retrieve a particular parameter beyond the substructure variable (eg. jet_pt)
-    if variable_to_retrieve:
-        parameter_path.append(variable_to_retrieve)
-    parameter_path_for_default = list(parameter_path)
-    parameter_path_for_default[0] = "default"
-
-    binning = None
-    specialized_binning = unfolding_settings.get("binning", {})
-    if specialized_binning:
-        binning = _get_possible_binning_from_settings(settings=specialized_binning, parameter_path=parameter_path, binning_type=binning_type)
-        if not binning:
-            # Try again, but this time with default binning...
-            binning = _get_possible_binning_from_settings(settings=specialized_binning, parameter_path=parameter_path_for_default, binning_type=binning_type)
-    # If not available in the specialized unfolding config, then grab it from the base config.
-    if not binning:
-        nominal_binning = base_unfolding_config["nominal_binning"]
-        binning = _get_possible_binning_from_settings(settings=nominal_binning, parameter_path=parameter_path, binning_type=binning_type)
-        if not binning:
-            binning = _get_possible_binning_from_settings(settings=nominal_binning, parameter_path=parameter_path_for_default, binning_type=binning_type)
-
-    # Final validation. We must find binning somewhere!
-    if not binning:
-        raise ValueError(f"Unable to find binning for parameter path: {parameter_path}, binning_type: {binning_type}")
-
+    binning = get_config_property_stored_in_binning(
+        unfolding_settings=unfolding_settings,
+        base_unfolding_config=base_unfolding_config,
+        binning_type=binning_type,
+        grooming_method=grooming_method,
+        substructure_variable_to_analyze=substructure_variable_to_analyze,
+        variable_to_retrieve=variable_to_retrieve,
+    )
     return np.array(binning, dtype=np.float64)
