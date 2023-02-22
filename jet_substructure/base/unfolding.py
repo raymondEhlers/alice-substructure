@@ -208,15 +208,15 @@ class Settings2D:
         base_filename += self.substructure_variable.encode_for_filename()
         # Jet pt
         base_filename += self.jet_pt.encode_for_filename()
+        # Double counting cut (if applicable)
+        if self.double_counting_cut_name != "disabled":
+            base_filename += f"__double_counting_cut_{self.double_counting_cut_name}_"
         # And then the required suffix
         base_filename += f"_{self.suffix}"
         # Additional options
         # Optional tag
         if self.label:
             base_filename += f"_{self.label}"
-        # Double counting cut (if applicable)
-        if self.double_counting_cut_name != "disabled":
-            base_filename += f"__double_counting_cut_{self.double_counting_cut_name}_"
         # Put other possible options after the tag so we can sort by tag if it exists.
         if self.use_pure_matches:
             base_filename += "_pure_matches"

@@ -257,16 +257,13 @@ class UnfoldingOutput:
         name += f"_smeared_{self.smeared_var_range}"
         name += f"_untagged_{self.smeared_untagged_var}"
         name += f"_smeared_{self.smeared_jet_pt_range}"
+        if self.double_counting_cut and self.double_counting_cut != "disabled":
+            name += f"__double_counting_cut_{self.double_counting_cut}_"
         if self.suffix:
             name += f"_{self.suffix}"
-        if self.label and "closure_" not in self.label:
-            name += f"_{self.label}"
-        if self.double_counting_cut:
-            name += f"__double_counting_cut_{self.double_counting_cut}_"
         if self.pure_matches:
             name += "_pure_matches"
-        # FIXME: the "closure_" condition is a huge hack!
-        if self.label and "closure_" in self.label:
+        if self.label:
             name += f"_{self.label}"
         return name
 
