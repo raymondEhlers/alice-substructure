@@ -1780,8 +1780,6 @@ def setup_all_unfolding(  # noqa: C901
                         binning_type="smeared", variable_to_retrieve="jet_pt",
                     ),
                     true_min_pt=_double_counting_cut_settings.min_true_pt,
-                    # true_bins=np.array([0, 40, 60, 80, 100, 120, 160], dtype=np.float64),
-                    # smeared_bins=np.array([40, 50, 60, 80, 100, 120], dtype=np.float64),
                 ),
                 substructure_variable=unfolding_base.SubstructureVariableSettings2D.from_binning(
                     true_bins=_get_bins(
@@ -1796,12 +1794,6 @@ def setup_all_unfolding(  # noqa: C901
                         substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
                         variable_to_retrieve=f"var_over_pt" if unfolding_runtime_settings.normalize_variable_by_jet_pt else None,
                     ),
-                    # true_bins=np.array(
-                    #    # NOTE: (-0.05, 0) is the untagged bin.
-                    #    [-0.05, 0, 2, 3, 4, 8, 100],
-                    #    dtype=np.float64,
-                    # ),
-                    # smeared_bins=np.array([1, 2, 3, 4, 8], dtype=np.float64),
                     name=unfolding_runtime_settings.variable_to_unfold,
                     variable_name=unfolding_runtime_settings.variable_to_unfold,
                     untagged_bin_below_range=True,
@@ -1816,13 +1808,15 @@ def setup_all_unfolding(  # noqa: C901
             settings[_default_settings.output_tag] = _default_settings
 
             closure_specific_settings = unfolding_settings.get("closure_settings", {})
-            if unfolding_settings["closures"]:
-                # And then add the variations.
+            # And then add the variations.
+            if unfolding_settings.get("compare_pure_matches", False):
                 # Pure matches
+                # Disabled by default because it doesn't seem especially important or helpful
                 _temp_settings = copy.deepcopy(_default_settings)
                 _temp_settings.use_pure_matches = True
                 settings[_temp_settings.output_tag] = _temp_settings
 
+            if unfolding_settings["closures"]:
                 # Untagged above
                 _temp_settings = copy.deepcopy(_default_settings)
                 _smeared_bins = _temp_settings.substructure_variable.smeared_bins
