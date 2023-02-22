@@ -210,7 +210,7 @@ class Settings2D:
         base_filename += self.jet_pt.encode_for_filename()
         # Double counting cut (if applicable)
         if self.double_counting_cut_name != "disabled":
-            base_filename += f"__double_counting_cut_{self.double_counting_cut_name}_"
+            base_filename += f"__DCC_{self.double_counting_cut_name}_"
         # And then the required suffix
         base_filename += f"_{self.suffix}"
         # Additional options
@@ -256,7 +256,7 @@ def hist_name_for_ratio_2D(
 ) -> str:
     # NOTE: This substructure binning implicitly encodes the kt/pt as a separate name because
     #       the binning will be different!
-    return f"{grooming_method}_{prefix_for_ratio}_{substructure_variable_name}_jet_pt_binning_smeared_kt_{_encode_binning_in_str(smeared_substructure_variable_bins)}_smeared_jet_pt_{_encode_binning_in_str(smeared_jet_pt_bins)}__double_counting_cut_{double_counting_cut_name}"
+    return f"{grooming_method}_{prefix_for_ratio}_{substructure_variable_name}_jet_pt_binning_smeared_kt_{_encode_binning_in_str(smeared_substructure_variable_bins)}_smeared_jet_pt_{_encode_binning_in_str(smeared_jet_pt_bins)}__DCC_{double_counting_cut_name}"
 
 
 BinningType = Literal["true", "smeared"]

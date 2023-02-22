@@ -1865,7 +1865,7 @@ analysis_configurations:
                         max_untagged_bin: 10
                     compare_pure_matches: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "nominal"
                 default_kt_1:
                     label: ""
@@ -1999,13 +1999,13 @@ analysis_configurations:
                     label: "tracking_efficiency"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "tracking_efficiency"
                 truncation_low:
                     label: "truncation"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "nominal"
                     binning:
                         default:
@@ -2015,7 +2015,7 @@ analysis_configurations:
                     label: "truncation"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "nominal"
                     binning:
                         default:
@@ -2025,7 +2025,7 @@ analysis_configurations:
                     label: "random_binning"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "nominal"
                     binning:
                         default:
@@ -2059,26 +2059,26 @@ analysis_configurations:
                     label: "reweight_prior"
                     closures: false
                     reweight_prior: true
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "nominal"
                 background_low:
                     label: "Rmax005"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "rmax_005"
                 background_high:
                     label: "Rmax050"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "rmax_050"
                 # Peter's binning
                 peter_binning:
                     label: "peter_binning"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "nominal"
                     binning: &_semi_central_R02_kt_binning_Peter_suggested
                         default: &_semi_central_R02_kt_binning_default_block_Peter_suggested
@@ -2107,7 +2107,7 @@ analysis_configurations:
                     label: "peter_binning_tracking_efficiency"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "tracking_efficiency"
                     binning:
                         <<: *_semi_central_R02_kt_binning_Peter_suggested
@@ -2115,7 +2115,7 @@ analysis_configurations:
                     label: "peter_binning_truncation"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "nominal"
                     binning:
                         <<: *_semi_central_R02_kt_binning_Peter_suggested
@@ -2127,7 +2127,7 @@ analysis_configurations:
                     label: "peter_binning_truncation"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "nominal"
                     binning:
                         <<: *_semi_central_R02_kt_binning_Peter_suggested
@@ -2139,7 +2139,7 @@ analysis_configurations:
                     label: "peter_binning_random_binning"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "nominal"
                     binning:
                         default:
@@ -2183,7 +2183,7 @@ analysis_configurations:
                     label: "peter_binning_reweight_prior"
                     closures: false
                     reweight_prior: true
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "nominal"
                     binning:
                         <<: *_semi_central_R02_kt_binning_Peter_suggested
@@ -2191,7 +2191,7 @@ analysis_configurations:
                     label: "peter_binning_Rmax005"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "rmax_005"
                     binning:
                         <<: *_semi_central_R02_kt_binning_Peter_suggested
@@ -2199,7 +2199,7 @@ analysis_configurations:
                     label: "peter_binning_Rmax050"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "traditional_det_level_track_pt"
+                    double_counting_cut: "OG_det_level_track_pt"
                     datasets: "rmax_050"
                     binning:
                         <<: *_semi_central_R02_kt_binning_Peter_suggested
