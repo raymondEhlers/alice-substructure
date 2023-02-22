@@ -2076,7 +2076,10 @@ analysis_configurations:
                 # Peter's binning
                 peter_binning:
                     label: "peter_binning"
-                    closures: false
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
                     reweight_prior: false
                     double_counting_cut: "OG_det_level_track_pt"
                     datasets: "nominal"
