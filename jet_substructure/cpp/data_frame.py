@@ -642,6 +642,7 @@ def run_create_closure_ratio(  # noqa: C901
     n_cores: int = 8,
     cross_check_task: bool = False,
     double_counting_cut_name: str | None = None,
+    additional_substructure_variable_cut: unfolding_base.AdditionalVariableCut | None = None,
 ) -> Tuple[bool, str]:
     """Create the histogram necessary to create the closure ratio.
 
@@ -655,6 +656,9 @@ def run_create_closure_ratio(  # noqa: C901
     Note:
         We are supposed to run this once for each dataset. So I ratio will require at least two calls to this function.
     """
+    # Validation
+    if additional_substructure_variable_cut is None:
+        additional_substructure_variable_cut = unfolding_base.AdditionalVariableCut()
     # Setup
     prefix_for_ratio = "hybrid" if "embed" in collision_system else "data"
     # Parameters
@@ -696,6 +700,7 @@ def run_create_closure_ratio(  # noqa: C901
         smeared_substructure_variable_bins=smeared_substructure_variable_bins,
         smeared_jet_pt_bins=smeared_jet_pt_bins,
         double_counting_cut_name=double_counting_cut_name,
+        additional_substructure_variable_cut=additional_substructure_variable_cut,
     )
 
     # Check for existing file. If it exists, check that the binning is the same.

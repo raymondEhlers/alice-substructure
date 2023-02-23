@@ -49,6 +49,20 @@ class AdditionalVariableCut:
     def enabled(self) -> bool:
         return self.name != ""
 
+    @property
+    def encode(self) -> str:
+        if not self.enabled:
+            return ""
+        s = f"additional_{self.name}_min_{str(self.min_value).replace('.', 'p')}_max_{str(self.max_value).replace('.', 'p')}"
+        applied_to = []
+        if self.apply_to_smeared:
+            applied_to.append("smeared")
+        if self.apply_to_true:
+            applied_to.append("true")
+        if applied_to:
+            s += "_applied_to_" + "_".join(applied_to)
+        return s
+
     @classmethod
     def from_config(cls, config: Mapping[str, Any]) -> AdditionalVariableCut:
         return cls(
@@ -282,10 +296,14 @@ def hist_name_for_ratio_2D(
     smeared_substructure_variable_bins: npt.NDArray[np.generic],
     smeared_jet_pt_bins: npt.NDArray[np.generic],
     double_counting_cut_name: str,
+    additional_substructure_variable_cut: AdditionalVariableCut,
 ) -> str:
     # NOTE: This substructure binning implicitly encodes the kt/pt as a separate name because
     #       the binning will be different!
-    return f"{grooming_method}_{prefix_for_ratio}_{substructure_variable_name}_jet_pt_binning_smeared_kt_{_encode_binning_in_str(smeared_substructure_variable_bins)}_smeared_jet_pt_{_encode_binning_in_str(smeared_jet_pt_bins)}__DCC_{double_counting_cut_name}"
+    suffix = ""
+    if additional_substructure_variable_cut.enabled:
+        suffix = f"__{additional_substructure_variable_cut.encode}"
+    return f"{grooming_method}_{prefix_for_ratio}_{substructure_variable_name}_jet_pt_binning_smeared_kt_{_encode_binning_in_str(smeared_substructure_variable_bins)}_smeared_jet_pt_{_encode_binning_in_str(smeared_jet_pt_bins)}__DCC_{double_counting_cut_name}{suffix}"
 
 
 BinningType = Literal["true", "smeared"]

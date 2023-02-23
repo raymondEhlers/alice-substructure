@@ -1377,6 +1377,7 @@ def setup_root_data_frame(
     input_results: Optional[MutableSequence[Future[Any]]] = None,
     unfolding_settings: Optional[Mapping[str, Any]] = None,
     substructure_variable_name: str | None = None,
+    unfolding_additional_substructure_variable_cut: unfolding_base.AdditionalVariableCut | None = None
 ) -> List[Future[Tuple[bool, str]]]:
     # Validation
     # NOTE: I only compromised on specifying the function here because it loses the typing
@@ -1471,6 +1472,7 @@ def setup_root_data_frame(
             "base_unfolding_config": base_unfolding_config,
             "unfolding_settings": unfolding_settings,
             "substructure_variable_name": substructure_variable_name,
+            "additional_substructure_variable_cut": unfolding_additional_substructure_variable_cut,
         }
 
     results = []
@@ -1871,6 +1873,7 @@ def setup_all_unfolding(  # noqa: C901
                         smeared_substructure_variable_bins=_default_settings.substructure_variable.smeared_bins,
                         smeared_jet_pt_bins=_default_settings.jet_pt.smeared_bins,
                         double_counting_cut_name=_default_settings.double_counting_cut_name,
+                        additional_substructure_variable_cut=_default_settings.substructure_variable.additional_variable_cut,
                     )
                     # Add collision system to make it 100% unique (it already is for PbPb due to the prefix_for_ratio,
                     # but it's not for pp).
@@ -1893,6 +1896,7 @@ def setup_all_unfolding(  # noqa: C901
                             base_unfolding_config=base_unfolding_config,
                             unfolding_settings=unfolding_settings,
                             substructure_variable_name=_default_settings.substructure_variable.variable_name,
+                            unfolding_additional_substructure_variable_cut=_default_settings.substructure_variable.additional_variable_cut,
                         )
                         # And add to final outputs
                         # We only want to add here - otherwise it can show up multiple times, which is
