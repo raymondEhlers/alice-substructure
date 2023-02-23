@@ -2572,6 +2572,22 @@ analysis_configurations:
                 dynamical_time:
                     delta_R:
                         <<: *_R02_delta_R_additional_kt_cut
+                soft_drop_z_cut_02:
+                    kt: &_central_R02_kt_binning_with_untagged_bin
+                        "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 100]
+                        "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
+                soft_drop_z_cut_04:
+                    kt:
+                        <<: *_central_R02_kt_binning_with_untagged_bin
+                dynamical_core_z_cut_02:
+                    kt:
+                        <<: *_central_R02_kt_binning_with_untagged_bin
+                dynamical_kt_z_cut_02:
+                    kt:
+                        <<: *_central_R02_kt_binning_with_untagged_bin
+                dynamical_time_z_cut_02:
+                    kt:
+                        <<: *_central_R02_kt_binning_with_untagged_bin
             settings:
                 default:
                     label: ""
@@ -2581,20 +2597,20 @@ analysis_configurations:
                         split_MC_fraction_for_response: 0.75
                         max_untagged_bin: 10
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                 # Systematics
                 tracking_efficiency:
                     label: "tracking_efficiency"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "tracking_efficiency"
                 truncation_low:
                     label: "truncation"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                     binning:
                         default:
@@ -2604,7 +2620,7 @@ analysis_configurations:
                     label: "truncation"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                     binning:
                         default:
@@ -2614,7 +2630,7 @@ analysis_configurations:
                     label: "random_binning"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                     binning:
                         default:
@@ -2625,23 +2641,53 @@ analysis_configurations:
                                 # In [4]: np.round(r * [2, 3, 4, 6,], 2)
                                 # Out[4]: array([1.93, 3.1 , 4.13, 6.17])
                                 "smeared": [0, 1.5, 1.93, 3.1, 4.13, 6.17, 8]
+                            delta_R:
+                                # NOTE: Same as for semi_central, since the binning is the same!
+                                # >>> In [2]: arr = np.array([0.02, 0.03, 0.044, 0.06, 0.08, 0.1, 0.14], dtype=np.float64)
+                                # >>> In [3]: r = np.random.random_sample(len(arr)) / 10 + 0.95
+                                # >>> In [4]: r
+                                # >>> Out[4]:
+                                # >>> array([0.97303875, 0.96501901, 0.97262902, 0.96561963, 0.96189403, 0.99881276, 1.00357631])
+                                # >>> In [5]: np.round(r * arr, 2)
+                                # >>> Out[5]: array([0.02, 0.03, 0.04, 0.06, 0.08, 0.1 , 0.14])
+                                "smeared": [-0.05, 0, 0.02, 0.03, 0.04, 0.06, 0.08, 0.1 , 0.14, 0.2]
+                        soft_drop_z_cut_02:
+                            kt: &_central_R02_kt_random_binning_with_untagged_bin
+                                # NOTE: Same as for semi_central, since the binning is the same!
+                                # >>> r = np.random.random_sample(7) / 10 + 0.95
+                                # >>> r
+                                # array([1.03659548, 0.98692702, 1.00371711, 0.97114479, 1.01570655, 0.9780861, 1.00131525])
+                                # >>> np.round(r * [0.5, 1, 1.5, 2, 3, 4, 6], 2)
+                                "smeared": [0, 0.25, 0.52, 0.99, 1.51, 1.94, 3.05, 3.91, 6.01, 8]
+                        soft_drop_z_cut_04:
+                            kt:
+                                <<: *_central_R02_kt_random_binning_with_untagged_bin
+                        dynamical_core_z_cut_02:
+                            kt:
+                                <<: *_central_R02_kt_random_binning_with_untagged_bin
+                        dynamical_kt_z_cut_02:
+                            kt:
+                                <<: *_central_R02_kt_random_binning_with_untagged_bin
+                        dynamical_time_z_cut_02:
+                            kt:
+                                <<: *_central_R02_kt_random_binning_with_untagged_bin
                 reweight_prior:
                     label: "reweight_prior"
                     closures: false
                     reweight_prior: true
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                 background_low:
                     label: "Rmax005"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "rmax_005"
                 background_high:
                     label: "Rmax050"
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "rmax_050"
                 # Peter's binning
                 peter_binning:
