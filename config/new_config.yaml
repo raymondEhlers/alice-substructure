@@ -2948,6 +2948,8 @@ analysis_configurations:
                             # NOTE: Need to match the min cut in both central and semi-central
                             min: 1.5
                             max: null
+                            apply_to_smeared: true
+                            apply_to_true: true
                 dynamical_kt:
                     delta_R:
                         <<: *_R02_delta_R_additional_kt_cut

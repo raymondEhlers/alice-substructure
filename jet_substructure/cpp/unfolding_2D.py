@@ -591,7 +591,7 @@ def run_unfolding(
     if settings.substructure_variable.additional_variable_cut.enabled:
         _cuts = settings.substructure_variable.additional_variable_cut
         _root_additional_variable_cut = ROOT.unfolding.AdditionalVariableCut(
-            _cuts.name, _cuts.min_value, _cuts.max_value,
+            _cuts.name, _cuts.min_value, _cuts.max_value, _cuts.apply_to_smeared, _cuts.apply_to_true,
         )
     else:
         _root_additional_variable_cut = ROOT.unfolding.AdditionalVariableCut()
@@ -777,7 +777,7 @@ def run_unfolding_closure_reweighting(
     if settings.substructure_variable.additional_variable_cut.enabled:
         _cuts = settings.substructure_variable.additional_variable_cut
         _root_additional_variable_cut = ROOT.unfolding.AdditionalVariableCut(
-            _cuts.name, _cuts.min_value, _cuts.max_value,
+            _cuts.name, _cuts.min_value, _cuts.max_value, _cuts.apply_to_smeared, _cuts.apply_to_true,
         )
     else:
         _root_additional_variable_cut = ROOT.unfolding.AdditionalVariableCut()

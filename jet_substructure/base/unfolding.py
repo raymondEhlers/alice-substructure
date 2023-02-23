@@ -42,6 +42,8 @@ class AdditionalVariableCut:
     name: str = attr.field(default="")
     min_value: float = attr.field(converter=attr.converters.default_if_none(1e-12), default=1e-12)  # type: ignore[misc]
     max_value: float = attr.field(converter=attr.converters.default_if_none(1e12), default=1e12)  # type: ignore[misc]
+    apply_to_smeared: bool = attr.field(default=True)
+    apply_to_true: bool = attr.field(default=True)
 
     @property
     def enabled(self) -> bool:
@@ -53,6 +55,8 @@ class AdditionalVariableCut:
             name=config.get("variable_name", ""),
             min_value=config.get("min", None),
             max_value=config.get("max", None),
+            apply_to_smeared=config.get("apply_to_smeared", True),
+            apply_to_true=config.get("apply_to_true", True),
         )
 
 

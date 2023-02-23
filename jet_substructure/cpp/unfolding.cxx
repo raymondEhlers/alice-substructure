@@ -86,16 +86,22 @@ struct AdditionalVariableCut {
   const std::string variableName;
   const double minValue;
   const double maxValue;
+  const bool applyToSmeared;
+  const bool applyToTrue;
 
   AdditionalVariableCut(
     const std::string _variableName = "",
     // Much smaller and larger than anything else
     const double _minValue = -1e12,
-    const double _maxValue = 1e12
+    const double _maxValue = 1e12,
+    const bool _applyToSmeared = true,
+    const bool _applyToTrue = true
   ):
     variableName(_variableName),
     minValue(_minValue),
-    maxValue(_maxValue)
+    maxValue(_maxValue),
+    applyToSmeared(_applyToSmeared),
+    applyToTrue(_applyToTrue)
   {}
 
   // Use the variable name as a proxy for if the cut is actually defined
@@ -103,7 +109,21 @@ struct AdditionalVariableCut {
 
   std::string to_string() const {
     if (this->enabled()) {
-      return std::to_string(this->minValue) + " <= " + this->variableName + " <= " + std::to_string(this->maxValue);
+      std::string s = std::to_string(this->minValue) + " <= " + this->variableName + " <= " + std::to_string(this->maxValue);
+      std::vector<std::string> appliedTo;
+      if (this->applyToSmeared) {
+        appliedTo.emplace_back("smeared");
+      }
+      if (this->applyToTrue) {
+        appliedTo.emplace_back("true");
+      }
+      if (appliedTo.size() > 0) {
+        s += std::string("\n") + "Applied to: [";
+        for (auto val : appliedTo) {
+          s += val + ", ";
+        }
+        s += "]";
+      }
     }
     return "";
   }
@@ -429,9 +449,12 @@ ResponseResult create_response_2D(
   }
   // Additional possible selection
   std::unique_ptr<TTreeReaderValue<float>> responseSmearedAdditionalVariableForCut = nullptr;
+  std::unique_ptr<TTreeReaderValue<float>> trueAdditionalVariableForCut = nullptr;
   if (settings.additionalSubstructureVariableCut.enabled()) {
     responseSmearedAdditionalVariableForCut = std::make_unique<TTreeReaderValue<float>>(
       mcReader, (settings.groomingMethod + "_" + prefixes.responseSmeared + "_" + settings.additionalSubstructureVariableCut.variableName).c_str());
+    trueAdditionalVariableForCut = std::make_unique<TTreeReaderValue<float>>(
+      mcReader, (settings.groomingMethod + "_" + prefixes.responseTrue + "_" + settings.additionalSubstructureVariableCut.variableName).c_str());
   }
 
   int treeNumber = -1;
@@ -479,6 +502,13 @@ ResponseResult create_response_2D(
     if (trueSubstructureVariableValue < settings.trueSplittingVariableBins.front() ||
         trueSubstructureVariableValue > settings.trueSplittingVariableBins.back()) {
       continue;
+    }
+    // Enables selections on eg. kt when unfolding for Rg
+    if (trueAdditionalVariableForCut) {
+      if (**trueAdditionalVariableForCut < settings.additionalSubstructureVariableCut.minValue ||
+        **trueAdditionalVariableForCut > settings.additionalSubstructureVariableCut.maxValue ) {
+          continue;
+        }
     }
     // Finish up possible double counting cut selections (other aspects of the cut are implemented earlier)
     if (!settings.unfoldingForPP && doubleCountingCut.useDetLevelTrackPtCut) {
@@ -658,9 +688,12 @@ ResponseResult create_closure_response_2D(
   }
   // Additional possible selection
   std::unique_ptr<TTreeReaderValue<float>> responseSmearedAdditionalVariableForCut = nullptr;
+  std::unique_ptr<TTreeReaderValue<float>> trueAdditionalVariableForCut = nullptr;
   if (settings.additionalSubstructureVariableCut.enabled()) {
     responseSmearedAdditionalVariableForCut = std::make_unique<TTreeReaderValue<float>>(
       mcReader, (settings.groomingMethod + "_" + prefixes.responseSmeared + "_" + settings.additionalSubstructureVariableCut.variableName).c_str());
+    trueAdditionalVariableForCut = std::make_unique<TTreeReaderValue<float>>(
+      mcReader, (settings.groomingMethod + "_" + prefixes.responseTrue + "_" + settings.additionalSubstructureVariableCut.variableName).c_str());
   }
 
   int treeNumber = -1;
@@ -695,6 +728,13 @@ ResponseResult create_closure_response_2D(
     if (trueSubstructureVariableValue < settings.trueSplittingVariableBins.front() ||
         trueSubstructureVariableValue > settings.trueSplittingVariableBins.back()) {
       continue;
+    }
+    // Enables selections on eg. kt when unfolding for Rg
+    if (trueAdditionalVariableForCut) {
+      if (**trueAdditionalVariableForCut < settings.additionalSubstructureVariableCut.minValue ||
+        **trueAdditionalVariableForCut > settings.additionalSubstructureVariableCut.maxValue ) {
+          continue;
+        }
     }
     // Finish up possible double counting cut selections (other aspects of the cut are implemented earlier)
     if (!settings.unfoldingForPP && doubleCountingCut.useDetLevelTrackPtCut) {
