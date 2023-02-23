@@ -1489,7 +1489,7 @@ def setup_root_data_frame(
             # NOTE: We are hard coding this assumption. It shouldn't vary much better
             #       different substructure variables, so this should be okay
             substructure_variable_to_analyze="kt",
-            variable_to_retrieve="jet_pt",
+            nested_variable_name="jet_pt",
         )
         main_jet_pt_range = jsub_helpers.JetPtRange(_nominal_smeared_jet_pt_bins[0], _nominal_smeared_jet_pt_bins[-1])
 
@@ -1767,17 +1767,33 @@ def setup_all_unfolding(  # noqa: C901
         for grooming_method in grooming_methods:
             settings = {}
 
+            # Grab potential additional substructure cut (eg. kt cut on Rg)
+            _additional_variable_cut = unfolding_base.get_config_property_stored_in_binning(
+                base_unfolding_config=base_unfolding_config,
+                unfolding_settings=unfolding_settings,
+                grooming_method=grooming_method,
+                substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
+                property_name="additional_substructure_variable_cut",
+                must_find_parameter=False
+            )
+            # If None, any possible additional cut will not be enabled
+            if _additional_variable_cut is None:
+                _additional_variable_cut = {}
+            else:
+                # Convert from yaml type to standard dict for convenience
+                _additional_variable_cut = dict(_additional_variable_cut)
+
             # First, define the default settings.
             _default_settings = unfolding_base.Settings2D(
                 grooming_method=grooming_method,
                 jet_pt=unfolding_base.JetPtSettings2D.from_binning(
                     true_bins=_get_bins(
                         grooming_method=grooming_method, substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
-                        binning_type="true", variable_to_retrieve="jet_pt",
+                        binning_type="true", nested_variable_name="jet_pt",
                     ),
                     smeared_bins=_get_bins(
                         grooming_method=grooming_method, substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
-                        binning_type="smeared", variable_to_retrieve="jet_pt",
+                        binning_type="smeared", nested_variable_name="jet_pt",
                     ),
                     true_min_pt=_double_counting_cut_settings.min_true_pt,
                 ),
@@ -1786,18 +1802,21 @@ def setup_all_unfolding(  # noqa: C901
                         binning_type="true",
                         grooming_method=grooming_method,
                         substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
-                        variable_to_retrieve=f"var_over_pt" if unfolding_runtime_settings.normalize_variable_by_jet_pt else None,
+                        nested_variable_name=f"var_over_pt" if unfolding_runtime_settings.normalize_variable_by_jet_pt else None,
                     ),
                     smeared_bins=_get_bins(
                         binning_type="smeared",
                         grooming_method=grooming_method,
                         substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
-                        variable_to_retrieve=f"var_over_pt" if unfolding_runtime_settings.normalize_variable_by_jet_pt else None,
+                        nested_variable_name=f"var_over_pt" if unfolding_runtime_settings.normalize_variable_by_jet_pt else None,
                     ),
                     name=unfolding_runtime_settings.variable_to_unfold,
                     variable_name=unfolding_runtime_settings.variable_to_unfold,
                     untagged_bin_below_range=True,
                     normalize_by_jet_pt=unfolding_runtime_settings.normalize_variable_by_jet_pt,
+                    additional_variable_cut=unfolding_base.AdditionalSubstructureVariableCut.from_config(
+                        _additional_variable_cut
+                    ),
                 ),
                 double_counting_cut_name=_double_counting_cut_name,
                 suffix=base_unfolding_config["suffix"],

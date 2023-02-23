@@ -37,6 +37,24 @@ def _np_array_converter(value: Any, dtype: npt.DTypeLike = np.float64) -> npt.ND
     """
     return np.array(value, dtype=dtype)
 
+@attr.define
+class AdditionalSubstructureVariableCut:
+    name: str = attr.field(default="")
+    min_value: float = attr.field(converter=attr.converters.default_if_none(1e-12), default=1e-12)  # type: ignore[misc]
+    max_value: float = attr.field(converter=attr.converters.default_if_none(1e12), default=1e12)  # type: ignore[misc]
+
+    @property
+    def enabled(self) -> bool:
+        return self.name != ""
+
+    @classmethod
+    def from_config(cls, config: Mapping[str, Any]) -> AdditionalSubstructureVariableCut:
+        return cls(
+            name=config.get("variable_name", ""),
+            min_value=config.get("min", None),
+            max_value=config.get("max", None),
+        )
+
 
 @attr.define
 class ParameterSettings2D:
@@ -115,6 +133,7 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
     smeared_range: helpers.RangeSelector
     untagged_bin: helpers.RangeSelector
     normalize_by_jet_pt: bool = attr.field(default=False)
+    additional_variable_cut: AdditionalSubstructureVariableCut = attr.field(factory=AdditionalSubstructureVariableCut)
 
     @property
     def untagged_value(self) -> float:
@@ -142,7 +161,12 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
         variable_name: str,
         untagged_bin_below_range: bool = True,
         normalize_by_jet_pt: bool = False,
+        additional_variable_cut: AdditionalSubstructureVariableCut | None = None,
     ) -> SubstructureVariableSettings2D:
+        # Validation
+        if additional_variable_cut is None:
+            additional_variable_cut = AdditionalSubstructureVariableCut()
+
         # Determine the appropriate range class.
         # Either "Kt", "Rg", or "Zg"
         _variable_to_range_class_name = {
@@ -184,6 +208,7 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
             smeared_range=smeared_range,
             untagged_bin=untagged_bin,
             normalize_by_jet_pt=normalize_by_jet_pt,
+            additional_variable_cut=additional_variable_cut,
         )
 
 
@@ -269,7 +294,7 @@ def _getitem_for_dict_with_default(d: Mapping[str, Any], key: str) -> Any:
 def _get_possible_parameter_from_settings(
     settings: Mapping[str, Any],
     parameter_path: Sequence[str],
-    binning_type: BinningType
+    key_name: str
 ) -> List[float] | Any | None:
     # Setup
     binning = None
@@ -277,13 +302,13 @@ def _get_possible_parameter_from_settings(
 
     while len(parameter_path) > 1:
         logger.debug(f"Checking {parameter_path}")
-        possible_binning = functools.reduce(_getitem_for_dict_with_default, parameter_path, settings)
-        binning = possible_binning.get(binning_type, None)
+        possible_mapping_with_property = functools.reduce(_getitem_for_dict_with_default, parameter_path, settings)
+        binning = possible_mapping_with_property.get(key_name, None)
         if binning:
             break
         else:
             # We need to remove the second to last element because the last element identifies the
-            # field that we actually want to retrieve!
+            # variable that we actually want to retrieve!
             # NOTE: We can't use pop because we want to preserve the last element.
             #       Instead, we assign the previous two elements to the last element,
             #       thereby deleting the second to last element. It's the same as directly
@@ -297,10 +322,11 @@ def _get_possible_parameter_from_settings(
 def get_config_property_stored_in_binning(
     unfolding_settings: Mapping[str, Any],
     base_unfolding_config: Mapping[str, Any],
-    binning_type: BinningType,
     grooming_method: str,
     substructure_variable_to_analyze: str,
-    variable_to_retrieve: str | None = None,
+    property_name: str,
+    nested_variable_name: str | None = None,
+    must_find_parameter: bool = True,
 ) -> Any:
     """Get unfolding binning property for a particular variable name.
 
@@ -309,22 +335,24 @@ def get_config_property_stored_in_binning(
     Args:
         unfolding_settings: Unfolding settings for a particular case.
         base_unfolding_config: Base unfolding config for the system.
-        binning_type: Type of binning to retrieve - either "smeared" or "true".
         grooming_method: Name of the grooming method to allow for specialization
             of the binning based on the grooming method (if specified)
         substructure_variable_to_analyze: Name of the substructure variable to specialize with.
             This will implicitly be the field we attempt to retrieve unless the
             `variable_to_retrieve` is specified
-        variable_to_retrieve: Particular name of variable to retrieve as stored inside
-            of the substructure_variable. An option is `jet_pt` or `var_over_pt`.
+        property_name: Name of the property to retrieve. If binning, either "smeared" or "true".
+        nested_variable_name: Particular name of variable to retrieve as stored inside
+            of the substructure_variable beyond the property_name. Note that this is most useful
+            for retrieving specific binning.  Options include `jet_pt` or `var_over_pt`.
+        must_find_parameter: If True, the parameter must be found. Default: True.
     Returns:
         Binning for that axis.
     """
     # Validation
     parameter_path = [grooming_method, substructure_variable_to_analyze]
     # If we need to retrieve a particular parameter beyond the substructure variable (eg. jet_pt)
-    if variable_to_retrieve:
-        parameter_path.append(variable_to_retrieve)
+    if nested_variable_name:
+        parameter_path.append(nested_variable_name)
     parameter_path_for_default = list(parameter_path)
     parameter_path_for_default[0] = "default"
     # Further setup
@@ -333,29 +361,29 @@ def get_config_property_stored_in_binning(
     parameter = None
     specialized_binning = unfolding_settings.get("binning", {})
     if specialized_binning:
-        parameter = _get_possible_parameter_from_settings(settings=specialized_binning, parameter_path=parameter_path, binning_type=binning_type)
+        parameter = _get_possible_parameter_from_settings(settings=specialized_binning, parameter_path=parameter_path, key_name=property_name)
         if not parameter:
             # Try again, but this time with default binning...
-            parameter = _get_possible_parameter_from_settings(settings=specialized_binning, parameter_path=parameter_path_for_default, binning_type=binning_type)
+            parameter = _get_possible_parameter_from_settings(settings=specialized_binning, parameter_path=parameter_path_for_default, key_name=property_name)
     # If not available in the selected specialized unfolding config, then try to grab it from other
     # options for specified settings.
     for additional_settings_name in additional_settings_names_for_property_lookups:
         if not parameter:
             logger.debug(f"Looking in additional settings \"{additional_settings_name}\"")
             additional_settings_binning = base_unfolding_config["settings"][additional_settings_name].get("binning", {})
-            parameter = _get_possible_parameter_from_settings(settings=additional_settings_binning, parameter_path=parameter_path, binning_type=binning_type)
+            parameter = _get_possible_parameter_from_settings(settings=additional_settings_binning, parameter_path=parameter_path, key_name=property_name)
             if not parameter:
-                parameter = _get_possible_parameter_from_settings(settings=additional_settings_binning, parameter_path=parameter_path_for_default, binning_type=binning_type)
+                parameter = _get_possible_parameter_from_settings(settings=additional_settings_binning, parameter_path=parameter_path_for_default, key_name=property_name)
     # Lastly, if not available in the any specialized unfolding config, then grab it from the base config.
     if not parameter:
         nominal_binning = base_unfolding_config["nominal_binning"]
-        parameter = _get_possible_parameter_from_settings(settings=nominal_binning, parameter_path=parameter_path, binning_type=binning_type)
+        parameter = _get_possible_parameter_from_settings(settings=nominal_binning, parameter_path=parameter_path, key_name=property_name)
         if not parameter:
-            parameter = _get_possible_parameter_from_settings(settings=nominal_binning, parameter_path=parameter_path_for_default, binning_type=binning_type)
+            parameter = _get_possible_parameter_from_settings(settings=nominal_binning, parameter_path=parameter_path_for_default, key_name=property_name)
 
     # Final validation. We must find the parameter somewhere!
-    if not parameter:
-        raise ValueError(f"Unable to find parameter for parameter path: {parameter_path}, binning_type: {binning_type}")
+    if must_find_parameter and not parameter:
+        raise ValueError(f"Unable to find parameter for parameter path: {parameter_path}, property_name: {property_name}")
 
     return parameter
 
@@ -363,10 +391,10 @@ def get_config_property_stored_in_binning(
 def get_binning(
     unfolding_settings: Mapping[str, Any],
     base_unfolding_config: Mapping[str, Any],
-    binning_type: BinningType,
     grooming_method: str,
     substructure_variable_to_analyze: str,
-    variable_to_retrieve: str | None = None,
+    binning_type: BinningType,
+    nested_variable_name: str | None = None,
 ) -> npt.NDArray[np.float64]:
     """Get unfolding binning for a particular axis name.
 
@@ -389,9 +417,9 @@ def get_binning(
     binning = get_config_property_stored_in_binning(
         unfolding_settings=unfolding_settings,
         base_unfolding_config=base_unfolding_config,
-        binning_type=binning_type,
         grooming_method=grooming_method,
         substructure_variable_to_analyze=substructure_variable_to_analyze,
-        variable_to_retrieve=variable_to_retrieve,
+        property_name=binning_type,
+        nested_variable_name=nested_variable_name,
     )
     return np.array(binning, dtype=np.float64)

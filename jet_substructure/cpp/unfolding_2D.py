@@ -588,6 +588,13 @@ def run_unfolding(
     # Configure arguments
     # We define this objects since the number of unfolding arguments is becoming untenable, and I'm worried
     # about putting them in the wrong order or being unable to add arguments with default values.
+    if settings.substructure_variable.additional_variable_cut.enabled:
+        _cuts = settings.substructure_variable.additional_variable_cut
+        _root_additional_variable_cut = ROOT.unfolding.AdditionalSubstructureVariableCut(
+            _cuts.name, _cuts.min_value, _cuts.max_value,
+        )
+    else:
+        _root_additional_variable_cut = ROOT.unfolding.AdditionalSubstructureVariableCut()
     _root_unfolding_settings = ROOT.unfolding.Settings2D(
         settings.grooming_method,
         settings.substructure_variable.variable_name,
@@ -603,6 +610,7 @@ def run_unfolding(
         unfolding_for_pp,
         settings.substructure_variable.normalize_by_jet_pt,
         h_reweighting_response_ratio,
+        _root_additional_variable_cut,
     )
     _root_double_counting_cut = ROOT.unfolding.DoubleCountingCut(
         _double_counting_cut_settings.det_level_leading_track_pt_cut
@@ -766,6 +774,13 @@ def run_unfolding_closure_reweighting(
     # Configure arguments
     # We define this objects since the number of unfolding arguments is becoming untenable, and I'm worried
     # about putting them in the wrong order or being unable to add arguments with default values.
+    if settings.substructure_variable.additional_variable_cut.enabled:
+        _cuts = settings.substructure_variable.additional_variable_cut
+        _root_additional_variable_cut = ROOT.unfolding.AdditionalSubstructureVariableCut(
+            _cuts.name, _cuts.min_value, _cuts.max_value,
+        )
+    else:
+        _root_additional_variable_cut = ROOT.unfolding.AdditionalSubstructureVariableCut()
     _root_unfolding_settings = ROOT.unfolding.Settings2D(
         settings.grooming_method,
         settings.substructure_variable.variable_name,
@@ -781,6 +796,7 @@ def run_unfolding_closure_reweighting(
         unfolding_for_pp,
         settings.substructure_variable.normalize_by_jet_pt,
         h_reweighting_ratio,
+        _root_additional_variable_cut,
     )
     _root_closure_settings = ROOT.unfolding.ClosureSettings(
         variation,

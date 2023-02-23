@@ -76,6 +76,12 @@ settings:
                     # NOTE: 6x default
                     "smeared": [6., 12., 18., 24., 30., 36.]
                     # "true" is 4x
+            dynamical_kt:
+                kt:
+                    additional_substructure_variable_cut:
+                        variable_name: "kt"
+                        min: 1.0
+                        max: null
 """
 
 @pytest.fixture
@@ -97,7 +103,7 @@ def binning_in_unfolding_config() -> Dict[str, Any]:
     "substructure_variable_to_analyze", ["kt", "delta_R"],
 )
 @pytest.mark.parametrize(
-    "variable_to_retrieve", [None, "jet_pt"],
+    "nested_variable_name", [None, "jet_pt"],
 )
 def test_loading_binning_from_unfolding_config(
     caplog: Any,
@@ -106,17 +112,17 @@ def test_loading_binning_from_unfolding_config(
     binning_type: unfolding_base.BinningType,
     grooming_method: str,
     substructure_variable_to_analyze: str,
-    variable_to_retrieve: str | None,
+    nested_variable_name: str | None,
 ) -> None:
     base_unfolding_config = binning_in_unfolding_config
     unfolding_settings = binning_in_unfolding_config["settings"][specialized_settings]
     binning = unfolding_base.get_binning(
         unfolding_settings=unfolding_settings,
         base_unfolding_config=base_unfolding_config,
-        binning_type=binning_type,
         grooming_method=grooming_method,
         substructure_variable_to_analyze=substructure_variable_to_analyze,
-        variable_to_retrieve=variable_to_retrieve,
+        nested_variable_name=nested_variable_name,
+        binning_type=binning_type,
     )
 
     # Determine the expected value
@@ -134,8 +140,8 @@ def test_loading_binning_from_unfolding_config(
     }
     # First, what variable are we trying to look at?
     _expected_variable_name = substructure_variable_to_analyze
-    if variable_to_retrieve:
-        _expected_variable_name = variable_to_retrieve
+    if nested_variable_name:
+        _expected_variable_name = nested_variable_name
     # And grab those relevant values
     _expected_values = (_base_smeared_values if binning_type == "smeared" else _base_true_values)[_expected_variable_name]
     # Next, we need to figure out what factor to expect
@@ -177,3 +183,51 @@ def test_loading_binning_from_unfolding_config(
 
     # NOTE: This directly asserts, so we don't need an assertion
     np.testing.assert_allclose(binning, _expected_values)
+
+
+@pytest.mark.parametrize(
+    "specialized_settings", ["some_new_settings", "new_settings_with_additional_lookup"]
+)
+@pytest.mark.parametrize(
+    "grooming_method", ["dynamical_kt"],
+)
+@pytest.mark.parametrize(
+    "substructure_variable_to_analyze", ["kt"],
+)
+@pytest.mark.parametrize(
+    "property_name", ["additional_substructure_variable_cut"],
+)
+@pytest.mark.parametrize(
+    "nested_variable_name", [None],
+)
+def test_loading_property_stored_in_binning(
+    caplog: Any,
+    binning_in_unfolding_config: Any,
+    specialized_settings: str,
+    grooming_method: str,
+    substructure_variable_to_analyze: str,
+    property_name: str,
+    nested_variable_name: str | None,
+) -> None:
+    base_unfolding_config = binning_in_unfolding_config
+    unfolding_settings = binning_in_unfolding_config["settings"][specialized_settings]
+    property_value = unfolding_base.get_config_property_stored_in_binning(
+        unfolding_settings=unfolding_settings,
+        base_unfolding_config=base_unfolding_config,
+        grooming_method=grooming_method,
+        substructure_variable_to_analyze=substructure_variable_to_analyze,
+        nested_variable_name=nested_variable_name,
+        property_name=property_name,
+        must_find_parameter=False,
+    )
+
+    _expected_output_table: dict[tuple[str, str, str, str, str | None], dict[str, Any] | None] = {
+        ("some_new_settings", "dynamical_kt", "kt", "additional_substructure_variable_cut", None): None,
+        ("new_settings_with_additional_lookup", "dynamical_kt", "kt", "additional_substructure_variable_cut", None): {"variable_name": "kt", "min": 1, "max": None},
+    }
+    _expected_output = _expected_output_table[
+        (specialized_settings, grooming_method, substructure_variable_to_analyze, property_name, nested_variable_name)
+    ]
+
+    assert property_value == _expected_output
+
