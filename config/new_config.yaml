@@ -2046,6 +2046,15 @@ analysis_configurations:
                                 # >>> np.round(r * [1.5, 2, 3, 4, 6,], 2)
                                 # array([1.45, 1.94, 2.87, 4.07, 6.05])
                                 "smeared": [0, 1, 1.45, 1.94, 2.87, 4.07, 6.05, 8]
+                            delta_R:
+                                # >>> In [2]: arr = np.array([0.02, 0.03, 0.044, 0.06, 0.08, 0.1, 0.14], dtype=np.float64)
+                                # >>> In [3]: r = np.random.random_sample(len(arr)) / 10 + 0.95
+                                # >>> In [4]: r
+                                # >>> Out[4]:
+                                # >>> array([0.97303875, 0.96501901, 0.97262902, 0.96561963, 0.96189403, 0.99881276, 1.00357631])
+                                # >>> In [5]: np.round(r * arr, 2)
+                                # >>> Out[5]: array([0.02, 0.03, 0.04, 0.06, 0.08, 0.1 , 0.14])
+                                "smeared": [-0.05, 0, 0.02, 0.03, 0.04, 0.06, 0.08, 0.1 , 0.14, 0.2]
                         soft_drop_z_cut_02:
                             kt: &_semi_central_R02_kt_random_binning_with_untagged_bin
                                 # >>> r = np.random.random_sample(7) / 10 + 0.95
