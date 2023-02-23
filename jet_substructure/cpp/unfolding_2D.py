@@ -590,11 +590,11 @@ def run_unfolding(
     # about putting them in the wrong order or being unable to add arguments with default values.
     if settings.substructure_variable.additional_variable_cut.enabled:
         _cuts = settings.substructure_variable.additional_variable_cut
-        _root_additional_variable_cut = ROOT.unfolding.AdditionalSubstructureVariableCut(
+        _root_additional_variable_cut = ROOT.unfolding.AdditionalVariableCut(
             _cuts.name, _cuts.min_value, _cuts.max_value,
         )
     else:
-        _root_additional_variable_cut = ROOT.unfolding.AdditionalSubstructureVariableCut()
+        _root_additional_variable_cut = ROOT.unfolding.AdditionalVariableCut()
     _root_unfolding_settings = ROOT.unfolding.Settings2D(
         settings.grooming_method,
         settings.substructure_variable.variable_name,
@@ -776,11 +776,11 @@ def run_unfolding_closure_reweighting(
     # about putting them in the wrong order or being unable to add arguments with default values.
     if settings.substructure_variable.additional_variable_cut.enabled:
         _cuts = settings.substructure_variable.additional_variable_cut
-        _root_additional_variable_cut = ROOT.unfolding.AdditionalSubstructureVariableCut(
+        _root_additional_variable_cut = ROOT.unfolding.AdditionalVariableCut(
             _cuts.name, _cuts.min_value, _cuts.max_value,
         )
     else:
-        _root_additional_variable_cut = ROOT.unfolding.AdditionalSubstructureVariableCut()
+        _root_additional_variable_cut = ROOT.unfolding.AdditionalVariableCut()
     _root_unfolding_settings = ROOT.unfolding.Settings2D(
         settings.grooming_method,
         settings.substructure_variable.variable_name,
