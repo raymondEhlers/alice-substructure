@@ -2337,6 +2337,16 @@ analysis_configurations:
                         max_untagged_bin: 10
                     reweight_prior: false
                     datasets: "nominal"
+                default_delta_R:
+                    label: "default_delta_R"
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        # It seems to be about 1 in 7200. Round to 1 in 1000
+                        #split_MC_fraction_for_response: 0.999
+                        max_untagged_bin: 0.4
+                    reweight_prior: false
+                    datasets: "nominal"
                 default_no_untagged:
                     label: ""
                     closures: false
@@ -2598,6 +2608,16 @@ analysis_configurations:
                         max_untagged_bin: 10
                     reweight_prior: false
                     double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "nominal"
+                default_delta_R:
+                    label: "default_delta_R"
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        # It seems to be about 1 in 7200. Round to 1 in 1000
+                        #split_MC_fraction_for_response: 0.999
+                        max_untagged_bin: 0.4
+                    reweight_prior: false
                     datasets: "nominal"
                 # Systematics
                 tracking_efficiency:
@@ -2983,6 +3003,16 @@ analysis_configurations:
                         # It seems to be about 1 in 7200. Round to 1 in 1000
                         #split_MC_fraction_for_response: 0.999
                         max_untagged_bin: 10
+                    reweight_prior: false
+                    datasets: "nominal"
+                default_delta_R:
+                    label: "default_delta_R"
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        # It seems to be about 1 in 7200. Round to 1 in 1000
+                        #split_MC_fraction_for_response: 0.999
+                        max_untagged_bin: 0.4
                     reweight_prior: false
                     datasets: "nominal"
                 # NOTE: We skip reweighting the prior for pp. Instead, we use HERWIG for model dependence.
