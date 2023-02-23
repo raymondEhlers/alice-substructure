@@ -38,7 +38,7 @@ def _np_array_converter(value: Any, dtype: npt.DTypeLike = np.float64) -> npt.ND
     return np.array(value, dtype=dtype)
 
 @attr.define
-class AdditionalSubstructureVariableCut:
+class AdditionalVariableCut:
     name: str = attr.field(default="")
     min_value: float = attr.field(converter=attr.converters.default_if_none(1e-12), default=1e-12)  # type: ignore[misc]
     max_value: float = attr.field(converter=attr.converters.default_if_none(1e12), default=1e12)  # type: ignore[misc]
@@ -48,7 +48,7 @@ class AdditionalSubstructureVariableCut:
         return self.name != ""
 
     @classmethod
-    def from_config(cls, config: Mapping[str, Any]) -> AdditionalSubstructureVariableCut:
+    def from_config(cls, config: Mapping[str, Any]) -> AdditionalVariableCut:
         return cls(
             name=config.get("variable_name", ""),
             min_value=config.get("min", None),
@@ -133,7 +133,7 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
     smeared_range: helpers.RangeSelector
     untagged_bin: helpers.RangeSelector
     normalize_by_jet_pt: bool = attr.field(default=False)
-    additional_variable_cut: AdditionalSubstructureVariableCut = attr.field(factory=AdditionalSubstructureVariableCut)
+    additional_variable_cut: AdditionalVariableCut = attr.field(factory=AdditionalVariableCut)
 
     @property
     def untagged_value(self) -> float:
@@ -161,11 +161,11 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
         variable_name: str,
         untagged_bin_below_range: bool = True,
         normalize_by_jet_pt: bool = False,
-        additional_variable_cut: AdditionalSubstructureVariableCut | None = None,
+        additional_variable_cut: AdditionalVariableCut | None = None,
     ) -> SubstructureVariableSettings2D:
         # Validation
         if additional_variable_cut is None:
-            additional_variable_cut = AdditionalSubstructureVariableCut()
+            additional_variable_cut = AdditionalVariableCut()
 
         # Determine the appropriate range class.
         # Either "Kt", "Rg", or "Zg"
@@ -339,7 +339,7 @@ def get_config_property_stored_in_binning(
             of the binning based on the grooming method (if specified)
         substructure_variable_to_analyze: Name of the substructure variable to specialize with.
             This will implicitly be the field we attempt to retrieve unless the
-            `variable_to_retrieve` is specified
+            `nested_variable_name` is specified
         property_name: Name of the property to retrieve. If binning, either "smeared" or "true".
         nested_variable_name: Particular name of variable to retrieve as stored inside
             of the substructure_variable beyond the property_name. Note that this is most useful
@@ -408,8 +408,8 @@ def get_binning(
             of the binning based on the grooming method (if specified)
         substructure_variable_to_analyze: Name of the substructure variable to specialize with.
             This will implicitly be the field we attempt to retrieve unless the
-            `variable_to_retrieve` is specified
-        variable_to_retrieve: Particular name of variable to retrieve as stored inside
+            `nested_variable_name` is specified
+        nested_variable_name: Particular name of variable to retrieve as stored inside
             of the substructure_variable. An option is `jet_pt` or `var_over_pt`.
     Returns:
         Binning for that axis.

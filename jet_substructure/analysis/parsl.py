@@ -1418,7 +1418,7 @@ def setup_root_data_frame(
     # We want to protect against accidentally forgetting this in PbPb!
     # NOTE: We use the default double counting cut here by default, but we can configure it by
     #       passing some selected unfolding_settings. We should still be a bit careful with this!
-    _config_for_double_counting_cut = unfolding_settings if unfolding_settings is not None else base_unfolding_config["nominal_binning"]["default"]
+    _config_for_double_counting_cut = unfolding_settings if unfolding_settings is not None else base_unfolding_config["settings"]["default"]
     _double_counting_cut_name = _config_for_double_counting_cut.get("double_counting_cut", "")
     # Things are treated so different that it's better to be direct about the data collision system.
     _analyzing_pp = (collision_system == "pp" or collision_system == "pythia")
@@ -1814,7 +1814,7 @@ def setup_all_unfolding(  # noqa: C901
                     variable_name=unfolding_runtime_settings.variable_to_unfold,
                     untagged_bin_below_range=True,
                     normalize_by_jet_pt=unfolding_runtime_settings.normalize_variable_by_jet_pt,
-                    additional_variable_cut=unfolding_base.AdditionalSubstructureVariableCut.from_config(
+                    additional_variable_cut=unfolding_base.AdditionalVariableCut.from_config(
                         _additional_variable_cut
                     ),
                 ),
