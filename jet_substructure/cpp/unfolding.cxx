@@ -82,6 +82,38 @@ struct ResponseResult {
   std::shared_ptr<RooUnfoldResponse> response_no_trunc;
 };
 
+struct AdditionalVariableCut {
+  const std::string variableName;
+  const double minValue;
+  const double maxValue;
+
+  AdditionalVariableCut(
+    const std::string _variableName = "",
+    // Much smaller and larger than anything else
+    const double _minValue = -1e12,
+    const double _maxValue = 1e12
+  ):
+    variableName(_variableName),
+    minValue(_minValue),
+    maxValue(_maxValue)
+  {}
+
+  // Use the variable name as a proxy for if the cut is actually defined
+  bool enabled() const { return this->variableName != ""; }
+
+  std::string to_string() const {
+    if (this->enabled()) {
+      return std::to_string(this->minValue) + " <= " + this->variableName + " <= " + std::to_string(this->maxValue);
+    }
+    return "";
+  }
+};
+
+std::ostream& operator<<(std::ostream& in, const AdditionalVariableCut & c) {
+  in << c.to_string();
+  return in;
+}
+
 struct Settings2D {
   const std::string groomingMethod;
   const std::string substructureVariableName;
@@ -89,14 +121,15 @@ struct Settings2D {
   std::vector<double> trueJetPtBins;
   std::vector<double> smearedSplittingVariableBins;
   std::vector<double> trueSplittingVariableBins;
-  double smearedUntaggedBinValue;
-  bool disableUntaggedBin;
-  double minSmearedSplittingVariable;
-  double maxSmearedSplittingVariable;
-  const bool usePureMatches = false;
-  const bool unfoldingForPP = false;
-  TH2D* hReweightingResponse = nullptr;
-  const bool normalizeSubstructureVariableByJetPt = false;
+  const double smearedUntaggedBinValue;
+  const bool disableUntaggedBin;
+  const double minSmearedSplittingVariable;
+  const double maxSmearedSplittingVariable;
+  const bool usePureMatches;
+  const bool unfoldingForPP;
+  const bool normalizeSubstructureVariableByJetPt;
+  TH2D* hReweightingResponse;
+  const AdditionalVariableCut additionalSubstructureVariableCut;
 
   // NOTE: Can't do brace construction from python :-(
   Settings2D(
@@ -106,14 +139,15 @@ struct Settings2D {
     std::vector<double> _trueJetPtBins,
     std::vector<double> _smearedSplittingVariableBins,
     std::vector<double> _trueSplittingVariableBins,
-    double _smearedUntaggedBinValue,
-    bool _disableUntaggedBin,
-    double _minSmearedSplittingVariable,
-    double _maxSmearedSplittingVariable,
+    const double _smearedUntaggedBinValue,
+    const bool _disableUntaggedBin,
+    const double _minSmearedSplittingVariable,
+    const double _maxSmearedSplittingVariable,
     const bool _usePureMatches = false,
     const bool _unfoldingForPP = false,
     const bool _normalizeSubstructureVariableByJetPt = false,
-    TH2D* _hReweightingResponse = nullptr
+    TH2D* _hReweightingResponse = nullptr,
+    AdditionalVariableCut _additionalSubstructureVariableCut = AdditionalVariableCut()
   ):
     groomingMethod(_groomingMethod),
     substructureVariableName(_substructureVariableName),
@@ -128,15 +162,16 @@ struct Settings2D {
     usePureMatches(_usePureMatches),
     unfoldingForPP(_unfoldingForPP),
     normalizeSubstructureVariableByJetPt(_normalizeSubstructureVariableByJetPt),
-    hReweightingResponse(_hReweightingResponse)
+    hReweightingResponse(_hReweightingResponse),
+    additionalSubstructureVariableCut(_additionalSubstructureVariableCut)
   {}
 };
 
 struct DoubleCountingCut {
-  bool useDetLevelTrackPtCut = false;
+  const bool useDetLevelTrackPtCut = false;
 
   DoubleCountingCut(
-    bool _useDetLevelTrackPtCut = false
+    const bool _useDetLevelTrackPtCut = false
   ):
     useDetLevelTrackPtCut(_useDetLevelTrackPtCut)
   {}
@@ -242,8 +277,21 @@ ResponseResult create_response_2D(
   stdoutStream << "Max smeared substructure variable: " << settings.maxSmearedSplittingVariable << "\n";
   stdoutStream << std::boolalpha << "Use pure matches: " << settings.usePureMatches << "\n";
   stdoutStream << std::boolalpha << "Unfolding for pp: " << settings.unfoldingForPP << "\n";
+  if (settings.additionalSubstructureVariableCut.enabled()) {
+    stdoutStream << "Additional selections:" << settings.additionalSubstructureVariableCut << "\n";
+  }
   // Add some space before the filename printouts.
   stdoutStream << "\n";
+
+  // Validation
+  if (settings.additionalSubstructureVariableCut.variableName == settings.substructureVariableName) {
+    // NOTE: As of Feb 2023, I can't imagine where we would want this, but I suppose it's possible.
+    //       Since I'm not entirely sure, we'll throw the exception here if it happens so that I can
+    //       think about it carefully if it comes up in the future.
+    throw std::runtime_error(
+      "Same variable name for substructure var and additional cut. This cut should be done during via the standard substructure binning."
+    );
+  }
 
   // General setup
   double untaggedBelowThisValue = 0.;
@@ -266,6 +314,12 @@ ResponseResult create_response_2D(
   TTreeReaderValue<float> dataJetPt(dataReader, (prefixes.data + "_jet_pt").c_str());
   TTreeReaderValue<float> dataSubstructureVariable(
    dataReader, (settings.groomingMethod + "_" + prefixes.data + "_" + settings.substructureVariableName).c_str());
+  // Additional possible selection
+  std::unique_ptr<TTreeReaderValue<float>> dataAdditionalVariableForCut = nullptr;
+  if (settings.additionalSubstructureVariableCut.enabled()) {
+    dataAdditionalVariableForCut = std::make_unique<TTreeReaderValue<float>>(
+      dataReader, (settings.groomingMethod + "_" + prefixes.data + "_" + settings.additionalSubstructureVariableCut.variableName).c_str());
+  }
   while (dataReader.Next()) {
     // Jet pt cut.
     if (*dataJetPt < settings.smearedJetPtBins.front() || *dataJetPt > settings.smearedJetPtBins.back()) {
@@ -299,6 +353,13 @@ ResponseResult create_response_2D(
         dataSubstructureVariableValue > settings.maxSmearedSplittingVariable) {
         continue;
       }
+    }
+    // Enables selections on eg. kt when unfolding for Rg
+    if (dataAdditionalVariableForCut) {
+      if (**dataAdditionalVariableForCut < settings.additionalSubstructureVariableCut.minValue ||
+        **dataAdditionalVariableForCut > settings.additionalSubstructureVariableCut.maxValue ) {
+          continue;
+        }
     }
     hists["h2_raw"]->Fill(dataSubstructureVariableValue, *dataJetPt);
   }
@@ -365,6 +426,12 @@ ResponseResult create_response_2D(
       // Potentially useful for the double counting cut.
       responseSmearedUnsubLeadingTrackPt = std::make_unique<TTreeReaderValue<float>>(mcReader, (prefixes.responseSmeared + "_leading_track_pt").c_str());
       detLevelLeadingTrackPt = std::make_unique<TTreeReaderValue<float>>(mcReader, (prefixes.responseDetLevel + "_leading_track_pt").c_str());
+  }
+  // Additional possible selection
+  std::unique_ptr<TTreeReaderValue<float>> responseSmearedAdditionalVariableForCut = nullptr;
+  if (settings.additionalSubstructureVariableCut.enabled()) {
+    responseSmearedAdditionalVariableForCut = std::make_unique<TTreeReaderValue<float>>(
+      mcReader, (settings.groomingMethod + "_" + prefixes.responseSmeared + "_" + settings.additionalSubstructureVariableCut.variableName).c_str());
   }
 
   int treeNumber = -1;
@@ -474,6 +541,13 @@ ResponseResult create_response_2D(
         continue;
       }
     }
+    // Enables selections on eg. kt when unfolding for Rg
+    if (responseSmearedAdditionalVariableForCut) {
+      if (**responseSmearedAdditionalVariableForCut < settings.additionalSubstructureVariableCut.minValue ||
+        **responseSmearedAdditionalVariableForCut > settings.additionalSubstructureVariableCut.maxValue ) {
+          continue;
+        }
+    }
     // Matching cuts: Requiring a pure match.
     if (!settings.unfoldingForPP &&
          settings.usePureMatches &&
@@ -517,7 +591,17 @@ ResponseResult create_closure_response_2D(
   std::ostream & stdoutStream = std::cout,
   std::ostream & stderrStream = std::cerr
 ) {
+  // Validation
+  if (settings.additionalSubstructureVariableCut.variableName == settings.substructureVariableName) {
+    // NOTE: As of Feb 2023, I can't imagine where we would want this, but I suppose it's possible.
+    //       Since I'm not entirely sure, we'll throw the exception here if it happens so that I can
+    //       think about it carefully if it comes up in the future.
+    throw std::runtime_error(
+      "Same variable name for substructure var and additional cut. This cut should be done during via the standard substructure binning."
+    );
+  }
   // NOTE: We rely on the user to validate that the binning matches the reweighting hist.
+
   // Setup
   TRandom3 random(0);
   // Handle untagged bin.
@@ -571,6 +655,12 @@ ResponseResult create_closure_response_2D(
       // Potentially useful for the double counting cut.
       responseSmearedUnsubLeadingTrackPt = std::make_unique<TTreeReaderValue<float>>(mcReader, (prefixes.responseSmeared + "_leading_track_pt").c_str());
       detLevelLeadingTrackPt = std::make_unique<TTreeReaderValue<float>>(mcReader, (prefixes.responseDetLevel + "_leading_track_pt").c_str());
+  }
+  // Additional possible selection
+  std::unique_ptr<TTreeReaderValue<float>> responseSmearedAdditionalVariableForCut = nullptr;
+  if (settings.additionalSubstructureVariableCut.enabled()) {
+    responseSmearedAdditionalVariableForCut = std::make_unique<TTreeReaderValue<float>>(
+      mcReader, (settings.groomingMethod + "_" + prefixes.responseSmeared + "_" + settings.additionalSubstructureVariableCut.variableName).c_str());
   }
 
   int treeNumber = -1;
@@ -656,6 +746,13 @@ ResponseResult create_closure_response_2D(
         responseSmearedSubstructureVariableValue > settings.maxSmearedSplittingVariable) {
         continue;
       }
+    }
+    // Enables selections on eg. kt when unfolding for Rg
+    if (responseSmearedAdditionalVariableForCut) {
+      if (**responseSmearedAdditionalVariableForCut < settings.additionalSubstructureVariableCut.minValue ||
+        **responseSmearedAdditionalVariableForCut > settings.additionalSubstructureVariableCut.maxValue ) {
+          continue;
+        }
     }
 
     // Potentially Reweight
