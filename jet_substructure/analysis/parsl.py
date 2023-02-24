@@ -1274,6 +1274,7 @@ def _root_data_frame_closure(
     unfolding_settings: Mapping[str, Any],
     substructure_variable_name: str,
     double_counting_cut_name: str,
+    additional_substructure_variable_cut: unfolding_base.AdditionalVariableCut,
     job_framework: job_utils.JobFramework,
     inputs: MutableSequence[File] = [],
     outputs: MutableSequence[File] = [],
@@ -1303,6 +1304,7 @@ def _root_data_frame_closure(
         n_cores=n_cores,
         cross_check_task=cross_check_task,
         double_counting_cut_name=double_counting_cut_name,
+        additional_substructure_variable_cut=additional_substructure_variable_cut,
     )
 
     return res
