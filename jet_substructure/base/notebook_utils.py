@@ -26,10 +26,15 @@ all_grooming_methods = [
     "dynamical_core",
     "soft_drop_z_cut_02",
     "soft_drop_z_cut_04",
+    "dynamical_core_z_cut_02",
+    "dynamical_kt_z_cut_02",
+    "dynamical_time_z_cut_02",
 ]
 leading_kt_grooming_methods = all_grooming_methods[:3]
 dynamical_grooming_methods = all_grooming_methods[3:7]
-soft_drop_grooming_methods = all_grooming_methods[7:]
+soft_drop_grooming_methods = all_grooming_methods[7:9]
+dynamical_grooming_with_z_cut = all_grooming_methods[9:]
+z_cut_02_grooming_methods = all_grooming_methods[9:] + [all_grooming_methods[7]]
 
 
 def load_histograms(
