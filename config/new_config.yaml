@@ -1843,12 +1843,29 @@ analysis_configurations:
                             # NOTE: Need to match the min cut in both central and semi-central, so take the max of all options (ie. 1.5)
                             min: 1.5
                             max: null
+                            apply_to_smeared: true
+                            apply_to_true: true
+                    z: &_R02_z_additional_kt_cut_no_z_cut
+                        # TODO: This is really speculative - need to look at the stats
+                        "true": [-0.05, 0, 0.1, 0.15, 0.2, 0.275, 0.35, 0.5, 0.8]
+                        "smeared": [-0.05, 0, 0.1, 0.15, 0.2, 0.275, 0.35, 0.5]
+                        additional_substructure_variable_cut:
+                            variable_name: "kt"
+                            # NOTE: Need to match the min cut in both central and semi-central, so take the max of all options (ie. 1.5)
+                            min: 1.5
+                            max: null
+                            apply_to_smeared: true
+                            apply_to_true: true
                 dynamical_kt:
                     delta_R:
                         <<: *_R02_delta_R_additional_kt_cut
+                    z:
+                        <<: *_R02_z_additional_kt_cut_no_z_cut
                 dynamical_time:
                     delta_R:
                         <<: *_R02_delta_R_additional_kt_cut
+                    z:
+                        <<: *_R02_z_additional_kt_cut_no_z_cut
                 soft_drop_z_cut_02:
                     kt: &_semi_central_R02_kt_binning_with_untagged_bin
                         "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 100]
@@ -1885,6 +1902,17 @@ analysis_configurations:
                         # It seems to be about 1 in 7200. Round to 1 in 1000
                         #split_MC_fraction_for_response: 0.999
                         max_untagged_bin: 0.4
+                    reweight_prior: false
+                    double_counting_cut: "OG_det_level_track_pt"
+                    datasets: "nominal"
+                default_z:
+                    label: ""
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        # It seems to be about 1 in 7200. Round to 1 in 1000
+                        #split_MC_fraction_for_response: 0.999
+                        max_untagged_bin: 0.6
                     reweight_prior: false
                     double_counting_cut: "OG_det_level_track_pt"
                     datasets: "nominal"
@@ -2066,6 +2094,14 @@ analysis_configurations:
                                 # >>> In [5]: np.round(r * arr, 2)
                                 # >>> Out[5]: array([0.02, 0.03, 0.04, 0.06, 0.08, 0.1 , 0.14])
                                 "smeared": [-0.05, 0, 0.02, 0.03, 0.04, 0.06, 0.08, 0.1 , 0.14, 0.2]
+                            z: &_R02_z_additional_kt_cut_no_z_cut_random_binning
+                                # >>> In [6]: arr = np.array([0.15, 0.2, 0.275, 0.35], dtype=np.float64)
+                                # >>> In [7]: r = np.random.random_sample(len(arr)) / 10 + 0.95
+                                # >>> In [8]: r
+                                # >>> Out[8]: array([0.9826242 , 1.01891914, 1.047041  , 1.04426942])
+                                # >>> In [9]: np.round(r * arr, 2)
+                                # >>> Out[9]: array([0.15, 0.2 , 0.29, 0.37])
+                                "smeared": [-0.05, 0, 0.1, 0.15, 0.2 , 0.29, 0.37, 0.5]
                         soft_drop_z_cut_02:
                             kt: &_semi_central_R02_kt_random_binning_with_untagged_bin
                                 # >>> r = np.random.random_sample(7) / 10 + 0.95
@@ -2577,12 +2613,22 @@ analysis_configurations:
                 dynamical_core:
                     delta_R:
                         <<: *_R02_delta_R_additional_kt_cut
+                    z:
+                        <<: *_R02_z_additional_kt_cut_no_z_cut
                 dynamical_kt:
                     delta_R:
                         <<: *_R02_delta_R_additional_kt_cut
+                    z:
+                        <<: *_R02_z_additional_kt_cut_no_z_cut
+                        # From Laura, pg 30
+                        # TODO: This is really speculative - need to look at the stats
+                        "true": [-0.05, 0, 0.1, 0.2, 0.275, 0.35, 0.5, 0.8]
+                        "smeared": [-0.05, 0, 0.1, 0.2, 0.275, 0.35, 0.5]
                 dynamical_time:
                     delta_R:
                         <<: *_R02_delta_R_additional_kt_cut
+                    z:
+                        <<: *_R02_z_additional_kt_cut_no_z_cut
                 soft_drop_z_cut_02:
                     kt: &_central_R02_kt_binning_with_untagged_bin
                         "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 100]
@@ -2619,6 +2665,18 @@ analysis_configurations:
                         #split_MC_fraction_for_response: 0.999
                         max_untagged_bin: 0.4
                     reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "nominal"
+                default_z:
+                    label: ""
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        # It seems to be about 1 in 7200. Round to 1 in 1000
+                        #split_MC_fraction_for_response: 0.999
+                        max_untagged_bin: 0.6
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                 # Systematics
                 tracking_efficiency:
@@ -2672,6 +2730,8 @@ analysis_configurations:
                                 # >>> In [5]: np.round(r * arr, 2)
                                 # >>> Out[5]: array([0.02, 0.03, 0.04, 0.06, 0.08, 0.1 , 0.14])
                                 "smeared": [-0.05, 0, 0.02, 0.03, 0.04, 0.06, 0.08, 0.1 , 0.14, 0.2]
+                            z:
+                                <<: *_R02_z_additional_kt_cut_no_z_cut_random_binning
                         soft_drop_z_cut_02:
                             kt: &_central_R02_kt_random_binning_with_untagged_bin
                                 # NOTE: Same as for semi_central, since the binning is the same!
@@ -2964,19 +3024,19 @@ analysis_configurations:
                             "smeared": [40, 50, 60, 70, 80, 90, 120]
                 dynamical_core:
                     delta_R:
-                        additional_substructure_variable_cut:
-                            variable_name: "kt"
-                            # NOTE: Need to match the min cut in both central and semi-central
-                            min: 1.5
-                            max: null
-                            apply_to_smeared: true
-                            apply_to_true: true
+                        <<: *_R02_delta_R_additional_kt_cut
+                    z:
+                        <<: *_R02_z_additional_kt_cut_no_z_cut
                 dynamical_kt:
                     delta_R:
                         <<: *_R02_delta_R_additional_kt_cut
+                    z:
+                        <<: *_R02_z_additional_kt_cut_no_z_cut
                 dynamical_time:
                     delta_R:
                         <<: *_R02_delta_R_additional_kt_cut
+                    z:
+                        <<: *_R02_z_additional_kt_cut_no_z_cut
                 soft_drop_z_cut_02:
                     kt: &_pp_R02_kt_binning_with_untagged_bin
                         # Same as above, but we include the untagged bin because it's meaningful for SD z > 0.2
@@ -3014,6 +3074,16 @@ analysis_configurations:
                         # It seems to be about 1 in 7200. Round to 1 in 1000
                         #split_MC_fraction_for_response: 0.999
                         max_untagged_bin: 0.4
+                    reweight_prior: false
+                    datasets: "nominal"
+                default_z:
+                    label: ""
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        # It seems to be about 1 in 7200. Round to 1 in 1000
+                        #split_MC_fraction_for_response: 0.999
+                        max_untagged_bin: 0.6
                     reweight_prior: false
                     datasets: "nominal"
                 # NOTE: We skip reweighting the prior for pp. Instead, we use HERWIG for model dependence.
@@ -3068,6 +3138,18 @@ analysis_configurations:
                                 # In [4]: np.round(r * [0.5, 1., 1.5, 2., 3, 4], 2)
                                 # Out[4]: array([0.52, 0.97, 1.52, 2.05, 3.01, 4.  ])
                                 "smeared": [0.25, 0.25, 0.52, 0.97, 1.52, 2.05, 3.01, 4., 6]
+                            delta_R:
+                                # NOTE: Same as for semi_central, since the binning is the same!
+                                # >>> In [2]: arr = np.array([0.02, 0.03, 0.044, 0.06, 0.08, 0.1, 0.14], dtype=np.float64)
+                                # >>> In [3]: r = np.random.random_sample(len(arr)) / 10 + 0.95
+                                # >>> In [4]: r
+                                # >>> Out[4]:
+                                # >>> array([0.97303875, 0.96501901, 0.97262902, 0.96561963, 0.96189403, 0.99881276, 1.00357631])
+                                # >>> In [5]: np.round(r * arr, 2)
+                                # >>> Out[5]: array([0.02, 0.03, 0.04, 0.06, 0.08, 0.1 , 0.14])
+                                "smeared": [-0.05, 0, 0.02, 0.03, 0.04, 0.06, 0.08, 0.1 , 0.14, 0.2]
+                            z:
+                                <<: *_R02_z_additional_kt_cut_no_z_cut_random_binning
                         soft_drop_z_cut_02:
                             kt: &_pp_R02_kt_random_binning_with_untagged_bin
                                 # Same as above, but including the untagged bin.
