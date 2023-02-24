@@ -162,7 +162,7 @@ def display_images(
 
             # Determine transform location
             # We always use the top as origin because when the image expands down below the nominal bottom of the view,
-            # scrollbars are added automatically. But if we go above the top, they aren't. This way, we can always have
+            # scroll bars are added automatically. But if we go above the top, they aren't. This way, we can always have
             # a way to see the entire image (even if scrolling isn't super convenient).
             origin = "top"
             # If we're on the left, then we put the origin on the left. We use right for images on the right.
@@ -184,7 +184,7 @@ def display_images(
             if embed_with_base64:
                 image_src = f"data:image/png;base64,{_image_to_base64(image_path)}"
 
-            # After all of the steup, we can finally compose the HTML.
+            # After all of the setup, we can finally compose the HTML.
             html = f"""<div {zoom_class} style="display: inline-block; width: {width}%; vertical-align: top; text-align: center;">
             <label>
             """
