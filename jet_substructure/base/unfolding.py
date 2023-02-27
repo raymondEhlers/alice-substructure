@@ -190,7 +190,7 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
         _variable_to_range_class_name = {
             "kt": "Kt",
             "delta_R": "Rg",
-            "z": "zg",
+            "z": "Zg",
         }
         range_class_name = _variable_to_range_class_name[variable_name]
         range_class_name += "Range"
