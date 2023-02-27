@@ -1381,7 +1381,77 @@ def plot_grooming_comparisons_for_single_system(
                             label=r"$\frac{\text{Method}}{\text{"
                             + grooming_styling[reference_grooming_method].label_short
                             + "}}$",
-                            range=(0.45, 1.55),
+                            range=(0.45, 1.55) if "soft_drop_z_cut_04" not in grooming_methods else (0.25, 1.55),
+                            font_size=text_font_size,
+                        ),
+                    ],
+                ),
+            ],
+            figure=pb.Figure(edge_padding=dict(left=0.15, bottom=0.095, top=0.975)),
+        ),
+        output_dir=output_dir,
+    )
+
+def plot_Rg_grooming_comparisons_for_single_system(
+    hists: Mapping[str, SingleResult],
+    grooming_methods: Sequence[str],
+    reference_grooming_method: str,
+    collision_system: str,
+    collision_system_key: str,
+    output_dir: Path,
+    rg_range: Union[helpers.KtRange, Mapping[str, helpers.RgRange]],
+    figure_rg_range: helpers.KtRange = helpers.KtRange(1.5, 15),
+    jet_R_str: str = "R02",
+    alice_status: str = "work_in_progress",
+    text_font_size: int = 31,
+    label: str = "",
+) -> None:
+    """Plot comparison of grooming methods for a single system."""
+
+    # Validation
+    if isinstance(rg_range, helpers.KtRange):
+        rg_range = {grooming_method: rg_range for grooming_method in grooming_methods}
+    if label:
+        label = f"_{label}"
+
+    grooming_styling = pb.define_grooming_styles()
+    jet_pt_bin = next(iter(hists.values())).ranges[0]
+
+    text = pb.label_to_display_string["ALICE"][alice_status]
+    text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
+    text += "\n" + pb.label_to_display_string["jets"]["general"]
+    text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    _plot_single_system_comparison(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        reference_grooming_method=reference_grooming_method,
+        set_zero_to_nan=False,
+        kt_range=rg_range,
+        plot_config=pb.PlotConfig(
+            name=f"unfolded_kt_{collision_system}_comparison_{jet_R_str}{label}",
+            panels=[
+                # Main panel
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}R_{\text{g}}$",
+                            font_size=text_font_size,
+                        ),
+                    ],
+                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
+                    legend=pb.LegendConfig(location="lower left", font_size=round(text_font_size*0.8), anchor=(0.015, 0.025), marker_label_spacing=0.075),
+                ),
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$R_{\text{g}}$", range=tuple(figure_rg_range), font_size=text_font_size),  # type: ignore[arg-type]
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$\frac{\text{Method}}{\text{"
+                            + grooming_styling[reference_grooming_method].label_short
+                            + "}}$",
+                            range=(0.45, 1.55) if "soft_drop_z_cut_04" not in grooming_methods else (0.25, 1.55),
                             font_size=text_font_size,
                         ),
                     ],
