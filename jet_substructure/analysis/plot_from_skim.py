@@ -305,6 +305,7 @@ def plot_prong_matching(
 def _plot_subjet_matching_purity(  # noqa: C901
     hists: Mapping[str, bh.Histogram],
     grooming_methods: Sequence[str],
+    all_available_methods: Sequence[str],
     matching_level: str,
     matching_jet_pt_prefix: str,
     subjet_for_purity: str,
@@ -337,7 +338,11 @@ def _plot_subjet_matching_purity(  # noqa: C901
         if hist_suffix:
             hist_name += f"_{hist_suffix}"
         # logger.debug(hist_name)
-        normalization = _project_matching_RDF(hists[hist_name], min_kt_hybrid=min_kt_hybrid)
+        try:
+            normalization = _project_matching_RDF(hists[hist_name], min_kt_hybrid=min_kt_hybrid)
+        except KeyError as e:
+            logger.info(f"Skipping grooming method {grooming_method} since the hist doesn't appear to be available")
+            continue
         # binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5), :: bh.sum])
 
         matching_type = "pure"
@@ -395,7 +400,11 @@ def _plot_subjet_matching_purity(  # noqa: C901
     plot_config.apply(fig=fig, axes=[ax])
 
     # Store and reset
-    grooming_methods_label = "_".join(grooming_methods)
+    if list(grooming_methods) == list(all_available_methods):
+        # Shortcut this - otherwise the filename is too long :-()
+        grooming_methods_label = "all_grooming_methods"
+    else:
+        grooming_methods_label = "_".join(grooming_methods)
     filename = f"{plot_config.name}_{grooming_methods_label}"
     if hist_suffix:
         # Add the min kt hybrid into the output filename if we've set it.
@@ -416,6 +425,7 @@ def _plot_subjet_matching_purity(  # noqa: C901
 def plot_prong_matching_purity(
     hists: Mapping[str, bh.Histogram],
     grooming_methods: Sequence[str],
+    all_available_methods: Sequence[str],
     output_dir: Path,
     plot_png: bool = False,
     min_kt_hybrid_values: Optional[Sequence[float]] = None,
@@ -442,6 +452,7 @@ def plot_prong_matching_purity(
                 _plot_subjet_matching_purity(
                     hists=hists,
                     grooming_methods=grooming_methods,
+                    all_available_methods=all_available_methods,
                     matching_level=matching_level,
                     matching_jet_pt_prefix=matching_jet_pt_prefix,
                     subjet_for_purity=subjet_for_purity,
