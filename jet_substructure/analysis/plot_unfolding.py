@@ -4466,7 +4466,15 @@ def run(collision_system: str) -> None:
         plot_kt_unfolding(unfolding_output=unfolding_output)
 
 
-def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = False) -> Path:
+def plot_delta_R_unfolding(
+    unfolding_output: UnfoldingOutput,
+    plot_png: bool = False,
+    reweighted_prior_output: Optional[UnfoldingOutput] = None,
+    unfolding_Rg_display_range: Optional[Tuple[float, float]] = None,
+) -> Path:
+    if unfolding_Rg_display_range is None:
+        unfolding_Rg_display_range = (-0.5, unfolding_output.smeared_var_range.max)
+    logger.info(f"Plotting {unfolding_output.identifier}")
     # with sns.color_palette("GnBu_d", n_colors=11):
     with sns.color_palette("Paired", n_colors=unfolding_output.max_n_iter):
         # Main unfolded plot.
@@ -4485,19 +4493,18 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                 for n_iter in unfolding_output.n_iter_range_to_plot()
             },
             plot_config=pb.PlotConfig(
-                name=f"unfolded_{unfolding_output.substructure_variable}_true_pt_60_80",
+                name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
                 panels=[
                     # Main panel
                     pb.Panel(
                         axes=[
                             pb.AxisConfig(
                                 "y",
-                                label=r"$\text{d}N/\text{d}\Delta R$",
-                                log=True,
+                                label=r"$\text{d}N/\text{d}R_{\text{g}}$",
                             )
                         ],
                         # legend=pb.LegendConfig(location="lower left"),
-                        legend=pb.LegendConfig(location="center right"),
+                        legend=pb.LegendConfig(location="center right", ncol=2),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
@@ -4506,12 +4513,17 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                             pb.AxisConfig(
                                 "y",
                                 label=fr"Ratio to iter {unfolding_output.n_iter_compare}",
+                                range=(0.5, 1.5),
                             )
                         ],
                     ),
                     pb.Panel(
                         axes=[
-                            pb.AxisConfig("x", label=r"$\Delta R$"),
+                            pb.AxisConfig(
+                                "x",
+                                label=r"$R_{\text{g}}$",
+                                range=unfolding_Rg_display_range,
+                            ),
                             pb.AxisConfig(
                                 "y",
                                 label="Ratio to {true_label}",
@@ -4520,6 +4532,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                         ],
                     ),
                 ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
             ),
             plot_png=plot_png,
         )
@@ -4539,18 +4552,17 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                 for n_iter in unfolding_output.n_iter_range_to_plot()
             },
             plot_config=pb.PlotConfig(
-                name=f"unfolded_{unfolding_output.substructure_variable}_true_pt_40_120",
+                name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
                 panels=[
                     # Main panel
                     pb.Panel(
                         axes=[
                             pb.AxisConfig(
                                 "y",
-                                label=r"$\text{d}N/\text{d}\Delta R$",
-                                log=True,
+                                label=r"$\text{d}N/\text{d}R_{\text{g}}$",
                             )
                         ],
-                        legend=pb.LegendConfig(location="center right"),
+                        legend=pb.LegendConfig(location="center right", ncol=2),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
@@ -4559,12 +4571,17 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                             pb.AxisConfig(
                                 "y",
                                 label=fr"Ratio to iter {unfolding_output.n_iter_compare}",
+                                range=(0.5, 1.5),
                             )
                         ],
                     ),
                     pb.Panel(
                         axes=[
-                            pb.AxisConfig("x", label=r"$\Delta R$"),
+                            pb.AxisConfig(
+                                "x",
+                                label=r"$R_{\text{g}}$",
+                                range=unfolding_Rg_display_range
+                            ),
                             pb.AxisConfig(
                                 "y",
                                 label="Ratio to {true_label}",
@@ -4573,10 +4590,70 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                         ],
                     ),
                 ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            ),
+            plot_png=plot_png,
+        )
+        # Check a higher jet pt bin: 80-100
+        true_jet_pt_range = helpers.JetPtRange(80, 100)
+        text = f"${true_jet_pt_range.display_str(label='true')}$"
+        plot_unfolded(
+            unfolding_output=unfolding_output,
+            hist_true=unfolding_output.true_substructure(
+                unfolding_output.true_hist_name, true_jet_pt_range=true_jet_pt_range
+            ),
+            hist_n_iter_compare=unfolding_output.unfolded_substructure(
+                unfolding_output.n_iter_compare, true_jet_pt_range=true_jet_pt_range
+            ),
+            unfolded_hists={
+                n_iter: unfolding_output.unfolded_substructure(n_iter=n_iter, true_jet_pt_range=true_jet_pt_range)
+                for n_iter in unfolding_output.n_iter_range_to_plot()
+            },
+            plot_config=pb.PlotConfig(
+                name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=r"$\text{d}N/\text{d}R_{\text{g}}$",
+                            )
+                        ],
+                        legend=pb.LegendConfig(location="center right", ncol=2),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"Ratio to iter {unfolding_output.n_iter_compare}",
+                                range=(0.5, 1.5),
+                            )
+                        ],
+                    ),
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "x",
+                                label=r"$R_{\text{g}}$",
+                                range=unfolding_Rg_display_range
+                            ),
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to {true_label}",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
             ),
             plot_png=plot_png,
         )
         # Unfolded jet pt
+        # First, over the full kt range.
         true_substructure_variable_range = helpers.RgRange(-1, 100)
         text = f"${true_substructure_variable_range.display_str(label='true')}$"
         plot_unfolded(
@@ -4591,7 +4668,8 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                 n_iter: unfolding_output.unfolded_jet_pt(
                     n_iter=n_iter, true_substructure_variable_range=true_substructure_variable_range
                 )
-                for n_iter in unfolding_output.n_iter_range_to_plot()
+                #for n_iter in unfolding_output.n_iter_range_to_plot()
+                for n_iter in range(1, unfolding_output.n_iter_compare + 5)
             },
             plot_config=pb.PlotConfig(
                 name="unfolded_pt",
@@ -4601,7 +4679,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                         axes=[
                             pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
                         ],
-                        legend=pb.LegendConfig(location="lower left"),
+                        legend=pb.LegendConfig(location="lower left", ncol=2),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
@@ -4624,6 +4702,62 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                         ],
                     ),
                 ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            ),
+            plot_png=plot_png,
+        )
+        # Since our smeared and true Rg ranges can match, we'll restrict it here.
+        # NOTE: Careful here, this doesn't actually apply for the main semi-central and central ranges...
+        true_substructure_variable_range = unfolding_output.smeared_var_range  # type: ignore[assignment]
+        text = f"${true_substructure_variable_range.display_str(label='true')}$"
+        plot_unfolded(
+            unfolding_output=unfolding_output,
+            hist_true=unfolding_output.true_jet_pt(
+                unfolding_output.true_hist_name, true_substructure_variable_range=true_substructure_variable_range
+            ),
+            hist_n_iter_compare=unfolding_output.unfolded_jet_pt(
+                unfolding_output.n_iter_compare, true_substructure_variable_range=true_substructure_variable_range
+            ),
+            unfolded_hists={
+                n_iter: unfolding_output.unfolded_jet_pt(
+                    n_iter=n_iter, true_substructure_variable_range=true_substructure_variable_range
+                )
+                #for n_iter in unfolding_output.n_iter_range_to_plot()
+                for n_iter in range(1, unfolding_output.n_iter_compare + 5)
+            },
+            plot_config=pb.PlotConfig(
+                # Display with f"unfolded_pt_true_{unfolding_output.smeared_var_range}"
+                name=f"unfolded_pt_true_{str(true_substructure_variable_range)}",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("y", label=r"$\text{d}N/\text{d}p_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
+                        ],
+                        legend=pb.LegendConfig(location="lower left", ncol=2),
+                        text=pb.TextConfig(text, 0.97, 0.97),
+                    ),
+                    # Ratio
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=fr"Ratio to iter {unfolding_output.n_iter_compare}",
+                            )
+                        ],
+                    ),
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
+                            pb.AxisConfig(
+                                "y",
+                                label="Ratio to {true_label}",
+                                range=(0.5, 1.5),
+                            ),
+                        ],
+                    ),
+                ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
             ),
             plot_png=plot_png,
         )
@@ -4649,14 +4783,14 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                 panels=[
                     # Main panel
                     pb.Panel(
-                        axes=[pb.AxisConfig("y", label=r"$\text{d}N/\text{d}\Delta R$", log=True)],
+                        axes=[pb.AxisConfig("y", label=r"$\text{d}N/\text{d}R_{\text{g}}$")],
                         legend=pb.LegendConfig(location="lower center", ncol=2),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
                     pb.Panel(
                         axes=[
-                            pb.AxisConfig("x", label=r"$\Delta R$"),
+                            pb.AxisConfig("x", label=r"$R_{\text{g}}$"),
                             # y label is set in the function.
                             pb.AxisConfig(
                                 "y",
@@ -4666,6 +4800,7 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                         ],
                     ),
                 ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
             ),
             plot_png=plot_png,
         )
@@ -4711,22 +4846,28 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
                         ],
                     ),
                 ],
+                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
             ),
             plot_png=plot_png,
         )
+        # NOTE: Going to skip slicing in the refolded here since I think we don't need
+        #       to do such exploration...
 
     # Plot the response
     if "h2_substructure_variable" in unfolding_output.hists:
-        jet_pt_for_text = helpers.JetPtRange(40, 120)
-        text = f"${jet_pt_for_text.display_str(label='hybrid')}$"
+        text = f"${unfolding_output.smeared_jet_pt_range.display_str(label='hybrid')}$"
         plot_response(
             hists=unfolding_output.hists,
             plot_config=pb.PlotConfig(
-                name=f"response_{unfolding_output.substructure_variable}_hybrid_40_120",
+                name=f"response_{unfolding_output.substructure_variable}_hybrid_{unfolding_output.smeared_jet_pt_range}",
                 panels=pb.Panel(
                     axes=[
-                        pb.AxisConfig("x", label=r"$\Delta R^{\text{hybrid}}\:(\text{GeV}/c)$"),
-                        pb.AxisConfig("y", label=r"$\Delta R^{\text{true}}\:(\text{GeV}/c)$", range=(0, 0.4)),
+                        pb.AxisConfig("x", label=r"$R_{\text{g}}^{\text{hybrid}}$",
+                            range=(0, unfolding_output.smeared_var_range.max),
+                        ),
+                        pb.AxisConfig("y", label=r"$R_{\text{g}}^{\text{true}}$",
+                            range=(0, unfolding_output.smeared_var_range.max),
+                        ),
                     ],
                     text=pb.TextConfig(text, 0.97, 0.03),
                 ),
@@ -4736,23 +4877,133 @@ def plot_delta_R_unfolding(unfolding_output: UnfoldingOutput, plot_png: bool = F
             plot_png=plot_png,
         )
 
-    # Select the n_iter iteration
-    jet_pt_for_text = helpers.JetPtRange(60, 80)
-    text = f"${jet_pt_for_text.display_str(label='true')}$"
-    plot_select_iteration(
-        unfolding_output=unfolding_output,
-        projection_func=UnfoldingOutput.unfolded_substructure,  # type: ignore[arg-type]
-        max_iter=unfolding_output.max_n_iter,
-        true_bin=helpers.JetPtRange(60, 80),
+    # Plot Rg vs jet pt
+    plot_jet_pt_vs_substructure(
+        hists=unfolding_output.hists,
+        hist_name="smeared",
         plot_config=pb.PlotConfig(
-            name=f"select_iteration_{unfolding_output.substructure_variable}_true_pt_60_80",
+            name=f"{unfolding_output.substructure_variable}_vs_jet_pt_hybrid",
             panels=pb.Panel(
                 axes=[
-                    pb.AxisConfig("x", label="Iteration"),
-                    pb.AxisConfig("y", label="Summed Error", range=(0, None)),
+                    pb.AxisConfig("x", label=r"$R_{\text{g}}^{\text{hybrid}}$"),
+                    pb.AxisConfig("y", label=r"$p_{\text{T}}^{\text{hybrid}}\:(\text{GeV}/c)$"),
                 ],
-                legend=pb.LegendConfig(location="center right"),
-                text=pb.TextConfig(text, 0.03, 0.03),
+                text=pb.TextConfig(text, 0.97, 0.03),
+            ),
+        ),
+        output_dir=unfolding_output.output_dir,
+        plot_png=plot_png,
+    )
+    # True
+    plot_jet_pt_vs_substructure(
+        hists=unfolding_output.hists,
+        hist_name="true",
+        plot_config=pb.PlotConfig(
+            name=f"{unfolding_output.substructure_variable}_vs_jet_pt_true",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label=r"$R_{\text{g}}^{\text{true}}$"),
+                    pb.AxisConfig("y", label=r"$p_{\text{T}}^{\text{true}}\:(\text{GeV}/c)$"),
+                ],
+                text=pb.TextConfig(text, 0.97, 0.03),
+            ),
+        ),
+        output_dir=unfolding_output.output_dir,
+        plot_png=plot_png,
+    )
+
+    # Select the n_iter iteration
+    for true_jet_pt_range in [helpers.JetPtRange(60, 80), helpers.JetPtRange(80, 100)]:
+        text = f"${true_jet_pt_range.display_str(label='true')}$"
+        plot_select_iteration(
+            unfolding_output=unfolding_output,
+            projection_func=UnfoldingOutput.unfolded_substructure,  # type: ignore[arg-type]
+            max_iter=unfolding_output.max_n_iter,
+            true_bin=true_jet_pt_range,
+            plot_config=pb.PlotConfig(
+                name=f"select_iteration_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+                panels=pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label="Iteration"),
+                        pb.AxisConfig("y", label="Summed Error", range=(0, None)),
+                    ],
+                    legend=pb.LegendConfig(location="center right"),
+                    text=pb.TextConfig(text, 0.03, 0.03),
+                ),
+            ),
+            output_dir=unfolding_output.output_dir,
+            plot_png=plot_png,
+            reweighted_prior_output=reweighted_prior_output,
+        )
+
+    # Efficiency
+    plot_efficiency(
+        hists=unfolding_output.hists,
+        efficiency_func=_efficiency_substructure_variable,
+        true_bins=[
+            helpers.JetPtRange(40, 120),
+            helpers.JetPtRange(40, 60),
+            helpers.JetPtRange(60, 80),
+            helpers.JetPtRange(80, 100),
+            helpers.JetPtRange(80, 120),
+        ],
+        true_bin_label="p",
+        plot_config=pb.PlotConfig(
+            name=f"efficiency_{unfolding_output.substructure_variable}",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label=r"$R_{\text{g}}$"),
+                    pb.AxisConfig("y", label="Efficiency"),
+                ],
+                legend=pb.LegendConfig(location="lower left"),
+                # text=pb.TextConfig(text, 0.97, 0.97),
+            ),
+        ),
+        output_dir=unfolding_output.output_dir,
+        plot_png=plot_png,
+    )
+    # Cleaned up Rg efficiency, focused on the ranges that we will measure.
+    plot_efficiency(
+        hists=unfolding_output.hists,
+        efficiency_func=_efficiency_substructure_variable,
+        true_bins=[
+            helpers.JetPtRange(60, 80),
+        ],
+        true_bin_label="p",
+        plot_config=pb.PlotConfig(
+            name=f"efficiency_{unfolding_output.substructure_variable}_true_pt_60_80",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label=r"$R_{\text{g}}$", range=unfolding_Rg_display_range),
+                    pb.AxisConfig("y", label="Efficiency"),
+                ],
+                legend=pb.LegendConfig(location="lower left"),
+                # text=pb.TextConfig(text, 0.97, 0.97),
+            ),
+        ),
+        output_dir=unfolding_output.output_dir,
+        plot_png=plot_png,
+    )
+    plot_efficiency(
+        hists=unfolding_output.hists,
+        efficiency_func=_efficiency_pt,
+        true_bins=[
+            unfolding_output.smeared_var_range,
+            # helpers.RangeSelector(unfolding_output.smeared_var_range.min, unfolding_output.smeared_var_range.max),
+            # helpers.RangeSelector(1, 15),
+            # helpers.RangeSelector(2, 13),
+            # helpers.RangeSelector(2, 15),
+        ],
+        true_bin_label="Rg",
+        plot_config=pb.PlotConfig(
+            name="efficiency_pt",
+            panels=pb.Panel(
+                axes=[
+                    pb.AxisConfig("x", label=r"$p_{\text{T}}\:(\text{GeV}/c)$"),
+                    pb.AxisConfig("y", label="Efficiency"),
+                ],
+                legend=pb.LegendConfig(location="lower right"),
+                # text=pb.TextConfig(text, 0.97, 0.97),
             ),
         ),
         output_dir=unfolding_output.output_dir,
