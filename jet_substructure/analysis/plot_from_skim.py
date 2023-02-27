@@ -192,6 +192,7 @@ def plot_prong_matching(
     rdf_plots: bool,
     plot_png: bool = False,
     min_kt_hybrid_values: Optional[Sequence[float]] = None,
+    system_label: str | None = None,
 ) -> None:
     # Validation
     if min_kt_hybrid_values is None:
@@ -207,7 +208,11 @@ def plot_prong_matching(
     ]:
         for min_kt_hybrid in min_kt_hybrid_values:
             for grooming_method in grooming_methods:
-                text = "Iterative splittings"
+                if system_label:
+                    text = system_label
+                else:
+                    text = ""
+                text += "\n" + "Iterative splittings"
                 text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
                 text += "\n" + grooming_styling[grooming_method].label
                 hist_suffix = hybrid_jet_pt_bin.histogram_str(label="hybrid")
