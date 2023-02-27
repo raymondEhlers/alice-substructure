@@ -855,7 +855,7 @@ def _plot_jet_pt_residual_distribution(
 
     # Colors are to match the jet substructure semi-central AN
     for jet_types, label, color in [
-        ("hybrid_det", "Flucutations", "red"),
+        ("hybrid_det", "Fluctuations", "red"),
         ("hybrid_true", "Combined", "black"),
         ("det_true", "Detector", "blue"),
     ]:
@@ -1421,7 +1421,7 @@ def plot_compare_kt(
 ) -> None:
     hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
     identifier = analysis_objects.Identifier(iterative_splittings=True, jet_pt_bin=hybrid_jet_pt_bin)
-    data_hists_for_comparion = data_hists[identifier]
+    data_hists_for_comparison = data_hists[identifier]
 
     for grooming_method in grooming_methods:
         if grooming_method in [
@@ -1439,7 +1439,7 @@ def plot_compare_kt(
         _plot_kt_comparison(
             hists=hists,
             # TODO: This won't work quite right! It needs a rebin + not to be projected in the comparison function.
-            data_hist=getattr(data_hists_for_comparion, grooming_method).kt,
+            data_hist=getattr(data_hists_for_comparison, grooming_method).kt,
             grooming_method=grooming_method,
             hybrid_jet_pt_bin=hybrid_jet_pt_bin,
             plot_config=PlotConfig(
@@ -2743,7 +2743,7 @@ def _plot_lund_plane(
     # print(f"y_bin_widths: {y_bin_widths.size}")
     # print(f"bin_widths size: {bin_widths.size}")
     h /= bin_widths
-    # Scale by njets.
+    # Scale by n_jets.
     h /= np.sum(h.values)
 
     # Determine the normalization range
