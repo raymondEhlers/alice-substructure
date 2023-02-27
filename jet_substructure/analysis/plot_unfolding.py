@@ -2548,10 +2548,10 @@ def load_unfolded_outputs(
     Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]]
 ]:
     # Validation
-    if isinstance(smeared_var_range, helpers.KtRange):
+    if isinstance(smeared_var_range, helpers.RangeSelector):
         # Copy for every grooming method
         smeared_var_range = {grooming_method: smeared_var_range for grooming_method in grooming_methods}
-    if isinstance(smeared_untagged_var, helpers.KtRange):
+    if isinstance(smeared_untagged_var, helpers.RangeSelector):
         # Copy for every grooming method
         smeared_untagged_var = {grooming_method: smeared_untagged_var for grooming_method in grooming_methods}
     if isinstance(n_iter_compare, int):
