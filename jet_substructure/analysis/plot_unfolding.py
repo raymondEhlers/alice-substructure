@@ -1332,12 +1332,15 @@ def plot_grooming_comparisons_for_single_system(
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
+    label: str = "",
 ) -> None:
     """Plot comparison of grooming methods for a single system."""
 
     # Validation
     if isinstance(kt_range, helpers.KtRange):
         kt_range = {grooming_method: kt_range for grooming_method in grooming_methods}
+    if label:
+        label = f"_{label}"
 
     grooming_styling = pb.define_grooming_styles()
     jet_pt_bin = next(iter(hists.values())).ranges[0]
@@ -1354,7 +1357,7 @@ def plot_grooming_comparisons_for_single_system(
         set_zero_to_nan=False,
         kt_range=kt_range,
         plot_config=pb.PlotConfig(
-            name=f"unfolded_kt_{collision_system}_comparison_{jet_R_str}",
+            name=f"unfolded_kt_{collision_system}_comparison_{jet_R_str}{label}",
             panels=[
                 # Main panel
                 pb.Panel(
