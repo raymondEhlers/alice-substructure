@@ -1347,7 +1347,7 @@ available_datasets:
         jet_R: 0.2
         entries_per_job: 1.5e5
         files:
-            - "trains/embed_pythia/0061/production.yaml"
+            - "trains/embed_thermal_model/0061/production.yaml"
     #--------------------------------
     # Central data, AOD pass3 R = 0.2
     #--------------------------------
@@ -1494,7 +1494,7 @@ available_datasets:
         jet_R: 0.2
         entries_per_job: 1.5e5
         files:
-            - "trains/embed_pythia/0062/production.yaml"
+            - "trains/embed_thermal_model/0062/production.yaml"
 
 
 analysis_configurations:
