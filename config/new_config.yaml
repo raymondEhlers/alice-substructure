@@ -2139,6 +2139,13 @@ analysis_configurations:
                     reweight_prior: false
                     double_counting_cut: "OG_det_level_track_pt"
                     datasets: "rmax_050"
+                thermal_model:
+                    label: "thermal_model"
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "OG_det_level_track_pt"
+                    datasets: "thermal_model"
+
                 # Peter's binning
                 peter_binning:
                     label: "peter_binning"
@@ -2770,6 +2777,12 @@ analysis_configurations:
                     reweight_prior: false
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "rmax_050"
+                thermal_model:
+                    label: "thermal_model"
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "thermal_model"
                 # Peter's binning
                 peter_binning:
                     label: "peter_binning"
