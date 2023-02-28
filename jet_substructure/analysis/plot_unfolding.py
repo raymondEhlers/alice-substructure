@@ -1366,12 +1366,12 @@ def plot_grooming_comparisons_for_single_system(
                             "y",
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
-                            range=(7e-3, 1),
+                            range=(3e-3, 1),
                             font_size=text_font_size,
                         ),
                     ],
                     text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
-                    legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.015, 0.025), marker_label_spacing=0.075),
+                    legend=pb.LegendConfig(location="lower left", font_size=round(text_font_size*0.8), anchor=(0.015, 0.025), marker_label_spacing=0.075),
                 ),
                 pb.Panel(
                     axes=[
@@ -1513,7 +1513,7 @@ def _plot_pp_PbPb_comparison(
         "#FF8301",
 
         ## Red, green from generation where the first two values are fixed
-        "#ca5c61",
+        #"#ca5c61",
         ## TEMP: Teal
         ##"#59c28c",
         ## ENDTEMP
@@ -1525,7 +1525,7 @@ def _plot_pp_PbPb_comparison(
         # Option #2
         #"#85aa55",
         # Blue
-        "#7385d9",
+        #"#7385d9",
 
         # Option #1
         # I think I like these...
@@ -1751,7 +1751,8 @@ def plot_pp_PbPb_comparison(
                             "y",
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
-                            range=(7e-3, 1),
+                            #range=(7e-3, 1),
+                            range=(3e-3, 1),
                             font_size=text_font_size,
                         ),
                     ],
