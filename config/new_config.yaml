@@ -943,7 +943,9 @@ available_datasets:
             - "trains/embedPythia/7001/AnalysisResults.*.root"
 
 
-    # Validation productions
+    ################################
+    # mammoth validation productions
+    ################################
     LHC17pq_pp_R04_1: &LHC17pq_pp_R04_validation
         name: "LHC17pq_pp_R04_1"
         # yamllint disable-line rule:line-length
@@ -1083,6 +1085,39 @@ available_datasets:
         entries_per_job: 2e5
         files:
             - "trains/pythia/0062/production.yaml"
+    # Systematic: Herwig R = 0.2 with fastsim
+    LHC18b8_herwig_R02_fastsim_0063: &LHC18b8_herwig_R02_mammoth_fastsim
+        name: "LHC18b8_herwig_R02_fastsim_0063"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+            "true": "matched"
+        # Branches which don't exist for all prefixes
+        # NOTE: Nothing else will exist for the fastsim
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 2e5
+        files:
+            - "trains/pythia/0063/production.yaml"
+    LHC18b8_pythia_R02_fastsim_0064: &LHC18b8_pythia_R02_mammoth_fastsim
+        name: "LHC18b8_herwig_R02_fastsim_0064"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+            "true": "matched"
+        # Branches which don't exist for all prefixes
+        # NOTE: Nothing else will exist for the fastsim
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 2e5
+        files:
+            - "trains/pythia/0064/production.yaml"
 
     ######
     # PbPb
@@ -3001,6 +3036,12 @@ analysis_configurations:
             tracking_efficiency:
                 pp: *LHC17pq_pp_R02_mammoth
                 pythia: *LHC18b8_pythia_R02_mammoth_tracking_efficiency
+            herwig_fastsim:
+                pp: *LHC17pq_pp_R02_mammoth
+                pythia: *LHC18b8_herwig_R02_mammoth_fastsim
+            pythia_fastsim:
+                pp: *LHC17pq_pp_R02_mammoth
+                pythia: *LHC18b8_pythia_R02_mammoth_fastsim
         unfolding:
             suffix: "pp_R02"
             nominal_binning:
@@ -3179,6 +3220,17 @@ analysis_configurations:
                         dynamical_time_z_cut_02:
                             kt:
                                 <<: *_pp_R02_kt_random_binning_with_untagged_bin
+                model_dependence_herwig:
+                    label: "model_dependence_herwig_fastsim"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "herwig_fastsim"
+                model_dependence_pythia:
+                    label: "model_dependence_pythia_fastsim"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "pythia_fastsim"
+
                 # Peter's binning
                 peter_binning:
                     label: "peter_binning"
