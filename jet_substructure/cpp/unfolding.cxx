@@ -304,6 +304,19 @@ ResponseResult create_response_2D(
   stdoutStream << "\n";
 
   // Validation
+  // Since we do some selections when we set up the unfolding, ensure there are actually filenames left
+  if (inputFilenames.data.size() == 0) {
+    throw std::runtime_error(
+      "No data filenames left! Check your inputs for missing input files, too aggressive selections, etc"
+    );
+  }
+  if (inputFilenames.response.size() == 0) {
+    throw std::runtime_error(
+      "No response filenames left! Check your inputs for missing input files, too aggressive selections, etc"
+    );
+  }
+  // We don't want to try to apply an additional cut on top of the existing substructure variable that
+  // we're unfolding (it just won't work)
   if (settings.additionalSubstructureVariableCut.variableName == settings.substructureVariableName) {
     // NOTE: As of Feb 2023, I can't imagine where we would want this, but I suppose it's possible.
     //       Since I'm not entirely sure, we'll throw the exception here if it happens so that I can
