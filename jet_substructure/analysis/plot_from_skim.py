@@ -1518,6 +1518,13 @@ def plot_compare_kt_skim(
         )
 
 
+def _round_value_to_next_ten(value: float) -> float:
+    value_mod_10 = value % 10
+    if value_mod_10 != 0:
+        value += value_mod_10
+    return value
+
+
 def _plot_kt_vs_jet_pt_raw_with_labels(
     hists: Mapping[str, bh.Histogram],
     grooming_method: str,
@@ -1535,12 +1542,27 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     # We want to plot the 2D hist, so no need for any projections.
     # However, first we need to rebin
     tag = f"_{jet_pt_bin.histogram_str(label=prefix)}" if rdf_plots else ""
-    bh_hist = hists[f"{grooming_method}_{prefix}_kt_stats{tag}"]
-    # h = binned_data.BinnedData.from_existing_data(
-    #    bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1 :: bh.rebin(2)]  # noqa: E203
-    # )
+    try:
+        bh_hist = hists[f"{grooming_method}_{prefix}_kt_stats{tag}"]
+        # h = binned_data.BinnedData.from_existing_data(
+        #    bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1 :: bh.rebin(2)]  # noqa: E203
+        # )
+    except KeyError as e:
+        # Cleanup
+        plt.close(fig)
+        raise e
+
+    # For kt in R=0.4, use [1:15]
+    # For kt in R=0.2, use [bh.loc(1): bh.loc(12)]
+    # We want to round the jet pt up to ensure that we don't cut it off when rebinning
+    # (ie. if 85 is the max, round up to 90. But if 120 is max, leave at 120)
+    # NOTE: In that case, it's a bit misleading because it shows counts over a full bin at the top
+    #       end of the range, but it only includes the 0-5 (ie. data only goes from 80-85, but it
+    #       is plotted between 80-90). However, this is on the edge on what we're interested, so
+    #       this shouldn't be an issue. Just something to keep an eye out for.
+    jet_pt_max = _round_value_to_next_ten(jet_pt_bin.max)
     h = binned_data.BinnedData.from_existing_data(
-        bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.rebin(2), 1:15]  # noqa: E203
+        bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_max) : bh.rebin(2), :]  # noqa: E203
     )
 
     # Plot
@@ -1558,6 +1580,7 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     # Plot values labels. These will be the only things that show up.
     for i, kt_bin_center in enumerate(h.axes[1].bin_centers):
         for j, pt_bin_center in enumerate(h.axes[0].bin_centers):
+            #logger.info(f"({i}, {j}) ({kt_bin_center}, {pt_bin_center}): {h.values[j, i]:g}")
             ax.text(
                 kt_bin_center,
                 pt_bin_center,
@@ -1592,35 +1615,56 @@ def plot_kt_vs_jet_pt_stats(
     rdf_plots: bool,
     output_dir: Path,
     plot_png: bool,
+    system_label: str,
+    jet_R: float = 0.2,
+    substructure_var_range: helpers.RangeSelector | None = None,
 ) -> List[Path]:
+    # Validation
+    if substructure_var_range is None:
+        if jet_R == 0.4:
+            substructure_var_range = helpers.KtRange(-0.5, 25)
+        else:
+            substructure_var_range = helpers.KtRange(-0.5, 15)
+    # Setup
+    # We want to round the jet pt up to ensure that we don't cut it off when rebinning
+    # (ie. if 85 is the max, round up to 90. But if 120 is max, leave at 120)
+    jet_pt_max = _round_value_to_next_ten(jet_pt_bin.max)
+
     filenames = []
     for grooming_method in grooming_methods:
         text = "Iterative splittings"
-        text += ", " + " ".join(grooming_method.split("_")).capitalize()
-        filenames.append(
-            _plot_kt_vs_jet_pt_raw_with_labels(
-                hists=hists,
-                grooming_method=grooming_method,
-                prefix=prefix,
-                jet_pt_bin=jet_pt_bin,
-                rdf_plots=rdf_plots,
-                plot_config=PlotConfig(
-                    name="kt_vs_jet_pt_raw",
-                    panels=Panel(
-                        axes=[
-                            AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0, 25)),
-                            AxisConfig(
-                                "y", label=r"$p_{\text{T}}\:(\text{GeV}/c)$", range=(jet_pt_bin.min, jet_pt_bin.max)
-                            ),
-                        ],
-                        text=TextConfig(x=0.98, y=0.02, text=text),
+        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
+        text += "\n" + system_label
+        try:
+            filenames.append(
+                _plot_kt_vs_jet_pt_raw_with_labels(
+                    hists=hists,
+                    grooming_method=grooming_method,
+                    prefix=prefix,
+                    jet_pt_bin=jet_pt_bin,
+                    rdf_plots=rdf_plots,
+                    plot_config=PlotConfig(
+                        name="kt_vs_jet_pt_raw",
+                        panels=Panel(
+                            axes=[
+                                AxisConfig(
+                                    "x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                                    range=(substructure_var_range.min, substructure_var_range.max),
+                                ),
+                                AxisConfig(
+                                    "y", label=r"$p_{\text{T}}\:(\text{GeV}/c)$",
+                                    range=(jet_pt_bin.min, jet_pt_max)
+                                ),
+                            ],
+                            text=TextConfig(x=0.98, y=0.02, text=text),
+                        ),
                     ),
-                    figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
-                ),
-                output_dir=output_dir,
-                plot_png=plot_png,
+                    output_dir=output_dir,
+                    plot_png=plot_png,
+                )
             )
-        )
+        except KeyError as e:
+            logger.info(f"Skipping due to missing output: {e}")
 
     return filenames
 
