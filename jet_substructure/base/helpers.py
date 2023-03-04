@@ -298,7 +298,7 @@ class RangeSelector:
     def histogram_str(self, label: str = "") -> str:
         if label:
             label = f"_{label}"
-        return fr"{self._variable_name}{label}_{self.min}_{self.max}"
+        return fr"{self._variable_name}{label}_{self.min:g}_{self.max:g}"
 
     def zero_padded_str(self, n_zeros: int = 0) -> str:
         return f"{self._variable_name}_{int(self.min * 10 ** n_zeros)}_{int(self.max * 10 ** n_zeros)}"
