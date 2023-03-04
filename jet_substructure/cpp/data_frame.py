@@ -1264,7 +1264,7 @@ def run(  # noqa: C901
         _measured_min_kt_values = [-1, 0.5, 1, 1.5, 2]
 
     for measured_min_kt in _measured_min_kt_values:
-        tag = f"_jet_pt_{smeared_cut_prefix}_{main_jet_pt_range.min}_{main_jet_pt_range.max}"
+        tag = f"_{main_jet_pt_range.histogram_str(label=smeared_cut_prefix)}"
         # kt == -1 is the cause that includes the untagged. There, we don't want to include any kt tag.
         if measured_min_kt == -1:
             df = df_measured_selections
