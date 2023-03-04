@@ -498,7 +498,7 @@ def split_tree(  # noqa: C901
                 # Save the new tree.
                 # It appears that we don't even need to write the tree because it's attached to the new_file...
                 new_tree.Write()
-                # NOTE: Don't use AutoSave - it could lead to writing with memberwise splittings, which won't
+                # NOTE: Don't use AutoSave - it could lead to writing with member-wise splittings, which won't
                 #       be read by uproot...
                 # Cleanup
                 new_file.Close()
