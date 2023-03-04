@@ -31,14 +31,18 @@ label_to_display_string: Dict[str, Dict[str, str]] = {
         simulation="ALICE Simulation",
     ),
     "collision_system": dict(
-        PbPb=r"$\text{Pb--Pb}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
-        embedPythia=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
-        embed_pythia=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
+        PbPb_5TeV=r"$\text{Pb--Pb}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
+        embedPythia_5TeV=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
+        embed_pythia_5TeV=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
         pp_PbPb_5TeV=r"$\text{pp},\:\text{Pb--Pb}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
         pp_5TeV=r"$\text{pp}\;\sqrt{s} = 5.02$ TeV",
         pp_5TeV_NN=r"$\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
         pythia_5TeV=r"$\text{PYTHIA8}\;\sqrt{s} = 5.02$ TeV",
         pythia_5TeV_NN=r"$\text{PYTHIA8}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
+        # Without energy are deprecated
+        PbPb=r"$\text{Pb--Pb}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
+        embedPythia=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
+        embed_pythia=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
     ),
     "jets": {f"R0{i}": (f"$R=0.{i}," + fr"\:|\eta_{{\text{{jet}}}}| < 0.{9-i}$") for i in range(1, 7)},
 }
