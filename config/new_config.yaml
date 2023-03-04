@@ -1391,7 +1391,7 @@ available_datasets:
     #######################################################################
     # Nominal: Rmax = 0.1
     LHC18qr_central_R02_0070: &LHC18qr_central_R02_mammoth
-        name: "LHC18qr_central_02_0070"
+        name: "LHC18qr_central_R02_0070"
         tree_name: "tree"
         # Map for the uniform prefix name to the analysis task prefix.
         prefixes:
