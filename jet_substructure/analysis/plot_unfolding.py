@@ -247,6 +247,7 @@ class UnfoldingOutput:
 
         # Initialize the file if the histograms aren't specified.
         if not self.hists:
+            #logger.info(f"{self.input_filename=}")
             f = uproot.open(self.input_filename)
             for k in f.keys(cycle=False):
                 self.hists[k] = binned_data.BinnedData.from_existing_data(f[k])
@@ -2228,6 +2229,29 @@ def setup_unfolding_closures(
         )
     except FileNotFoundError:
         logger.debug("Skipping reweighted response because the output file doesn't exist.")
+
+    try:
+        unfolding_outputs["thermal_model"] = UnfoldingOutput(
+            substructure_variable=substructure_variable,
+            grooming_method=grooming_method,
+            smeared_var_range=smeared_var_range,
+            smeared_untagged_var=smeared_untagged_var,
+            smeared_jet_pt_range=smeared_jet_pt_range,
+            collision_system=collision_system,
+            base_dir=output_dir,
+            n_iter_compare=n_iter_compare,
+            pure_matches=pure_matches,
+            suffix=suffix,
+            input_dir_tag=input_dir_tag,
+            double_counting_cut=double_counting_cut,
+            #label="thermal_model_closure_trivial_hybrid_smeared_as_input",
+            #raw_hist_name="smeared",
+            label="thermal_model_closure_split_MC",
+            raw_hist_name="h2_pseudo_data",
+            true_hist_name="h2_pseudo_true",
+        )
+    except FileNotFoundError:
+        logger.debug("Skipping thermal model closure because the output file doesn't exist.")
 
     return unfolding_outputs
 
