@@ -395,6 +395,16 @@ class SingleResult:
     ranges: Sequence[helpers.RangeSelector] = attr.ib(factory=list)
 
 
+@attr.define
+class ModelDependenceConfiguration:
+    nominal: str
+    variations: list[str]
+    approach_to_combining: str = attr.field(default="max")
+
+    def all_models(self) -> list[str]:
+        return [self.nominal] + self.variations
+
+
 def plot_relative_individual_systematics(
     unfolded: SingleResult,
     plot_config: pb.PlotConfig,
@@ -2282,6 +2292,7 @@ def setup_unfolding_outputs(  # noqa: C901
     displaced_untagged_above_range: bool = True,
     displaced_extremum: Optional[float] = None,
     skip_reweighted_prior_in_systematics: bool = False,
+    model_dependence_configuration: ModelDependenceConfiguration | None = None,
 ) -> Dict[str, UnfoldingOutput]:
     # Validation
     # Keep the truncation positive so we know how we've shifted.
@@ -2447,26 +2458,28 @@ def setup_unfolding_outputs(  # noqa: C901
         )
 
     # Model dependence
-    try:
-        # Careful here: the outputs in pp are not in the standard format. But this is a convenient fiction.
-        unfolding_outputs["model_dependence"] = UnfoldingOutput(
-            substructure_variable=substructure_variable,
-            grooming_method=grooming_method,
-            smeared_var_range=smeared_var_range,
-            smeared_untagged_var=smeared_untagged_var,
-            smeared_jet_pt_range=smeared_jet_pt_range,
-            collision_system=collision_system,
-            base_dir=output_dir,
-            n_iter_compare=n_iter_compare,
-            max_n_iter=max_n_iter,
-            pure_matches=False,
-            suffix=suffix,
-            input_dir_tag=input_dir_tag,
-            double_counting_cut=double_counting_cut,
-            label="model_dependence",
-        )
-    except FileNotFoundError:
-        logger.debug("Skipping model dependence because the output file doesn't exist.")
+    if model_dependence_configuration is not None:
+        for model_name in model_dependence_configuration.all_models:
+            try:
+                # Careful here: the outputs in pp are not in the standard format. But this is a convenient fiction.
+                unfolding_outputs[f"model_dependence_{model_name}"] = UnfoldingOutput(
+                    substructure_variable=substructure_variable,
+                    grooming_method=grooming_method,
+                    smeared_var_range=smeared_var_range,
+                    smeared_untagged_var=smeared_untagged_var,
+                    smeared_jet_pt_range=smeared_jet_pt_range,
+                    collision_system=collision_system,
+                    base_dir=output_dir,
+                    n_iter_compare=n_iter_compare,
+                    max_n_iter=max_n_iter,
+                    pure_matches=False,
+                    suffix=suffix,
+                    input_dir_tag=input_dir_tag,
+                    double_counting_cut=double_counting_cut,
+                    label=f"model_dependence_{model_name}" if model_name != "default" else "",
+                )
+            except FileNotFoundError:
+                logger.debug(f"Skipping model dependence '{model_name}' because the output file doesn't exist.")
 
     # Background subtraction
     for background_setting in ["Rmax070", "Rmax050", "Rmax005"]:
@@ -2512,6 +2525,7 @@ def _load_unfolded_outputs(
     tag_after_suffix: str = "",
     displaced_untagged_above_range: bool = True,
     skip_reweighted_prior_in_systematics: bool = False,
+    model_dependence_configuration: ModelDependenceConfiguration | None = None,
 ) -> Tuple[Dict[str, UnfoldingOutput], Dict[str, UnfoldingOutput], Dict[str, UnfoldingOutput]]:
     # Validation
     suffix = f"{event_activity}_{jet_R_str}"
@@ -2569,6 +2583,7 @@ def _load_unfolded_outputs(
         displaced_untagged_above_range=displaced_untagged_above_range,
         displaced_extremum=displaced_extremum,
         skip_reweighted_prior_in_systematics=skip_reweighted_prior_in_systematics,
+        model_dependence_configuration=model_dependence_configuration,
     )
 
     return unfolding_closure_outputs, unfolding_closure_pure_matches_outputs, unfolding_systematics_outputs
@@ -2652,17 +2667,20 @@ def _unfolded_outputs_with_systematics(
     grooming_method: str,
     unfolding_systematics_outputs: Dict[str, Dict[str, UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
+    model_dependence_configuration: ModelDependenceConfiguration | None = None,
 ) -> Tuple[SingleResult, binned_data.BinnedData]:
     logger.info(f"Calculating systematics for {grooming_method}")
     unfolded = unfolded_substructure_results(
         unfolding_outputs=unfolding_systematics_outputs[grooming_method],
         true_jet_pt_range=true_jet_pt_range,
+        model_dependence_configuration=model_dependence_configuration,
     )
 
     unfolded_with_systematics = calculate_systematics(
         unfolded=unfolded,
         unfolding_outputs=unfolding_systematics_outputs[grooming_method],
         true_jet_pt_range=true_jet_pt_range,
+        model_dependence_configuration=model_dependence_configuration,
     )
 
     true_reference = unfolding_systematics_outputs[grooming_method]["default"].true_substructure(
@@ -2676,7 +2694,12 @@ def unfolded_outputs_with_systematics(
     grooming_methods: Sequence[str],
     unfolding_systematics_outputs: Dict[str, Dict[str, UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
+    model_dependence_configuration: Dict[str, ModelDependenceConfiguration] | ModelDependenceConfiguration | None = None,
 ) -> Tuple[Dict[str, SingleResult], Dict[str, binned_data.BinnedData]]:
+    # Validation
+    if isinstance(model_dependence_configuration, ModelDependenceConfiguration) or ModelDependenceConfiguration is None:
+        model_dependence_configuration = {grooming_method: model_dependence_configuration for grooming_method in grooming_methods}
+
     unfolded_with_systematics = {}
     true_reference = {}
     for grooming_method in grooming_methods:
@@ -2687,13 +2710,16 @@ def unfolded_outputs_with_systematics(
             grooming_method=grooming_method,
             unfolding_systematics_outputs=unfolding_systematics_outputs,
             true_jet_pt_range=true_jet_pt_range,
+            model_dependence_configuration=model_dependence_configuration[grooming_method],
         )
 
     return unfolded_with_systematics, true_reference
 
 
 def unfolded_substructure_results(
-    unfolding_outputs: Mapping[str, UnfoldingOutput], true_jet_pt_range: helpers.JetPtRange
+    unfolding_outputs: Mapping[str, UnfoldingOutput],
+    true_jet_pt_range: helpers.JetPtRange,
+    model_dependence_configuration: ModelDependenceConfiguration | None = None,
 ) -> Dict[str, SingleResult]:
     """Convert unfolded results into individual unfolded substructure results (selecting a particular iteration).
 
@@ -2708,9 +2734,15 @@ def unfolded_substructure_results(
     Returns:
         Unfolded substructure results.
     """
+    # Validation
+    _entry_for_model_dependence = np.array(["model_dependence" in k for k in unfolding_outputs])
+    if model_dependence_configuration is None and np.count_nonzero(_entry_for_model_dependence) == 1:
+        # For the outputs from Leticia, which are in a different format than our usual.
+        skip_converting_model_dependence = True
+
     unfolded = {}
     for k, v in unfolding_outputs.items():
-        if k == "model_dependence":
+        if skip_converting_model_dependence and k == "model_dependence":
             # We have to handle this manually. See the systematics calculation.
             continue
         unfolded[k] = SingleResult(
@@ -2729,7 +2761,8 @@ def calculate_systematics(  # noqa: C901
     unfolded: Mapping[str, SingleResult],
     unfolding_outputs: Mapping[str, UnfoldingOutput],
     true_jet_pt_range: helpers.JetPtRange,
-    truncation_iter: Optional[helpers.RangeSelector] = None,
+    truncation_iter: helpers.RangeSelector | None = None,
+    model_dependence_configuration: ModelDependenceConfiguration | None = None,
 ) -> SingleResult:
     # Validation
     if truncation_iter is None:
@@ -2857,6 +2890,7 @@ def calculate_systematics(  # noqa: C901
     # This is treated as a symmetric uncertainty.
     # However, we store it as asymmetric errors objects for consistency with everything else.
     try:
+        # TODO: Loop over these, and take the maximum
         # NOTE: Unlike the others, we take the abs and set the values here directly because
         #       we want them to be symmetric.
         # NOTE: The reference needs to be to the PseudoTrue, so we need to retrieve it here.
@@ -2883,7 +2917,11 @@ def calculate_systematics(  # noqa: C901
 
     # Model dependence.
     # The output should include _either_ the model dependence or the prior
-    if "model_dependence" in unfolding_outputs:
+    _entry_for_model_dependence = np.array(["model_dependence" in k for k in unfolding_outputs])
+    if model_dependence_configuration is None and np.count_nonzero(_entry_for_model_dependence) == 1:
+        # This is the original model dependence from Leticia. We had to do special things here because the
+        # output was not in our standard format.
+        logger.warning("Handling model dependence from Leticia.")
         # First, extract the model dependence graph
         # NOTE: This output is quite different, so we just need to handle the graph (not hist!) directly.
         graph = unfolding_outputs["model_dependence"].hists[
@@ -2906,6 +2944,34 @@ def calculate_systematics(  # noqa: C901
             f"\n\tlow: {relative_errors_on_model_dependence_low}"
             f"\n\thigh: {relative_errors_on_model_dependence_high}"
             f'\n\tmodel_dependence errors: {unfolded["default"].data.metadata["y_systematic"]["model_dependence"]}'
+        )
+    elif np.any(_entry_for_model_dependence):
+        # Updated handling for more recent productions
+        assert model_dependence_configuration is not None
+        nominal_values = unfolded[model_dependence_configuration.nominal].data.values
+        nominal_errors = unfolded[model_dependence_configuration.nominal].data.errors
+        relative_errors_by_model = {}
+        for model_name in model_dependence_configuration.variations:
+            # Intermediate step: Find the asymmetric relative errors of each model variation
+            relative_errors_by_model[model_name] = (unfolded[model_name].data.values - nominal_values) / nominal_errors
+
+        if model_dependence_configuration.approach == "max":
+            model_dependence_relative = np.zeros(len(nominal_values), dtype=np.float64)
+            for model_name, relative_uncertainty in relative_errors_by_model.items():
+                current_model_has_large_uncertainties = np.abs(relative_uncertainty) > np.abs(model_dependence_relative)
+                model_dependence_relative[current_model_has_large_uncertainties] = relative_uncertainty[current_model_has_large_uncertainties]
+        elif model_dependence_configuration.approach == "quadrature":
+            raise NotImplementedError("Need to implement adding model dependence in quadrature")
+        else:
+            _msg = f"Model dependence approach {model_dependence_configuration.approach} is not recognized and there is not implemented."
+            raise NotImplementedError(_msg)
+
+        # Treat asymmetrically since the model goes in a particular direction
+        unfolded["default"].data.metadata["y_systematic"][
+            "model_dependence"
+        ] = unfolding_base.AsymmetricErrors(
+            # We need the absolute error, so multiply the difference by the default value
+            model_dependence_relative * unfolded["default"].data.values,
         )
 
     # Cross check to make sure that I haven't copied and pasted incorrectly.
