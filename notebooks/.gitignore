@@ -10,3 +10,6 @@ bak/
 
 # Ignore some generated output files
 *.html
+
+# Ignore notebooks themselves sinces we conver the code with jupytext
+*.ipynb
