@@ -129,7 +129,7 @@ def unfolding_2D(
     true_spectra: TH2D,
     error_treatment: Optional[RooUnfoldErrorTreatment] = None,
     tag: str = "",
-    max_iter: int = 20,
+    max_iter: int = 30,
     n_iter_for_covariance: int = 8,
 ) -> Dict[str, TH2D]:
     """Perform unfolding in 2D.
@@ -140,7 +140,7 @@ def unfolding_2D(
         true_spectra: True histogram. Just used for binning with the covariance matrices.
         error_treatment: Error treatment to be used for unfolding.
         tag: Tag...
-        max_iter: Maximum number of iterations for unfolding. Default: 20.
+        max_iter: Maximum number of iterations for unfolding. Default: 30.
         n_iter_for_covariance: Number of iterations that should be used for calculating the covariance. Default: 8.
     Returns:
         Unfolded and folded hists per iter, as well as the covariance matrices. See the hist names in the code.
@@ -654,7 +654,7 @@ def run_unfolding(
     output_hists = unfolding_2D(
         response=responses.response,
         input_spectra=hists["h2_raw"],
-        true_spectra=hists["h2_true"]
+        true_spectra=hists["h2_true"],
     )
     # Write the output before we move onto the next case.
     _write_hists([hists, output_hists], settings.output_filename)
