@@ -1440,7 +1440,7 @@ available_datasets:
     #######################################################################
     # 2023 Feb: Added new grooming methods, including a z_cut option to DyG
     #######################################################################
-    # Nominal: Rmax = 0.05
+    # Nominal: Rmax = 0.1
     LHC20g4_embedded_into_LHC18qr_central_R02_0071: &LHC18qr_central_R02_mammoth_embedded
         name: "LHC20g4_embedded_into_LHC18qr_central_R02_0071"
         tree_name: "tree"
