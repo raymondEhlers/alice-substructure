@@ -2176,7 +2176,10 @@ analysis_configurations:
                     datasets: "rmax_050"
                 thermal_model:
                     label: "thermal_model"
-                    closures: false
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
                     reweight_prior: false
                     double_counting_cut: "OG_det_level_track_pt"
                     datasets: "thermal_model"
@@ -2814,7 +2817,10 @@ analysis_configurations:
                     datasets: "rmax_050"
                 thermal_model:
                     label: "thermal_model"
-                    closures: false
+                    closures: true
+                    closure_settings:
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
                     reweight_prior: false
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "thermal_model"
