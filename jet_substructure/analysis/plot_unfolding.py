@@ -229,6 +229,7 @@ class UnfoldingOutput:
     raw_hist_name: str = attr.ib(default="raw")
     smeared_hist_name: str = attr.ib(default="smeared")
     true_hist_name: str = attr.ib(default="true")
+    _max_n_iter: int | None = attr.ib(default=None)
     hists: MutableMapping[str, binned_data.BinnedData] = attr.ib(factory=dict)
 
     def __attrs_post_init__(self) -> None:
@@ -270,9 +271,9 @@ class UnfoldingOutput:
 
     @property
     def max_n_iter(self) -> int:
-        try:
+        if hasattr(self, "_max_n_iter") and self._max_n_iter is not None:
             return self._max_n_iter
-        except AttributeError:
+        else:
             n = 1
             for hist_name in self.hists:
                 # We could equally use the unfolded.
