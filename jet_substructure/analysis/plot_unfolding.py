@@ -400,6 +400,7 @@ class ModelDependenceConfiguration:
     nominal: str
     variations: list[str]
     approach_to_combining: str = attr.field(default="max")
+    legacy_production: bool = attr.field(default=False)
 
     def all_models(self) -> list[str]:
         return [self.nominal] + self.variations
@@ -2460,9 +2461,23 @@ def setup_unfolding_outputs(  # noqa: C901
     # Model dependence
     if model_dependence_configuration is not None:
         for model_name in model_dependence_configuration.all_models:
+            # Validation
+            if model_name == "" and not model_dependence_configuration.legacy_production:
+                raise ValueError("Only allowed to load unlabeled model dependence if using a legacy production. Please check settings!")
+
+            # Handle the special case where the nominal is the default. In this case, no need to load it twice.
+            if model_name == "default":
+                continue
+
+            label = ""
+            # Handle the legacy case of the nominal being
+            if model_name != "":
+                label = f"_{model_name}"
+            else:
+                logger.warning("Loading unlabeled model dependence via legacy case.")
             try:
                 # Careful here: the outputs in pp are not in the standard format. But this is a convenient fiction.
-                unfolding_outputs[f"model_dependence_{model_name}"] = UnfoldingOutput(
+                unfolding_outputs[f"model_dependence{label}"] = UnfoldingOutput(
                     substructure_variable=substructure_variable,
                     grooming_method=grooming_method,
                     smeared_var_range=smeared_var_range,
@@ -2476,7 +2491,7 @@ def setup_unfolding_outputs(  # noqa: C901
                     suffix=suffix,
                     input_dir_tag=input_dir_tag,
                     double_counting_cut=double_counting_cut,
-                    label=f"model_dependence_{model_name}" if model_name != "default" else "",
+                    label=f"model_dependence{label}",
                 )
             except FileNotFoundError:
                 logger.debug(f"Skipping model dependence '{model_name}' because the output file doesn't exist.")
@@ -2917,62 +2932,77 @@ def calculate_systematics(  # noqa: C901
 
     # Model dependence.
     # The output should include _either_ the model dependence or the prior
-    _entry_for_model_dependence = np.array(["model_dependence" in k for k in unfolding_outputs])
-    if model_dependence_configuration is None and np.count_nonzero(_entry_for_model_dependence) == 1:
-        # This is the original model dependence from Leticia. We had to do special things here because the
-        # output was not in our standard format.
-        logger.warning("Handling model dependence from Leticia.")
-        # First, extract the model dependence graph
-        # NOTE: This output is quite different, so we just need to handle the graph (not hist!) directly.
-        graph = unfolding_outputs["model_dependence"].hists[
-            f'bayesian_unfolded_iter_{unfolding_outputs["model_dependence"].n_iter_compare}'
-        ]
+    if model_dependence_configuration is not None:
+        _entry_for_model_dependence = np.array(["model_dependence" in k for k in unfolding_outputs])
+        if model_dependence_configuration.legacy_production:
+            # Cross check
+            assert np.count_nonzero(_entry_for_model_dependence) == 1
+            # This is the original model dependence from Leticia. We had to do special things here because the
+            # output was not in our standard format.
+            # NOTE: As of 6 Mar 2023, I can't exactly trace back what Leticia gave me, but I can only assume
+            #       that it was the difference between the HERWIG and PYTHIA fastsim. Otherwise, I can't make sense
+            #       of what I did here. Will handle it properly for the paper since I've re-analyzed these, but am
+            #       definitely a bit confused here.
+            logger.warning("Handling model dependence from Leticia.")
+            # First, extract the model dependence graph
+            # NOTE: This output is quite different, so we just need to handle the graph (not hist!) directly.
+            graph = unfolding_outputs["model_dependence"].hists[
+                f'bayesian_unfolded_iter_{unfolding_outputs["model_dependence"].n_iter_compare}'
+            ]
 
-        # Then use the information
-        relative_errors_on_model_dependence_low = graph.metadata["y_errors"]["low"] / graph.values
-        relative_errors_on_model_dependence_high = graph.metadata["y_errors"]["high"] / graph.values
+            # Then use the information
+            relative_errors_on_model_dependence_low = graph.metadata["y_errors"]["low"] / graph.values
+            relative_errors_on_model_dependence_high = graph.metadata["y_errors"]["high"] / graph.values
 
-        logger.info(
-            f"\nmodel_dependence bin_edges: {graph.axes[0].bin_edges}"
-            f"\nnominal bin_edges: {unfolded['default'].data.axes[0].bin_edges}"
-        )
-        unfolded["default"].data.metadata["y_systematic"]["model_dependence"] = unfolding_base.AsymmetricErrors(
-            relative_errors_on_model_dependence_low * unfolded["default"].data.values,
-            relative_errors_on_model_dependence_high * unfolded["default"].data.values,
-        )
-        logger.info(
-            f"\n\tlow: {relative_errors_on_model_dependence_low}"
-            f"\n\thigh: {relative_errors_on_model_dependence_high}"
-            f'\n\tmodel_dependence errors: {unfolded["default"].data.metadata["y_systematic"]["model_dependence"]}'
-        )
-    elif np.any(_entry_for_model_dependence):
-        # Updated handling for more recent productions
-        assert model_dependence_configuration is not None
-        nominal_values = unfolded[model_dependence_configuration.nominal].data.values
-        nominal_errors = unfolded[model_dependence_configuration.nominal].data.errors
-        relative_errors_by_model = {}
-        for model_name in model_dependence_configuration.variations:
-            # Intermediate step: Find the asymmetric relative errors of each model variation
-            relative_errors_by_model[model_name] = (unfolded[model_name].data.values - nominal_values) / nominal_errors
+            logger.debug(
+                f"\nmodel_dependence bin_edges: {graph.axes[0].bin_edges}"
+                f"\nnominal bin_edges: {unfolded['default'].data.axes[0].bin_edges}"
+            )
+            unfolded["default"].data.metadata["y_systematic"]["model_dependence"] = unfolding_base.AsymmetricErrors(
+                relative_errors_on_model_dependence_low * unfolded["default"].data.values,
+                relative_errors_on_model_dependence_high * unfolded["default"].data.values,
+            )
+            logger.debug(
+                f"\n\tlow: {relative_errors_on_model_dependence_low}"
+                f"\n\thigh: {relative_errors_on_model_dependence_high}"
+                f'\n\tmodel_dependence errors: {unfolded["default"].data.metadata["y_systematic"]["model_dependence"]}'
+            )
+        elif np.any(_entry_for_model_dependence):
+            ###############################################
+            # Updated handling for more recent calculations
+            ###############################################
+            # Validation
+            # NOTE: We may only have one if we're comparing to the nominal value, but we may also have
+            #       more (eg. fastsim pythia (nominal) vs fastsim herwig (alternative)).
+            assert np.count_nonzero(_entry_for_model_dependence) >= 1
 
-        if model_dependence_configuration.approach == "max":
-            model_dependence_relative = np.zeros(len(nominal_values), dtype=np.float64)
-            for model_name, relative_uncertainty in relative_errors_by_model.items():
-                current_model_has_large_uncertainties = np.abs(relative_uncertainty) > np.abs(model_dependence_relative)
-                model_dependence_relative[current_model_has_large_uncertainties] = relative_uncertainty[current_model_has_large_uncertainties]
-        elif model_dependence_configuration.approach == "quadrature":
-            raise NotImplementedError("Need to implement adding model dependence in quadrature")
-        else:
-            _msg = f"Model dependence approach {model_dependence_configuration.approach} is not recognized and there is not implemented."
-            raise NotImplementedError(_msg)
+            # Retrieve common values and calculate relative uncertainties
+            nominal_values = unfolded[model_dependence_configuration.nominal].data.values
+            nominal_errors = unfolded[model_dependence_configuration.nominal].data.errors
+            relative_errors_by_model = {}
+            # We loop here since we could imagine multiple possible model dependence contributions.
+            for model_name in model_dependence_configuration.variations:
+                # Intermediate step: Find the asymmetric relative errors of each model variation
+                relative_errors_by_model[model_name] = (unfolded[model_name].data.values - nominal_values) / nominal_errors
 
-        # Treat asymmetrically since the model goes in a particular direction
-        unfolded["default"].data.metadata["y_systematic"][
-            "model_dependence"
-        ] = unfolding_base.AsymmetricErrors(
-            # We need the absolute error, so multiply the difference by the default value
-            model_dependence_relative * unfolded["default"].data.values,
-        )
+            if model_dependence_configuration.approach_to_combining == "max":
+                model_dependence_relative = np.zeros(len(nominal_values), dtype=np.float64)
+                for model_name, relative_uncertainty in relative_errors_by_model.items():
+                    current_model_has_large_uncertainties = np.abs(relative_uncertainty) > np.abs(model_dependence_relative)
+                    model_dependence_relative[current_model_has_large_uncertainties] = relative_uncertainty[current_model_has_large_uncertainties]
+            elif model_dependence_configuration.approach_to_combining == "quadrature":
+                raise NotImplementedError("Need to implement adding model dependence in quadrature")
+            else:
+                _msg = f"Model dependence approach {model_dependence_configuration.approach_to_combining} is not recognized and there is not implemented."
+                raise NotImplementedError(_msg)
+
+            # Treat asymmetrically since the model goes in a particular direction
+            unfolded["default"].data.metadata["y_systematic"][
+                "model_dependence"
+            ] = unfolding_base.AsymmetricErrors(
+                # We need the absolute error, so multiply the difference by the default value
+                model_dependence_relative * unfolded["default"].data.values,
+            )
 
     # Cross check to make sure that I haven't copied and pasted incorrectly.
     assert not any(
