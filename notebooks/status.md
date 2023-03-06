@@ -1,0 +1,108 @@
+## Status of kt, 8 April 2021
+
+- R = 0.2
+  - pp
+    - [x] Nominal dataset trains:
+      - [x] Data
+      - [x] Response
+    - [x] Systematics trains
+      - [x] Tracking efficiency
+    - [x] QA
+      - [x] Data
+      - [x] Embedding
+    - [ ] Response and prong matching QA
+    - [x] Unfolding
+    - [x] Reliable unfolding
+    - [ ] Systematics
+    - [ ] Calculations for comparison
+  - semi-central (all grooming methods are available. Below is for DyG core and kt, which have been explored)
+    - [x] Nominal dataset trains:
+      - [x] Data
+      - [x] Response
+    - [ ] Systematics trains
+      - [x] Tracking efficiency
+      - [ ] RMax = 0.05
+      - [ ] RMax = 0.7
+    - [x] QA
+      - [x] Data
+      - [x] Embedding
+    - [ ] Response and prong matching QA
+    - [x] Unfolding
+    - [x] Reliable unfolding
+    - [ ] Systematics
+    - [ ] Calculations for comparison
+  - Central
+    - DyG core (all pass1 at the moment)
+      - [x] Nominal dataset trains:
+        - [x] Data
+        - [x] Embedding
+      - [ ] Systematics trains
+        - [ ] Tracking efficiency
+        - [ ] RMax = 0.05
+        - [ ] RMax = 0.7
+      - [x] QA
+        - [x] Data
+        - [x] Embedding
+      - [x] Response and prong matching QA
+      - [x] Unfolding
+      - [x] Reliable unfolding
+      - [ ] Systematics
+      - [ ] Calculations for comparison
+    - DyG kt
+      - [ ] Nominal dataset trains:
+        - [x] Data
+        - [ ] Embedding: In progress
+      - [ ] Systematics trains
+        - [ ] Tracking efficiency
+        - [ ] RMax = 0.05
+        - [ ] RMax = 0.7
+      - [ ] QA
+        - [x] Data
+        - [ ] Embedding
+      - [ ] Response and prong matching
+      - [ ] Unfolding
+      - [ ] Reliable unfolding
+      - [ ] Systematics
+      - [ ] Calculations for comparison
+    - Leading kt (all pass1 at the moment). Including because we looked at it, but I don't recall having this unfold reliably. Maybe it would with the most recent binning, etc.
+      - [x] Nominal dataset trains:
+        - [x] Data
+        - [x] Embedding
+      - [x] QA
+        - [x] Data
+        - [x] Embedding
+      - [x] Response and prong matching QA
+      - [ ] Unfolding
+      - [ ] Reliable unfolding
+      - [ ] Systematics trains
+        - [ ] Tracking efficiency
+        - [ ] RMax = 0.05
+        - [ ] RMax = 0.7
+      - [ ] Systematics
+      - [ ] Calculations for comparison
+- R = 0.4
+  - pp
+    - [x] QA
+    - [x] Response and prong matching QA
+    - [x] Unfolding
+    - [x] Reliable unfolding
+    - [x] Systematics trains
+      - [x] Tracking efficiency
+    - [x] Systematics
+    - [x] Calculations for comparison
+      - Need to make the comparison
+  - semi-central (all grooming methods are available. Below is for DyG core and kt)
+    - [x] QA
+    - [x] Response and prong matching QA
+    - [x] Unfolding
+    - [ ] Reliable unfolding
+    - [x] Systematics trains
+      - [x] Tracking efficiency
+      - [x] RMax = 0.05
+      - [x] RMax = 0.7
+    - [ ] Systematics
+      - Have taken a first pass at calculating them
+    - [ ] Calculations for comparison
+      - Not exactly, but can compare to analytic calculations from pp
+  - Central
+    - Never tried. Probably not possible, at least in jet pt of 60-80 GeV/c
