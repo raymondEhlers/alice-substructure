@@ -2111,6 +2111,7 @@ def setup_unfolding_closures(
     smeared_jet_pt_range: helpers.JetPtRange,
     collision_system: str,
     n_iter_compare: int,
+    max_n_iter: int | None,
     suffix: str,
     double_counting_cut: str,
     input_dir_tag: str,
@@ -2128,6 +2129,7 @@ def setup_unfolding_closures(
         collision_system=collision_system,
         base_dir=output_dir,
         n_iter_compare=n_iter_compare,
+        max_n_iter=max_n_iter,
         pure_matches=pure_matches,
         suffix=suffix,
         input_dir_tag=input_dir_tag,
@@ -2144,6 +2146,7 @@ def setup_unfolding_closures(
         collision_system=collision_system,
         base_dir=output_dir,
         n_iter_compare=n_iter_compare,
+        max_n_iter=max_n_iter,
         pure_matches=pure_matches,
         suffix=suffix,
         input_dir_tag=input_dir_tag,
@@ -2161,6 +2164,7 @@ def setup_unfolding_closures(
         collision_system=collision_system,
         base_dir=output_dir,
         n_iter_compare=n_iter_compare,
+        max_n_iter=max_n_iter,
         pure_matches=pure_matches,
         suffix=suffix,
         input_dir_tag=input_dir_tag,
@@ -2178,6 +2182,7 @@ def setup_unfolding_closures(
             collision_system=collision_system,
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
+            max_n_iter=max_n_iter,
             pure_matches=pure_matches,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
@@ -2199,6 +2204,7 @@ def setup_unfolding_closures(
             collision_system=collision_system,
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
+            max_n_iter=max_n_iter,
             pure_matches=pure_matches,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
@@ -2220,6 +2226,7 @@ def setup_unfolding_closures(
             collision_system=collision_system,
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
+            max_n_iter=max_n_iter,
             pure_matches=pure_matches,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
@@ -2241,6 +2248,7 @@ def setup_unfolding_closures(
             collision_system=collision_system,
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
+            max_n_iter=max_n_iter,
             pure_matches=pure_matches,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
@@ -2265,6 +2273,7 @@ def setup_unfolding_outputs(  # noqa: C901
     smeared_jet_pt_range: helpers.JetPtRange,
     collision_system: str,
     n_iter_compare: int,
+    max_n_iter: int | None,
     suffix: str,
     double_counting_cut: str,
     input_dir_tag: str,
@@ -2294,6 +2303,7 @@ def setup_unfolding_outputs(  # noqa: C901
         collision_system=collision_system,
         base_dir=output_dir,
         n_iter_compare=n_iter_compare,
+        max_n_iter=max_n_iter,
         pure_matches=False,
         suffix=suffix,
         input_dir_tag=input_dir_tag,
@@ -2311,6 +2321,7 @@ def setup_unfolding_outputs(  # noqa: C901
             collision_system=collision_system,
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
+            max_n_iter=max_n_iter,
             pure_matches=False,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
@@ -2332,6 +2343,7 @@ def setup_unfolding_outputs(  # noqa: C901
             collision_system=collision_system,
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
+            max_n_iter=max_n_iter,
             pure_matches=False,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
@@ -2349,6 +2361,7 @@ def setup_unfolding_outputs(  # noqa: C901
             collision_system=collision_system,
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
+            max_n_iter=max_n_iter,
             pure_matches=False,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
@@ -2368,6 +2381,7 @@ def setup_unfolding_outputs(  # noqa: C901
             collision_system=collision_system,
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
+            max_n_iter=max_n_iter,
             pure_matches=False,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
@@ -2394,6 +2408,7 @@ def setup_unfolding_outputs(  # noqa: C901
                 collision_system=collision_system,
                 base_dir=output_dir,
                 n_iter_compare=n_iter_compare,
+                max_n_iter=max_n_iter,
                 pure_matches=False,
                 input_dir_tag=input_dir_tag,
                 suffix=suffix,
@@ -2417,6 +2432,7 @@ def setup_unfolding_outputs(  # noqa: C901
                 collision_system=collision_system,
                 base_dir=output_dir,
                 n_iter_compare=n_iter_compare,
+                max_n_iter=max_n_iter,
                 pure_matches=False,
                 suffix=suffix,
                 input_dir_tag=input_dir_tag,
@@ -2442,6 +2458,7 @@ def setup_unfolding_outputs(  # noqa: C901
             collision_system=collision_system,
             base_dir=output_dir,
             n_iter_compare=n_iter_compare,
+            max_n_iter=max_n_iter,
             pure_matches=False,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
@@ -2463,6 +2480,7 @@ def setup_unfolding_outputs(  # noqa: C901
                 collision_system=collision_system,
                 base_dir=output_dir,
                 n_iter_compare=n_iter_compare,
+                max_n_iter=max_n_iter,
                 pure_matches=False,
                 suffix=suffix,
                 input_dir_tag=input_dir_tag,
@@ -2485,6 +2503,7 @@ def _load_unfolded_outputs(
     event_activity: str,
     jet_R_str: str,
     n_iter_compare: int,
+    max_n_iter: int | None,
     truncation_shift: int,
     displaced_extremum: float,
     input_dir_tag: str,
@@ -2507,6 +2526,7 @@ def _load_unfolded_outputs(
         smeared_jet_pt_range=smeared_jet_pt_range,
         collision_system=collision_system,
         n_iter_compare=n_iter_compare,
+        max_n_iter=max_n_iter,
         suffix=suffix,
         input_dir_tag=input_dir_tag,
         output_dir=output_dir,
@@ -2521,6 +2541,7 @@ def _load_unfolded_outputs(
             smeared_jet_pt_range=smeared_jet_pt_range,
             collision_system=collision_system,
             n_iter_compare=n_iter_compare,
+            max_n_iter=max_n_iter,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
             output_dir=output_dir,
@@ -2539,6 +2560,7 @@ def _load_unfolded_outputs(
         smeared_jet_pt_range=smeared_jet_pt_range,
         collision_system=collision_system,
         n_iter_compare=n_iter_compare,
+        max_n_iter=max_n_iter,
         suffix=suffix,
         double_counting_cut=double_counting_cut,
         input_dir_tag=input_dir_tag,
@@ -2570,6 +2592,7 @@ def load_unfolded_outputs(
     double_counting_cut: str = "",
     displaced_untagged_above_range: bool = True,
     skip_reweighted_prior_in_systematics: bool = False,
+    max_n_iter: Dict[str, int | None] | int | None = None,
 ) -> Tuple[
     Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]]
 ]:
@@ -2586,6 +2609,8 @@ def load_unfolded_outputs(
     if isinstance(tag_after_suffix, str):
         # Copy for every grooming method
         tag_after_suffix = {grooming_method: tag_after_suffix for grooming_method in grooming_methods}
+    if isinstance(max_n_iter, int) or max_n_iter is None:
+        max_n_iter = {grooming_method: max_n_iter for grooming_method in grooming_methods}
     unfolding_closure_outputs = {}
     unfolding_closure_pure_matches_outputs = {}
     unfolding_systematics_outputs = {}
@@ -2612,6 +2637,8 @@ def load_unfolded_outputs(
             double_counting_cut=double_counting_cut,
             displaced_untagged_above_range=displaced_untagged_above_range,
             skip_reweighted_prior_in_systematics=skip_reweighted_prior_in_systematics,
+            # Default to None if we didn't specify it!
+            max_n_iter=max_n_iter.get(grooming_method, None),
         )
 
     return (
