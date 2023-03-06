@@ -1444,7 +1444,7 @@ def setup_root_data_frame(
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
                 logger.debug(f"Skipping train number {train_directory.name}")
                 continue
-            logger.info(f"Processing train number {train_directory.name}")
+            logger.info(f"{processing_mode=}, {collision_system=}: Processing train number {train_directory.name}")
 
             # Then iterate over the directories.
             for filename in Path(f"{train_directory}/skim/").glob("*.root"):
