@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
 
-import attr
+import attrs
 import boost_histogram as bh
 import cycler
 import matplotlib
@@ -211,26 +211,26 @@ def _unfolded(
     return _normalize_unfolded(hist=hist, efficiency=efficiency)
 
 
-@attr.s
+@attrs.define
 class UnfoldingOutput:
-    substructure_variable: str = attr.ib()
-    grooming_method: str = attr.ib()
-    smeared_var_range: helpers.RangeSelector = attr.ib()
-    smeared_untagged_var: helpers.RangeSelector = attr.ib()
-    smeared_jet_pt_range: helpers.JetPtRange = attr.ib()
-    collision_system: str = attr.ib()
-    base_dir: Path = attr.ib(converter=Path)
-    input_dir_tag: str = attr.ib(converter=Path, default="")
-    pure_matches: bool = attr.ib(default=False)
-    suffix: str = attr.ib(default="")
-    label: str = attr.ib(default="")
-    double_counting_cut: str = attr.ib(default="")
-    n_iter_compare: int = attr.ib(default=4)
-    raw_hist_name: str = attr.ib(default="raw")
-    smeared_hist_name: str = attr.ib(default="smeared")
-    true_hist_name: str = attr.ib(default="true")
-    _max_n_iter: int | None = attr.ib(default=None)
-    hists: MutableMapping[str, binned_data.BinnedData] = attr.ib(factory=dict)
+    substructure_variable: str = attrs.field()
+    grooming_method: str = attrs.field()
+    smeared_var_range: helpers.RangeSelector = attrs.field()
+    smeared_untagged_var: helpers.RangeSelector = attrs.field()
+    smeared_jet_pt_range: helpers.JetPtRange = attrs.field()
+    collision_system: str = attrs.field()
+    base_dir: Path = attrs.field(converter=Path)
+    input_dir_tag: str = attrs.field(converter=Path, default="")
+    pure_matches: bool = attrs.field(default=False)
+    suffix: str = attrs.field(default="")
+    label: str = attrs.field(default="")
+    double_counting_cut: str = attrs.field(default="")
+    n_iter_compare: int = attrs.field(default=4)
+    raw_hist_name: str = attrs.field(default="raw")
+    smeared_hist_name: str = attrs.field(default="smeared")
+    true_hist_name: str = attrs.field(default="true")
+    _max_n_iter: int | None = attrs.field(default=None)
+    hists: MutableMapping[str, binned_data.BinnedData] = attrs.field(factory=dict)
 
     def __attrs_post_init__(self) -> None:
         # Fully setup base dir.
@@ -386,24 +386,28 @@ class UnfoldingOutput:
         )
 
 
-@attr.s
+@attrs.define
 class SingleResult:
     """ Container for a single unfolding result. """
 
-    data: binned_data.BinnedData = attr.ib()
-    n_iter: int = attr.ib()
-    ranges: Sequence[helpers.RangeSelector] = attr.ib(factory=list)
+    data: binned_data.BinnedData = attrs.field()
+    n_iter: int = attrs.field()
+    ranges: Sequence[helpers.RangeSelector] = attrs.field(factory=list)
 
 
-@attr.define
+@attrs.define
 class ModelDependenceConfiguration:
     nominal: str
     variations: list[str]
-    approach_to_combining: str = attr.field(default="max")
-    legacy_production: bool = attr.field(default=False)
+    approach_to_combining: str = attrs.field(default="max")
+    legacy_production: bool = attrs.field(default=False)
 
     def all_models(self) -> list[str]:
         return [self.nominal] + self.variations
+
+
+@attrs.define
+
 
 
 def plot_relative_individual_systematics(
@@ -587,12 +591,12 @@ def load_sherpa_predictions(
     return output
 
 
-@attr.define
+@attrs.define
 class ModelInfo:
     # TODO: Implement this to wrap model predictions...
     label: str
-    needs_normalization: bool = attr.field(default=False)
-    metadata: Dict[str, Any] = attr.field(factory=dict)
+    needs_normalization: bool = attrs.field(default=False)
+    metadata: Dict[str, Any] = attrs.field(factory=dict)
 
 
 def _load_hybrid_model(
