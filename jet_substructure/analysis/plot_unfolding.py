@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
 
 import attrs
-import boost_histogram as bh
 import cycler
 import matplotlib
 import matplotlib.pyplot as plt
@@ -22,7 +21,7 @@ import seaborn as sns
 import uproot
 from pachyderm import binned_data
 
-from jet_substructure.analysis import plot_base as pb
+from jet_substructure.analysis import plot_base as pb, unfolding_analysis
 from jet_substructure.analysis import unfolding_base
 from jet_substructure.base import helpers
 
@@ -32,393 +31,8 @@ logger = logging.getLogger(__name__)
 pachyderm.plot.configure()
 
 
-def _efficiency_substructure_variable(
-    hists: Mapping[str, binned_data.BinnedData], true_jet_pt_range: helpers.RangeSelector
-) -> binned_data.BinnedData:
-    """Efficiency for the substructure variable.
-
-    Note:
-        Since we need a set of hists, we just pass all of them.
-
-    Args:
-        hists: Input histograms.
-        true_jet_pt_range: True jet pt range over which we will integrate.
-    Returns:
-        Efficiency hist for the substructure variable.
-    """
-    # Assign them for convenience
-    try:
-        bh_cut_efficiency = hists["true"].to_boost_histogram()
-        bh_full_efficiency = hists["truef"].to_boost_histogram()
-
-        # Select true pt range.
-        selection = slice(bh.loc(true_jet_pt_range.min), bh.loc(true_jet_pt_range.max), bh.sum)
-        cut = binned_data.BinnedData.from_existing_data(bh_cut_efficiency[:, selection])
-        full = binned_data.BinnedData.from_existing_data(bh_full_efficiency[:, selection])
-
-        return cut / full
-
-    except KeyError:
-        logger.warning(
-            'Hist "true" was not found. Instead, trying to extract the efficiency directly from the projection.'
-        )
-        # This hist already has the efficiency applied, so we can return it directly!
-        return binned_data.BinnedData.from_existing_data(
-            hists[f"correff{int(true_jet_pt_range.min)}-{int(true_jet_pt_range.max)}"]
-        )
-
-
-def _project_substructure_variable(
-    input_hist: binned_data.BinnedData, jet_pt_range: helpers.RangeSelector
-) -> binned_data.BinnedData:
-    """Project the hist to the substructure variable.
-
-    Args:
-        input_hist: Hist to be projected.
-        jet_pt_range: True jet pt range over which we will integrate.
-    Returns:
-        The input hist projected onto the substructure variable axis.
-    """
-    # For convenience
-    bh_hist = input_hist.to_boost_histogram()
-
-    selection = slice(bh.loc(jet_pt_range.min), bh.loc(jet_pt_range.max), bh.sum)
-    return binned_data.BinnedData.from_existing_data(bh_hist[:, selection])
-
-
-def _efficiency_pt(
-    hists: Mapping[str, binned_data.BinnedData], true_substructure_variable_range: helpers.RangeSelector
-) -> binned_data.BinnedData:
-    """Efficiency for the jet pt.
-
-    Note:
-        Since we need a set of hists, we just pass all of them.
-
-    Args:
-        hists: Input histograms.
-        true_substructure_variable_range: True substructure variable range over which we will integrate.
-    Returns:
-        Efficiency hist for jet pt.
-    """
-    # For convenience
-    bh_cut_efficiency = hists["true"].to_boost_histogram()
-    bh_full_efficiency = hists["truef"].to_boost_histogram()
-
-    # Select true pt range.
-    selection = slice(
-        bh.loc(true_substructure_variable_range.min), bh.loc(true_substructure_variable_range.max), bh.sum
-    )
-    cut = binned_data.BinnedData.from_existing_data(bh_cut_efficiency[selection, :])
-    full = binned_data.BinnedData.from_existing_data(bh_full_efficiency[selection, :])
-
-    return cut / full
-
-
-def _project_jet_pt(
-    input_hist: binned_data.BinnedData, substructure_variable_bin: helpers.RangeSelector
-) -> binned_data.BinnedData:
-    """Project the hist to the jet pt.
-
-    Args:
-        input_hist: Hist to be projected.
-        substructure_variable_range: True substructure variable range over which we will integrate.
-    Returns:
-        The input hist projected onto the the jet pt axis.
-    """
-    bh_hist = input_hist.to_boost_histogram()
-
-    selection = slice(bh.loc(substructure_variable_bin.min), bh.loc(substructure_variable_bin.max), bh.sum)
-    return binned_data.BinnedData.from_existing_data(bh_hist[selection, :])
-
-
-def _normalize_unfolded(hist: binned_data.BinnedData, efficiency: binned_data.BinnedData) -> binned_data.BinnedData:
-    """Normalized unfolded hist.
-
-    This involves applying the efficiency and then normalizing by the integral and the bin width.
-
-    Args:
-        hist: Histogram to be normalized.
-        efficiency: Efficiency histogram with the same binning as the input hist.
-    Returns:
-        The normalized histogram.
-    """
-    # Apply the efficiency.
-    hist /= efficiency
-    # Then normalize by the integral (sum) and bin width.
-    hist /= np.sum(hist.values)
-    hist /= hist.axes[0].bin_widths
-    return hist
-
-
-def _normalize_refolded(hist: binned_data.BinnedData) -> binned_data.BinnedData:
-    """Normalize refolded hist.
-
-    This involves normalizing by the integral and the bin width.
-
-    Args:
-        hist: Histogram to be normalized.
-    Returns:
-        The normalized histogram.
-    """
-    hist /= np.sum(hist.values)
-    hist /= hist.axes[0].bin_widths
-    return hist
-
-
-def _smeared(
-    hists: Mapping[str, binned_data.BinnedData],
-    hist_name: str,
-    projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
-    smeared_range_to_integrate_over: helpers.RangeSelector,
-) -> binned_data.BinnedData:
-    """Helper function to get a smeared hist along a desired axis.
-
-    Args:
-        hists: Input hists.
-        hist_name: Name of the smeared histogram to retrieve.
-        projection_func: Function to project the histogram along the desired axis.
-        smeared_range_to_integrate_over: Smeared range over which we will integrate.
-    Returns:
-        The desired smeared histogram.
-    """
-    hist = projection_func(hists[hist_name], smeared_range_to_integrate_over)
-    return _normalize_refolded(hist=hist)
-
-
-def _unfolded(
-    hists: Mapping[str, binned_data.BinnedData],
-    hist_name: str,
-    projection_func: Callable[[binned_data.BinnedData, helpers.RangeSelector], binned_data.BinnedData],
-    efficiency_func: Callable[[Mapping[str, binned_data.BinnedData], helpers.RangeSelector], binned_data.BinnedData],
-    true_range_to_integrate_over: helpers.RangeSelector,
-) -> binned_data.BinnedData:
-    """Helper function to get an unfolded hist along a desired axis.
-
-    Args:
-        hists: Input hists.
-        hist_name: Name of the unfolded histogram to retrieve.
-        projection_func: Function to project the histogram along the desired axis.
-        true_range_to_integrate_over: True range over which we will integrate.
-    Returns:
-        The desired unfolded histogram.
-    """
-    # efficiency = efficiency_func(hists, true_bin)
-    ## For convenience in normalizing.
-    # _normalize_hist = functools.partial(_normalize_unfolded, efficiency=efficiency)
-    hist = projection_func(hists[hist_name], true_range_to_integrate_over)
-    # hist = _normalize_hist(hist)
-    efficiency = efficiency_func(hists, true_range_to_integrate_over)
-    return _normalize_unfolded(hist=hist, efficiency=efficiency)
-
-
-@attrs.define
-class UnfoldingOutput:
-    substructure_variable: str = attrs.field()
-    grooming_method: str = attrs.field()
-    smeared_var_range: helpers.RangeSelector = attrs.field()
-    smeared_untagged_var: helpers.RangeSelector = attrs.field()
-    smeared_jet_pt_range: helpers.JetPtRange = attrs.field()
-    collision_system: str = attrs.field()
-    base_dir: Path = attrs.field(converter=Path)
-    input_dir_tag: str = attrs.field(converter=Path, default="")
-    pure_matches: bool = attrs.field(default=False)
-    suffix: str = attrs.field(default="")
-    label: str = attrs.field(default="")
-    double_counting_cut: str = attrs.field(default="")
-    n_iter_compare: int = attrs.field(default=4)
-    raw_hist_name: str = attrs.field(default="raw")
-    smeared_hist_name: str = attrs.field(default="smeared")
-    true_hist_name: str = attrs.field(default="true")
-    _max_n_iter: int | None = attrs.field(default=None)
-    hists: MutableMapping[str, binned_data.BinnedData] = attrs.field(factory=dict)
-
-    def __attrs_post_init__(self) -> None:
-        # Fully setup base dir.
-        # NOTE: Added "parsl" for the newer output results.
-        # self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "feb2021_test"
-        #self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2021-04"
-        # For convenience, I needed to split these results up momentarily
-        #if self.collision_system == "pp":
-        #    self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2022-03-QM"
-        #else:
-        #    self.base_dir = self.base_dir / self.collision_system / "unfolding" / "parsl" / "2023-01-dask"
-        self.base_dir = self.base_dir / self.collision_system / "unfolding"
-        if self.input_dir_tag:
-            self.base_dir = self.base_dir / self.input_dir_tag
-
-        # Initialize the file if the histograms aren't specified.
-        if not self.hists:
-            #logger.info(f"{self.input_filename=}")
-            f = uproot.open(self.input_filename)
-            for k in f.keys(cycle=False):
-                self.hists[k] = binned_data.BinnedData.from_existing_data(f[k])
-
-    @property
-    def identifier(self) -> str:
-        name = f"{self.substructure_variable}_grooming_method_{self.grooming_method}"
-        name += f"_smeared_{self.smeared_var_range}"
-        name += f"_untagged_{self.smeared_untagged_var}"
-        name += f"_smeared_{self.smeared_jet_pt_range}"
-        if self.double_counting_cut and self.double_counting_cut != "disabled":
-            name += f"__DCC_{self.double_counting_cut}_"
-        if self.suffix:
-            name += f"_{self.suffix}"
-        if self.pure_matches:
-            name += "_pure_matches"
-        if self.label:
-            name += f"_{self.label}"
-        return name
-
-    @property
-    def max_n_iter(self) -> int:
-        if hasattr(self, "_max_n_iter") and self._max_n_iter is not None:
-            return self._max_n_iter
-        else:
-            n = 1
-            for hist_name in self.hists:
-                # We could equally use the unfolded.
-                if "bayesian_folded_iter_" in hist_name:
-                    # We add a +1 so we can use it easily with range(...).
-                    n = max(n, int(hist_name.split("_")[-1]) + 1)
-            self._max_n_iter: int = n
-        return self._max_n_iter
-
-    def n_iter_range_to_plot(self) -> Iterable[int]:
-        """Generate the n_iter range to plot.
-
-        This lets us cut down on the iterations to plot when it would be too much to view comfortably.
-        First, we return the first n, and then take every second from there.
-        """
-        change_to_sparse = 8
-        if self.max_n_iter > change_to_sparse:
-            return itertools.chain(range(1, change_to_sparse + 1), range(change_to_sparse + 1, self.max_n_iter, 2))
-        return range(1, self.max_n_iter)
-
-    @property
-    def input_filename(self) -> Path:
-        return self.base_dir / f"unfolding_{self.identifier}.root"
-
-    @property
-    def output_dir(self) -> Path:
-        p = self.base_dir / self.substructure_variable / self.identifier
-        p.mkdir(parents=True, exist_ok=True)
-        return p
-
-    @property
-    def output_dir_png(self) -> Path:
-        return self.output_dir / "png"
-
-    @property
-    def disabled_untagged_bin(self) -> bool:
-        """If the untagged bin min and max are the same, the untagged bin was disabled."""
-        return self.smeared_untagged_var.min == self.smeared_untagged_var.max
-
-    def unfolded_substructure(self, n_iter: int, true_jet_pt_range: helpers.JetPtRange) -> binned_data.BinnedData:
-        """ Helper to retrieve the unfolded substructure directly """
-        return self.true_substructure(
-            hist_name=f"bayesian_unfolded_iter_{n_iter}",
-            true_jet_pt_range=true_jet_pt_range,
-        )
-
-    def true_substructure(self, hist_name: str, true_jet_pt_range: helpers.JetPtRange) -> binned_data.BinnedData:
-        """ Retrieve a true level substructure hist. """
-        return _unfolded(
-            hists=self.hists,
-            hist_name=hist_name,
-            projection_func=_project_substructure_variable,
-            efficiency_func=_efficiency_substructure_variable,
-            true_range_to_integrate_over=true_jet_pt_range,
-        )
-
-    def unfolded_jet_pt(
-        self, n_iter: int, true_substructure_variable_range: helpers.RangeSelector
-    ) -> binned_data.BinnedData:
-        return self.true_jet_pt(
-            hist_name=f"bayesian_unfolded_iter_{n_iter}",
-            true_substructure_variable_range=true_substructure_variable_range,
-        )
-
-    def true_jet_pt(
-        self, hist_name: str, true_substructure_variable_range: helpers.RangeSelector
-    ) -> binned_data.BinnedData:
-        return _unfolded(
-            hists=self.hists,
-            hist_name=hist_name,
-            projection_func=_project_jet_pt,
-            efficiency_func=_efficiency_pt,
-            true_range_to_integrate_over=true_substructure_variable_range,
-        )
-
-    def refolded_substructure(self, n_iter: int, smeared_jet_pt_range: helpers.JetPtRange) -> binned_data.BinnedData:
-        """ Helper to retrieve the refolded substructure directly. """
-        return self.smeared_substructure(
-            hist_name=f"bayesian_folded_iter_{n_iter}",
-            smeared_jet_pt_range=smeared_jet_pt_range,
-        )
-
-    def smeared_substructure(self, hist_name: str, smeared_jet_pt_range: helpers.JetPtRange) -> binned_data.BinnedData:
-        """ Retrieve a smeared substructure hist. """
-        return _smeared(
-            hists=self.hists,
-            hist_name=hist_name,
-            projection_func=_project_substructure_variable,
-            smeared_range_to_integrate_over=smeared_jet_pt_range,
-        )
-
-    def refolded_jet_pt(
-        self, n_iter: int, smeared_substructure_variable_range: helpers.RangeSelector
-    ) -> binned_data.BinnedData:
-        """ Helper to retrieve the refolded jet pt directly. """
-        return self.smeared_jet_pt(
-            hist_name=f"bayesian_folded_iter_{n_iter}",
-            smeared_substructure_variable_range=smeared_substructure_variable_range,
-        )
-
-    def smeared_jet_pt(
-        self, hist_name: str, smeared_substructure_variable_range: helpers.RangeSelector
-    ) -> binned_data.BinnedData:
-        """ Retrieve a smeared jet pt hist. """
-        return _smeared(
-            hists=self.hists,
-            hist_name=hist_name,
-            projection_func=_project_jet_pt,
-            smeared_range_to_integrate_over=smeared_substructure_variable_range,
-        )
-
-
-@attrs.define
-class SingleResult:
-    """ Container for a single unfolding result. """
-
-    data: binned_data.BinnedData = attrs.field()
-    n_iter: int = attrs.field()
-    ranges: Sequence[helpers.RangeSelector] = attrs.field(factory=list)
-
-
-@attrs.define
-class ModelDependenceConfiguration:
-    nominal: str
-    variations: list[str]
-    approach_to_combining: str = attrs.field(default="max")
-    legacy_production: bool = attrs.field(default=False)
-
-    @property
-    def all_models(self) -> list[str]:
-        return [self.nominal] + self.variations
-
-
-@attrs.define
-class NonClosureConfiguration:
-    """Define how to handle the non-closure."""
-    contributors: list[str]
-    approach_to_combining: str = attrs.field(default="max")
-
-class BackgroundSubtractionConfiguration:
-    contributors: list[str]
-
-
 def plot_relative_individual_systematics(
-    unfolded: SingleResult,
+    unfolded: unfolding_analysis.SingleResult,
     plot_config: pb.PlotConfig,
     output_dir: Path,
     plot_png: bool = False,
@@ -873,7 +487,7 @@ _palette_6_mod = [
 
 
 def _plot_data_model_comparison_for_single_system(
-    hists: Mapping[str, SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     models: Mapping[str, Mapping[str, binned_data.BinnedData]],
     grooming_methods: Sequence[str],
     set_zero_to_nan: bool,
@@ -1053,7 +667,7 @@ def _plot_data_model_comparison_for_single_system(
 
 
 def plot_grooming_model_comparisons_for_single_system(
-    hists: Mapping[str, SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     models: Mapping[str, Mapping[str, binned_data.BinnedData]],
     grooming_methods: Sequence[str],
     collision_system: str,
@@ -1121,7 +735,7 @@ def plot_grooming_model_comparisons_for_single_system(
 
 
 def _plot_single_system_comparison(
-    hists: Mapping[str, SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
     reference_grooming_method: str,
     set_zero_to_nan: bool,
@@ -1345,7 +959,7 @@ def _plot_single_system_comparison(
 
 
 def plot_grooming_comparisons_for_single_system(
-    hists: Mapping[str, SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
     reference_grooming_method: str,
     collision_system: str,
@@ -1417,7 +1031,7 @@ def plot_grooming_comparisons_for_single_system(
     )
 
 def plot_Rg_grooming_comparisons_for_single_system(
-    hists: Mapping[str, SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
     reference_grooming_method: str,
     collision_system: str,
@@ -1488,7 +1102,7 @@ def plot_Rg_grooming_comparisons_for_single_system(
 
 
 def _plot_pp_PbPb_comparison(
-    hists: Mapping[str, SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_method: str,
     set_zero_to_nan: bool,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
@@ -1734,7 +1348,7 @@ def _plot_pp_PbPb_comparison(
 
 
 def plot_pp_PbPb_comparison(
-    hists: Mapping[str, SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_method: str,
     output_dir: Path,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
@@ -1803,7 +1417,7 @@ def plot_pp_PbPb_comparison(
 
 
 def _plot_simple_kt_with_systematics(
-    hists: Mapping[str, SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
     set_zero_to_nan: bool,
     plot_config: pb.PlotConfig,
@@ -1884,7 +1498,7 @@ def _plot_simple_kt_with_systematics(
 
 
 def plot_PbPb_systematics_simple(
-    hists: Mapping[str, SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
     event_activity: str,
     output_dir: Path,
@@ -1937,7 +1551,7 @@ def plot_PbPb_systematics_simple(
 
 
 def _plot_compare_kt_with_systematics(
-    hists: Mapping[str, SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     reference: Mapping[str, binned_data.BinnedData],
     grooming_methods: Sequence[str],
     set_zero_to_nan: bool,
@@ -2061,7 +1675,7 @@ def _plot_compare_kt_with_systematics(
 
 
 def plot_PbPb_systematics(
-    hists: Mapping[str, SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     reference: Mapping[str, binned_data.BinnedData],
     grooming_methods: Sequence[str],
     event_activity: str,
@@ -2139,10 +1753,10 @@ def setup_unfolding_closures(
     input_dir_tag: str,
     output_dir: Path,
     pure_matches: bool = False,
-) -> Dict[str, UnfoldingOutput]:
+) -> Dict[str, unfolding_analysis.UnfoldingOutput]:
     # Setup the input files
     unfolding_outputs = {}
-    unfolding_outputs["default"] = UnfoldingOutput(
+    unfolding_outputs["default"] = unfolding_analysis.UnfoldingOutput(
         substructure_variable=substructure_variable,
         grooming_method=grooming_method,
         smeared_var_range=smeared_var_range,
@@ -2159,7 +1773,7 @@ def setup_unfolding_closures(
     )
 
     # These should always exist.
-    unfolding_outputs["trivial_closure"] = UnfoldingOutput(
+    unfolding_outputs["trivial_closure"] = unfolding_analysis.UnfoldingOutput(
         substructure_variable=substructure_variable,
         grooming_method=grooming_method,
         smeared_var_range=smeared_var_range,
@@ -2177,7 +1791,7 @@ def setup_unfolding_closures(
         raw_hist_name="smeared",
     )
 
-    unfolding_outputs["closure_later_iter"] = UnfoldingOutput(
+    unfolding_outputs["closure_later_iter"] = unfolding_analysis.UnfoldingOutput(
         substructure_variable=substructure_variable,
         grooming_method=grooming_method,
         smeared_var_range=smeared_var_range,
@@ -2195,7 +1809,7 @@ def setup_unfolding_closures(
     )
 
     try:
-        unfolding_outputs["split_MC"] = UnfoldingOutput(
+        unfolding_outputs["split_MC"] = unfolding_analysis.UnfoldingOutput(
             substructure_variable=substructure_variable,
             grooming_method=grooming_method,
             smeared_var_range=smeared_var_range,
@@ -2217,7 +1831,7 @@ def setup_unfolding_closures(
         logger.debug("Skipping split MC because the output file doesn't exist.")
 
     try:
-        unfolding_outputs["reweight_pseudo_data"] = UnfoldingOutput(
+        unfolding_outputs["reweight_pseudo_data"] = unfolding_analysis.UnfoldingOutput(
             substructure_variable=substructure_variable,
             grooming_method=grooming_method,
             smeared_var_range=smeared_var_range,
@@ -2239,7 +1853,7 @@ def setup_unfolding_closures(
         logger.debug("Skipping reweighted pseudo data because the output file doesn't exist.")
 
     try:
-        unfolding_outputs["reweight_response"] = UnfoldingOutput(
+        unfolding_outputs["reweight_response"] = unfolding_analysis.UnfoldingOutput(
             substructure_variable=substructure_variable,
             grooming_method=grooming_method,
             smeared_var_range=smeared_var_range,
@@ -2261,7 +1875,7 @@ def setup_unfolding_closures(
         logger.debug("Skipping reweighted response because the output file doesn't exist.")
 
     try:
-        unfolding_outputs["thermal_model"] = UnfoldingOutput(
+        unfolding_outputs["thermal_model"] = unfolding_analysis.UnfoldingOutput(
             substructure_variable=substructure_variable,
             grooming_method=grooming_method,
             smeared_var_range=smeared_var_range,
@@ -2304,8 +1918,8 @@ def setup_unfolding_outputs(  # noqa: C901
     displaced_untagged_above_range: bool = True,
     displaced_extremum: Optional[float] = None,
     skip_reweighted_prior_in_systematics: bool = False,
-    model_dependence_configuration: ModelDependenceConfiguration | None = None,
-) -> Dict[str, UnfoldingOutput]:
+    model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
+) -> Dict[str, unfolding_analysis.UnfoldingOutput]:
     # Validation
     # Keep the truncation positive so we know how we've shifted.
     if truncation_shift < 0:
@@ -2317,7 +1931,7 @@ def setup_unfolding_outputs(  # noqa: C901
 
     # Setup the input files
     unfolding_outputs = {}
-    unfolding_outputs["default"] = UnfoldingOutput(
+    unfolding_outputs["default"] = unfolding_analysis.UnfoldingOutput(
         substructure_variable=substructure_variable,
         grooming_method=grooming_method,
         smeared_var_range=smeared_var_range,
@@ -2335,7 +1949,7 @@ def setup_unfolding_outputs(  # noqa: C901
     logger.info(f"default: {unfolding_outputs['default'].identifier}")
 
     try:
-        unfolding_outputs["tracking_efficiency"] = UnfoldingOutput(
+        unfolding_outputs["tracking_efficiency"] = unfolding_analysis.UnfoldingOutput(
             substructure_variable=substructure_variable,
             grooming_method=grooming_method,
             smeared_var_range=smeared_var_range,
@@ -2355,7 +1969,7 @@ def setup_unfolding_outputs(  # noqa: C901
         logger.debug("Skipping tracking efficiency because the output file doesn't exist.")
 
     try:
-        unfolding_outputs["truncation_low"] = UnfoldingOutput(
+        unfolding_outputs["truncation_low"] = unfolding_analysis.UnfoldingOutput(
             substructure_variable=substructure_variable,
             grooming_method=grooming_method,
             smeared_var_range=smeared_var_range,
@@ -2373,7 +1987,7 @@ def setup_unfolding_outputs(  # noqa: C901
             double_counting_cut=double_counting_cut,
             label="truncation",
         )
-        unfolding_outputs["truncation_high"] = UnfoldingOutput(
+        unfolding_outputs["truncation_high"] = unfolding_analysis.UnfoldingOutput(
             substructure_variable=substructure_variable,
             grooming_method=grooming_method,
             smeared_var_range=smeared_var_range,
@@ -2395,7 +2009,7 @@ def setup_unfolding_outputs(  # noqa: C901
         logger.debug(f"Skipping truncation because the output file doesn't exist.")
 
     try:
-        unfolding_outputs["random_binning"] = UnfoldingOutput(
+        unfolding_outputs["random_binning"] = unfolding_analysis.UnfoldingOutput(
             substructure_variable=substructure_variable,
             grooming_method=grooming_method,
             smeared_var_range=smeared_var_range,
@@ -2422,7 +2036,7 @@ def setup_unfolding_outputs(  # noqa: C901
             else:
                 displaced_untagged_var = helpers.KtRange(displaced_extremum, smeared_var_range.min)
 
-            unfolding_outputs["untagged_bin"] = UnfoldingOutput(
+            unfolding_outputs["untagged_bin"] = unfolding_analysis.UnfoldingOutput(
                 substructure_variable=substructure_variable,
                 grooming_method=grooming_method,
                 smeared_var_range=smeared_var_range,
@@ -2446,7 +2060,7 @@ def setup_unfolding_outputs(  # noqa: C901
 
     if not skip_reweighted_prior_in_systematics:
         try:
-            unfolding_outputs["reweight_prior"] = UnfoldingOutput(
+            unfolding_outputs["reweight_prior"] = unfolding_analysis.UnfoldingOutput(
                 substructure_variable=substructure_variable,
                 grooming_method=grooming_method,
                 smeared_var_range=smeared_var_range,
@@ -2488,7 +2102,7 @@ def setup_unfolding_outputs(  # noqa: C901
                 logger.warning("Loading unlabeled model dependence via legacy case.")
             try:
                 # Careful here: the outputs in pp are not in the standard format. But this is a convenient fiction.
-                unfolding_outputs[f"model_dependence{label}"] = UnfoldingOutput(
+                unfolding_outputs[f"model_dependence{label}"] = unfolding_analysis.UnfoldingOutput(
                     substructure_variable=substructure_variable,
                     grooming_method=grooming_method,
                     smeared_var_range=smeared_var_range,
@@ -2512,7 +2126,7 @@ def setup_unfolding_outputs(  # noqa: C901
     #       We'll sort which to use later.
     for background_setting in ["Rmax070", "Rmax050", "Rmax005"]:
         try:
-            unfolding_outputs[background_setting] = UnfoldingOutput(
+            unfolding_outputs[background_setting] = unfolding_analysis.UnfoldingOutput(
                 substructure_variable=substructure_variable,
                 grooming_method=grooming_method,
                 smeared_var_range=smeared_var_range,
@@ -2553,8 +2167,8 @@ def _load_unfolded_outputs(
     tag_after_suffix: str = "",
     displaced_untagged_above_range: bool = True,
     skip_reweighted_prior_in_systematics: bool = False,
-    model_dependence_configuration: ModelDependenceConfiguration | None = None,
-) -> Tuple[Dict[str, UnfoldingOutput], Dict[str, UnfoldingOutput], Dict[str, UnfoldingOutput]]:
+    model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
+) -> Tuple[Dict[str, unfolding_analysis.UnfoldingOutput], Dict[str, unfolding_analysis.UnfoldingOutput], Dict[str, unfolding_analysis.UnfoldingOutput]]:
     # Validation
     suffix = f"{event_activity}_{jet_R_str}"
     if tag_after_suffix:
@@ -2636,9 +2250,9 @@ def load_unfolded_outputs(
     displaced_untagged_above_range: bool = True,
     skip_reweighted_prior_in_systematics: bool = False,
     max_n_iter: Dict[str, int | None] | int | None = None,
-    model_dependence_configuration: dict[str, ModelDependenceConfiguration] | ModelDependenceConfiguration | None = None,
+    model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration] | unfolding_analysis.ModelDependenceConfiguration | None = None,
 ) -> Tuple[
-    Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]]
+    Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]], Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]], Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]]
 ]:
     # Validation
     # Copy for every grooming method
@@ -2654,7 +2268,7 @@ def load_unfolded_outputs(
         tag_after_suffix = {grooming_method: tag_after_suffix for grooming_method in grooming_methods}
     if isinstance(max_n_iter, int) or max_n_iter is None:
         max_n_iter = {grooming_method: max_n_iter for grooming_method in grooming_methods}
-    if isinstance(model_dependence_configuration, ModelDependenceConfiguration) or model_dependence_configuration is None:
+    if isinstance(model_dependence_configuration, unfolding_analysis.ModelDependenceConfiguration) or model_dependence_configuration is None:
         model_dependence_configuration = {grooming_method: model_dependence_configuration for grooming_method in grooming_methods}
 
     unfolding_closure_outputs = {}
@@ -2697,12 +2311,12 @@ def load_unfolded_outputs(
 
 def _unfolded_outputs_with_systematics(
     grooming_method: str,
-    unfolding_systematics_outputs: Dict[str, Dict[str, UnfoldingOutput]],
+    unfolding_systematics_outputs: Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
-    model_dependence_configuration: ModelDependenceConfiguration | None = None,
-    non_closure_configuration: NonClosureConfiguration | None = None,
-    background_subtraction_configuration: BackgroundSubtractionConfiguration | None = None,
-) -> Tuple[SingleResult, binned_data.BinnedData]:
+    model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
+    non_closure_configuration: unfolding_analysis.NonClosureConfiguration | None = None,
+    background_subtraction_configuration: unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
+) -> Tuple[unfolding_analysis.SingleResult, binned_data.BinnedData]:
     logger.info(f"Calculating systematics for {grooming_method}")
     unfolded = unfolded_substructure_results(
         unfolding_outputs=unfolding_systematics_outputs[grooming_method],
@@ -2728,18 +2342,18 @@ def _unfolded_outputs_with_systematics(
 
 def unfolded_outputs_with_systematics(
     grooming_methods: Sequence[str],
-    unfolding_systematics_outputs: Dict[str, Dict[str, UnfoldingOutput]],
+    unfolding_systematics_outputs: Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
-    model_dependence_configuration: Dict[str, ModelDependenceConfiguration] | ModelDependenceConfiguration | None = None,
-    non_closure_configuration: Dict[str, NonClosureConfiguration] | NonClosureConfiguration | None = None,
-    background_subtraction_configuration: Dict[str, BackgroundSubtractionConfiguration] | BackgroundSubtractionConfiguration | None = None,
-) -> Tuple[Dict[str, SingleResult], Dict[str, binned_data.BinnedData]]:
+    model_dependence_configuration: Dict[str, unfolding_analysis.ModelDependenceConfiguration] | unfolding_analysis.ModelDependenceConfiguration | None = None,
+    non_closure_configuration: Dict[str, unfolding_analysis.NonClosureConfiguration] | unfolding_analysis.NonClosureConfiguration | None = None,
+    background_subtraction_configuration: Dict[str, unfolding_analysis.BackgroundSubtractionConfiguration] | unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
+) -> Tuple[Dict[str, unfolding_analysis.SingleResult], Dict[str, binned_data.BinnedData]]:
     # Validation
-    if isinstance(model_dependence_configuration, ModelDependenceConfiguration) or model_dependence_configuration is None:
+    if isinstance(model_dependence_configuration, unfolding_analysis.ModelDependenceConfiguration) or model_dependence_configuration is None:
         model_dependence_configuration = {grooming_method: model_dependence_configuration for grooming_method in grooming_methods}
-    if isinstance(non_closure_configuration, NonClosureConfiguration) or non_closure_configuration is None:
+    if isinstance(non_closure_configuration, unfolding_analysis.NonClosureConfiguration) or non_closure_configuration is None:
         non_closure_configuration = {grooming_method: non_closure_configuration for grooming_method in grooming_methods}
-    if isinstance(background_subtraction_configuration, BackgroundSubtractionConfiguration) or background_subtraction_configuration is None:
+    if isinstance(background_subtraction_configuration, unfolding_analysis.BackgroundSubtractionConfiguration) or background_subtraction_configuration is None:
         background_subtraction_configuration = {grooming_method: background_subtraction_configuration for grooming_method in grooming_methods}
 
     unfolded_with_systematics = {}
@@ -2761,10 +2375,10 @@ def unfolded_outputs_with_systematics(
 
 
 def unfolded_substructure_results(
-    unfolding_outputs: Mapping[str, UnfoldingOutput],
+    unfolding_outputs: Mapping[str, unfolding_analysis.UnfoldingOutput],
     true_jet_pt_range: helpers.JetPtRange,
-    model_dependence_configuration: ModelDependenceConfiguration | None = None,
-) -> Dict[str, SingleResult]:
+    model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
+) -> Dict[str, unfolding_analysis.SingleResult]:
     """Convert unfolded results into individual unfolded substructure results (selecting a particular iteration).
 
     This is useful for working with substructure systematics.
@@ -2790,7 +2404,7 @@ def unfolded_substructure_results(
         if skip_converting_model_dependence and k == "model_dependence":
             # We have to handle this manually. See the systematics calculation.
             continue
-        unfolded[k] = SingleResult(
+        unfolded[k] = unfolding_analysis.SingleResult(
             # NOTE: We want to match the iter of the default case.
             data=v.unfolded_substructure(
                 n_iter=unfolding_outputs["default"].n_iter_compare,
@@ -2817,14 +2431,14 @@ def _calculate_max_relative_error_from_contributions(
 
 
 def calculate_systematics(  # noqa: C901
-    unfolded: Mapping[str, SingleResult],
-    unfolding_outputs: Mapping[str, UnfoldingOutput],
+    unfolded: Mapping[str, unfolding_analysis.SingleResult],
+    unfolding_outputs: Mapping[str, unfolding_analysis.UnfoldingOutput],
     true_jet_pt_range: helpers.JetPtRange,
     truncation_iter: helpers.RangeSelector | None = None,
-    model_dependence_configuration: ModelDependenceConfiguration | None = None,
-    non_closure_configuration: NonClosureConfiguration | None = None,
-    background_subtraction_configuration: BackgroundSubtractionConfiguration | None = None,
-) -> SingleResult:
+    model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
+    non_closure_configuration: unfolding_analysis.NonClosureConfiguration | None = None,
+    background_subtraction_configuration: unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
+) -> unfolding_analysis.SingleResult:
     # Validation
     if truncation_iter is None:
         truncation_iter = helpers.RangeSelector(1, 1)
@@ -3112,7 +2726,7 @@ def calculate_systematics(  # noqa: C901
 
 
 def plot_unfolded(
-    unfolding_output: UnfoldingOutput,
+    unfolding_output: unfolding_analysis.UnfoldingOutput,
     hist_true: binned_data.BinnedData,
     hist_n_iter_compare: binned_data.BinnedData,
     unfolded_hists: Mapping[int, binned_data.BinnedData],
@@ -3245,7 +2859,7 @@ def plot_unfolded(
 
 
 def plot_refolded(
-    unfolding_output: UnfoldingOutput,
+    unfolding_output: unfolding_analysis.UnfoldingOutput,
     hist_raw: binned_data.BinnedData,
     hist_smeared: binned_data.BinnedData,
     refolded_hists: Mapping[int, binned_data.BinnedData],
@@ -3490,14 +3104,14 @@ def plot_efficiency(
 
 
 def plot_select_iteration(
-    unfolding_output: UnfoldingOutput,
-    projection_func: Callable[[UnfoldingOutput, int, helpers.RangeSelector], binned_data.BinnedData],
+    unfolding_output: unfolding_analysis.UnfoldingOutput,
+    projection_func: Callable[[unfolding_analysis.UnfoldingOutput, int, helpers.RangeSelector], binned_data.BinnedData],
     max_iter: int,
     true_bin: helpers.RangeSelector,
     plot_config: pb.PlotConfig,
     output_dir: Path,
     plot_png: bool = False,
-    reweighted_prior_output: Optional[UnfoldingOutput] = None,
+    reweighted_prior_output: Optional[unfolding_analysis.UnfoldingOutput] = None,
 ) -> None:
     """Plot selected iteration."""
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
@@ -3634,9 +3248,9 @@ def plot_select_iteration(
 
 
 def plot_kt_unfolding(
-    unfolding_output: UnfoldingOutput,
+    unfolding_output: unfolding_analysis.UnfoldingOutput,
     plot_png: bool = False,
-    reweighted_prior_output: Optional[UnfoldingOutput] = None,
+    reweighted_prior_output: Optional[unfolding_analysis.UnfoldingOutput] = None,
     unfolding_kt_display_range: Optional[Tuple[float, float]] = None,
 ) -> Path:
     if unfolding_kt_display_range is None:
@@ -4159,7 +3773,7 @@ def plot_kt_unfolding(
         text = f"${true_jet_pt_range.display_str(label='true')}$"
         plot_select_iteration(
             unfolding_output=unfolding_output,
-            projection_func=UnfoldingOutput.unfolded_substructure,  # type: ignore[arg-type]
+            projection_func=unfolding_analysis.UnfoldingOutput.unfolded_substructure,  # type: ignore[arg-type]
             max_iter=unfolding_output.max_n_iter,
             true_bin=true_jet_pt_range,
             plot_config=pb.PlotConfig(
@@ -4181,7 +3795,7 @@ def plot_kt_unfolding(
     # Efficiency
     plot_efficiency(
         hists=unfolding_output.hists,
-        efficiency_func=_efficiency_substructure_variable,
+        efficiency_func=unfolding_analysis.efficiency_substructure_variable,
         true_bins=[
             helpers.JetPtRange(40, 120),
             helpers.JetPtRange(40, 60),
@@ -4207,7 +3821,7 @@ def plot_kt_unfolding(
     # Cleaned up kt efficiency, focused on the ranges that we will measure.
     plot_efficiency(
         hists=unfolding_output.hists,
-        efficiency_func=_efficiency_substructure_variable,
+        efficiency_func=unfolding_analysis.efficiency_substructure_variable,
         true_bins=[
             helpers.JetPtRange(60, 80),
         ],
@@ -4228,7 +3842,7 @@ def plot_kt_unfolding(
     )
     plot_efficiency(
         hists=unfolding_output.hists,
-        efficiency_func=_efficiency_pt,
+        efficiency_func=unfolding_analysis.efficiency_pt,
         true_bins=[
             unfolding_output.smeared_var_range,
             # helpers.RangeSelector(unfolding_output.smeared_var_range.min, unfolding_output.smeared_var_range.max),
@@ -4264,7 +3878,7 @@ def run(collision_system: str) -> None:
     for unfolding_output in [
         ###################### kt smeared = 2-10 ##########################
         ## 2-10, 1-2, 30-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -4272,7 +3886,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(30, 120),
         #    n_iter_compare=7,
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -4282,7 +3896,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 2-10, 1-2, 40-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -4290,7 +3904,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         #    n_iter_compare=3,
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -4300,7 +3914,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 2-10, 10-13, 30-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -4308,7 +3922,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(30, 120),
         #    n_iter_compare=7,
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -4318,7 +3932,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 2-10, 10-13, 40-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -4326,7 +3940,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         #    n_iter_compare=3,
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(2, 10),
@@ -4337,7 +3951,7 @@ def run(collision_system: str) -> None:
         # ),
         ###################### kt smeared = 3-10 ##########################
         ## 3-10, 2-3, 30-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4345,7 +3959,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(30, 120),
         #    n_iter_compare=4,
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4355,7 +3969,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         # 3-10, 2-3, 40-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4363,7 +3977,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         #    n_iter_compare=3,
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4373,7 +3987,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-10, 10-13, 30-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4381,7 +3995,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(30, 120),
         #    n_iter_compare=4,
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4391,7 +4005,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-10, 10-13, 40-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4399,7 +4013,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         #    n_iter_compare=3,
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4409,7 +4023,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         # 3-10, 2-3, 40-120, pure matches
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4419,7 +4033,7 @@ def run(collision_system: str) -> None:
         #    n_iter_compare=11,
         #    max_iter=15,
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4432,7 +4046,7 @@ def run(collision_system: str) -> None:
         # ),
         ###################### kt smeared = 3-10, broad true bins ##########################
         ## 3-10, 2-3, 30-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4441,7 +4055,7 @@ def run(collision_system: str) -> None:
         #    n_iter_compare=4,
         #    suffix="broadTrueBins",
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4452,7 +4066,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-10, 2-3, 40-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4461,7 +4075,7 @@ def run(collision_system: str) -> None:
         #    n_iter_compare=3,
         #    suffix="broadTrueBins",
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 10),
@@ -4472,14 +4086,14 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-11, 30-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 11),
         #    smeared_untagged_var=helpers.KtRange(2, 3),
         #    smeared_jet_pt_range=helpers.JetPtRange(30, 120),
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 11),
@@ -4488,14 +4102,14 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-11, 40-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 11),
         #    smeared_untagged_var=helpers.KtRange(2, 3),
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 11),
@@ -4504,14 +4118,14 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-15, 30-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 15),
         #    smeared_untagged_var=helpers.KtRange(2, 3),
         #    smeared_jet_pt_range=helpers.JetPtRange(30, 120),
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 15),
@@ -4520,7 +4134,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 3-15, 40-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 15),
@@ -4529,7 +4143,7 @@ def run(collision_system: str) -> None:
         #    n_iter_compare=3,
         #    pure_matches=True,
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(3, 15),
@@ -4541,7 +4155,7 @@ def run(collision_system: str) -> None:
         # ),
         ###################### kt smeared = 5-15 ##########################
         ## 4-15, 3-4, 40-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(4, 15),
@@ -4549,7 +4163,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         #    n_iter_compare=3,
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(4, 15),
@@ -4559,7 +4173,7 @@ def run(collision_system: str) -> None:
         #    smeared_input=True,
         # ),
         ## 5-15, 4-5, 40-120
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(5, 15),
@@ -4567,7 +4181,7 @@ def run(collision_system: str) -> None:
         #    smeared_jet_pt_range=helpers.JetPtRange(40, 120),
         #    n_iter_compare=3,
         # ),
-        # UnfoldingOutput(
+        # unfolding_configuration.UnfoldingOutput(
         #    "kt",
         #    "leading_kt_z_cut_02",
         #    smeared_var_range=helpers.KtRange(5, 15),
@@ -4578,7 +4192,7 @@ def run(collision_system: str) -> None:
         # ),
         ####### Dynamical kt ##########
         # 3-15, 2-3, 40-120
-        UnfoldingOutput(
+        unfolding_analysis.UnfoldingOutput(
             "kt",
             "dynamical_kt",
             smeared_var_range=helpers.KtRange(3, 15),
@@ -4589,7 +4203,7 @@ def run(collision_system: str) -> None:
             collision_system=collision_system,
             base_dir=base_dir,
         ),
-        UnfoldingOutput(
+        unfolding_analysis.UnfoldingOutput(
             "kt",
             "dynamical_kt",
             smeared_var_range=helpers.KtRange(3, 15),
@@ -4602,7 +4216,7 @@ def run(collision_system: str) -> None:
             base_dir=base_dir,
         ),
         # 2-15, 1-2, 30-120
-        UnfoldingOutput(
+        unfolding_analysis.UnfoldingOutput(
             "kt",
             "dynamical_kt",
             smeared_var_range=helpers.KtRange(2, 15),
@@ -4613,7 +4227,7 @@ def run(collision_system: str) -> None:
             collision_system=collision_system,
             base_dir=base_dir,
         ),
-        UnfoldingOutput(
+        unfolding_analysis.UnfoldingOutput(
             "kt",
             "dynamical_kt",
             smeared_var_range=helpers.KtRange(2, 15),
@@ -4627,7 +4241,7 @@ def run(collision_system: str) -> None:
         ),
         ####### Dynamical time ##########
         # 3-15, 2-3, 40-120
-        UnfoldingOutput(
+        unfolding_analysis.UnfoldingOutput(
             "kt",
             "dynamical_time",
             smeared_var_range=helpers.KtRange(3, 15),
@@ -4638,7 +4252,7 @@ def run(collision_system: str) -> None:
             collision_system=collision_system,
             base_dir=base_dir,
         ),
-        UnfoldingOutput(
+        unfolding_analysis.UnfoldingOutput(
             "kt",
             "dynamical_time",
             smeared_var_range=helpers.KtRange(3, 15),
@@ -4652,7 +4266,7 @@ def run(collision_system: str) -> None:
         ),
         ####### Leading kt ##########
         # 3-15, 2-3, 40-120
-        UnfoldingOutput(
+        unfolding_analysis.UnfoldingOutput(
             "kt",
             "leading_kt",
             smeared_var_range=helpers.KtRange(3, 15),
@@ -4663,7 +4277,7 @@ def run(collision_system: str) -> None:
             collision_system=collision_system,
             base_dir=base_dir,
         ),
-        UnfoldingOutput(
+        unfolding_analysis.UnfoldingOutput(
             "kt",
             "leading_kt",
             smeared_var_range=helpers.KtRange(3, 15),
@@ -4680,9 +4294,9 @@ def run(collision_system: str) -> None:
 
 
 def plot_delta_R_unfolding(
-    unfolding_output: UnfoldingOutput,
+    unfolding_output: unfolding_analysis.UnfoldingOutput,
     plot_png: bool = False,
-    reweighted_prior_output: Optional[UnfoldingOutput] = None,
+    reweighted_prior_output: Optional[unfolding_analysis.UnfoldingOutput] = None,
     unfolding_Rg_display_range: Optional[Tuple[float, float]] = None,
 ) -> Path:
     if unfolding_Rg_display_range is None:
@@ -5130,7 +4744,7 @@ def plot_delta_R_unfolding(
         text = f"${true_jet_pt_range.display_str(label='true')}$"
         plot_select_iteration(
             unfolding_output=unfolding_output,
-            projection_func=UnfoldingOutput.unfolded_substructure,  # type: ignore[arg-type]
+            projection_func=unfolding_analysis.UnfoldingOutput.unfolded_substructure,  # type: ignore[arg-type]
             max_iter=unfolding_output.max_n_iter,
             true_bin=true_jet_pt_range,
             plot_config=pb.PlotConfig(
@@ -5152,7 +4766,7 @@ def plot_delta_R_unfolding(
     # Efficiency
     plot_efficiency(
         hists=unfolding_output.hists,
-        efficiency_func=_efficiency_substructure_variable,
+        efficiency_func=unfolding_analysis.efficiency_substructure_variable,
         true_bins=[
             helpers.JetPtRange(40, 120),
             helpers.JetPtRange(40, 60),
@@ -5178,7 +4792,7 @@ def plot_delta_R_unfolding(
     # Cleaned up Rg efficiency, focused on the ranges that we will measure.
     plot_efficiency(
         hists=unfolding_output.hists,
-        efficiency_func=_efficiency_substructure_variable,
+        efficiency_func=unfolding_analysis.efficiency_substructure_variable,
         true_bins=[
             helpers.JetPtRange(60, 80),
         ],
@@ -5199,7 +4813,7 @@ def plot_delta_R_unfolding(
     )
     plot_efficiency(
         hists=unfolding_output.hists,
-        efficiency_func=_efficiency_pt,
+        efficiency_func=unfolding_analysis.efficiency_pt,
         true_bins=[
             unfolding_output.smeared_var_range,
             # helpers.RangeSelector(unfolding_output.smeared_var_range.min, unfolding_output.smeared_var_range.max),
@@ -5229,7 +4843,7 @@ def plot_delta_R_unfolding(
 def run_delta_R(collision_system: str) -> None:
     base_dir = Path("output")
     for unfolding_output in [
-        UnfoldingOutput(
+        unfolding_analysis.UnfoldingOutput(
             "delta_R",
             "leading_kt_z_cut_02",
             # Hack until the labeling is fixed...
@@ -5239,7 +4853,7 @@ def run_delta_R(collision_system: str) -> None:
             collision_system=collision_system,
             base_dir=base_dir,
         ),
-        UnfoldingOutput(
+        unfolding_analysis.UnfoldingOutput(
             "delta_R",
             "leading_kt_z_cut_02",
             # Hack until the labeling is fixed...
