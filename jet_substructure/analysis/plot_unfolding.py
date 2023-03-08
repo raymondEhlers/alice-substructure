@@ -407,7 +407,13 @@ class ModelDependenceConfiguration:
 
 
 @attrs.define
+class NonClosureConfiguration:
+    """Define how to handle the non-closure."""
+    contributors: list[str]
+    approach_to_combining: str = attrs.field(default="max")
 
+class BackgroundSubtractionConfiguration:
+    contributors: list[str]
 
 
 def plot_relative_individual_systematics(
@@ -2501,6 +2507,8 @@ def setup_unfolding_outputs(  # noqa: C901
                 logger.debug(f"Skipping model dependence '{model_name}' because the output file doesn't exist.")
 
     # Background subtraction
+    # NOTE: We don't make this directly configurable because we just want it to grab all possible values.
+    #       We'll sort which to use later.
     for background_setting in ["Rmax070", "Rmax050", "Rmax005"]:
         try:
             unfolding_outputs[background_setting] = UnfoldingOutput(
@@ -2687,6 +2695,8 @@ def _unfolded_outputs_with_systematics(
     unfolding_systematics_outputs: Dict[str, Dict[str, UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
     model_dependence_configuration: ModelDependenceConfiguration | None = None,
+    non_closure_configuration: NonClosureConfiguration | None = None,
+    background_subtraction_configuration: BackgroundSubtractionConfiguration | None = None,
 ) -> Tuple[SingleResult, binned_data.BinnedData]:
     logger.info(f"Calculating systematics for {grooming_method}")
     unfolded = unfolded_substructure_results(
@@ -2700,6 +2710,8 @@ def _unfolded_outputs_with_systematics(
         unfolding_outputs=unfolding_systematics_outputs[grooming_method],
         true_jet_pt_range=true_jet_pt_range,
         model_dependence_configuration=model_dependence_configuration,
+        non_closure_configuration=non_closure_configuration,
+        background_subtraction_configuration=background_subtraction_configuration,
     )
 
     true_reference = unfolding_systematics_outputs[grooming_method]["default"].true_substructure(
@@ -2714,10 +2726,16 @@ def unfolded_outputs_with_systematics(
     unfolding_systematics_outputs: Dict[str, Dict[str, UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
     model_dependence_configuration: Dict[str, ModelDependenceConfiguration] | ModelDependenceConfiguration | None = None,
+    non_closure_configuration: Dict[str, NonClosureConfiguration] | NonClosureConfiguration | None = None,
+    background_subtraction_configuration: Dict[str, BackgroundSubtractionConfiguration] | BackgroundSubtractionConfiguration | None = None,
 ) -> Tuple[Dict[str, SingleResult], Dict[str, binned_data.BinnedData]]:
     # Validation
-    if isinstance(model_dependence_configuration, ModelDependenceConfiguration) or ModelDependenceConfiguration is None:
+    if isinstance(model_dependence_configuration, ModelDependenceConfiguration) or model_dependence_configuration is None:
         model_dependence_configuration = {grooming_method: model_dependence_configuration for grooming_method in grooming_methods}
+    if isinstance(non_closure_configuration, NonClosureConfiguration) or non_closure_configuration is None:
+        non_closure_configuration = {grooming_method: non_closure_configuration for grooming_method in grooming_methods}
+    if isinstance(background_subtraction_configuration, BackgroundSubtractionConfiguration) or background_subtraction_configuration is None:
+        background_subtraction_configuration = {grooming_method: background_subtraction_configuration for grooming_method in grooming_methods}
 
     unfolded_with_systematics = {}
     true_reference = {}
@@ -2730,6 +2748,8 @@ def unfolded_outputs_with_systematics(
             unfolding_systematics_outputs=unfolding_systematics_outputs,
             true_jet_pt_range=true_jet_pt_range,
             model_dependence_configuration=model_dependence_configuration[grooming_method],
+            non_closure_configuration=non_closure_configuration,
+            background_subtraction_configuration=background_subtraction_configuration,
         )
 
     return unfolded_with_systematics, true_reference
@@ -2776,12 +2796,28 @@ def unfolded_substructure_results(
     return unfolded
 
 
+def _calculate_max_relative_error_from_contributions(
+    relative_uncertainty_by_contribution: dict[str, npt.NDArray[np.float64]],
+    n_values: int,
+) -> npt.NDArray[np.float64]:
+    """Simple helper for calculating the maximum contribution bin-by-bin"""
+    final_relative_uncertainty = np.zeros(n_values, dtype=np.float64)
+    for name, relative_uncertainty in relative_uncertainty_by_contribution.items():
+        entry_has_larger_uncertainties_mask = np.abs(relative_uncertainty) > np.abs(final_relative_uncertainty)
+        final_relative_uncertainty[entry_has_larger_uncertainties_mask] = relative_uncertainty[entry_has_larger_uncertainties_mask]
+        logger.debug(f"Contribution {name} has contributions at {entry_has_larger_uncertainties_mask}")
+
+    return final_relative_uncertainty
+
+
 def calculate_systematics(  # noqa: C901
     unfolded: Mapping[str, SingleResult],
     unfolding_outputs: Mapping[str, UnfoldingOutput],
     true_jet_pt_range: helpers.JetPtRange,
     truncation_iter: helpers.RangeSelector | None = None,
     model_dependence_configuration: ModelDependenceConfiguration | None = None,
+    non_closure_configuration: NonClosureConfiguration | None = None,
+    background_subtraction_configuration: BackgroundSubtractionConfiguration | None = None,
 ) -> SingleResult:
     # Validation
     if truncation_iter is None:
@@ -2872,67 +2908,81 @@ def calculate_systematics(  # noqa: C901
 
     # Background subtraction systematics.
     background_systematics = {}
-    # FIXME: Something more elegant for defining the possible background values
-    #        would be preferred here, but fine for now...
-    for background_setting in ["Rmax070", "Rmax050", "Rmax005"]:
-        try:
+    if background_subtraction_configuration is not None:
+        #for background_setting in ["Rmax070", "Rmax050", "Rmax005"]:
+        for background_setting in background_subtraction_configuration.contributors:
+            # Since we're explicitly passing the configuration, we should expect that the outputs are there!
             background_systematics[background_setting] = (
                 unfolded[background_setting].data.values - unfolded["default"].data.values
             )
-        except KeyError as e:
-            logger.debug(f"Skipping background systematic {background_setting} because of {e!r}")
 
-    if len(background_systematics) > 0:
         if len(background_systematics) >= 3:
-            raise ValueError(
-                f"Found too many background sub systematics - it's ambiguous. Please check! {list(background_systematics.keys())=}"
-            )
+            _msg = f"Found too many background sub systematics - it's ambiguous. Please check! {list(background_systematics.keys())=}"
+            raise ValueError(_msg)
         _background_subtraction_values = list(background_systematics.values())
-        if len(_background_subtraction_values ) == 1:
+        # NOTE: This is important! Otherwise, the uncertainties will be treated as one sided!
+        #       If we for some reason only had one side, we would want to duplicate them since the background
+        #       can be asymmetric, but should be two sided.
+        if len(_background_subtraction_values) == 1:
             _background_subtraction_values.append(*_background_subtraction_values)
         unfolded["default"].data.metadata["y_systematic"][
             "background_sub"
         ] = unfolding_base.AsymmetricErrors.calculate_errors(
             *_background_subtraction_values
         )
-        #] = unfolding_base.AsymmetricErrors(
-        #    background_systematics.get("Rmax005", first_background_sub),
-        #    background_systematics.get("Rmax070", first_background_sub),
-        #)
         logger.warning(f"Bin centers: {unfolded['default'].data.axes[0].bin_centers}")
         for _bkg_label, _bkg_value in background_systematics.items():
             logger.warning(f"{_bkg_label}: {_bkg_value / unfolded['default'].data.values}")
     else:
-        logger.debug("Skipping background subtraction systematic because no values are available")
+        logger.info(f"Skipping background subtraction because background sub config was not passed.")
 
     # Non-closure
     # This is treated as a symmetric uncertainty.
     # However, we store it as asymmetric errors objects for consistency with everything else.
-    try:
-        # TODO: Loop over these, and take the maximum
-        # NOTE: Unlike the others, we take the abs and set the values here directly because
-        #       we want them to be symmetric.
-        # NOTE: The reference needs to be to the PseudoTrue, so we need to retrieve it here.
-        # NOTE: We calculate this as a relative error because the scales could be (quite) different.
-        #       We then scale the default values by this relative error to determine the non-closure.
-        pseudo_true = unfolding_outputs["non_closure"].true_substructure(
-            unfolding_outputs["non_closure"].true_hist_name, true_jet_pt_range=true_jet_pt_range
-        )
-        logger.info(f"true name: {unfolding_outputs['non_closure'].true_hist_name}")
-        non_closure_sym_relative = np.abs(unfolded["non_closure"].data.values - pseudo_true.values) / pseudo_true.values
-        logger.info(f"non_closure values: {unfolded['non_closure'].data.values}")
-        logger.info(f"pseudo true: {pseudo_true.values}")
-        # non_closure_sym = (1 - non_closure_sym_relative) * unfolded["default"].data.values
-        logger.info(f"non_closure_sym_relative: {non_closure_sym_relative}")
-        logger.info(f"non_closure bin edges: {unfolded['non_closure'].data.axes[0].bin_edges}")
-        logger.info(f"pseudo_true bin edges: {pseudo_true.axes[0].bin_edges}")
+    if non_closure_configuration is not None:
+        # We loop here since we could there could be multiple contributors to the non-closure.
+        non_closure_relative_errors_by_contribution = {}
+        for _name in non_closure_configuration.contributors:
+            # Intermediate step: Find the asymmetric relative errors of each non-closure variation
+            # NOTE: Unlike the others, we take the abs and set the values here directly because
+            #       we want them to be symmetric.
+            # NOTE: Since the non-closure is generated via a closure (by definition), the reference
+            #       needs to be to the PseudoTrue, so we need to retrieve it here.
+            # NOTE: We calculate this as a relative error because the scales could be (quite) different.
+            #       We then scale the default values by this relative error to determine the non-closure.
+            _pseudo_true = unfolding_outputs[_name].true_substructure(
+                unfolding_outputs[_name].true_hist_name, true_jet_pt_range=true_jet_pt_range
+            )
+            non_closure_relative_errors_by_contribution[_name] = np.abs(unfolded[_name].data.values - _pseudo_true.values) / _pseudo_true.values
+            #logger.info(f"true name: {unfolding_outputs[_name].true_hist_name}")
+            #non_closure_sym_relative =
+            #logger.info(f"non_closure values: {unfolded['non_closure'].data.values}")
+            #logger.info(f"pseudo true: {pseudo_true.values}")
+            ## non_closure_sym = (1 - non_closure_sym_relative) * unfolded["default"].data.values
+            #logger.info(f"non_closure_sym_relative: {non_closure_sym_relative}")
+            #logger.info(f"non_closure bin edges: {unfolded['non_closure'].data.axes[0].bin_edges}")
+            #logger.info(f"pseudo_true bin edges: {pseudo_true.axes[0].bin_edges}")
 
+        # Now calculate the contributions
+        if non_closure_configuration.approach_to_combining == "max":
+            non_closure_sym_relative = _calculate_max_relative_error_from_contributions(
+                relative_uncertainty_by_contribution=non_closure_relative_errors_by_contribution,
+                n_values=len(unfolded["default"].data.values),
+            )
+        elif non_closure_configuration.approach_to_combining == "quadrature":
+            _msg = "Need to implement adding model dependence in quadrature"
+            raise NotImplementedError(_msg)
+        else:
+            _msg = f"Model dependence approach {model_dependence_configuration.approach_to_combining} is not recognized and there is not implemented."
+            raise NotImplementedError(_msg)
+
+        # Treat symmetrically since we don't have an obvious source of this non-closure
         unfolded["default"].data.metadata["y_systematic"]["non_closure"] = unfolding_base.AsymmetricErrors(
             non_closure_sym_relative * unfolded["default"].data.values,
             non_closure_sym_relative * unfolded["default"].data.values,
         )
-    except KeyError as e:
-        logger.debug(f"Skipping non closure systematic because of {e}")
+    else:
+        logger.info(f"Skipping non closure systematic because the configuration is None.")
 
     # Model dependence.
     # The output should include _either_ the model dependence or the prior
@@ -2982,20 +3032,20 @@ def calculate_systematics(  # noqa: C901
 
             # Retrieve common values and calculate relative uncertainties
             nominal_values = unfolded[model_dependence_configuration.nominal].data.values
-            nominal_errors = unfolded[model_dependence_configuration.nominal].data.errors
             relative_errors_by_model = {}
             # We loop here since we could imagine multiple possible model dependence contributions.
             for model_name in model_dependence_configuration.variations:
                 # Intermediate step: Find the asymmetric relative errors of each model variation
-                relative_errors_by_model[model_name] = (unfolded[model_name].data.values - nominal_values) / nominal_errors
+                relative_errors_by_model[model_name] = (unfolded[model_name].data.values - nominal_values) / nominal_values
 
             if model_dependence_configuration.approach_to_combining == "max":
-                model_dependence_relative = np.zeros(len(nominal_values), dtype=np.float64)
-                for model_name, relative_uncertainty in relative_errors_by_model.items():
-                    current_model_has_large_uncertainties = np.abs(relative_uncertainty) > np.abs(model_dependence_relative)
-                    model_dependence_relative[current_model_has_large_uncertainties] = relative_uncertainty[current_model_has_large_uncertainties]
+                model_dependence_relative = _calculate_max_relative_error_from_contributions(
+                    relative_uncertainty_by_contribution=relative_errors_by_model,
+                    n_values=len(nominal_values),
+                )
             elif model_dependence_configuration.approach_to_combining == "quadrature":
-                raise NotImplementedError("Need to implement adding model dependence in quadrature")
+                _msg = "Need to implement adding model dependence in quadrature"
+                raise NotImplementedError(_msg)
             else:
                 _msg = f"Model dependence approach {model_dependence_configuration.approach_to_combining} is not recognized and there is not implemented."
                 raise NotImplementedError(_msg)
@@ -3031,7 +3081,11 @@ def calculate_systematics(  # noqa: C901
     unfolded["default"].data.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
         low=np.sqrt(
             np.sum(
-                [v.low ** 2 for k, v in unfolded["default"].data.metadata["y_systematic"].items() if k != "quadrature"],
+                [
+                    v.low ** 2
+                    for k, v in unfolded["default"].data.metadata["y_systematic"].items()
+                    if k != "quadrature"
+                ],
                 axis=0,
             )
         ),
