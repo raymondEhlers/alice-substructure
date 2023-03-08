@@ -402,6 +402,7 @@ class ModelDependenceConfiguration:
     approach_to_combining: str = attrs.field(default="max")
     legacy_production: bool = attrs.field(default=False)
 
+    @property
     def all_models(self) -> list[str]:
         return [self.nominal] + self.variations
 
@@ -2628,31 +2629,34 @@ def load_unfolded_outputs(
     n_iter_compare: Union[int, Mapping[str, int]],
     truncation_shift: int,
     displaced_extremum: float,
-    input_dir_tag: str,
+    input_dir_tag: Dict[str, str] | str,
     output_dir: Path,
     tag_after_suffix: Union[str, Mapping[str, str]] = "",
     double_counting_cut: str = "",
     displaced_untagged_above_range: bool = True,
     skip_reweighted_prior_in_systematics: bool = False,
     max_n_iter: Dict[str, int | None] | int | None = None,
+    model_dependence_configuration: dict[str, ModelDependenceConfiguration] | ModelDependenceConfiguration | None = None,
 ) -> Tuple[
     Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]], Dict[str, Dict[str, UnfoldingOutput]]
 ]:
     # Validation
+    # Copy for every grooming method
     if isinstance(smeared_var_range, helpers.RangeSelector):
-        # Copy for every grooming method
         smeared_var_range = {grooming_method: smeared_var_range for grooming_method in grooming_methods}
     if isinstance(smeared_untagged_var, helpers.RangeSelector):
-        # Copy for every grooming method
         smeared_untagged_var = {grooming_method: smeared_untagged_var for grooming_method in grooming_methods}
     if isinstance(n_iter_compare, int):
-        # Copy for every grooming method
         n_iter_compare = {grooming_method: n_iter_compare for grooming_method in grooming_methods}
+    if isinstance(input_dir_tag, str):
+        input_dir_tag = {grooming_method: input_dir_tag for grooming_method in grooming_methods}
     if isinstance(tag_after_suffix, str):
-        # Copy for every grooming method
         tag_after_suffix = {grooming_method: tag_after_suffix for grooming_method in grooming_methods}
     if isinstance(max_n_iter, int) or max_n_iter is None:
         max_n_iter = {grooming_method: max_n_iter for grooming_method in grooming_methods}
+    if isinstance(model_dependence_configuration, ModelDependenceConfiguration) or model_dependence_configuration is None:
+        model_dependence_configuration = {grooming_method: model_dependence_configuration for grooming_method in grooming_methods}
+
     unfolding_closure_outputs = {}
     unfolding_closure_pure_matches_outputs = {}
     unfolding_systematics_outputs = {}
@@ -2673,7 +2677,7 @@ def load_unfolded_outputs(
             n_iter_compare=n_iter_compare[grooming_method],
             truncation_shift=truncation_shift,
             displaced_extremum=displaced_extremum,
-            input_dir_tag=input_dir_tag,
+            input_dir_tag=input_dir_tag[grooming_method],
             output_dir=output_dir,
             tag_after_suffix=tag_after_suffix[grooming_method],
             double_counting_cut=double_counting_cut,
@@ -2681,6 +2685,7 @@ def load_unfolded_outputs(
             skip_reweighted_prior_in_systematics=skip_reweighted_prior_in_systematics,
             # Default to None if we didn't specify it!
             max_n_iter=max_n_iter.get(grooming_method, None),
+            model_dependence_configuration=model_dependence_configuration[grooming_method],
         )
 
     return (
@@ -2774,6 +2779,7 @@ def unfolded_substructure_results(
         Unfolded substructure results.
     """
     # Validation
+    skip_converting_model_dependence = False
     _entry_for_model_dependence = np.array(["model_dependence" in k for k in unfolding_outputs])
     if model_dependence_configuration is None and np.count_nonzero(_entry_for_model_dependence) == 1:
         # For the outputs from Leticia, which are in a different format than our usual.
