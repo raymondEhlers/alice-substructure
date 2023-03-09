@@ -1753,6 +1753,7 @@ def setup_unfolding_closures(
     input_dir_tag: str,
     output_dir: Path,
     pure_matches: bool = False,
+    output_dir_tag: str | None = None,
 ) -> Dict[str, unfolding_analysis.UnfoldingOutput]:
     # Setup the input files
     unfolding_outputs = {}
@@ -1769,6 +1770,7 @@ def setup_unfolding_closures(
         pure_matches=pure_matches,
         suffix=suffix,
         input_dir_tag=input_dir_tag,
+        output_dir_tag=output_dir_tag,
         double_counting_cut=double_counting_cut,
     )
 
@@ -1786,6 +1788,7 @@ def setup_unfolding_closures(
         pure_matches=pure_matches,
         suffix=suffix,
         input_dir_tag=input_dir_tag,
+        output_dir_tag=output_dir_tag,
         double_counting_cut=double_counting_cut,
         label="closure_trivial_hybrid_smeared_as_input",
         raw_hist_name="smeared",
@@ -1804,6 +1807,7 @@ def setup_unfolding_closures(
         pure_matches=pure_matches,
         suffix=suffix,
         input_dir_tag=input_dir_tag,
+        output_dir_tag=output_dir_tag,
         double_counting_cut=double_counting_cut,
         label="closure_5_iter_5",
     )
@@ -1822,6 +1826,7 @@ def setup_unfolding_closures(
             pure_matches=pure_matches,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
+            output_dir_tag=output_dir_tag,
             double_counting_cut=double_counting_cut,
             label="closure_split_MC",
             raw_hist_name="h2_pseudo_data",
@@ -1844,6 +1849,7 @@ def setup_unfolding_closures(
             pure_matches=pure_matches,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
+            output_dir_tag=output_dir_tag,
             double_counting_cut=double_counting_cut,
             label="closure_reweight_pseudo_data",
             raw_hist_name="h2_pseudo_data",
@@ -1866,6 +1872,7 @@ def setup_unfolding_closures(
             pure_matches=pure_matches,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
+            output_dir_tag=output_dir_tag,
             double_counting_cut=double_counting_cut,
             label="closure_reweight_response",
             raw_hist_name="h2_pseudo_data",
@@ -1888,6 +1895,7 @@ def setup_unfolding_closures(
             pure_matches=pure_matches,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
+            output_dir_tag=output_dir_tag,
             double_counting_cut=double_counting_cut,
             #label="thermal_model_closure_trivial_hybrid_smeared_as_input",
             #raw_hist_name="smeared",
@@ -1918,6 +1926,7 @@ def setup_unfolding_outputs(  # noqa: C901
     displaced_untagged_above_range: bool = True,
     displaced_extremum: Optional[float] = None,
     skip_reweighted_prior_in_systematics: bool = False,
+    output_dir_tag: str | None = None,
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
 ) -> Dict[str, unfolding_analysis.UnfoldingOutput]:
     # Validation
@@ -1944,6 +1953,7 @@ def setup_unfolding_outputs(  # noqa: C901
         pure_matches=False,
         suffix=suffix,
         input_dir_tag=input_dir_tag,
+        output_dir_tag=output_dir_tag,
         double_counting_cut=double_counting_cut,
     )
     logger.info(f"default: {unfolding_outputs['default'].identifier}")
@@ -1962,6 +1972,7 @@ def setup_unfolding_outputs(  # noqa: C901
             pure_matches=False,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
+            output_dir_tag=output_dir_tag,
             double_counting_cut=double_counting_cut,
             label="tracking_efficiency",
         )
@@ -1984,6 +1995,7 @@ def setup_unfolding_outputs(  # noqa: C901
             pure_matches=False,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
+            output_dir_tag=output_dir_tag,
             double_counting_cut=double_counting_cut,
             label="truncation",
         )
@@ -2002,6 +2014,7 @@ def setup_unfolding_outputs(  # noqa: C901
             pure_matches=False,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
+            output_dir_tag=output_dir_tag,
             double_counting_cut=double_counting_cut,
             label="truncation",
         )
@@ -2022,6 +2035,7 @@ def setup_unfolding_outputs(  # noqa: C901
             pure_matches=False,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
+            output_dir_tag=output_dir_tag,
             double_counting_cut=double_counting_cut,
             label="random_binning",
         )
@@ -2048,6 +2062,7 @@ def setup_unfolding_outputs(  # noqa: C901
                 max_n_iter=max_n_iter,
                 pure_matches=False,
                 input_dir_tag=input_dir_tag,
+                output_dir_tag=output_dir_tag,
                 suffix=suffix,
                 double_counting_cut=double_counting_cut,
             )
@@ -2073,6 +2088,7 @@ def setup_unfolding_outputs(  # noqa: C901
                 pure_matches=False,
                 suffix=suffix,
                 input_dir_tag=input_dir_tag,
+                output_dir_tag=output_dir_tag,
                 double_counting_cut=double_counting_cut,
                 label="reweight_prior",
             )
@@ -2115,6 +2131,7 @@ def setup_unfolding_outputs(  # noqa: C901
                     pure_matches=False,
                     suffix=suffix,
                     input_dir_tag=input_dir_tag,
+                    output_dir_tag=output_dir_tag,
                     double_counting_cut=double_counting_cut,
                     label=f"model_dependence{label}",
                 )
@@ -2139,6 +2156,7 @@ def setup_unfolding_outputs(  # noqa: C901
                 pure_matches=False,
                 suffix=suffix,
                 input_dir_tag=input_dir_tag,
+                output_dir_tag=output_dir_tag,
                 double_counting_cut=double_counting_cut,
                 label=f"{background_setting}",
             )
@@ -2167,6 +2185,7 @@ def _load_unfolded_outputs(
     tag_after_suffix: str = "",
     displaced_untagged_above_range: bool = True,
     skip_reweighted_prior_in_systematics: bool = False,
+    output_dir_tag: str | None = None,
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
 ) -> Tuple[Dict[str, unfolding_analysis.UnfoldingOutput], Dict[str, unfolding_analysis.UnfoldingOutput], Dict[str, unfolding_analysis.UnfoldingOutput]]:
     # Validation
@@ -2185,6 +2204,7 @@ def _load_unfolded_outputs(
         max_n_iter=max_n_iter,
         suffix=suffix,
         input_dir_tag=input_dir_tag,
+        output_dir_tag=output_dir_tag,
         output_dir=output_dir,
         double_counting_cut=double_counting_cut,
     )
@@ -2200,6 +2220,7 @@ def _load_unfolded_outputs(
             max_n_iter=max_n_iter,
             suffix=suffix,
             input_dir_tag=input_dir_tag,
+            output_dir_tag=output_dir_tag,
             output_dir=output_dir,
             double_counting_cut=double_counting_cut,
             pure_matches=True,
@@ -2220,6 +2241,7 @@ def _load_unfolded_outputs(
         suffix=suffix,
         double_counting_cut=double_counting_cut,
         input_dir_tag=input_dir_tag,
+        output_dir_tag=output_dir_tag,
         output_dir=output_dir,
         truncation_shift=truncation_shift,
         displaced_untagged_above_range=displaced_untagged_above_range,
@@ -2249,6 +2271,7 @@ def load_unfolded_outputs(
     double_counting_cut: str = "",
     displaced_untagged_above_range: bool = True,
     skip_reweighted_prior_in_systematics: bool = False,
+    output_dir_tag: Dict[str, str | None] | str | None = None,
     max_n_iter: Dict[str, int | None] | int | None = None,
     model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration] | unfolding_analysis.ModelDependenceConfiguration | None = None,
 ) -> Tuple[
@@ -2264,6 +2287,8 @@ def load_unfolded_outputs(
         n_iter_compare = {grooming_method: n_iter_compare for grooming_method in grooming_methods}
     if isinstance(input_dir_tag, str):
         input_dir_tag = {grooming_method: input_dir_tag for grooming_method in grooming_methods}
+    if isinstance(output_dir_tag, str) or output_dir_tag is None:
+        output_dir_tag = {grooming_method: output_dir_tag for grooming_method in grooming_methods}
     if isinstance(tag_after_suffix, str):
         tag_after_suffix = {grooming_method: tag_after_suffix for grooming_method in grooming_methods}
     if isinstance(max_n_iter, int) or max_n_iter is None:
@@ -2297,6 +2322,7 @@ def load_unfolded_outputs(
             double_counting_cut=double_counting_cut,
             displaced_untagged_above_range=displaced_untagged_above_range,
             skip_reweighted_prior_in_systematics=skip_reweighted_prior_in_systematics,
+            output_dir_tag=output_dir_tag[grooming_method],
             # Default to None if we didn't specify it!
             max_n_iter=max_n_iter.get(grooming_method, None),
             model_dependence_configuration=model_dependence_configuration[grooming_method],
