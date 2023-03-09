@@ -2577,7 +2577,7 @@ def calculate_systematics(  # noqa: C901
     # Background subtraction systematics.
     background_systematics = {}
     if background_subtraction_configuration is not None:
-        #for background_setting in ["Rmax070", "Rmax050", "Rmax005"]:
+        # (Usual) possible values: ["Rmax070", "Rmax050", "Rmax005"]:
         for background_setting in background_subtraction_configuration.contributors:
             # Since we're explicitly passing the configuration, we should expect that the outputs are there!
             background_systematics[background_setting] = (
@@ -2588,9 +2588,9 @@ def calculate_systematics(  # noqa: C901
             _msg = f"Found too many background sub systematics - it's ambiguous. Please check! {list(background_systematics.keys())=}"
             raise ValueError(_msg)
         _background_subtraction_values = list(background_systematics.values())
-        # NOTE: This is important! Otherwise, the uncertainties will be treated as one sided!
-        #       If we for some reason only had one side, we would want to duplicate them since the background
-        #       can be asymmetric, but should be two sided.
+        # NOTE: This is important to append for there to be two values! Otherwise, the uncertainties will
+        #       be treated as one sided! If we for some reason only had one side, we would want to duplicate
+        #       them since the background can be asymmetric, but they should always be treated as two sided.
         if len(_background_subtraction_values) == 1:
             _background_subtraction_values.append(*_background_subtraction_values)
         unfolded["default"].data.metadata["y_systematic"][
@@ -2598,9 +2598,13 @@ def calculate_systematics(  # noqa: C901
         ] = unfolding_base.AsymmetricErrors.calculate_errors(
             *_background_subtraction_values
         )
-        logger.warning(f"Bin centers: {unfolded['default'].data.axes[0].bin_centers}")
-        for _bkg_label, _bkg_value in background_systematics.items():
-            logger.warning(f"{_bkg_label}: {_bkg_value / unfolded['default'].data.values}")
+        #logger.info(f"Bin edges: {unfolded['default'].data.axes[0].bin_edges}")
+        #for _bkg_label, _bkg_value in background_systematics.items():
+        #    logger.info(f"{_bkg_label} relative: {_bkg_value / unfolded['default'].data.values}")
+        #logger.info(
+        #    f'low relative: {unfolded["default"].data.metadata["y_systematic"]["background_sub"].low / unfolded["default"].data.values}\n'
+        #    f'high relative: {unfolded["default"].data.metadata["y_systematic"]["background_sub"].high / unfolded["default"].data.values}'
+        #)
     else:
         logger.info(f"Skipping background subtraction because background sub config was not passed.")
 
