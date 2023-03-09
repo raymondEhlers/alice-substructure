@@ -2668,19 +2668,19 @@ def calculate_systematics(  # noqa: C901
             relative_errors_on_model_dependence_low = graph.metadata["y_errors"]["low"] / graph.values
             relative_errors_on_model_dependence_high = graph.metadata["y_errors"]["high"] / graph.values
 
-            logger.debug(
-                f"\nmodel_dependence bin_edges: {graph.axes[0].bin_edges}"
-                f"\nnominal bin_edges: {unfolded['default'].data.axes[0].bin_edges}"
-            )
+            #logger.debug(
+            #    f"\nmodel_dependence bin_edges: {graph.axes[0].bin_edges}"
+            #    f"\nnominal bin_edges: {unfolded['default'].data.axes[0].bin_edges}"
+            #)
             unfolded["default"].data.metadata["y_systematic"]["model_dependence"] = unfolding_base.AsymmetricErrors(
                 relative_errors_on_model_dependence_low * unfolded["default"].data.values,
                 relative_errors_on_model_dependence_high * unfolded["default"].data.values,
             )
-            logger.debug(
-                f"\n\tlow: {relative_errors_on_model_dependence_low}"
-                f"\n\thigh: {relative_errors_on_model_dependence_high}"
-                f'\n\tmodel_dependence errors: {unfolded["default"].data.metadata["y_systematic"]["model_dependence"]}'
-            )
+            #logger.debug(
+            #    f"\n\tlow (relative): {relative_errors_on_model_dependence_low}"
+            #    f"\n\thigh (relative): {relative_errors_on_model_dependence_high}"
+            #    f'\n\tmodel_dependence errors: {unfolded["default"].data.metadata["y_systematic"]["model_dependence"]}'
+            #)
         elif np.any(_entry_for_model_dependence):
             ###############################################
             # Updated handling for more recent calculations
@@ -2724,6 +2724,13 @@ def calculate_systematics(  # noqa: C901
                 # We need the absolute error, so multiply the difference by the default value
                 model_dependence_relative * unfolded["default"].data.values,
             )
+
+            #logger.debug(f"Relative error: {model_dependence_relative}")
+            #logger.debug(f"{unfolded[f'model_dependence{_nominal_name_label}'].data.axes[0].bin_edges}")
+            #logger.debug(f'model_dependence errors: {unfolded["default"].data.metadata["y_systematic"]["model_dependence"]}')
+            #logger.debug(
+            #    f'\n\tmodel_dependence errors: {unfolded["default"].data.metadata["y_systematic"]["model_dependence"]}'
+            #)
 
     # Cross check to make sure that I haven't copied and pasted incorrectly.
     assert not any(
