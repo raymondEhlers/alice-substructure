@@ -298,7 +298,6 @@ collision_system = "PbPb"
 event_activity = "semi_central"
 _tag_after_suffix = "pass3"
 #_tag_after_suffix = "pass3_peter_binning"
-_double_counting_cut = "OG_det_level_track_pt"
 #_double_counting_cut = "min_true_10_pt_hat_3"
 _smeared_jet_pt_range = helpers.JetPtRange(40, 120)
 _truncation_shift = 5
@@ -340,10 +339,62 @@ _max_n_iter = {
     # Need +1 for convenience with range iteration
     "soft_drop_z_cut_04": 30,
 }
+_max_n_iter.update({
+    grooming_method: None for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
+})
 
-# %%
-from importlib import reload
-reload(plot_unfolding)
+###################
+# Setup I/O options
+###################
+_use_qm22_inputs = True
+_grooming_methods_using_qm_result_conventions = _OG_grooming_methods if _use_qm22_inputs else []
+_grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inputs else grooming_methods
+# Input directory location
+# Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
+_input_dir_tag = {
+    _method: "parsl/2022-03-QM"
+    for _method in _grooming_methods_using_qm_result_conventions
+}
+_input_dir_tag.update({
+    _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
+})
+_output_dir_tag = {
+    _method: input_dir_tag + "-from-QM22-results"
+    for _method in _grooming_methods_using_qm_result_conventions
+}
+_output_dir_tag.update({
+    _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
+})
+# Double counting cut
+# It's all the same here, but the QM22 results don't include the label
+_double_counting_cut = {
+    _method: ""
+    for _method in _grooming_methods_using_qm_result_conventions
+}
+_double_counting_cut.update({
+    _method: "OG_det_level_track_pt"
+    for _method in _grooming_methods_using_new_conventions
+})
+# Model dependence.
+_model_dependence_configuration = None
+# Background subtraction configurations
+_background_subtraction_configuration = {
+    _method: unfolding_analysis.BackgroundSubtractionConfiguration(
+        contributors=["Rmax005", "Rmax070"]
+    )
+    for _method in _grooming_methods_using_qm_result_conventions
+}
+_background_subtraction_configuration.update({
+    _method: unfolding_analysis.BackgroundSubtractionConfiguration(
+        contributors=["Rmax005", "Rmax050"]
+    )
+    for _method in _grooming_methods_using_new_conventions
+})
+# Add in the closure test to provide the non-closure uncertainty
+_non_closure_configuration = unfolding_analysis.NonClosureConfiguration(
+    contributors=["reweight_response"],
+    approach_to_combining="max",
+)
 
 # %% tags=["remove_cell"]
 # Initially load data
@@ -360,28 +411,28 @@ semi_central_R02_unfolding_closure_outputs, semi_central_R02_unfolding_closure_p
     max_n_iter=_max_n_iter,
     truncation_shift=_truncation_shift,
     displaced_extremum=_displaced_extremum,
-    input_dir_tag=input_dir_tag,
+    input_dir_tag=_input_dir_tag,
+    output_dir_tag=_output_dir_tag,
     output_dir=output_dir,
     tag_after_suffix=_tag_after_suffix,
     double_counting_cut=_double_counting_cut,
+    model_dependence_configuration=_model_dependence_configuration,
 )
-
-# Add in the closure test to provide the non-closure uncertainty
-for grooming_method in grooming_methods:
-    semi_central_R02_unfolding_systematics_outputs[grooming_method]["non_closure"] = \
-        semi_central_R02_unfolding_closure_outputs[grooming_method]["reweight_response"]
-        #semi_central_R02_unfolding_closure_outputs[grooming_method]["reweight_pseudo_data"]
 
 # Focus down onto just the unfolded distributions
 semi_central_R02_unfolded_with_systematics, semi_central_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
     grooming_methods=grooming_methods,
     unfolding_systematics_outputs=semi_central_R02_unfolding_systematics_outputs,
+    unfolding_closure_outputs=semi_central_R02_unfolding_closure_outputs,
     true_jet_pt_range=true_jet_pt_range,
+    model_dependence_configuration=_model_dependence_configuration,
+    non_closure_configuration=_non_closure_configuration,
+    background_subtraction_configuration=_background_subtraction_configuration,
 )
 
 # %%
-list(semi_central_R02_unfolding_systematics_outputs["dynamical_kt_z_cut_02"].keys())
-list(semi_central_R02_unfolding_closure_outputs[grooming_method].keys())
+print(list(semi_central_R02_unfolding_systematics_outputs["dynamical_kt_z_cut_02"].keys()))
+print(list(semi_central_R02_unfolding_closure_outputs[grooming_method].keys()))
 
 # %% jupyter={"outputs_hidden": true} tags=["remove_cell"]
 plot = True
