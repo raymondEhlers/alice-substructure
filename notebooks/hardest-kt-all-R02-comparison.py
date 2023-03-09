@@ -216,6 +216,7 @@ if False:
 pp_R02_unfolded_with_systematics, pp_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
     grooming_methods=grooming_methods,
     unfolding_systematics_outputs=pp_R02_unfolding_systematics_outputs,
+    unfolding_closure_outputs=pp_R02_unfolding_closure_outputs,
     true_jet_pt_range=true_jet_pt_range,
     model_dependence_configuration=_model_dependence_configuration,
     non_closure_configuration=non_closure_configuration,
