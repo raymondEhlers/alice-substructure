@@ -16,7 +16,6 @@
 # %% [markdown]
 # # Comparison for $R=0.2$ pp, semi-central, central
 #
-# To start, focus on DyG core. May or may not contain systematic uncertainties. Depends on what is available
 
 # %%
 # Setup
@@ -26,9 +25,10 @@ from typing import Dict, Mapping, Optional, Sequence
 
 import matplotlib
 import matplotlib.pyplot as plt
-from pachyderm import binned_data
 import seaborn as sns
 import uproot
+from pachyderm import binned_data
+from mammoth import helpers as mammoth_helpers
 
 import jet_substructure.analysis.plot_base as pb
 from jet_substructure.base import helpers, notebook_utils as nb_utils
@@ -44,7 +44,7 @@ plt.ioff()
 # Ensure the axes are legible on a dark background
 matplotlib.rcParams['figure.facecolor'] = 'w'
 
-helpers.setup_logging()
+mammoth_helpers.setup_logging(level=logging.DEBUG)
 # Quiet down the matplotlib logging
 logging.getLogger("matplotlib").setLevel(logging.INFO)
 logging.getLogger("PIL").setLevel(logging.INFO)
@@ -94,6 +94,12 @@ _new_grooming_methods = [
     "soft_drop_z_cut_04",
 ]
 input_dir_tag = "2023-02-HP"
+###################
+# Setup I/O options
+###################
+_use_qm22_inputs = True
+_grooming_methods_using_qm_result_conventions = _OG_grooming_methods if _use_qm22_inputs else []
+_grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inputs else grooming_methods
 
 _output_dir = output_dir / "comparison" / "unfolding" / input_dir_tag / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
@@ -138,9 +144,6 @@ _n_iter_compare = {
 ###################
 # Setup I/O options
 ###################
-_use_qm22_inputs = True
-_grooming_methods_using_qm_result_conventions = _OG_grooming_methods if _use_qm22_inputs else []
-_grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inputs else grooming_methods
 # Input directory location
 # Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
 _input_dir_tag = {
@@ -346,9 +349,6 @@ _max_n_iter.update({
 ###################
 # Setup I/O options
 ###################
-_use_qm22_inputs = True
-_grooming_methods_using_qm_result_conventions = _OG_grooming_methods if _use_qm22_inputs else []
-_grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inputs else grooming_methods
 # Input directory location
 # Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
 _input_dir_tag = {
@@ -392,7 +392,7 @@ _background_subtraction_configuration.update({
 })
 # Add in the closure test to provide the non-closure uncertainty
 _non_closure_configuration = unfolding_analysis.NonClosureConfiguration(
-    contributors=["reweight_response"],
+    contributors=["reweight_response", "thermal_model"],
     approach_to_combining="max",
 )
 
