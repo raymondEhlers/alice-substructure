@@ -1956,7 +1956,7 @@ def setup_unfolding_outputs(  # noqa: C901
         output_dir_tag=output_dir_tag,
         double_counting_cut=double_counting_cut,
     )
-    logger.info(f"default: {unfolding_outputs['default'].identifier}")
+    logger.info(f"{grooming_method} default: {unfolding_outputs['default'].identifier}")
 
     try:
         unfolding_outputs["tracking_efficiency"] = unfolding_analysis.UnfoldingOutput(
@@ -2066,7 +2066,7 @@ def setup_unfolding_outputs(  # noqa: C901
                 suffix=suffix,
                 double_counting_cut=double_counting_cut,
             )
-            logger.debug(f"untagged_bin: {unfolding_outputs['untagged_bin'].identifier}")
+            #logger.debug(f"untagged_bin: {unfolding_outputs['untagged_bin'].identifier}")
         else:
             logger.info("Skipping untagged bin outputs because it is disabled")
 
@@ -2115,7 +2115,7 @@ def setup_unfolding_outputs(  # noqa: C901
             if model_name != "":
                 label = f"_{model_name}"
             else:
-                logger.warning("Loading unlabeled model dependence via legacy case.")
+                logger.warning("Loading unlabeled model dependence via legacy production.")
             try:
                 # Careful here: the outputs in pp are not in the standard format. But this is a convenient fiction.
                 unfolding_outputs[f"model_dependence{label}"] = unfolding_analysis.UnfoldingOutput(
@@ -2193,6 +2193,7 @@ def _load_unfolded_outputs(
     if tag_after_suffix:
         suffix += f"_{tag_after_suffix}"
 
+    logger.debug(f"{grooming_method}: Loading closures...")
     unfolding_closure_outputs = setup_unfolding_closures(
         substructure_variable=substructure_variable,
         grooming_method=grooming_method,
@@ -2209,6 +2210,7 @@ def _load_unfolded_outputs(
         double_counting_cut=double_counting_cut,
     )
     try:
+        logger.debug(f"{grooming_method}: Attempting to load pure matches closures...")
         unfolding_closure_pure_matches_outputs = setup_unfolding_closures(
             substructure_variable=substructure_variable,
             grooming_method=grooming_method,
@@ -2229,6 +2231,7 @@ def _load_unfolded_outputs(
         logger.debug("Skipping pure matches because the output file doesn't exist.")
         unfolding_closure_pure_matches_outputs = {}
 
+    logger.debug(f"{grooming_method}: Loading systematics outputs...")
     unfolding_systematics_outputs = setup_unfolding_outputs(
         substructure_variable=substructure_variable,
         grooming_method=grooming_method,
@@ -2323,8 +2326,7 @@ def load_unfolded_outputs(
             displaced_untagged_above_range=displaced_untagged_above_range,
             skip_reweighted_prior_in_systematics=skip_reweighted_prior_in_systematics,
             output_dir_tag=output_dir_tag[grooming_method],
-            # Default to None if we didn't specify it!
-            max_n_iter=max_n_iter.get(grooming_method, None),
+            max_n_iter=max_n_iter[grooming_method],
             model_dependence_configuration=model_dependence_configuration[grooming_method],
         )
 
@@ -2438,7 +2440,7 @@ def unfolded_substructure_results(
             # We have to handle this manually. See the systematics calculation.
             continue
 
-        logger.debug(f"Converted to single result for {k=}, {true_jet_pt_range=}")
+        #logger.debug(f"Converted to single result for {k=}, {true_jet_pt_range=}")
         unfolded[k] = unfolding_analysis.SingleResult(
             # NOTE: We want to match the iter of the default case.
             data=v.unfolded_substructure(
@@ -2539,7 +2541,8 @@ def calculate_systematics(  # noqa: C901
             random_binning_sym, random_binning_sym,
         )
     except KeyError as e:
-        logger.debug(f"Skipping random binning because of {e}")
+        _msg = f"Skipping random binning because of KeyError {e}"
+        logger.debug(_msg)
 
     # Untagged bin location
     try:
@@ -2549,7 +2552,8 @@ def calculate_systematics(  # noqa: C901
             unfolded["untagged_bin"].data.values - unfolded["default"].data.values
         )
     except KeyError as e:
-        logger.debug(f"Skipping untagged bin location because of {e}")
+        _msg = f"Skipping untagged bin location because of KeyError {e}"
+        logger.debug(_msg)
 
     # Reweight prior
     try:
@@ -2559,7 +2563,8 @@ def calculate_systematics(  # noqa: C901
             unfolded["reweight_prior"].data.values - unfolded["default"].data.values
         )
     except KeyError as e:
-        logger.debug(f"Skipping reweighting prior because of {e}")
+        _msg = f"Skipping reweighting prior because of KeyError {e}"
+        logger.debug(_msg)
 
     # Background subtraction systematics.
     background_systematics = {}
