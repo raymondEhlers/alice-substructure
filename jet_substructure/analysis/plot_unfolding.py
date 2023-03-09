@@ -31,6 +31,57 @@ logger = logging.getLogger(__name__)
 pachyderm.plot.configure()
 
 
+def ks_test(
+    unfolded_pp: unfolding_analysis.SingleResult,
+    unfolded_PbPb: unfolding_analysis.SingleResult,
+    use_ROOT: bool = True,
+) -> float:
+    import scipy.stats
+
+    # Input data
+    hist_pp = unfolded_pp.data
+    hist_PbPb = unfolded_PbPb.data
+
+    # Calculate the ratio histogram
+    # TODO: Error prop
+    hist = hist_PbPb / hist_pp
+
+    # Add the uncertainties in quadrature
+
+    # Create ROOT hist (:-()
+    if use_ROOT:
+        import ROOT
+
+        data_hist = ROOT.TH1D("data", "data", len(hist.axes[0].bin_edges) - 1, hist.axes[0].bin_edges)
+
+        for i, (_value, _error) in enumerate(zip(hist.values, hist.errors), start=1):
+            data_hist.SetBinContent(i, _value)
+            data_hist.SetBinError(i, _error)
+
+        reference_hist = data_hist.Clone("reference").Reset()
+        for i in range(1, reference_hist.GetXaxis().GetNbins() + 1):
+            reference_hist.SetBinContent(i, 1)
+            reference_hist.SetBinError(i, 0)
+
+        return data_hist.KolmogorovTest(reference_hist)  # type: ignore[no-any-return]
+    else:
+        # Create distribution from histogram and bin edges
+        # From: https://stackoverflow.com/a/72224046/12907985
+        hist_dist = scipy.stats.rv_histogram(
+            (hist.values, hist.axes[0].bin_edges)
+        )
+
+        # Perform the test
+        # NOTE: Validation by passing the same distributions...
+        result = scipy.stats.kstest(
+            hist_dist,
+            scipy.stats.uniform.cdf,
+        )
+
+        return result.pvalue  # type: ignore[no-any-return]
+
+
+
 def plot_relative_individual_systematics(
     unfolded: unfolding_analysis.SingleResult,
     plot_config: pb.PlotConfig,
@@ -1138,7 +1189,7 @@ def _plot_pp_PbPb_comparison(
 
     _p7 = [
         # Suggested by Hannah:
-        # Pretty yellow :-/
+        # Too yellow for my test :-/
         #"#FFA500",
         #"#dd9132",
         #"#5a3c00",
