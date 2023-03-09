@@ -401,6 +401,7 @@ class NonClosureConfiguration:
     contributors: list[str]
     approach_to_combining: str = attrs.field(default="max")
 
+@attrs.define
 class BackgroundSubtractionConfiguration:
     """Define how to handle the background subtraction """
     contributors: list[str]
