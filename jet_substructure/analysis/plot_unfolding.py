@@ -87,7 +87,7 @@ def plot_relative_individual_systematics(
     plot_config.apply(fig=fig, ax=ax)
 
     figure_name = f"{plot_config.name}"
-    logger.info(f"Writing plot to {output_dir / figure_name}.pdf")
+    logger.info(f"Writing plot to '{output_dir / figure_name}.pdf'")
     fig.savefig(output_dir / f"{figure_name}.pdf")
     if plot_png:
         output_dir_png = output_dir / "png"
@@ -739,7 +739,7 @@ def _plot_single_system_comparison(
     grooming_methods: Sequence[str],
     reference_grooming_method: str,
     set_zero_to_nan: bool,
-    kt_range: Mapping[str, helpers.KtRange],
+    kt_range: Mapping[str, helpers.KtRange | helpers.RgRange],
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
@@ -1037,8 +1037,8 @@ def plot_Rg_grooming_comparisons_for_single_system(
     collision_system: str,
     collision_system_key: str,
     output_dir: Path,
-    rg_range: Union[helpers.KtRange, Mapping[str, helpers.RgRange]],
-    figure_rg_range: helpers.KtRange = helpers.KtRange(1.5, 15),
+    rg_range: Union[helpers.RgRange, Mapping[str, helpers.RgRange]],
+    figure_rg_range: helpers.RgRange = helpers.RgRange(0, 0.2),
     jet_R_str: str = "R02",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
@@ -1047,7 +1047,7 @@ def plot_Rg_grooming_comparisons_for_single_system(
     """Plot comparison of grooming methods for a single system."""
 
     # Validation
-    if isinstance(rg_range, helpers.KtRange):
+    if isinstance(rg_range, helpers.RgRange):
         rg_range = {grooming_method: rg_range for grooming_method in grooming_methods}
     if label:
         label = f"_{label}"
