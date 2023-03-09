@@ -1897,8 +1897,10 @@ def setup_unfolding_closures(
             input_dir_tag=input_dir_tag,
             output_dir_tag=output_dir_tag,
             double_counting_cut=double_counting_cut,
+            # Trivial closure
             #label="thermal_model_closure_trivial_hybrid_smeared_as_input",
             #raw_hist_name="smeared",
+            # Split MC closure
             label="thermal_model_closure_split_MC",
             raw_hist_name="h2_pseudo_data",
             true_hist_name="h2_pseudo_true",
