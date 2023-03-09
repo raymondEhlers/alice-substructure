@@ -2393,8 +2393,8 @@ def unfolded_outputs_with_systematics(
             unfolding_systematics_outputs=unfolding_systematics_outputs,
             true_jet_pt_range=true_jet_pt_range,
             model_dependence_configuration=model_dependence_configuration[grooming_method],
-            non_closure_configuration=non_closure_configuration,
-            background_subtraction_configuration=background_subtraction_configuration,
+            non_closure_configuration=non_closure_configuration[grooming_method],
+            background_subtraction_configuration=background_subtraction_configuration[grooming_method],
         )
 
     return unfolded_with_systematics, true_reference
@@ -2421,15 +2421,24 @@ def unfolded_substructure_results(
     # Validation
     skip_converting_model_dependence = False
     _entry_for_model_dependence = np.array(["model_dependence" in k for k in unfolding_outputs])
-    if model_dependence_configuration is None and np.count_nonzero(_entry_for_model_dependence) == 1:
+
+    if model_dependence_configuration is not None and model_dependence_configuration.legacy_production:
         # For the outputs from Leticia, which are in a different format than our usual.
         skip_converting_model_dependence = True
+        # Cross check
+        if np.count_nonzero(_entry_for_model_dependence) == 1 and not skip_converting_model_dependence:
+            _msg = "Using legacy production, but too many model dependence entries. Check your input!"
+            raise ValueError(_msg)
 
     unfolded = {}
     for k, v in unfolding_outputs.items():
         if skip_converting_model_dependence and k == "model_dependence":
+            _msg = "Skipping conversion of model dependence due to legacy production. We'll handle it later."
+            logger.info(_msg)
             # We have to handle this manually. See the systematics calculation.
             continue
+
+        logger.debug(f"Converted to single result for {k=}, {true_jet_pt_range=}")
         unfolded[k] = unfolding_analysis.SingleResult(
             # NOTE: We want to match the iter of the default case.
             data=v.unfolded_substructure(
@@ -2616,10 +2625,10 @@ def calculate_systematics(  # noqa: C901
                 n_values=len(unfolded["default"].data.values),
             )
         elif non_closure_configuration.approach_to_combining == "quadrature":
-            _msg = "Need to implement adding model dependence in quadrature"
+            _msg = "Need to implement adding non-closure dependence in quadrature"
             raise NotImplementedError(_msg)
         else:
-            _msg = f"Model dependence approach {model_dependence_configuration.approach_to_combining} is not recognized and there is not implemented."
+            _msg = f"Non-closure dependence approach {non_closure_configuration.approach_to_combining} is not recognized and is not implemented."
             raise NotImplementedError(_msg)
 
         # Treat symmetrically since we don't have an obvious source of this non-closure
@@ -2628,7 +2637,7 @@ def calculate_systematics(  # noqa: C901
             non_closure_sym_relative * unfolded["default"].data.values,
         )
     else:
-        logger.info(f"Skipping non closure systematic because the configuration is None.")
+        logger.info(f"Skipping non closure systematic because no configuration was provided.")
 
     # Model dependence.
     # The output should include _either_ the model dependence or the prior
@@ -2677,12 +2686,19 @@ def calculate_systematics(  # noqa: C901
             assert np.count_nonzero(_entry_for_model_dependence) >= 1
 
             # Retrieve common values and calculate relative uncertainties
-            nominal_values = unfolded[model_dependence_configuration.nominal].data.values
+            _nominal_name_label = model_dependence_configuration.nominal
+            if _nominal_name_label != "":
+                _nominal_name_label = f"_{_nominal_name_label}"
+
+            nominal_values = unfolded[f"model_dependence{_nominal_name_label}"].data.values
             relative_errors_by_model = {}
             # We loop here since we could imagine multiple possible model dependence contributions.
             for model_name in model_dependence_configuration.variations:
                 # Intermediate step: Find the asymmetric relative errors of each model variation
-                relative_errors_by_model[model_name] = (unfolded[model_name].data.values - nominal_values) / nominal_values
+                _model_name_label = f"_{model_name}" if model_name != "" else ""
+                relative_errors_by_model[model_name] = (
+                    unfolded[f"model_dependence{_model_name_label}"].data.values - nominal_values
+                ) / nominal_values
 
             if model_dependence_configuration.approach_to_combining == "max":
                 model_dependence_relative = _calculate_max_relative_error_from_contributions(
@@ -2693,13 +2709,13 @@ def calculate_systematics(  # noqa: C901
                 _msg = "Need to implement adding model dependence in quadrature"
                 raise NotImplementedError(_msg)
             else:
-                _msg = f"Model dependence approach {model_dependence_configuration.approach_to_combining} is not recognized and there is not implemented."
+                _msg = f"Model dependence approach {model_dependence_configuration.approach_to_combining} is not recognized and is not implemented."
                 raise NotImplementedError(_msg)
 
             # Treat asymmetrically since the model goes in a particular direction
             unfolded["default"].data.metadata["y_systematic"][
                 "model_dependence"
-            ] = unfolding_base.AsymmetricErrors(
+            ] = unfolding_base.AsymmetricErrors.calculate_errors(
                 # We need the absolute error, so multiply the difference by the default value
                 model_dependence_relative * unfolded["default"].data.values,
             )
