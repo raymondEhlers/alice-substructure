@@ -15,7 +15,7 @@ import seaborn as sns
 from pachyderm import binned_data
 
 from jet_substructure.analysis import plot_base as pb
-from jet_substructure.analysis import plot_unfolding, unfolding_base
+from jet_substructure.analysis import plot_unfolding, unfolding_analysis, unfolding_base
 from jet_substructure.base import helpers
 
 
@@ -42,7 +42,7 @@ def adjust_lightness(color, amount=0.5):
 
 
 def _plot_pp_grooming_comparison_with_models(  # noqa: C901
-    hists: Mapping[str, plot_unfolding.SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
     reference_grooming_method: str,
     models: Mapping[str, Mapping[str, binned_data.BinnedData]],
@@ -356,7 +356,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 )
 
                 # For theory curves with systematic uncertainties, such as the analytical calculations,
-                # we need to propagate the systematics. It's a bit awkawrd since the systematic bar is already
+                # we need to propagate the systematics. It's a bit awkward since the systematic bar is already
                 # plotted, but I don't see an obviously better way forward
                 if "y_systematic" in model_for_ratio.metadata:
                     y_relative_error_low = unfolding_base.relative_error(
@@ -418,7 +418,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
 
 
 def plot_pp_grooming_comparison_with_models(
-    hists: Mapping[str, plot_unfolding.SingleResult],
+    hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
     reference_grooming_method: str,
     models: Mapping[str, Mapping[str, binned_data.BinnedData]],
