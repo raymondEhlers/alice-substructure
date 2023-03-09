@@ -2373,6 +2373,7 @@ def _unfolded_outputs_with_systematics(
 def unfolded_outputs_with_systematics(
     grooming_methods: Sequence[str],
     unfolding_systematics_outputs: Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]],
+    unfolding_closure_outputs: Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
     model_dependence_configuration: Dict[str, unfolding_analysis.ModelDependenceConfiguration | None] | unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: Dict[str, unfolding_analysis.NonClosureConfiguration | None] | unfolding_analysis.NonClosureConfiguration | None = None,
@@ -2389,6 +2390,11 @@ def unfolded_outputs_with_systematics(
     unfolded_with_systematics = {}
     true_reference = {}
     for grooming_method in grooming_methods:
+        # Add in the closures relevant for non-closure into systematics
+        if non_closure_configuration[grooming_method] is not None:
+            for _contributor in non_closure_configuration[grooming_method].contributors:  # type: ignore[union-attr]
+                unfolding_systematics_outputs[grooming_method][_contributor] = unfolding_closure_outputs[grooming_method][_contributor]
+
         (
             unfolded_with_systematics[grooming_method],
             true_reference[grooming_method],
