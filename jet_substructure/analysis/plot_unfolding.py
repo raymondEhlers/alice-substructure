@@ -1174,18 +1174,6 @@ def _plot_pp_PbPb_comparison(
         "central": r"0-10\% $\text{Pb--Pb}$",
         "semi_central": r"30-50\% $\text{Pb--Pb}$",
     }
-    # NOTE: Probably should make this configurable at some point.
-    # Based on kinematic eff and unfolding ranges
-    #event_activity_to_range = {
-    #    # TEMP: Make this configurable...
-    #    "pp": helpers.KtRange(0.25, 6),
-    #    # "semi_central": helpers.KtRange(0.25, 6),
-    #    # "pp": helpers.KtRange(0.5, 6),
-    #    "semi_central": helpers.KtRange(2, 6),
-    #    #"semi_central": helpers.KtRange(0.25, 6),
-    #    "central": helpers.KtRange(3, 6),
-    #}
-
 
     _p7 = [
         # Suggested by Hannah:
