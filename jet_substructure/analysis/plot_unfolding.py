@@ -2271,7 +2271,7 @@ def load_unfolded_outputs(
     input_dir_tag: Dict[str, str] | str,
     output_dir: Path,
     tag_after_suffix: Union[str, Mapping[str, str]] = "",
-    double_counting_cut: str = "",
+    double_counting_cut: dict[str, str] | str = "",
     displaced_untagged_above_range: bool = True,
     skip_reweighted_prior_in_systematics: bool = False,
     output_dir_tag: Dict[str, str | None] | str | None = None,
@@ -2294,6 +2294,8 @@ def load_unfolded_outputs(
         output_dir_tag = {grooming_method: output_dir_tag for grooming_method in grooming_methods}
     if isinstance(tag_after_suffix, str):
         tag_after_suffix = {grooming_method: tag_after_suffix for grooming_method in grooming_methods}
+    if isinstance(double_counting_cut, str):
+        double_counting_cut = {grooming_method: double_counting_cut for grooming_method in grooming_methods}
     if isinstance(max_n_iter, int) or max_n_iter is None:
         max_n_iter = {grooming_method: max_n_iter for grooming_method in grooming_methods}
     if isinstance(model_dependence_configuration, unfolding_analysis.ModelDependenceConfiguration) or model_dependence_configuration is None:
@@ -2322,7 +2324,7 @@ def load_unfolded_outputs(
             input_dir_tag=input_dir_tag[grooming_method],
             output_dir=output_dir,
             tag_after_suffix=tag_after_suffix[grooming_method],
-            double_counting_cut=double_counting_cut,
+            double_counting_cut=double_counting_cut[grooming_method],
             displaced_untagged_above_range=displaced_untagged_above_range,
             skip_reweighted_prior_in_systematics=skip_reweighted_prior_in_systematics,
             output_dir_tag=output_dir_tag[grooming_method],
