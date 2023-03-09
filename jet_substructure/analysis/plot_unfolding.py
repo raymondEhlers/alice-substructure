@@ -2273,7 +2273,7 @@ def load_unfolded_outputs(
     skip_reweighted_prior_in_systematics: bool = False,
     output_dir_tag: Dict[str, str | None] | str | None = None,
     max_n_iter: Dict[str, int | None] | int | None = None,
-    model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration] | unfolding_analysis.ModelDependenceConfiguration | None = None,
+    model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration | None] | unfolding_analysis.ModelDependenceConfiguration | None = None,
 ) -> Tuple[
     Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]], Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]], Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]]
 ]:
@@ -2370,9 +2370,9 @@ def unfolded_outputs_with_systematics(
     grooming_methods: Sequence[str],
     unfolding_systematics_outputs: Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
-    model_dependence_configuration: Dict[str, unfolding_analysis.ModelDependenceConfiguration] | unfolding_analysis.ModelDependenceConfiguration | None = None,
-    non_closure_configuration: Dict[str, unfolding_analysis.NonClosureConfiguration] | unfolding_analysis.NonClosureConfiguration | None = None,
-    background_subtraction_configuration: Dict[str, unfolding_analysis.BackgroundSubtractionConfiguration] | unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
+    model_dependence_configuration: Dict[str, unfolding_analysis.ModelDependenceConfiguration | None] | unfolding_analysis.ModelDependenceConfiguration | None = None,
+    non_closure_configuration: Dict[str, unfolding_analysis.NonClosureConfiguration | None] | unfolding_analysis.NonClosureConfiguration | None = None,
+    background_subtraction_configuration: Dict[str, unfolding_analysis.BackgroundSubtractionConfiguration | None] | unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
 ) -> Tuple[Dict[str, unfolding_analysis.SingleResult], Dict[str, binned_data.BinnedData]]:
     # Validation
     if isinstance(model_dependence_configuration, unfolding_analysis.ModelDependenceConfiguration) or model_dependence_configuration is None:
