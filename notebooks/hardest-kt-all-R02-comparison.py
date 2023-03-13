@@ -266,8 +266,9 @@ if plot:
             # NOTE: This includes both:
             #       - HERWIG vs PYTHIA
             #       - fastsim vs full sim as well as whatever HERWIG
-            #       Consequently, it may not be the most accurate overall magnitude, but we can still use
-            #       it to look at the shape. Alternatively, we can switch back to the reweighted_prior
+            #       Consequently, the fastsim output may not be the most accurate overall magnitude, but we can
+            #       still use it to look at the shape for selecting the iteration. Alternatively, we can switch
+            #       back to the reweighted_prior, but that output is less satisfying for pp.
             # NOTE: We can't remove the fastsim vs full sim dependence at the moment because we would need
             #       the full UnfoldingOutput object, which we don't have available since the model dependence here
             #       is constructed by transfer the differecnes from the fastsim outputs to the default.
