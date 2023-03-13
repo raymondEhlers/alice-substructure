@@ -3006,6 +3006,9 @@ def plot_refolded(
     """Plot refolded."""
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
 
+    # Make it easier to see individual points when necessary
+    _jitter = 0.001
+
     with sns.color_palette(_colors_for_plotting(n_colors=len(refolded_hists))):
         # Setup
         fig, axes = plt.subplots(
@@ -3029,6 +3032,8 @@ def plot_refolded(
                 marker="o",
                 linestyle="",
                 color="red",
+                # Arbitrarily large
+                zorder=49,
             )
 
         # Smeared
@@ -3041,13 +3046,18 @@ def plot_refolded(
             marker="o",
             linestyle="",
             color="green",
+            # Arbitrarily large
+            zorder=50,
         )
 
         raw_is_smeared = unfolding_output.raw_hist_name == "smeared"
         ratio_denominator = hist_smeared if raw_is_smeared else hist_raw
-        for i, hist in refolded_hists.items():
+        for _plot_counter, (i, hist) in enumerate(refolded_hists.items()):
+            # NOTE: We only apply the jitter in the ratios since that's where we need to see in detail
+            _jitter_per_iter = (-1) ** _plot_counter * (_jitter * _plot_counter)
+
             ax_upper.errorbar(
-                hist.axes[0].bin_centers,
+                hist.axes[0].bin_centers + _jitter_per_iter,
                 hist.values,
                 xerr=hist.axes[0].bin_widths / 2,
                 yerr=hist.errors,
@@ -3055,17 +3065,25 @@ def plot_refolded(
                 marker="o",
                 linestyle="",
                 alpha=0.8,
+                # NOTE: We plot the earliest on top so we can keep better track of the error bars (because
+                #       the later iterations have larger error bars).
+                # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+                zorder=3 + len(refolded_hists) - _plot_counter,
             )
 
             ratio = hist / ratio_denominator
             ax_lower.errorbar(
-                ratio.axes[0].bin_centers,
+                ratio.axes[0].bin_centers + _jitter_per_iter,
                 ratio.values,
                 xerr=ratio.axes[0].bin_widths / 2,
                 yerr=ratio.errors,
                 marker="o",
                 linestyle="",
                 alpha=0.8,
+                # NOTE: We plot the earliest on top so we can keep better track of the error bars (because
+                #       the later iterations have larger error bars).
+                # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+                zorder=3 + len(refolded_hists) - _plot_counter,
             )
 
         # Add smeared ratio in the right circumstances.
@@ -3719,7 +3737,7 @@ def plot_kt_unfolding(
                     axes=[
                         pb.AxisConfig("y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True)
                     ],
-                    legend=pb.LegendConfig(location="lower left", ncol=2, anchor=(0.15, 0.025)),
+                    legend=pb.LegendConfig(location="lower left", ncol=2, anchor=(0.025, 0.025)),
                     text=pb.TextConfig(text, 0.97, 0.97),
                 ),
                 # Ratio
@@ -3826,7 +3844,7 @@ def plot_kt_unfolding(
                                 "y", label=r"$\text{d}N/\text{d}k_{\text{T}}\:(\text{GeV}/c)^{-1}$", log=True
                             )
                         ],
-                        legend=pb.LegendConfig(location="lower left", ncol=2, anchor=(0.15, 0.025)),
+                        legend=pb.LegendConfig(location="lower left", ncol=2, anchor=(0.025, 0.025)),
                         text=pb.TextConfig(text, 0.97, 0.97),
                     ),
                     # Ratio
