@@ -232,6 +232,7 @@ pp_R02_unfolded_with_systematics["dynamical_core"].data.metadata["y_systematic"]
 # %% jupyter={"outputs_hidden": true} tags=["remove_cell"]
 plot = True
 _plot_systematic_breakdown = True
+_plot_systematics = True
 _plot_closures = True
 if plot:
     for grooming_method in grooming_methods:
@@ -279,14 +280,14 @@ if plot:
             unfolding_kt_display_range=(0.25, 6),
         )
         if _plot_closures:
-            ##for _outputs in [pp_R02_unfolding_closure_outputs, pp_R02_unfolding_closure_pure_matches_outputs, pp_R02_unfolding_systematics_outputs]:
-            #for _outputs in [pp_R02_unfolding_closure_outputs]:
-            for _outputs in [pp_R02_unfolding_closure_outputs, pp_R02_unfolding_systematics_outputs]:
+            for _outputs in [
+                pp_R02_unfolding_closure_outputs if _plot_closures else {grooming_method: []},
+                pp_R02_unfolding_systematics_outputs if _plot_systematics else {grooming_method: []},
+            ]:
                 for name, _unfolding_output in _outputs[grooming_method].items():
                     # Skip, since we already plotted above.
                     if name == "default":
                         continue
-                    logger.warning(f"{name=}")
                     plot_unfolding.plot_kt_unfolding(
                         unfolding_output=_unfolding_output,
                         plot_png=True,
