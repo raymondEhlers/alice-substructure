@@ -97,7 +97,7 @@ input_dir_tag = "2023-02-HP"
 ###################
 # Setup I/O options
 ###################
-_use_qm22_inputs = True
+_use_qm22_inputs = False
 _grooming_methods_using_qm_result_conventions = _OG_grooming_methods if _use_qm22_inputs else []
 _grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inputs else grooming_methods
 
@@ -119,6 +119,25 @@ _tag_after_suffix = ""
 _truncation_shift = 3
 _displaced_extremum = 10
 
+###################
+# Setup I/O options
+###################
+# Input directory location
+# Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
+_input_dir_tag = {
+    _method: "parsl/2022-03-QM"
+    for _method in _grooming_methods_using_qm_result_conventions
+}
+_input_dir_tag.update({
+    _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
+})
+_output_dir_tag = {
+    _method: input_dir_tag + "-from-QM22-results"
+    for _method in _grooming_methods_using_qm_result_conventions
+}
+_output_dir_tag.update({
+    _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
+})
 # Grooming method dependent settings
 _smeared_untagged_var = {
     "dynamical_core": helpers.KtRange(0.25, 0.25),
@@ -140,26 +159,6 @@ _n_iter_compare = {
     "dynamical_kt_z_cut_02": 3,
     "dynamical_time_z_cut_02": 3,
 }
-
-###################
-# Setup I/O options
-###################
-# Input directory location
-# Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
-_input_dir_tag = {
-    _method: "parsl/2022-03-QM"
-    for _method in _grooming_methods_using_qm_result_conventions
-}
-_input_dir_tag.update({
-    _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
-})
-_output_dir_tag = {
-    _method: input_dir_tag + "-from-QM22-results"
-    for _method in _grooming_methods_using_qm_result_conventions
-}
-_output_dir_tag.update({
-    _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
-})
 # Model dependence.
 # Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
 _model_dependence_configuration = {
@@ -226,12 +225,16 @@ pp_R02_unfolded_with_systematics, pp_R02_true_reference = plot_unfolding.unfolde
     background_subtraction_configuration=None,
 )
 
+# %%
+pp_R02_unfolding_systematics_outputs["dynamical_core"].keys()
+pp_R02_unfolded_with_systematics["dynamical_core"].data.metadata["y_systematic"].keys()
+
 # %% jupyter={"outputs_hidden": true} tags=["remove_cell"]
 plot = True
 _plot_systematic_breakdown = True
-_plot_closures = False
+_plot_closures = True
 if plot:
-    for grooming_method in grooming_methods:
+    for grooming_method in grooming_methods[:1]:
         if _plot_systematic_breakdown:
             # Plot the individual relative systematics
             plot_unfolding.plot_relative_individual_systematics(
@@ -257,21 +260,23 @@ if plot:
                 plot_png = True,
             )
         
+        plot_unfolding.plot_kt_unfolding(
+            unfolding_output=pp_R02_unfolding_systematics_outputs[grooming_method]["default"],
+            plot_png=True,
+            # NOTE: This is probably overestimating in the overall magnitude, but we can look at the shape
+            reweighted_prior_output=pp_R02_unfolding_systematics_outputs[grooming_method]["model_dependence_herwig_fastsim"],
+            #reweighted_prior_output=pp_R02_unfolding_systematics_outputs[grooming_method]["reweight_prior"],
+            unfolding_kt_display_range=(0.25, 6),
+        )
         if _plot_closures:
-            plot_unfolding.plot_kt_unfolding(
-                unfolding_output=pp_R02_unfolding_systematics_outputs[grooming_method]["default"],
-                plot_png=True,
-                reweighted_prior_output=pp_R02_unfolding_systematics_outputs[grooming_method]["model_dependence"],
-                #reweighted_prior_output=pp_R02_unfolding_systematics_outputs[grooming_method]["reweight_prior"],
-                unfolding_kt_display_range=(0.25, 6),
-            )
             ##for _outputs in [pp_R02_unfolding_closure_outputs, pp_R02_unfolding_closure_pure_matches_outputs, pp_R02_unfolding_systematics_outputs]:
-            #for _outputs in [pp_R02_unfolding_closure_outputs, pp_R02_unfolding_systematics_outputs]:
-            for _outputs in [pp_R02_unfolding_closure_outputs]:
+            #for _outputs in [pp_R02_unfolding_closure_outputs]:
+            for _outputs in [pp_R02_unfolding_closure_outputs, pp_R02_unfolding_systematics_outputs]:
                 for name, _unfolding_output in _outputs[grooming_method].items():
                     # Skip, since we already plotted above.
                     if name == "default":
                         continue
+                    logger.warning(f"{name=}")
                     plot_unfolding.plot_kt_unfolding(
                         unfolding_output=_unfolding_output,
                         plot_png=True,
@@ -290,8 +295,6 @@ if plot:
 #        # Arbitrarily take the first grooming method for the output dir
 #        output_dir=pp_R02_unfolding_systematics_outputs[grooming_methods[0]]["default"].output_dir,
 #    )
-
-# %%
 
 # %% [markdown]
 # ### Semi-central
