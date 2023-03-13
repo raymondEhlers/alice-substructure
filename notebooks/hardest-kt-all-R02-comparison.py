@@ -230,11 +230,12 @@ pp_R02_unfolding_systematics_outputs["dynamical_core"].keys()
 pp_R02_unfolded_with_systematics["dynamical_core"].data.metadata["y_systematic"].keys()
 
 # %% jupyter={"outputs_hidden": true} tags=["remove_cell"]
-plot = True
+_plot = True
+_plot_png = False
 _plot_systematic_breakdown = True
 _plot_systematics = True
 _plot_closures = True
-if plot:
+if _plot:
     for grooming_method in grooming_methods:
         if _plot_systematic_breakdown:
             # Plot the individual relative systematics
@@ -258,12 +259,12 @@ if plot:
                     ],
                 ),
                 output_dir = pp_R02_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-                plot_png = True,
+                plot_png=_plot_png,
             )
         
         plot_unfolding.plot_kt_unfolding(
             unfolding_output=pp_R02_unfolding_systematics_outputs[grooming_method]["default"],
-            plot_png=True,
+            plot_png=_plot_png,
             # NOTE: This includes both:
             #       - HERWIG vs PYTHIA
             #       - fastsim vs full sim as well as whatever HERWIG
@@ -290,11 +291,11 @@ if plot:
                         continue
                     plot_unfolding.plot_kt_unfolding(
                         unfolding_output=_unfolding_output,
-                        plot_png=True,
+                        plot_png=_plot_png,
                         #unfolding_kt_display_range=(0.5, 6) if "z_cut" not in grooming_method else (0.25, 6),
                         unfolding_kt_display_range=(0.25, 6),
                     )
-#
+
 ## Plot full systematics for multiple grooming methods on one plot.
 #if plot:
 #    plot_unfolding.plot_PbPb_systematics(
