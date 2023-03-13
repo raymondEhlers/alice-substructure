@@ -3805,18 +3805,11 @@ def plot_kt_unfolding(
     )
 
     # Slice the refolded in jet pt just to get a sense of what they look like.
-    if unfolding_output.smeared_jet_pt_range.min > 20:
-        # Effectively, a proxy for PbPb
-        _small_jet_pt_bins = np.array([30, 40, 60, 80, 100, 120])
-        if unfolding_output.smeared_jet_pt_range.min > 30:
-            # Drop the lowest bin, since it's outside of our smeared jet pt range.
-            _small_jet_pt_bins = _small_jet_pt_bins[1:]
-            # Set the lowest bin lower edge to the smallest smeared value. This way,
-            # it will work for truncation systematics.
-            # _small_jet_pt_bins[0] = unfolding_output.smeared_jet_pt_range.min
-    else:
-        # Effectively, a proxy for pp
-        _small_jet_pt_bins = np.array([20, 30, 40, 50, 60, 85])
+    # pp
+    _small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 30, 40, 50, 60, 85])
+    if unfolding_output.collision_system != "pp":
+        # PbPb needs somewhat different binning
+        _small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 40, 60, 80, 100, 120])
     for _low, _high in zip(_small_jet_pt_bins[:-1], _small_jet_pt_bins[1:]):
         _small_jet_pt_range = helpers.JetPtRange(_low, _high)
         text = f"${_small_jet_pt_range.display_str(label='data')}$"
