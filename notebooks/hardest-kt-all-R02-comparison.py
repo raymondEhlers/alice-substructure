@@ -234,7 +234,7 @@ plot = True
 _plot_systematic_breakdown = True
 _plot_closures = True
 if plot:
-    for grooming_method in grooming_methods[:1]:
+    for grooming_method in grooming_methods:
         if _plot_systematic_breakdown:
             # Plot the individual relative systematics
             plot_unfolding.plot_relative_individual_systematics(
@@ -263,7 +263,16 @@ if plot:
         plot_unfolding.plot_kt_unfolding(
             unfolding_output=pp_R02_unfolding_systematics_outputs[grooming_method]["default"],
             plot_png=True,
-            # NOTE: This is probably overestimating in the overall magnitude, but we can look at the shape
+            # NOTE: This includes both:
+            #       - HERWIG vs PYTHIA
+            #       - fastsim vs full sim as well as whatever HERWIG
+            #       Consequently, it may not be the most accurate overall magnitude, but we can still use
+            #       it to look at the shape. Alternatively, we can switch back to the reweighted_prior
+            # NOTE: We can't remove the fastsim vs full sim dependence at the moment because we would need
+            #       the full UnfoldingOutput object, which we don't have available since the model dependence here
+            #       is constructed by transfer the differecnes from the fastsim outputs to the default.
+            #       We could do this, but it's more tricky (eg. can refolded be treated the same way?
+            #       Probably, but would need to be checked), so we just stick with the HERWIG model dependence.
             reweighted_prior_output=pp_R02_unfolding_systematics_outputs[grooming_method]["model_dependence_herwig_fastsim"],
             #reweighted_prior_output=pp_R02_unfolding_systematics_outputs[grooming_method]["reweight_prior"],
             unfolding_kt_display_range=(0.25, 6),
