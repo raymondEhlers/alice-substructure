@@ -138,7 +138,9 @@ _output_dir_tag = {
 _output_dir_tag.update({
     _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
 })
+####################################
 # Grooming method dependent settings
+####################################
 _smeared_untagged_var = {
     "dynamical_core": helpers.KtRange(0.25, 0.25),
     "dynamical_kt": helpers.KtRange(0.25, 0.25),
@@ -280,7 +282,7 @@ if _plot:
             #       back to the reweighted_prior, but that output is less satisfying for pp.
             # NOTE: We can't remove the fastsim vs full sim dependence at the moment because we would need
             #       the full UnfoldingOutput object, which we don't have available since the model dependence here
-            #       is constructed by transfer the differecnes from the fastsim outputs to the default.
+            #       is constructed by transferring the differences from the fastsim outputs to the default.
             #       We could do this, but it's more tricky (eg. can refolded be treated the same way?
             #       Probably, but would need to be checked), so we just stick with the HERWIG model dependence.
             reweighted_prior_output=pp_R02_unfolding_systematics_outputs[grooming_method]["model_dependence_herwig_fastsim"],
@@ -328,7 +330,28 @@ _smeared_jet_pt_range = helpers.JetPtRange(40, 120)
 _truncation_shift = 5
 _displaced_extremum = 10
 
+###################
+# Setup I/O options
+###################
+# Input directory location
+# Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
+_input_dir_tag = {
+    _method: "parsl/2022-03-QM"
+    for _method in _grooming_methods_using_qm_result_conventions
+}
+_input_dir_tag.update({
+    _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
+})
+_output_dir_tag = {
+    _method: input_dir_tag + "-from-QM22-results"
+    for _method in _grooming_methods_using_qm_result_conventions
+}
+_output_dir_tag.update({
+    _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
+})
+####################################
 # Grooming method dependent settings
+####################################
 _smeared_var_range = {
     "dynamical_core": helpers.KtRange(1, 8),
     "dynamical_kt": helpers.KtRange(1, 8),
@@ -357,9 +380,15 @@ _n_iter_compare = {
     "dynamical_core_z_cut_02": 3,
     "dynamical_kt_z_cut_02": 3,
     "dynamical_time_z_cut_02": 3,
-    # TODO: May need to increase on account of how long it takes to converge.
     "soft_drop_z_cut_04": 3,
 }
+if _use_qm22_inputs:
+    _n_iter_compare.update({
+        "dynamical_core": 3,
+        "dynamical_kt": 3,
+        "dynamical_time": 3,
+        "soft_drop_z_cut_02": 3,
+    })
 _max_n_iter = {
     # Need +1 for convenience with range iteration
     "soft_drop_z_cut_04": 30,
@@ -368,25 +397,6 @@ _max_n_iter.update({
     grooming_method: None for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
 })
 
-###################
-# Setup I/O options
-###################
-# Input directory location
-# Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
-_input_dir_tag = {
-    _method: "parsl/2022-03-QM"
-    for _method in _grooming_methods_using_qm_result_conventions
-}
-_input_dir_tag.update({
-    _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
-})
-_output_dir_tag = {
-    _method: input_dir_tag + "-from-QM22-results"
-    for _method in _grooming_methods_using_qm_result_conventions
-}
-_output_dir_tag.update({
-    _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
-})
 # Double counting cut
 # It's all the same here, but the QM22 results don't include the label
 _double_counting_cut = {
@@ -413,10 +423,20 @@ _background_subtraction_configuration.update({
     for _method in _grooming_methods_using_new_conventions
 })
 # Add in the closure test to provide the non-closure uncertainty
-_non_closure_configuration = unfolding_analysis.NonClosureConfiguration(
-    contributors=["reweight_response", "thermal_model"],
-    approach_to_combining="max",
-)
+_non_closure_configuration = {
+    grooming_method: unfolding_analysis.NonClosureConfiguration(
+        contributors=["reweight_response"],
+        approach_to_combining="max",
+    )
+    for grooming_method in _grooming_methods_using_qm_result_conventions
+}
+_non_closure_configuration.update({
+    grooming_method: unfolding_analysis.NonClosureConfiguration(
+        contributors=["reweight_response"] + (["thermal_model"] if "soft_drop" in grooming_method else []) ,
+        approach_to_combining="max",
+    )
+    for grooming_method in _grooming_methods_using_new_conventions
+})
 
 # %% tags=["remove_cell"]
 # Initially load data
@@ -456,10 +476,32 @@ semi_central_R02_unfolded_with_systematics, semi_central_R02_true_reference = pl
 print(list(semi_central_R02_unfolding_systematics_outputs["dynamical_kt_z_cut_02"].keys()))
 print(list(semi_central_R02_unfolding_closure_outputs[grooming_method].keys()))
 
+# %%
+plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
+    grooming_methods=grooming_methods,
+    unfolded_with_systematics=semi_central_R02_unfolded_with_systematics,
+    unfolding_systematics_outputs=semi_central_R02_unfolding_systematics_outputs,
+    unfolding_closure_outputs=semi_central_R02_unfolding_closure_outputs,
+    plot=True,
+    plot_png=False,
+    plot_systematic_breakdown=True,
+    plot_systematics=True,
+    plot_closures=True,
+    prior_variation_output_name="reweight_prior",
+    unfolding_kt_display_range={
+        grooming_method: (0.25, 6) if "z_cut" in grooming_method else (1, 6)
+        for grooming_method in grooming_methods
+    },
+    relative_individual_systematic_ratio_range={
+        grooming_method: (0.25, 1.75) if grooming_method != "soft_drop_z_cut_02" else (0.6, 1.4)
+        for grooming_method in grooming_methods
+    }
+)
+
 # %% jupyter={"outputs_hidden": true} tags=["remove_cell"]
 plot = True
-plot_png = False
 _plot_systematic_breakdown = False
+plot_png = False
 if plot:
     for grooming_method in grooming_methods:
         if _plot_systematic_breakdown:
@@ -488,10 +530,6 @@ if plot:
                 plot_png=plot_png,
             )
         for k in semi_central_R02_unfolding_closure_outputs[grooming_method]:
-            # TEMP
-            if "thermal_model" not in k:
-                continue
-            # ENDTEMP
             logger.warning(f"Plotting {k} for {grooming_method}")
             plot_unfolding.plot_kt_unfolding(
                 unfolding_output=semi_central_R02_unfolding_closure_outputs[grooming_method][k],
