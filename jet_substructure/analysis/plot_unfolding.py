@@ -5015,6 +5015,99 @@ def run_delta_R(collision_system: str) -> None:
         plot_delta_R_unfolding(unfolding_output=unfolding_output)
 
 
+def steer_plotting_of_kt_unfolding_outputs(
+    grooming_methods: list[str],
+    unfolded_with_systematics: dict[str, unfolding_analysis.SingleResult],
+    unfolding_systematics_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
+    unfolding_closure_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
+    plot: bool,
+    plot_png: bool,
+    plot_systematic_breakdown: bool,
+    plot_systematics: bool,
+    plot_closures: bool,
+    unfolding_kt_display_range: dict[str, Tuple[float, float]] | Tuple[float, float],
+    prior_variation_output_name: str | None = None,
+    relative_individual_systematic_ratio_range: dict[str, Tuple[float, float]] | Tuple[float, float] | None = None,
+) -> None:
+    # Validation
+    if isinstance(unfolding_kt_display_range, tuple):
+        unfolding_kt_display_range = {grooming_method: unfolding_kt_display_range for grooming_method in grooming_methods}
+    if isinstance(relative_individual_systematic_ratio_range, tuple) or relative_individual_systematic_ratio_range is None:
+        relative_individual_systematic_ratio_range = {
+            grooming_method: relative_individual_systematic_ratio_range if relative_individual_systematic_ratio_range is not None else (0.5, 1.5)
+            for grooming_method in grooming_methods
+        }
+
+    # Skip out immediately if we can
+    if not plot:
+        return
+
+    for grooming_method in grooming_methods:
+        logger.info(f"Plotting '{grooming_method}'")
+        if plot_systematic_breakdown:
+            # Plot the individual relative systematics
+            plot_relative_individual_systematics(
+                unfolded=unfolded_with_systematics[grooming_method],
+                plot_config=pb.PlotConfig(
+                    name="unfolded_systematic_relative",
+                    panels=[
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "x",
+                                    label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                                    range=unfolding_kt_display_range[grooming_method],
+                                ),
+                                pb.AxisConfig(
+                                    "y",
+                                    label="Relative error",
+                                    range=relative_individual_systematic_ratio_range[grooming_method],
+                                ),
+                            ],
+                            legend=pb.LegendConfig(location="upper right", ncol=2),
+                            #text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                    ],
+                ),
+                output_dir=unfolding_systematics_outputs[grooming_method]["default"].output_dir,
+                plot_png=plot_png,
+            )
+
+        plot_kt_unfolding(
+            unfolding_output=unfolding_systematics_outputs[grooming_method]["default"],
+            plot_png=plot_png,
+            # TODO: Move this to the pp comments, since this doesn't really belong here.
+            # NOTE: This includes both:
+            #       - HERWIG vs PYTHIA
+            #       - fastsim vs full sim as well as whatever HERWIG
+            #       Consequently, the fastsim output may not be the most accurate overall magnitude, but we can
+            #       still use it to look at the shape for selecting the iteration. Alternatively, we can switch
+            #       back to the reweighted_prior, but that output is less satisfying for pp.
+            # NOTE: We can't remove the fastsim vs full sim dependence at the moment because we would need
+            #       the full UnfoldingOutput object, which we don't have available since the model dependence here
+            #       is constructed by transferring the differences from the fastsim outputs to the default.
+            #       We could do this, but it's more tricky (eg. can refolded be treated the same way?
+            #       Probably, but would need to be checked), so we just stick with the HERWIG model dependence.
+            prior_variation_output=unfolding_systematics_outputs[grooming_method][prior_variation_output_name] if prior_variation_output_name is not None else None,
+            #prior_variation_output=unfolding_systematics_outputs[grooming_method]["model_dependence_herwig_fastsim"],
+            #prior_variation_output=unfolding_systematics_outputs[grooming_method]["reweight_prior"],
+            unfolding_kt_display_range=unfolding_kt_display_range[grooming_method],
+        )
+        for _outputs in [
+            unfolding_closure_outputs if plot_closures else {grooming_method: {}},
+            unfolding_systematics_outputs if plot_systematics else {grooming_method: {}},
+        ]:
+            for name, _unfolding_output in _outputs[grooming_method].items():
+                # Skip, since we already plotted above.
+                if name == "default":
+                    continue
+                plot_kt_unfolding(
+                    unfolding_output=_unfolding_output,
+                    plot_png=plot_png,
+                    unfolding_kt_display_range=unfolding_kt_display_range[grooming_method],
+                )
+
+
 if __name__ == "__main__":
     # Setup
     helpers.setup_logging()
