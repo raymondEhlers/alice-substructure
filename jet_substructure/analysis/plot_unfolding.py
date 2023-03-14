@@ -3268,7 +3268,7 @@ def plot_select_iteration(
     plot_config: pb.PlotConfig,
     output_dir: Path,
     plot_png: bool = False,
-    reweighted_prior_output: Optional[unfolding_analysis.UnfoldingOutput] = None,
+    prior_variation_output: Optional[unfolding_analysis.UnfoldingOutput] = None,
 ) -> None:
     """Plot selected iteration."""
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
@@ -3337,8 +3337,8 @@ def plot_select_iteration(
         hist_stat.values[i] = stat_value
         # If prior is provided, calculate.
         prior_value = 0
-        if reweighted_prior_output:
-            prior = projection_func(reweighted_prior_output, iter, true_bin)
+        if prior_variation_output:
+            prior = projection_func(prior_variation_output, iter, true_bin)
             prior_value = np.sum(
                 np.divide(
                     np.abs(current_iter_hist.values - prior.values),
@@ -3380,7 +3380,7 @@ def plot_select_iteration(
         linestyle="",
     )
     # And the prior values, if they were provided
-    if reweighted_prior_output:
+    if prior_variation_output:
         ax.errorbar(
             hist_prior.axes[0].bin_centers,
             hist_prior.values,
@@ -3407,7 +3407,7 @@ def plot_select_iteration(
 def plot_kt_unfolding(
     unfolding_output: unfolding_analysis.UnfoldingOutput,
     plot_png: bool = False,
-    reweighted_prior_output: Optional[unfolding_analysis.UnfoldingOutput] = None,
+    prior_variation_output: Optional[unfolding_analysis.UnfoldingOutput] = None,
     unfolding_kt_display_range: Optional[Tuple[float, float]] = None,
 ) -> Path:
     if unfolding_kt_display_range is None:
@@ -3938,7 +3938,7 @@ def plot_kt_unfolding(
             ),
             output_dir=unfolding_output.output_dir,
             plot_png=plot_png,
-            reweighted_prior_output=reweighted_prior_output,
+            prior_variation_output=prior_variation_output,
         )
 
     # Efficiency
@@ -4445,7 +4445,7 @@ def run(collision_system: str) -> None:
 def plot_delta_R_unfolding(
     unfolding_output: unfolding_analysis.UnfoldingOutput,
     plot_png: bool = False,
-    reweighted_prior_output: Optional[unfolding_analysis.UnfoldingOutput] = None,
+    prior_variation_output: Optional[unfolding_analysis.UnfoldingOutput] = None,
     unfolding_Rg_display_range: Optional[Tuple[float, float]] = None,
 ) -> Path:
     if unfolding_Rg_display_range is None:
@@ -4907,7 +4907,7 @@ def plot_delta_R_unfolding(
             ),
             output_dir=unfolding_output.output_dir,
             plot_png=plot_png,
-            reweighted_prior_output=reweighted_prior_output,
+            prior_variation_output=prior_variation_output,
         )
 
     # Efficiency
