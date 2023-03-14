@@ -416,7 +416,9 @@ def _get_raw_data_hist(
         additional_substructure_variable_cut=additional_substructure_variable_cut,
     )
     h_data = f_data.Get(h_data_name)
+
     # Take ownership on the python side so we can close the file
+    h_data.SetDirectory(0)
     ROOT.SetOwnership(h_data, True)
 
     # Cleanup
