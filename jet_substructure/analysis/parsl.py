@@ -1620,6 +1620,7 @@ def _unfolding_closure(
     settings: unfolding_base.Settings2D,
     closure_variation: str,
     unfolding_for_pp: bool,
+    use_data_stat_precision_for_smeared: bool,
     fraction_for_response: float,
     reweight_data_dataset_name: str,
     reweight_response_dataset_name: str,
@@ -1645,6 +1646,7 @@ def _unfolding_closure(
         response_filenames=response_filenames,
         response_tree_name=response_tree_name,
         closure_variation=closure_variation,
+        use_data_stat_precision_for_smeared=use_data_stat_precision_for_smeared,
         unfolding_for_pp=unfolding_for_pp,
         fraction_for_response=fraction_for_response,
         reweight_data_dataset_name=reweight_data_dataset_name,
@@ -1964,6 +1966,7 @@ def setup_all_unfolding(  # noqa: C901
                                 closure_variation=closure_variation,
                                 unfolding_for_pp=unfolding_for_pp,
                                 fraction_for_response=closure_specific_settings["split_MC_fraction_for_response"],
+                                use_data_stat_precision_for_smeared=closure_specific_settings["use_data_stat_precision_for_smeared"],
                                 # We always want to reweight with the nominal datasets.
                                 reweight_data_dataset_name=base_dataset_config["datasets"]["nominal"][
                                     data_collision_system

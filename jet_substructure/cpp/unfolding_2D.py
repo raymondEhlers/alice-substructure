@@ -384,6 +384,47 @@ def _collision_system_names(unfolding_for_pp: bool) -> Tuple[str, str]:
     return "PbPb", "embed_pythia"
 
 
+def _get_raw_data_hist(
+    *,
+    data_collision_system: str,
+    data_dataset_name: str,
+    substructure_variable_name: str,
+    smeared_substructure_variable_bins: npt.NDArray[np.float64],
+    smeared_jet_pt_bins: npt.NDArray[np.float64],
+    grooming_method: str,
+    double_counting_cut_name: str,
+    additional_substructure_variable_cut: unfolding_base.AdditionalVariableCut,
+    base_directory: Path,
+) -> TH2D:
+    # Delayed import to avoid direct dependence.
+    import ROOT
+
+    data_filename = (
+        base_directory
+        / data_collision_system
+        / "RDF"
+        / f"{data_dataset_name}_{grooming_method}_prefixes_data_closure.root"
+    )
+    f_data = ROOT.TFile(str(data_filename), "READ")
+    h_data_name = unfolding_base.hist_name_for_ratio_2D(
+        grooming_method=grooming_method,
+        prefix_for_ratio="data",
+        substructure_variable_name=substructure_variable_name,
+        smeared_substructure_variable_bins=smeared_substructure_variable_bins,
+        smeared_jet_pt_bins=smeared_jet_pt_bins,
+        double_counting_cut_name=double_counting_cut_name,
+        additional_substructure_variable_cut=additional_substructure_variable_cut,
+    )
+    h_data = f_data.Get(h_data_name)
+    # Take ownership on the python side so we can close the file
+    ROOT.SetOwnership(h_data, True)
+
+    # Cleanup
+    f_data.Close()
+
+    return h_data
+
+
 def _get_reweighted_ratio(
     data_dataset_name: str,
     response_dataset_name: str,
@@ -425,23 +466,17 @@ def _get_reweighted_ratio(
     )
     h_response = f_response.Get(h_response_name)
     # Retrieve data hist
-    data_filename = (
-        base_directory
-        / data_collision_system
-        / "RDF"
-        / f"{data_dataset_name}_{grooming_method}_prefixes_data_closure.root"
-    )
-    f_data = ROOT.TFile(str(data_filename), "READ")
-    h_data_name = unfolding_base.hist_name_for_ratio_2D(
-        grooming_method=grooming_method,
-        prefix_for_ratio="data",
+    h_data = _get_raw_data_hist(
+        data_collision_system=data_collision_system,
+        data_dataset_name=data_dataset_name,
         substructure_variable_name=substructure_variable_name,
         smeared_substructure_variable_bins=smeared_substructure_variable_bins,
         smeared_jet_pt_bins=smeared_jet_pt_bins,
+        grooming_method=grooming_method,
         double_counting_cut_name=double_counting_cut_name,
         additional_substructure_variable_cut=additional_substructure_variable_cut,
+        base_directory=base_directory,
     )
-    h_data = f_data.Get(h_data_name)
 
     # Calculate the ratio and cleanup
     # NOTE: There seems to be some race condition here, but I can't seem to isolate it.
@@ -460,7 +495,6 @@ def _get_reweighted_ratio(
 
     # Cleanup
     f_response.Close()
-    f_data.Close()
 
     return h_ratio
 
@@ -497,6 +531,49 @@ def _get_reweighting_ratio(
     np.testing.assert_allclose(temp_hist.axes[1].bin_edges, settings.jet_pt.smeared_bins)
 
     return h_reweighting_ratio
+
+
+def _get_data_stats(
+    data_stat_dataset_name: str,
+    settings: unfolding_base.Settings2D,
+    unfolding_for_pp: bool,
+    base_directory: Path = Path("output"),
+) -> TH2D:
+    """ Retrieve statistics in data via the stored closure input.
+
+    NOTE:
+        This relies on ROOT. In principle, we could do it with python, but we're going to use it to
+        set uncertainties in a ROOT histogram, so we may as well mirror everything for symmetry.
+
+    Args:
+        data_stat_dataset_name: Name of dataset to use for determining the statistics. Probably the
+            same as `reweight_data_dataset_name`.
+        settings: Unfolding settings.
+        unfolding_for_pp: True if unfolding for pp.
+        base_directory: Base directory where everything is stored. Default: `output`.
+    """
+    data_collision_system, _ = _collision_system_names(unfolding_for_pp=unfolding_for_pp)
+
+    h_raw_data = _get_raw_data_hist(
+        data_collision_system=data_collision_system,
+        data_dataset_name=data_stat_dataset_name,
+        substructure_variable_name=settings.substructure_variable.variable_name,
+        smeared_substructure_variable_bins=settings.substructure_variable.smeared_bins,
+        smeared_jet_pt_bins=settings.jet_pt.smeared_bins,
+        grooming_method=settings.grooming_method,
+        double_counting_cut_name=settings.double_counting_cut_name,
+        additional_substructure_variable_cut=settings.substructure_variable.additional_variable_cut,
+        base_directory=base_directory,
+    )
+
+    # Validate the reweighting ratio
+    # x axis should contain the smeared substructure variable
+    # y axis contains the smeared jet pt.
+    temp_hist = binned_data.BinnedData.from_existing_data(h_raw_data)
+    np.testing.assert_allclose(temp_hist.axes[0].bin_edges, settings.substructure_variable.smeared_bins)
+    np.testing.assert_allclose(temp_hist.axes[1].bin_edges, settings.jet_pt.smeared_bins)
+
+    return h_raw_data
 
 
 def _create_branch_rename_shim(
@@ -721,6 +798,7 @@ def run_unfolding_closure_reweighting(
     response_filenames: Sequence[Path],
     response_tree_name: str,
     closure_variation: str,
+    use_data_stat_precision_for_smeared: bool,
     unfolding_for_pp: bool = False,
     fraction_for_response: float = 0.75,
     reweight_data_dataset_name: str = "",
@@ -771,6 +849,14 @@ def run_unfolding_closure_reweighting(
         h_reweighting_ratio = _get_reweighting_ratio(
             reweight_data_dataset_name=reweight_data_dataset_name,
             reweight_response_dataset_name=reweight_response_dataset_name,
+            settings=settings,
+            unfolding_for_pp=unfolding_for_pp,
+        )
+    # Option to load data stats so we can use that to set the precision of the smeared in the closure.
+    h_data_stats = None
+    if use_data_stat_precision_for_smeared:
+        h_data_stats = _get_data_stats(
+            data_stat_dataset_name=reweight_data_dataset_name,
             settings=settings,
             unfolding_for_pp=unfolding_for_pp,
         )
@@ -839,12 +925,19 @@ def run_unfolding_closure_reweighting(
     _log_root_cpp_logs(root_stdout=_root_stdout, root_stderr=_root_stderr)
 
     # Perform the actual unfolding.
+    _input_spectra = hists["h2_pseudo_data"]
+    if use_data_stat_precision_for_smeared:
+        assert h_data_stats is not None
+        for _i in range(1, h_data_stats.GetXaxis().GetNbins() + 1):
+            for _j in range(1, h_data_stats.GetYaxis().GetNbins() + 1):
+                _input_spectra.SetBinError(_i, _j, h_data_stats.GetBinError(_i, _j))
+
     # First, the standard split MC closure
     output_hists = {}
     output_hists.update(
         unfolding_2D(
             response=responses.response,
-            input_spectra=hists["h2_pseudo_data"],
+            input_spectra=_input_spectra,
             true_spectra=hists["h2_pseudo_true"],
         )
     )
@@ -858,12 +951,15 @@ def run_unfolding_closure_reweighting(
         del output_hists
 
     # And cleanup the rest of our input hists.
+    del _input_spectra
     # NOTE: I haven't confirmed if the ordered matters here, but I think it's probably safer to delete the
     #       std::map first since I suspect that python will handle deleted objects better than ROOT.
     if hists_map_for_root:
         del hists_map_for_root
     if hists:
         del hists
+    if h_data_stats:
+        del h_data_stats
     # NOTE: Can verify that everything has been deleted by now by checking `ROOT.gROOT.ls()`
 
     return True
