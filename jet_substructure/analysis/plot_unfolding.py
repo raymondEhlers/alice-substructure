@@ -3809,7 +3809,7 @@ def plot_kt_unfolding(
     _small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 30, 40, 50, 60, 85])
     if unfolding_output.collision_system != "pp":
         # PbPb needs somewhat different binning
-        _small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 40, 60, 80, 100, 120])
+        _small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 60, 80, 100, 120])
     for _low, _high in zip(_small_jet_pt_bins[:-1], _small_jet_pt_bins[1:]):
         _small_jet_pt_range = helpers.JetPtRange(_low, _high)
         text = f"${_small_jet_pt_range.display_str(label='data')}$"
