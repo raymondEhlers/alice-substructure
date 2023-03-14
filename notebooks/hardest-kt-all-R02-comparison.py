@@ -159,6 +159,13 @@ _n_iter_compare = {
     "dynamical_kt_z_cut_02": 3,
     "dynamical_time_z_cut_02": 3,
 }
+if _use_qm22_inputs:
+    _n_iter_compare.update({
+        "dynamical_core": 3,
+        "dynamical_kt": 3,
+        "dynamical_time": 3,
+        "soft_drop_z_cut_02": 3,
+    })
 # Model dependence.
 # Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
 _model_dependence_configuration = {
