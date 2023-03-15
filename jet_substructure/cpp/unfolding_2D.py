@@ -932,7 +932,26 @@ def run_unfolding_closure_reweighting(
         assert h_data_stats is not None
         for _i in range(1, h_data_stats.GetXaxis().GetNbins() + 1):
             for _j in range(1, h_data_stats.GetYaxis().GetNbins() + 1):
-                _input_spectra.SetBinError(_i, _j, h_data_stats.GetBinError(_i, _j))
+                try:
+                    _fractional_error = h_data_stats.GetBinError(_i, _j) / h_data_stats.GetBinContent(_i, _j)
+                    _updated_error = _input_spectra.GetBinContent(_i, _j) * _fractional_error
+                except ZeroDivisionError:
+                    logger.debug(
+                        f"(kt, pt) ({_input_spectra.GetXaxis().GetBinCenter(_i)}, {_input_spectra.GetYaxis().GetBinCenter(_j)}):"
+                        " No counts in data. Keeping existing error."
+                    )
+                    continue
+
+                # These are too noisy to have always included, but they're really useful for cross checking
+                logger.debug(
+                    f"(kt, pt) ({_input_spectra.GetXaxis().GetBinCenter(_i)}, {_input_spectra.GetYaxis().GetBinCenter(_j)}):"
+                    f" Smeared: {_input_spectra.GetBinContent(_i, _j)} +/- {_input_spectra.GetBinError(_i, _j)} w/ fractional error of {_input_spectra.GetBinError(_i, _j) / _input_spectra.GetBinContent(_i, _j)},"
+                    f" Data: {h_data_stats.GetBinContent(_i, _j)} +/- {h_data_stats.GetBinError(_i, _j)}. Use fractional error of {_fractional_error}"
+                )
+                logger.debug(
+                    f"old->new: {_input_spectra.GetBinError(_i, _j)} -> {_updated_error}"
+                )
+                _input_spectra.SetBinError(_i, _j, _updated_error)
 
     # First, the standard split MC closure
     output_hists = {}
