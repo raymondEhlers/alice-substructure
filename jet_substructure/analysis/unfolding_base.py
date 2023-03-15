@@ -9,7 +9,7 @@ import logging
 from functools import reduce
 from typing import Any, Dict, Optional, Type
 
-import attr
+import attrs
 import numpy as np
 import numpy.typing as npt
 from pachyderm import binned_data
@@ -20,10 +20,10 @@ from jet_substructure.base import helpers
 logger = logging.getLogger(__name__)
 
 
-@attr.s(eq=False)
+@attrs.define(eq=False)
 class AsymmetricErrors:
-    low: npt.NDArray[np.float64] = attr.ib()
-    high: npt.NDArray[np.float64] = attr.ib()
+    low: npt.NDArray[np.float64]
+    high: npt.NDArray[np.float64]
 
     def __eq__(self, other: Any) -> bool:
         if other.__class__ is not self.__class__:
@@ -114,10 +114,10 @@ class AsymmetricErrors:
         return cls(low=low, high=high)
 
 
-@attr.s
+@attrs.define
 class ErrorInput:
-    value: npt.NDArray[np.float64] = attr.ib()
-    error: npt.NDArray[np.float64] = attr.ib()
+    value: npt.NDArray[np.float64]
+    error: npt.NDArray[np.float64]
 
 
 def relative_error(*inputs: ErrorInput) -> npt.NDArray[np.float64]:
