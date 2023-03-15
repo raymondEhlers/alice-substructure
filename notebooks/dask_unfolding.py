@@ -153,14 +153,14 @@ grooming_methods = [
     # "leading_kt_z_cut_02",
     # "leading_kt_z_cut_04",
     # "dynamical_z",
-    #"dynamical_core",
-    #"dynamical_kt",
-    #"dynamical_time",
-    #"soft_drop_z_cut_02",
+    "dynamical_core",
+    "dynamical_kt",
+    "dynamical_time",
+    "soft_drop_z_cut_02",
     "soft_drop_z_cut_04",
-    #"dynamical_core_z_cut_02",
-    #"dynamical_kt_z_cut_02",
-    #"dynamical_time_z_cut_02",
+    "dynamical_core_z_cut_02",
+    "dynamical_kt_z_cut_02",
+    "dynamical_time_z_cut_02",
 ]
 unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
     variable_to_unfold="kt",
@@ -168,10 +168,10 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
     #variable_to_unfold="z",
     normalize_variable_by_jet_pt=False,
     selected_settings=[
-        #"default",
+        "default",
         #"default_delta_R",
         #"default_z",
-        ## Systematics
+        # Systematics
         ## Unfolding
         #"truncation_low",
         #"truncation_high",
@@ -188,6 +188,10 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
         #"reweight_prior",
         ## PbPb thermal model
         #"thermal_model",
+
+        # Binning variations
+        ## Merge 3-6 bin for SD zcut 0.4
+        #"default_merge_3_6",
         ## Peter's binning
         #"peter_binning",
         ## Systematics (copied from above and adapted as needed)
@@ -214,7 +218,7 @@ if task_config.n_cores_per_task > 1:
 #n_cores_to_allocate = 8
 # Formerly n_cores_to_allocate, this new variable is == n_cores_to_allocate if n_cores_per_task == 1
 #target_n_tasks_to_run_simultaneously = 8
-# TODO: Go back to 8!
+# TODO: Go back to 8 when I need speed (as opposed to be being able to plot and function while running...)!
 target_n_tasks_to_run_simultaneously = 6
 walltime = "24:00:00"
 log_level = logging.INFO
