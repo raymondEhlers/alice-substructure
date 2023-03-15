@@ -1924,6 +1924,7 @@ analysis_configurations:
                     closures: true
                     closure_settings:
                         split_MC_fraction_for_response: 0.75
+                        use_data_stat_precision_for_smeared: true
                         max_untagged_bin: 10
                     compare_pure_matches: false
                     reweight_prior: false
@@ -2696,6 +2697,7 @@ analysis_configurations:
                     # NOTE: Untagged bin above is included in the closures!
                     closures: true
                     closure_settings:
+                        use_data_stat_precision_for_smeared: true
                         split_MC_fraction_for_response: 0.75
                         max_untagged_bin: 10
                     reweight_prior: false
