@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import itertools
+import concurrent.futures
 import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
@@ -91,7 +91,7 @@ def plot_relative_individual_systematics(
     plot_config: pb.PlotConfig,
     output_dir: Path,
     plot_png: bool = False,
-) -> None:
+) -> Path:
     """Plot relative individual systematic errors."""
     import mplhep as hep
 
@@ -150,6 +150,10 @@ def plot_relative_individual_systematics(
         fig.savefig(output_dir_png / f"{figure_name}.png")
 
     plt.close(fig)
+
+    # We don't really need this path, but it's vaguely convenient to have a consistent interface
+    # for plotting functions, so we do the same here. It doesn't hurt anything.
+    return output_dir / f"{figure_name}.pdf"
 
 
 def _load_analytical_calculations(filename: Path, bin_edges: npt.NDArray[np.float64]) -> binned_data.BinnedData:
@@ -5028,6 +5032,7 @@ def steer_plotting_of_kt_unfolding_outputs(
     unfolding_kt_display_range: dict[str, Tuple[float, float]] | Tuple[float, float],
     prior_variation_output_name: str | None = None,
     relative_individual_systematic_ratio_range: dict[str, Tuple[float, float]] | Tuple[float, float] | None = None,
+    n_cores: int = 1,
 ) -> None:
     # Validation
     if isinstance(unfolding_kt_display_range, tuple):
@@ -5042,56 +5047,82 @@ def steer_plotting_of_kt_unfolding_outputs(
     if not plot:
         return
 
-    for grooming_method in grooming_methods:
-        logger.info(f"Plotting '{grooming_method}'")
-        if plot_systematic_breakdown:
-            # Plot the individual relative systematics
-            plot_relative_individual_systematics(
-                unfolded=unfolded_with_systematics[grooming_method],
-                plot_config=pb.PlotConfig(
-                    name="unfolded_systematic_relative",
-                    panels=[
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig(
-                                    "x",
-                                    label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-                                    range=unfolding_kt_display_range[grooming_method],
-                                ),
-                                pb.AxisConfig(
-                                    "y",
-                                    label="Relative error",
-                                    range=relative_individual_systematic_ratio_range[grooming_method],
+
+    # Delay import because this isn't relevant otherwise
+    import mammoth.helpers
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=n_cores) as executor:
+        futures = []
+        for grooming_method in grooming_methods:
+            logger.info(f"Plotting '{grooming_method}'")
+            if plot_systematic_breakdown:
+                # Plot the individual relative systematics
+                futures.append(
+                    executor.submit(
+                        plot_relative_individual_systematics,
+                        unfolded=unfolded_with_systematics[grooming_method],
+                        plot_config=pb.PlotConfig(
+                            name="unfolded_systematic_relative",
+                            panels=[
+                                pb.Panel(
+                                    axes=[
+                                        pb.AxisConfig(
+                                            "x",
+                                            label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                                            range=unfolding_kt_display_range[grooming_method],
+                                        ),
+                                        pb.AxisConfig(
+                                            "y",
+                                            label="Relative error",
+                                            range=relative_individual_systematic_ratio_range[grooming_method],
+                                        ),
+                                    ],
+                                    legend=pb.LegendConfig(location="upper right", ncol=2),
+                                    #text=pb.TextConfig(text, 0.97, 0.97),
                                 ),
                             ],
-                            legend=pb.LegendConfig(location="upper right", ncol=2),
-                            #text=pb.TextConfig(text, 0.97, 0.97),
                         ),
-                    ],
-                ),
-                output_dir=unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-                plot_png=plot_png,
-            )
+                        output_dir=unfolding_systematics_outputs[grooming_method]["default"].output_dir,
+                        plot_png=plot_png,
+                    )
+                )
 
-        plot_kt_unfolding(
-            unfolding_output=unfolding_systematics_outputs[grooming_method]["default"],
-            plot_png=plot_png,
-            prior_variation_output=unfolding_systematics_outputs[grooming_method][prior_variation_output_name] if prior_variation_output_name is not None else None,
-            unfolding_kt_display_range=unfolding_kt_display_range[grooming_method],
-        )
-        for _outputs in [
-            unfolding_closure_outputs if plot_closures else {grooming_method: {}},
-            unfolding_systematics_outputs if plot_systematics else {grooming_method: {}},
-        ]:
-            for name, _unfolding_output in _outputs[grooming_method].items():
-                # Skip, since we already plotted above.
-                if name == "default":
-                    continue
-                plot_kt_unfolding(
-                    unfolding_output=_unfolding_output,
+            futures.append(
+                executor.submit(
+                    plot_kt_unfolding,
+                    unfolding_output=unfolding_systematics_outputs[grooming_method]["default"],
                     plot_png=plot_png,
+                    prior_variation_output=unfolding_systematics_outputs[grooming_method][prior_variation_output_name] if prior_variation_output_name is not None else None,
                     unfolding_kt_display_range=unfolding_kt_display_range[grooming_method],
                 )
+            )
+            for _outputs in [
+                unfolding_closure_outputs if plot_closures else {grooming_method: {}},
+                unfolding_systematics_outputs if plot_systematics else {grooming_method: {}},
+            ]:
+                for name, _unfolding_output in _outputs[grooming_method].items():
+                    # Skip, since we already plotted above.
+                    if name == "default":
+                        continue
+                    futures.append(
+                        executor.submit(
+                            plot_kt_unfolding,
+                            unfolding_output=_unfolding_output,
+                            plot_png=plot_png,
+                            unfolding_kt_display_range=unfolding_kt_display_range[grooming_method],
+                        )
+                    )
+
+        with mammoth.helpers.progress_bar() as progress:
+            track_results = progress.add_task(total=len(futures), description="Processing plot groups...")
+            results = []
+            for future in concurrent.futures.as_completed(futures):
+                print(f"{future.result()=}")
+                results.append(future.result())
+                progress.update(track_results, advance=1)
+
+    # NOTE: We elect not to return the results right now because I don't need them.
+    #       However, I kept track of them above because it's easy and makes it easy to change my mind later.
 
 
 if __name__ == "__main__":
