@@ -138,11 +138,11 @@ conda_environment_name = "substructure_c_24_06"
 #base_dataset_name = "pp_R02"
 #collision_system = "pp"
 # Semi-central
-base_dataset_name = "PbPb_semi_central_R02_pass3"
-collision_system = "PbPb"
-# Central
-#base_dataset_name = "PbPb_central_R02_pass3"
+#base_dataset_name = "PbPb_semi_central_R02_pass3"
 #collision_system = "PbPb"
+# Central
+base_dataset_name = "PbPb_central_R02_pass3"
+collision_system = "PbPb"
 dataset_type = "nominal"
 # Detailed analysis settings
 jobs_to_execute = [
@@ -153,14 +153,14 @@ grooming_methods = [
     # "leading_kt_z_cut_02",
     # "leading_kt_z_cut_04",
     # "dynamical_z",
-    "dynamical_core",
-    "dynamical_kt",
-    "dynamical_time",
-    "soft_drop_z_cut_02",
+    #"dynamical_core",
+    #"dynamical_kt",
+    #"dynamical_time",
+    #"soft_drop_z_cut_02",
     "soft_drop_z_cut_04",
-    "dynamical_core_z_cut_02",
-    "dynamical_kt_z_cut_02",
-    "dynamical_time_z_cut_02",
+    #"dynamical_core_z_cut_02",
+    #"dynamical_kt_z_cut_02",
+    #"dynamical_time_z_cut_02",
 ]
 unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
     variable_to_unfold="kt",
@@ -168,10 +168,13 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
     #variable_to_unfold="z",
     normalize_variable_by_jet_pt=False,
     selected_settings=[
-        "default",
+        #########
+        # Nominal
+        #########
+        #"default",
         #"default_delta_R",
         #"default_z",
-        # Systematics
+        ## Systematics
         ## Unfolding
         #"truncation_low",
         #"truncation_high",
@@ -189,10 +192,34 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
         ## PbPb thermal model
         #"thermal_model",
 
+        ####################
         # Binning variations
-        ## Merge 3-6 bin for SD zcut 0.4
-        #"default_merge_3_6",
-        ## Peter's binning
+        ####################
+        # ------------------------------
+        # Merge 3-6 bin for SD zcut 0.4
+        # ------------------------------
+        "merge_3_6",
+        # Systematics (copied from above and adapted as needed)
+        # Unfolding
+        "merge_3_6_truncation_low",
+        "merge_3_6_truncation_high",
+        "merge_3_6_random_binning",
+        # Tracking efficiency
+        "merge_3_6_tracking_efficiency",
+        ## Model dependence in pp
+        #"merge_3_6_model_dependence_herwig",
+        #"merge_3_6_model_dependence_pythia",
+        # PbPb background
+        "merge_3_6_background_low",
+        "merge_3_6_background_high",
+        # PbPb Unfolding
+        "merge_3_6_reweight_prior",
+        # PbPb thermal model
+        "merge_3_6_thermal_model",
+
+        # ------------------------------
+        # Peter's binning
+        # ------------------------------
         #"peter_binning",
         ## Systematics (copied from above and adapted as needed)
         ## Unfolding
