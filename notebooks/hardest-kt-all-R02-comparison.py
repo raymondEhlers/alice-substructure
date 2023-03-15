@@ -620,49 +620,6 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
 )
 
 # %%
-plot = True
-plot_png = False
-_plot_systematic_breakdown = False
-_plot_closures = False
-if plot:
-    for grooming_method in grooming_methods:
-        # Plot the individual relative systematics
-        if _plot_systematic_breakdown:
-            plot_unfolding.plot_relative_individual_systematics(
-                unfolded=central_R02_unfolded_with_systematics[grooming_method],
-                plot_config=pb.PlotConfig(
-                    name="unfolded_systematic_relative",
-                    panels=[
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-                                            range=(0.25, 6) if "z_cut" in grooming_method else (1.5, 6),),
-                                pb.AxisConfig(
-                                    "y",
-                                    label="Relative error",
-                                    range=(0.25, 1.75) if grooming_method != "soft_drop_z_cut_02" else (0.6, 1.4),
-                                ),
-                            ],
-                            legend=pb.LegendConfig(location="upper right", ncol=2),
-                            #text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                    ],
-                ),
-                output_dir=central_R02_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-                plot_png=plot_png,
-            )
-        
-        if _plot_closures:
-            for k in central_R02_unfolding_closure_outputs[grooming_method]:
-                logger.warning(f"Plotting {k} for {grooming_method}")
-                plot_unfolding.plot_kt_unfolding(
-                    unfolding_output=central_R02_unfolding_closure_outputs[grooming_method][k],
-                    plot_png=plot_png,
-                    reweighted_prior_output=central_R02_unfolding_systematics_outputs[grooming_method]["reweight_prior"] if k == "default" else None,
-                    unfolding_kt_display_range=(0.25, 6) if "z_cut" in grooming_method else (1.5, 6),
-                )
-
-# %%
 print(list(central_R02_unfolded_with_systematics.keys()))
 print(list(central_R02_unfolding_closure_outputs["dynamical_core"].keys()))
 print(list(central_R02_unfolding_systematics_outputs["dynamical_core"].keys()))
