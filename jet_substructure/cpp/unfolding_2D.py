@@ -712,7 +712,12 @@ def run_unfolding(
     )
 
     # Create the responses. We assume some conventions about column names.
-    # They should generally be reasonable, but may require tweaks from time to time.
+    # The assumptions should generally be reasonable, but may require tweaks from time to time.
+    # NOTE: We want this call to release the gil so that python isn't entirely frozen while executing,
+    #       which will help this function behave more nicely with dask. See https://root.cern/manual/python/ .
+    #       As of 14 March 2023, it doesn't seem to help, but it also doesn't appear to hurt anything, so we
+    #       leave it here to see if we find other benefits.
+    ROOT.unfolding.create_response_2D.__release_gil__ = True
     responses = ROOT.unfolding.create_response_2D(
         hists_map_for_root,
         _root_unfolding_settings,
@@ -911,7 +916,12 @@ def run_unfolding_closure_reweighting(
     )
 
     # Create the responses. We assume some conventions about column names.
-    # They should generally be reasonable, but may require tweaks from time to time.
+    # The assumptions should generally be reasonable, but may require tweaks from time to time.
+    # NOTE: We want this call to release the gil so that python isn't entirely frozen while executing,
+    #       which will help this function behave more nicely with dask. See https://root.cern/manual/python/ .
+    #       As of 14 March 2023, it doesn't seem to help, but it also doesn't appear to hurt anything, so we
+    #       leave it here to see if we find other benefits.
+    ROOT.unfolding.create_closure_response_2D.__release_gil__ = True
     responses = ROOT.unfolding.create_closure_response_2D(
         hists_map_for_root,
         _root_unfolding_settings,
