@@ -172,6 +172,13 @@ if _use_qm22_inputs:
         "dynamical_time": 3,
         "soft_drop_z_cut_02": 3,
     })
+_max_n_iter = {
+    # Need +1 for convenience with range iteration
+    "soft_drop_z_cut_04": 30,
+}
+_max_n_iter.update({
+    grooming_method: 20 for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
+})
 # Model dependence.
 # Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
 _model_dependence_configuration = {
@@ -207,6 +214,7 @@ pp_R02_unfolding_closure_outputs, pp_R02_unfolding_closure_pure_matches_outputs,
     event_activity=event_activity,
     jet_R_str=jet_R_str,
     n_iter_compare=_n_iter_compare,
+    max_n_iter=_max_n_iter,
     truncation_shift=_truncation_shift,
     displaced_extremum=_displaced_extremum,
     input_dir_tag=_input_dir_tag,
@@ -244,7 +252,7 @@ print(pp_R02_unfolded_with_systematics["dynamical_core"].data.metadata["y_system
 
 # %%
 plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
-    grooming_methods=grooming_methods[-1:],
+    grooming_methods=grooming_methods,
     unfolded_with_systematics=pp_R02_unfolded_with_systematics,
     unfolding_systematics_outputs=pp_R02_unfolding_systematics_outputs,
     unfolding_closure_outputs=pp_R02_unfolding_closure_outputs,
@@ -253,7 +261,6 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     plot_systematic_breakdown=False,
     plot_systematics=False,
     plot_closures=True,
-
     # NOTE: For the prior variation, passing the HERwIG model dependence includes both:
     #       - HERWIG vs PYTHIA
     #       - fastsim vs full sim as well as whatever HERWIG
@@ -357,7 +364,7 @@ _max_n_iter = {
     "soft_drop_z_cut_04": 30,
 }
 _max_n_iter.update({
-    grooming_method: None for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
+    grooming_method: 20 for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
 })
 
 # Double counting cut
@@ -437,7 +444,7 @@ semi_central_R02_unfolded_with_systematics, semi_central_R02_true_reference = pl
 
 # %%
 print(list(semi_central_R02_unfolding_systematics_outputs["dynamical_kt_z_cut_02"].keys()))
-print(list(semi_central_R02_unfolding_closure_outputs[grooming_method].keys()))
+print(list(semi_central_R02_unfolding_closure_outputs["dynamical_kt_z_cut_02"].keys()))
 
 # %%
 plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
@@ -530,7 +537,7 @@ _max_n_iter = {
     "soft_drop_z_cut_04": 30,
 }
 _max_n_iter.update({
-    grooming_method: None for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
+    grooming_method: 20 for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
 })
 
 # Double counting cut
@@ -568,6 +575,7 @@ central_R02_unfolding_closure_outputs, central_R02_unfolding_closure_pure_matche
     event_activity=event_activity,
     jet_R_str=jet_R_str,
     n_iter_compare=_n_iter_compare,
+    max_n_iter=_max_n_iter,
     truncation_shift=_truncation_shift,
     displaced_extremum=_displaced_extremum,
     input_dir_tag=_input_dir_tag,
