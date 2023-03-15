@@ -3000,7 +3000,7 @@ analysis_configurations:
                     datasets: "nominal"
                     binning:
                         soft_drop_z_cut_04:
-                            kt: &_semi_central_R02_kt_random_binning_with_untagged_bin
+                            kt: &_central_R02_kt_merge_3_6_random_binning_with_untagged_bin
                                 # NOTE: Same as for semi_central, since the binning is the same!
                                 # >>> r = np.random.random_sample(7) / 10 + 0.95
                                 # >>> r
