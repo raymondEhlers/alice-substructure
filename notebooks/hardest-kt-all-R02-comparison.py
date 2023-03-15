@@ -113,9 +113,6 @@ collision_system = "pp"
 event_activity = "pp"
 _smeared_var_range = helpers.KtRange(0.25, 6)
 _smeared_jet_pt_range = helpers.JetPtRange(20, 85)
-#_tag_after_suffix = "2_4_split"
-#_tag_after_suffix = "peter_binning"
-_tag_after_suffix = ""
 _truncation_shift = 3
 _displaced_extremum = 10
 
@@ -138,6 +135,13 @@ _output_dir_tag = {
 _output_dir_tag.update({
     _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
 })
+#_tag_after_suffix = "2_4_split"
+#_tag_after_suffix = "peter_binning"
+#_tag_after_suffix = ""
+_tag_after_suffix = {
+    grooming_method: "" for grooming_method in grooming_methods
+}
+_tag_after_suffix["soft_drop_z_cut_04"] = "merge_3_6"
 ####################################
 # Grooming method dependent settings
 ####################################
@@ -156,7 +160,7 @@ _n_iter_compare = {
     "dynamical_kt": 3,
     "dynamical_time": 3,
     "soft_drop_z_cut_02": 3,
-    "soft_drop_z_cut_04": 3,
+    "soft_drop_z_cut_04": 11,
     "dynamical_core_z_cut_02": 3,
     "dynamical_kt_z_cut_02": 3,
     "dynamical_time_z_cut_02": 3,
@@ -235,87 +239,41 @@ pp_R02_unfolded_with_systematics, pp_R02_true_reference = plot_unfolding.unfolde
 )
 
 # %%
-pp_R02_unfolding_systematics_outputs["dynamical_core"].keys()
-pp_R02_unfolded_with_systematics["dynamical_core"].data.metadata["y_systematic"].keys()
+print(pp_R02_unfolding_systematics_outputs["dynamical_core"].keys())
+print(pp_R02_unfolded_with_systematics["dynamical_core"].data.metadata["y_systematic"].keys())
 
-# %% jupyter={"outputs_hidden": true} tags=["remove_cell"]
-_plot = True
-_plot_png = False
-_plot_systematic_breakdown = True
-_plot_systematics = True
-_plot_closures = True
-if _plot:
-    for grooming_method in grooming_methods:
-        if _plot_systematic_breakdown:
-            # Plot the individual relative systematics
-            plot_unfolding.plot_relative_individual_systematics(
-                unfolded=pp_R02_unfolded_with_systematics[grooming_method],
-                plot_config=pb.PlotConfig(
-                    name="unfolded_systematic_relative",
-                    panels=[
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0.25, 6)),
-                                pb.AxisConfig(
-                                    "y",
-                                    label="Relative error",
-                                    range=[0.5, 1.5],
-                                ),
-                            ],
-                            legend=pb.LegendConfig(location="upper right", ncol=2),
-                            #text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                    ],
-                ),
-                output_dir = pp_R02_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-                plot_png=_plot_png,
-            )
-        
-        plot_unfolding.plot_kt_unfolding(
-            unfolding_output=pp_R02_unfolding_systematics_outputs[grooming_method]["default"],
-            plot_png=_plot_png,
-            # NOTE: This includes both:
-            #       - HERWIG vs PYTHIA
-            #       - fastsim vs full sim as well as whatever HERWIG
-            #       Consequently, the fastsim output may not be the most accurate overall magnitude, but we can
-            #       still use it to look at the shape for selecting the iteration. Alternatively, we can switch
-            #       back to the reweighted_prior, but that output is less satisfying for pp.
-            # NOTE: We can't remove the fastsim vs full sim dependence at the moment because we would need
-            #       the full UnfoldingOutput object, which we don't have available since the model dependence here
-            #       is constructed by transferring the differences from the fastsim outputs to the default.
-            #       We could do this, but it's more tricky (eg. can refolded be treated the same way?
-            #       Probably, but would need to be checked), so we just stick with the HERWIG model dependence.
-            reweighted_prior_output=pp_R02_unfolding_systematics_outputs[grooming_method]["model_dependence_herwig_fastsim"],
-            #reweighted_prior_output=pp_R02_unfolding_systematics_outputs[grooming_method]["reweight_prior"],
-            unfolding_kt_display_range=(0.25, 6),
-        )
-        if _plot_closures:
-            for _outputs in [
-                pp_R02_unfolding_closure_outputs if _plot_closures else {grooming_method: []},
-                pp_R02_unfolding_systematics_outputs if _plot_systematics else {grooming_method: []},
-            ]:
-                for name, _unfolding_output in _outputs[grooming_method].items():
-                    # Skip, since we already plotted above.
-                    if name == "default":
-                        continue
-                    plot_unfolding.plot_kt_unfolding(
-                        unfolding_output=_unfolding_output,
-                        plot_png=_plot_png,
-                        #unfolding_kt_display_range=(0.5, 6) if "z_cut" not in grooming_method else (0.25, 6),
-                        unfolding_kt_display_range=(0.25, 6),
-                    )
+# %%
+plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
+    grooming_methods=grooming_methods[-1:],
+    unfolded_with_systematics=pp_R02_unfolded_with_systematics,
+    unfolding_systematics_outputs=pp_R02_unfolding_systematics_outputs,
+    unfolding_closure_outputs=pp_R02_unfolding_closure_outputs,
+    plot=True,
+    plot_png=False,
+    plot_systematic_breakdown=False,
+    plot_systematics=False,
+    plot_closures=True,
 
-## Plot full systematics for multiple grooming methods on one plot.
-#if plot:
-#    plot_unfolding.plot_PbPb_systematics(
-#        hists=pp_R02_unfolded_with_systematics,
-#        reference=pp_R02_true_reference,
-#        grooming_methods=grooming_methods,
-#        event_activity=event_activity,
-#        kt_range=[2, 15],
-#        # Arbitrarily take the first grooming method for the output dir
-#        output_dir=pp_R02_unfolding_systematics_outputs[grooming_methods[0]]["default"].output_dir,
-#    )
+    # NOTE: For the prior variation, passing the HERwIG model dependence includes both:
+    #       - HERWIG vs PYTHIA
+    #       - fastsim vs full sim as well as whatever HERWIG
+    #       Consequently, the fastsim output may not be the most accurate overall magnitude, but we can
+    #       still use it to look at the shape for selecting the iteration. Alternatively, we can switch
+    #       back to the reweighted_prior, but that output is less satisfying for pp.
+    # NOTE: We can't remove the fastsim vs full sim dependence at the moment because we would need
+    #       the full UnfoldingOutput object, which we don't have available since the model dependence here
+    #       is constructed by transferring the differences from the fastsim outputs to the default.
+    #       We could do this, but it's more tricky (eg. can refolded be treated the same way?
+    #       Probably, but would need to be checked), so we just stick with the HERWIG model dependence.
+    prior_variation_output_name="model_dependence_herwig_fastsim",
+    unfolding_kt_display_range={
+        grooming_method: (0.25, 6)
+        for grooming_method in grooming_methods
+    },
+    relative_individual_systematic_ratio_range={
+        grooming_method: (0.5, 1.5) for grooming_method in grooming_methods
+    }
+)
 
 # %% [markdown]
 # ### Semi-central
@@ -323,8 +281,6 @@ if _plot:
 # %% tags=["remove_cell"]
 collision_system = "PbPb"
 event_activity = "semi_central"
-_tag_after_suffix = "pass3"
-#_tag_after_suffix = "pass3_peter_binning"
 #_double_counting_cut = "min_true_10_pt_hat_3"
 _smeared_jet_pt_range = helpers.JetPtRange(40, 120)
 _truncation_shift = 5
@@ -349,6 +305,13 @@ _output_dir_tag = {
 _output_dir_tag.update({
     _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
 })
+#_tag_after_suffix = "pass3"
+#_tag_after_suffix = "pass3_peter_binning"
+_tag_after_suffix_base = "pass3"
+_tag_after_suffix = {
+    grooming_method: _tag_after_suffix_base for grooming_method in grooming_methods
+}
+_tag_after_suffix["soft_drop_z_cut_04"] = f"{_tag_after_suffix_base}_merge_3_6"
 ####################################
 # Grooming method dependent settings
 ####################################
@@ -498,55 +461,6 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     }
 )
 
-# %% jupyter={"outputs_hidden": true} tags=["remove_cell"]
-plot = True
-_plot_systematic_breakdown = False
-plot_png = False
-if plot:
-    for grooming_method in grooming_methods:
-        if _plot_systematic_breakdown:
-            # Plot the individual relative systematics
-            plot_unfolding.plot_relative_individual_systematics(
-                unfolded=semi_central_R02_unfolded_with_systematics[grooming_method],
-                plot_config=pb.PlotConfig(
-                    name="unfolded_systematic_relative",
-                    panels=[
-                        pb.Panel(
-                            axes=[
-                                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
-                                            range=(0.25, 6) if "z_cut" in grooming_method else (1, 6)),
-                                pb.AxisConfig(
-                                    "y",
-                                    label="Relative error",
-                                    range=(0.25, 1.75) if grooming_method != "soft_drop_z_cut_02" else (0.6, 1.4),
-                                ),
-                            ],
-                            legend=pb.LegendConfig(location="upper right", ncol=2),
-                            #text=pb.TextConfig(text, 0.97, 0.97),
-                        ),
-                    ],
-                ),
-                output_dir=semi_central_R02_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-                plot_png=plot_png,
-            )
-        for k in semi_central_R02_unfolding_closure_outputs[grooming_method]:
-            logger.warning(f"Plotting {k} for {grooming_method}")
-            plot_unfolding.plot_kt_unfolding(
-                unfolding_output=semi_central_R02_unfolding_closure_outputs[grooming_method][k],
-                plot_png=plot_png,
-                reweighted_prior_output=semi_central_R02_unfolding_systematics_outputs[grooming_method]["reweight_prior"] if k == "default" else None,
-                unfolding_kt_display_range=(0.25, 6) if "z_cut" in grooming_method else (1, 6),
-            )
-        #for k in semi_central_R02_unfolding_systematics_outputs[grooming_method]:
-        #    if "Rmax" not in k:
-        #        continue
-        #    plot_unfolding.plot_kt_unfolding(
-        #        unfolding_output=semi_central_R02_unfolding_systematics_outputs[grooming_method][k],
-        #        plot_png=True,
-        #        #reweighted_prior_output=semi_central_R02_unfolding_systematics_outputs[grooming_method]["reweight_prior"] if k == "default" else None,
-        #        unfolding_kt_display_range=(0.5, 6) if "soft_drop" not in grooming_method else (0.25, 6),
-        #    )
-
 # %%
 list(semi_central_R02_unfolded_with_systematics.keys())
 
@@ -556,14 +470,31 @@ list(semi_central_R02_unfolded_with_systematics.keys())
 # %% tags=["remove_cell"]
 collision_system = "PbPb"
 event_activity = "central"
-_tag_after_suffix = "pass3"
-#_tag_after_suffix = "pass3_peter_binning"
-_double_counting_cut = "min_true_10_pt_hat_3"
 _smeared_jet_pt_range = helpers.JetPtRange(40, 120)
 _truncation_shift = 5
 _displaced_extremum = 10
 
+###################
+# Setup I/O options
+###################
+# Input directory location
+# Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
+_input_dir_tag = {
+    _method: input_dir_tag for _method in grooming_methods
+}
+_output_dir_tag = {
+    _method: input_dir_tag for _method in grooming_methods
+}
+#_tag_after_suffix = "pass3"
+#_tag_after_suffix = "pass3_peter_binning"
+_tag_after_suffix_base = "pass3"
+_tag_after_suffix = {
+    grooming_method: _tag_after_suffix_base for grooming_method in grooming_methods
+}
+_tag_after_suffix["soft_drop_z_cut_04"] = f"{_tag_after_suffix_base}_merge_3_6"
+####################################
 # Grooming method dependent settings
+####################################
 _smeared_var_range = {
     "dynamical_core": helpers.KtRange(1.5, 8),
     "dynamical_kt": helpers.KtRange(1.5, 8),
@@ -594,6 +525,36 @@ _n_iter_compare = {
     "dynamical_time_z_cut_02": 6,
     "soft_drop_z_cut_04": 8,
 }
+_max_n_iter = {
+    # Need +1 for convenience with range iteration
+    "soft_drop_z_cut_04": 30,
+}
+_max_n_iter.update({
+    grooming_method: None for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
+})
+
+# Double counting cut
+_double_counting_cut.update({
+    _method: "min_true_10_pt_hat_3"
+    for _method in grooming_methods
+})
+# Model dependence.
+_model_dependence_configuration = None
+# Background subtraction configurations
+_background_subtraction_configuration = {
+    _method: unfolding_analysis.BackgroundSubtractionConfiguration(
+        contributors=["Rmax005", "Rmax050"]
+    )
+    for _method in grooming_methods
+}
+# Add in the closure test to provide the non-closure uncertainty
+_non_closure_configuration = {
+    grooming_method: unfolding_analysis.NonClosureConfiguration(
+        contributors=["reweight_response"] + (["thermal_model"] if "soft_drop" in grooming_method else []) ,
+        approach_to_combining="max",
+    )
+    for grooming_method in grooming_methods
+}
 
 # %% tags=["remove_cell"]
 # Initially load data
@@ -609,22 +570,45 @@ central_R02_unfolding_closure_outputs, central_R02_unfolding_closure_pure_matche
     n_iter_compare=_n_iter_compare,
     truncation_shift=_truncation_shift,
     displaced_extremum=_displaced_extremum,
-    input_dir_tag=input_dir_tag,
+    input_dir_tag=_input_dir_tag,
+    output_dir_tag=_output_dir_tag,
     output_dir=output_dir,
     tag_after_suffix=_tag_after_suffix,
     double_counting_cut=_double_counting_cut,
+    model_dependence_configuration=_model_dependence_configuration,
 )
-
-# Add in the closure test to provide the non-closure uncertainty
-for grooming_method in grooming_methods:
-    central_R02_unfolding_systematics_outputs[grooming_method]["non_closure"] = \
-        central_R02_unfolding_closure_outputs[grooming_method]["reweight_response"]
 
 # Focus down onto just the unfolded distributions
 central_R02_unfolded_with_systematics, central_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
     grooming_methods=grooming_methods,
     unfolding_systematics_outputs=central_R02_unfolding_systematics_outputs,
+    unfolding_closure_outputs=central_R02_unfolding_closure_outputs,
     true_jet_pt_range=true_jet_pt_range,
+    model_dependence_configuration=_model_dependence_configuration,
+    non_closure_configuration=_non_closure_configuration,
+    background_subtraction_configuration=_background_subtraction_configuration,
+)
+
+# %%
+plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
+    grooming_methods=grooming_methods,
+    unfolded_with_systematics=central_R02_unfolded_with_systematics,
+    unfolding_systematics_outputs=central_R02_unfolding_systematics_outputs,
+    unfolding_closure_outputs=central_R02_unfolding_closure_outputs,
+    plot=True,
+    plot_png=False,
+    plot_systematic_breakdown=True,
+    plot_systematics=True,
+    plot_closures=True,
+    prior_variation_output_name="reweight_prior",
+    unfolding_kt_display_range={
+        grooming_method: (0.25, 6) if "z_cut" in grooming_method else (1.5, 6)
+        for grooming_method in grooming_methods
+    },
+    relative_individual_systematic_ratio_range={
+        grooming_method: (0.25, 1.75) if grooming_method != "soft_drop_z_cut_02" else (0.6, 1.4)
+        for grooming_method in grooming_methods
+    }
 )
 
 # %%

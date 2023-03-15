@@ -5076,21 +5076,7 @@ def steer_plotting_of_kt_unfolding_outputs(
         plot_kt_unfolding(
             unfolding_output=unfolding_systematics_outputs[grooming_method]["default"],
             plot_png=plot_png,
-            # TODO: Move this to the pp comments, since this doesn't really belong here.
-            # NOTE: This includes both:
-            #       - HERWIG vs PYTHIA
-            #       - fastsim vs full sim as well as whatever HERWIG
-            #       Consequently, the fastsim output may not be the most accurate overall magnitude, but we can
-            #       still use it to look at the shape for selecting the iteration. Alternatively, we can switch
-            #       back to the reweighted_prior, but that output is less satisfying for pp.
-            # NOTE: We can't remove the fastsim vs full sim dependence at the moment because we would need
-            #       the full UnfoldingOutput object, which we don't have available since the model dependence here
-            #       is constructed by transferring the differences from the fastsim outputs to the default.
-            #       We could do this, but it's more tricky (eg. can refolded be treated the same way?
-            #       Probably, but would need to be checked), so we just stick with the HERWIG model dependence.
             prior_variation_output=unfolding_systematics_outputs[grooming_method][prior_variation_output_name] if prior_variation_output_name is not None else None,
-            #prior_variation_output=unfolding_systematics_outputs[grooming_method]["model_dependence_herwig_fastsim"],
-            #prior_variation_output=unfolding_systematics_outputs[grooming_method]["reweight_prior"],
             unfolding_kt_display_range=unfolding_kt_display_range[grooming_method],
         )
         for _outputs in [
