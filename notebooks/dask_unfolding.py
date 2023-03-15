@@ -217,9 +217,10 @@ if task_config.n_cores_per_task > 1:
     facility = "rehlers_mbp_m1pro_multi_core"
 #n_cores_to_allocate = 8
 # Formerly n_cores_to_allocate, this new variable is == n_cores_to_allocate if n_cores_per_task == 1
-#target_n_tasks_to_run_simultaneously = 8
-# TODO: Go back to 8 when I need speed (as opposed to be being able to plot and function while running...)!
-target_n_tasks_to_run_simultaneously = 6
+# I use 8 when I don't need to do other intensive things at the same time.
+target_n_tasks_to_run_simultaneously = 8
+# If I have other intensive tasks, I can use 6
+#target_n_tasks_to_run_simultaneously = 6
 walltime = "24:00:00"
 log_level = logging.INFO
 debug_mode = False
