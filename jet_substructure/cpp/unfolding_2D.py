@@ -952,10 +952,22 @@ def run_unfolding_closure_reweighting(
                     )
                     continue
 
+                # NOTE: This quantity is only for debugging, but I think it's still useful, and everything here is cheap to fairly
+                #       calculate, so may as well just do it and help any future debugging efforts.
+                try:
+                    _fractional_error_in_pseudo_data = _input_spectra.GetBinError(_i, _j) / _input_spectra.GetBinContent(_i, _j)
+                except ZeroDivisionError:
+                    logger.debug(
+                        f"(kt, pt) ({_input_spectra.GetXaxis().GetBinCenter(_i)}, {_input_spectra.GetYaxis().GetBinCenter(_j)}):"
+                        " No counts in pseudo data. Keeping existing error."
+                    )
+                    continue
+
                 # These are too noisy to have always included, but they're really useful for cross checking
+                # TODO: Need to protect here too. Better to just calculate - it's useful.
                 logger.debug(
                     f"(kt, pt) ({_input_spectra.GetXaxis().GetBinCenter(_i)}, {_input_spectra.GetYaxis().GetBinCenter(_j)}):"
-                    f" Smeared: {_input_spectra.GetBinContent(_i, _j)} +/- {_input_spectra.GetBinError(_i, _j)} w/ fractional error of {_input_spectra.GetBinError(_i, _j) / _input_spectra.GetBinContent(_i, _j)},"
+                    f" Smeared: {_input_spectra.GetBinContent(_i, _j)} +/- {_input_spectra.GetBinError(_i, _j)} w/ fractional error of {_fractional_error_in_pseudo_data},"
                     f" Data: {h_data_stats.GetBinContent(_i, _j)} +/- {h_data_stats.GetBinError(_i, _j)}. Use fractional error of {_fractional_error}"
                 )
                 logger.debug(
