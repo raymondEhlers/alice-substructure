@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional, Type
 
 import attr
 import numpy as np
+import numpy.typing as npt
 from pachyderm import binned_data
 
 from jet_substructure.base import helpers
@@ -21,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 @attr.s(eq=False)
 class AsymmetricErrors:
-    low: np.ndarray = attr.ib()
-    high: np.ndarray = attr.ib()
+    low: npt.NDArray[np.float64] = attr.ib()
+    high: npt.NDArray[np.float64] = attr.ib()
 
     def __eq__(self, other: Any) -> bool:
         if other.__class__ is not self.__class__:
@@ -31,7 +32,7 @@ class AsymmetricErrors:
 
     @classmethod
     def calculate_errors(
-        cls: Type[AsymmetricErrors], errors_one: np.ndarray, errors_two: Optional[np.ndarray] = None
+        cls: Type[AsymmetricErrors], errors_one: npt.NDArray[np.float64], errors_two: Optional[npt.NDArray[np.float64]] = None
     ) -> AsymmetricErrors:
         """Calculate asymmetric errors from given errors.
 
@@ -113,18 +114,18 @@ class AsymmetricErrors:
 
 @attr.s
 class ErrorInput:
-    value: np.ndarray = attr.ib()
-    error: np.ndarray = attr.ib()
+    value: npt.NDArray[np.float64] = attr.ib()
+    error: npt.NDArray[np.float64] = attr.ib()
 
 
-def relative_error(*inputs: ErrorInput) -> np.ndarray:
+def relative_error(*inputs: ErrorInput) -> npt.NDArray[np.float64]:
     if len(inputs) == 0:
         raise ValueError("Must pass at least one ErrorInput")
     if len(inputs) > 1:
-        relative_error_squared = reduce(lambda x, y: ((x.error / x.value) ** 2) + ((y.error / y.value) ** 2), inputs)  # type: ignore
+        relative_error_squared: npt.NDArray[np.float64] = reduce(lambda x, y: ((x.error / x.value) ** 2) + ((y.error / y.value) ** 2), inputs)  # type: ignore[arg-type, no-any-return, attr-defined]
     else:
         relative_error_squared = (inputs[0].error / inputs[0].value) ** 2
-    return np.sqrt(relative_error_squared)  # type: ignore
+    return np.sqrt(relative_error_squared)
 
 
 def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelector) -> binned_data.BinnedData:
