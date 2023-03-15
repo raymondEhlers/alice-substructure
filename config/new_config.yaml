@@ -3119,10 +3119,10 @@ analysis_configurations:
                     label: ""
                     closures: true
                     closure_settings:
+                        # If using the data precision, the split MC fraction is applied, but then
+                        # the uncertainties on the smeared are matched to those seen in data.
                         split_MC_fraction_for_response: 0.75
-                        # TODO: Optimize factor.
-                        # It seems to be about 1 in 7200. Round to 1 in 1000
-                        #split_MC_fraction_for_response: 0.999
+                        use_data_stat_precision_for_smeared: true
                         max_untagged_bin: 10
                     reweight_prior: false
                     datasets: "nominal"
@@ -3130,9 +3130,10 @@ analysis_configurations:
                     label: ""
                     closures: true
                     closure_settings:
+                        # If using the data precision, the split MC fraction is applied, but then
+                        # the uncertainties on the smeared are matched to those seen in data.
                         split_MC_fraction_for_response: 0.75
-                        # It seems to be about 1 in 7200. Round to 1 in 1000
-                        #split_MC_fraction_for_response: 0.999
+                        use_data_stat_precision_for_smeared: true
                         max_untagged_bin: 0.4
                     reweight_prior: false
                     datasets: "nominal"
@@ -3140,9 +3141,10 @@ analysis_configurations:
                     label: ""
                     closures: true
                     closure_settings:
+                        # If using the data precision, the split MC fraction is applied, but then
+                        # the uncertainties on the smeared are matched to those seen in data.
                         split_MC_fraction_for_response: 0.75
-                        # It seems to be about 1 in 7200. Round to 1 in 1000
-                        #split_MC_fraction_for_response: 0.999
+                        use_data_stat_precision_for_smeared: true
                         max_untagged_bin: 0.6
                     reweight_prior: false
                     datasets: "nominal"
