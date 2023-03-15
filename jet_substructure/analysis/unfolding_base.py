@@ -98,16 +98,18 @@ class AsymmetricErrors:
         high[mask] = errors_two_abs[mask]
 
         # Cross checks. We almost certainly will never have 0 in both bins.
-        low_is_zero = low == 0
-        high_is_zero = high == 0
-        if np.any(low_is_zero & high_is_zero):
-            logger.warning("Errors are identically zero for this calculation! Check this carefully!")
+        low_is_all_zero = np.allclose(low, np.zeros(len(low)), atol=1e-17)
+        high_is_all_zero = np.allclose(high, np.zeros(len(high)), atol=1e-17)
+        if np.any(low_is_all_zero & high_is_all_zero):
+            logger.warning(f"Errors are all identically zero for this calculation! Check this carefully!")
         # If it's one sided, then we always should have only one non-zero error.
         if one_sided:
-            # not required because assert needs to be False for the assertion to fail.
+            low_is_zero_array = np.isclose(low, np.zeros(len(low)), atol=1e-17)
+            high_is_zero_array = np.isclose(high, np.zeros(len(high)), atol=1e-17)
+            # `not` is needed because assert needs to be False for the assertion to fail.
             assert not np.any(
-                ~low_is_zero & ~high_is_zero
-            ), f"One sided errors should only have one non-zero value. low: {low}, high: {high}, test: {~low_is_zero & ~high_is_zero}"
+                ~low_is_zero_array & ~high_is_zero_array
+            ), f"One sided errors should only have one non-zero value. low: {low}, high: {high}, test: {np.where(~low_is_zero_array & ~high_is_zero_array)}"
 
         return cls(low=low, high=high)
 
