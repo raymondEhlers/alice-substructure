@@ -2515,7 +2515,8 @@ def _calculate_max_relative_error_from_contributions(
     for name, relative_uncertainty in relative_uncertainty_by_contribution.items():
         entry_has_larger_uncertainties_mask = np.abs(relative_uncertainty) > np.abs(final_relative_uncertainty)
         final_relative_uncertainty[entry_has_larger_uncertainties_mask] = relative_uncertainty[entry_has_larger_uncertainties_mask]
-        logger.debug(f"Contribution {name} has contributions at {entry_has_larger_uncertainties_mask}")
+        #logger.debug(f"Contribution {name} has contributions at {entry_has_larger_uncertainties_mask}")
+        #logger.debug(f"{final_relative_uncertainty=}")
 
     return final_relative_uncertainty
 
