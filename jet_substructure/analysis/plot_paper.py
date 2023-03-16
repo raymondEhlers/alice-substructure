@@ -1,11 +1,13 @@
 """ Paper plots
 
-.. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
+.. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, LBL/UCB
 """
+
+from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Mapping, Sequence, Union
+from typing import Any, Mapping, Sequence, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -24,7 +26,7 @@ logger = logging.getLogger(__name__)
 pachyderm.plot.configure()
 
 
-def adjust_lightness(color, amount=0.5):
+def adjust_lightness(color: str | tuple[float, float, float], amount: float = 0.5) -> tuple[float, float, float]:
     """
     From: https://stackoverflow.com/a/49601444/12907985
 
@@ -134,7 +136,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 # TODO: Refactor when more awake...
                 kt_range_for_current_grooming_method = kt_range[grooming_method]
                 kt_range_for_reference = kt_range[reference_grooming_method]
-                kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)
+                kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)  # type: ignore[var-annotated, arg-type]
                 if kt_range_min < kt_range_for_reference.min:
                     kt_range_min = kt_range_for_reference.min
                 if kt_range_max > kt_range_for_reference.max:
@@ -277,7 +279,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 # TODO: Refactor when more awake...
                 kt_range_for_current_grooming_method = kt_range[grooming_method]
                 kt_range_for_model = kt_ranges_for_models[model_name]
-                kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)
+                kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)  # type: ignore[arg-type]
                 if kt_range_min < kt_range_for_model.min:
                     kt_range_min = kt_range_for_model.min
                 if kt_range_max > kt_range_for_model.max:
@@ -331,7 +333,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 ratio = model_for_ratio / h_for_model_ratio
 
                 # Ratio + statistical error bars
-                temp_kwargs = dict(plot_unfolding._models_styles[model_name])
+                temp_kwargs: dict[str, Any] = dict(plot_unfolding._models_styles[model_name])
                 temp_kwargs["label"] = (
                     # For all in one panel
                     temp_kwargs["label"] if grooming_method == name_of_grooming_method_to_draw_models else None
@@ -480,7 +482,7 @@ def plot_pp_grooming_comparison_with_models(
         ),
         pb.Panel(
             axes=[
-                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
+                pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore[arg-type]
                 pb.AxisConfig(
                     "y",
                     label=r"$\frac{\text{Model}}{\text{SD}\;z>0.2}$",
