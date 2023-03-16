@@ -2082,7 +2082,7 @@ analysis_configurations:
                         soft_drop_z_cut_04:
                             kt:
                                 "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 6, 100]
-                                "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
+                                "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 6, 8]
                 merge_3_6_tracking_efficiency:
                     label: "merge_3_6_tracking_efficiency"
                     additional_settings_names_for_property_lookup: ["merge_3_6"]
