@@ -2521,6 +2521,22 @@ def _calculate_max_relative_error_from_contributions(
     return final_relative_uncertainty
 
 
+def _calculate_quadrature_relative_error_from_contributions(
+    relative_uncertainty_by_contribution: dict[str, npt.NDArray[np.float64]],
+) -> npt.NDArray[np.float64]:
+    """Simple helper for calculating the maximum contribution bin-by-bin"""
+    final_relative_uncertainty: npt.NDArray[np.float64] = np.sqrt(
+        np.sum(
+            [
+                relative_uncertainty ** 2
+                for relative_uncertainty in relative_uncertainty_by_contribution.values()
+            ],
+            axis=0,
+        )
+    )
+    return final_relative_uncertainty
+
+
 def calculate_systematics(  # noqa: C901
     unfolded: Mapping[str, unfolding_analysis.SingleResult],
     unfolding_outputs: Mapping[str, unfolding_analysis.UnfoldingOutput],
@@ -2688,8 +2704,9 @@ def calculate_systematics(  # noqa: C901
                 n_values=len(unfolded["default"].data.values),
             )
         elif non_closure_configuration.approach_to_combining == "quadrature":
-            _msg = "Need to implement adding non-closure dependence in quadrature"
-            raise NotImplementedError(_msg)
+            non_closure_sym_relative = _calculate_quadrature_relative_error_from_contributions(
+                relative_uncertainty_by_contribution=non_closure_relative_errors_by_contribution,
+            )
         else:
             _msg = f"Non-closure dependence approach {non_closure_configuration.approach_to_combining} is not recognized and is not implemented."
             raise NotImplementedError(_msg)
@@ -2769,8 +2786,9 @@ def calculate_systematics(  # noqa: C901
                     n_values=len(nominal_values),
                 )
             elif model_dependence_configuration.approach_to_combining == "quadrature":
-                _msg = "Need to implement adding model dependence in quadrature"
-                raise NotImplementedError(_msg)
+                model_dependence_relative = _calculate_quadrature_relative_error_from_contributions(
+                    relative_uncertainty_by_contribution=relative_errors_by_model,
+                )
             else:
                 _msg = f"Model dependence approach {model_dependence_configuration.approach_to_combining} is not recognized and is not implemented."
                 raise NotImplementedError(_msg)
