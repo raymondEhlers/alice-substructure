@@ -50,6 +50,7 @@ logging.getLogger("matplotlib").setLevel(logging.INFO)
 logging.getLogger("PIL").setLevel(logging.INFO)
 logging.getLogger("pachyderm.histogram").setLevel(logging.INFO)
 logging.getLogger("boost_histogram").setLevel(logging.INFO)
+logging.getLogger("numba").setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +98,7 @@ input_dir_tag = "2023-02-HP"
 ###################
 # Setup I/O options
 ###################
-_use_qm22_inputs = False
+_use_qm22_inputs = True
 _grooming_methods_using_qm_result_conventions = _OG_grooming_methods if _use_qm22_inputs else []
 _grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inputs else grooming_methods
 
@@ -156,14 +157,14 @@ _smeared_untagged_var = {
     "dynamical_time_z_cut_02": helpers.KtRange(0, 0.25),
 }
 _n_iter_compare = {
-    "dynamical_core": 3,
-    "dynamical_kt": 3,
-    "dynamical_time": 3,
-    "soft_drop_z_cut_02": 3,
+    "dynamical_core": 6,
+    "dynamical_kt": 6,
+    "dynamical_time": 6,
+    "soft_drop_z_cut_02": 6,
+    "dynamical_core_z_cut_02": 6,
+    "dynamical_kt_z_cut_02": 6,
+    "dynamical_time_z_cut_02": 6,
     "soft_drop_z_cut_04": 11,
-    "dynamical_core_z_cut_02": 3,
-    "dynamical_kt_z_cut_02": 3,
-    "dynamical_time_z_cut_02": 3,
 }
 if _use_qm22_inputs:
     _n_iter_compare.update({
@@ -196,11 +197,21 @@ _model_dependence_configuration.update({
         variations=["herwig_fastsim"],
     ) for _method in _grooming_methods_using_new_conventions
 })
+# Option to add in the closure test to provide the non-closure uncertainty
+non_closure_configuration = None
+if False:
+    non_closure_configuration = unfolding_analysis.NonClosureConfiguration(
+        contributors=["reweight_pseudo_data"],
+        approach_to_combining="max",
+    )
 
 # Either take model dependence or reweighted prior
 # Model dependence is always preferred, but it may not have been analyzed yet for the a particular configuration
 # (or in PbPb, it likely isn't possible since we don't have a reliable MC)
 skip_reweighted_prior_in_systematics = True
+
+# %%
+_n_iter_compare
 
 # %% tags=["remove_cell"]
 # Initially load data
@@ -227,14 +238,6 @@ pp_R02_unfolding_closure_outputs, pp_R02_unfolding_closure_pure_matches_outputs,
 #for grooming_method in grooming_methods:
 #    print(f"running {grooming_method}")
 
-# Option to add in the closure test to provide the non-closure uncertainty
-non_closure_configuration = None
-if False:
-    non_closure_configuration = unfolding_analysis.NonClosureConfiguration(
-        contributors=["reweight_pseudo_data"],
-        approach_to_combining="max",
-    )
-
 # Focus down onto just the unfolded distributions
 pp_R02_unfolded_with_systematics, pp_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
     grooming_methods=grooming_methods,
@@ -252,15 +255,16 @@ print(pp_R02_unfolded_with_systematics["dynamical_core"].data.metadata["y_system
 
 # %%
 plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
-    grooming_methods=grooming_methods,
+    #grooming_methods=grooming_methods,
+    grooming_methods=_grooming_methods_using_qm_result_conventions,
     unfolded_with_systematics=pp_R02_unfolded_with_systematics,
     unfolding_systematics_outputs=pp_R02_unfolding_systematics_outputs,
     unfolding_closure_outputs=pp_R02_unfolding_closure_outputs,
     plot=True,
     plot_png=False,
-    plot_systematic_breakdown=False,
+    plot_systematic_breakdown=True,
     plot_systematics=False,
-    plot_closures=True,
+    plot_closures=False,
     # NOTE: For the prior variation, passing the HERwIG model dependence includes both:
     #       - HERWIG vs PYTHIA
     #       - fastsim vs full sim as well as whatever HERWIG
@@ -272,7 +276,8 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     #       is constructed by transferring the differences from the fastsim outputs to the default.
     #       We could do this, but it's more tricky (eg. can refolded be treated the same way?
     #       Probably, but would need to be checked), so we just stick with the HERWIG model dependence.
-    prior_variation_output_name="model_dependence_herwig_fastsim",
+    #prior_variation_output_name="model_dependence_herwig_fastsim",
+    prior_variation_output_name="reweight_prior",
     unfolding_kt_display_range={
         grooming_method: (0.25, 6)
         for grooming_method in grooming_methods
@@ -343,14 +348,14 @@ _smeared_untagged_var = {
     "dynamical_time_z_cut_02": helpers.KtRange(0, 0.25),
 }
 _n_iter_compare = {
-    "dynamical_core": 3,
-    "dynamical_kt": 3,
-    "dynamical_time": 3,
-    "soft_drop_z_cut_02": 3,
-    "dynamical_core_z_cut_02": 3,
-    "dynamical_kt_z_cut_02": 3,
-    "dynamical_time_z_cut_02": 3,
-    "soft_drop_z_cut_04": 3,
+    "dynamical_core": 6,
+    "dynamical_kt": 6,
+    "dynamical_time": 6,
+    "soft_drop_z_cut_02": 9,
+    "dynamical_core_z_cut_02": 9,
+    "dynamical_kt_z_cut_02": 9,
+    "dynamical_time_z_cut_02": 9,
+    "soft_drop_z_cut_04": 9,
 }
 if _use_qm22_inputs:
     _n_iter_compare.update({
@@ -402,7 +407,7 @@ _non_closure_configuration = {
 }
 _non_closure_configuration.update({
     grooming_method: unfolding_analysis.NonClosureConfiguration(
-        contributors=["reweight_response"] + (["thermal_model"] if "soft_drop" in grooming_method else []) ,
+        contributors=["reweight_response", "reweight_pseudo_data", "thermal_model"],
         approach_to_combining="max",
     )
     for grooming_method in _grooming_methods_using_new_conventions
@@ -455,15 +460,15 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     plot=True,
     plot_png=False,
     plot_systematic_breakdown=True,
-    plot_systematics=True,
-    plot_closures=True,
+    plot_systematics=False,
+    plot_closures=False,
     prior_variation_output_name="reweight_prior",
     unfolding_kt_display_range={
         grooming_method: (0.25, 6) if "z_cut" in grooming_method else (1, 6)
         for grooming_method in grooming_methods
     },
     relative_individual_systematic_ratio_range={
-        grooming_method: (0.25, 1.75) if grooming_method != "soft_drop_z_cut_02" else (0.6, 1.4)
+        grooming_method: (0.6, 1.4) if "z_cut" in grooming_method else(0.25, 1.75)
         for grooming_method in grooming_methods
     }
 )
@@ -523,14 +528,14 @@ _smeared_untagged_var = {
     "dynamical_time_z_cut_02": helpers.KtRange(0, 0.25),
 }
 _n_iter_compare = {
-    "dynamical_core": 8,
-    "dynamical_kt": 8,
-    "dynamical_time": 8,
+    "dynamical_core": 11,
+    "dynamical_kt": 9,
+    "dynamical_time": 10,
     "soft_drop_z_cut_02": 8,
-    "dynamical_core_z_cut_02": 6,
-    "dynamical_kt_z_cut_02": 6,
-    "dynamical_time_z_cut_02": 6,
-    "soft_drop_z_cut_04": 8,
+    "dynamical_core_z_cut_02": 8,
+    "dynamical_kt_z_cut_02": 8,
+    "dynamical_time_z_cut_02": 8,
+    "soft_drop_z_cut_04": 17,
 }
 _max_n_iter = {
     # Need +1 for convenience with range iteration
@@ -541,10 +546,10 @@ _max_n_iter.update({
 })
 
 # Double counting cut
-_double_counting_cut.update({
+_double_counting_cut = {
     _method: "min_true_10_pt_hat_3"
     for _method in grooming_methods
-})
+}
 # Model dependence.
 _model_dependence_configuration = None
 # Background subtraction configurations
@@ -557,7 +562,7 @@ _background_subtraction_configuration = {
 # Add in the closure test to provide the non-closure uncertainty
 _non_closure_configuration = {
     grooming_method: unfolding_analysis.NonClosureConfiguration(
-        contributors=["reweight_response"] + (["thermal_model"] if "soft_drop" in grooming_method else []) ,
+        contributors=["reweight_pseudo_data", "reweight_response", "thermal_model"],
         approach_to_combining="max",
     )
     for grooming_method in grooming_methods
@@ -614,7 +619,7 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
         for grooming_method in grooming_methods
     },
     relative_individual_systematic_ratio_range={
-        grooming_method: (0.25, 1.75) if grooming_method != "soft_drop_z_cut_02" else (0.6, 1.4)
+        grooming_method: (0.6, 1.4) if "z_cut" in grooming_method else (0.25, 1.75)
         for grooming_method in grooming_methods
     }
 )
@@ -766,6 +771,9 @@ list(pp_R04_unfolded_with_systematics.keys())
 # %%
 jetscape_pp = plot_unfolding.load_jetscape_data(
     output_dir / "comparison" / "models" / "jetscape" / "5020_PP_Colorless" / "AnalysisResultsFinal.root"
+)
+jetscape_semi_central = plot_unfolding.load_jetscape_data(
+    output_dir / "comparison" / "models" / "jetscape" / "5020_PbPb_30-50_0.30_2.0_1" / "AnalysisResultsFinal.root"
 )
 jetscape_central = plot_unfolding.load_jetscape_data(
     output_dir / "comparison" / "models" / "jetscape" / "5020_PbPb_0-10_0.30_2.0_1" / "AnalysisResultsFinal.root"
@@ -1902,7 +1910,7 @@ plot_unfolding.plot_grooming_comparisons_for_single_system(
 # %%
 
 # %% [markdown]
-# # QM 2022 Plots
+# # QM 2022 + HP 2023 Plots
 
 # %%
 alice_status = "work_in_progress"
@@ -1923,18 +1931,28 @@ jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / input_dir_tag / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
-plot_unfolding.plot_grooming_comparisons_for_single_system(
-    hists=pp_R02_unfolded_with_systematics,
-    grooming_methods=grooming_methods,
-    reference_grooming_method="dynamical_kt_z_cut_02",
-    collision_system="pp",
-    collision_system_key="pp_5TeV",
-    output_dir=_output_dir,
-    kt_range=helpers.KtRange(0.25, 6),
-    figure_kt_range=helpers.KtRange(0, 6.25),
-    jet_R_str=jet_R_str,
-    alice_status=alice_status,
-)
+for _temp_grooming_methods, _reference_method, _label in [
+    (["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"], "dynamical_core", "1"),
+    (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "2"),
+    (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "3"),
+    (["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "4"),
+    (["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "dynamical_kt_z_cut_02", "5"),
+]:
+    plot_unfolding.plot_grooming_comparisons_for_single_system(
+        hists=pp_R02_unfolded_with_systematics,
+        grooming_methods=_temp_grooming_methods,
+        reference_grooming_method=_reference_method,
+        collision_system="pp",
+        collision_system_key="pp_5TeV",
+        output_dir=_output_dir,
+        kt_range=helpers.KtRange(0.25, 6),
+        figure_kt_range=helpers.KtRange(0, 6.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+        label=_label,
+    )
+
+# %%
 
 # %% [markdown]
 # ## pp comparison to models
@@ -1991,6 +2009,8 @@ for _collision_system, _hists in [
         (["soft_drop_z_cut_02", "dynamical_core", "dynamical_kt", "dynamical_time"], "soft_drop_z_cut_02", "1"),
         (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "2"),
         (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "3"),
+        (["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "4"),
+        (["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "dynamical_kt_z_cut_02", "5"),
     ]:
         plot_unfolding.plot_grooming_comparisons_for_single_system(
             hists=_hists,
@@ -2004,10 +2024,10 @@ for _collision_system, _hists in [
                 "dynamical_kt": helpers.KtRange(2, 6) if _collision_system == "semi_central" else helpers.KtRange(3, 6),
                 "dynamical_time": helpers.KtRange(2, 6) if _collision_system == "semi_central" else helpers.KtRange(3, 6),
                 "soft_drop_z_cut_02": helpers.KtRange(0.25, 6),
-                "soft_drop_z_cut_04": helpers.KtRange(0.25, 6),
                 "dynamical_core_z_cut_02": helpers.KtRange(0.25, 6),
                 "dynamical_kt_z_cut_02": helpers.KtRange(0.25, 6),
                 "dynamical_time_z_cut_02": helpers.KtRange(0.25, 6),
+                "soft_drop_z_cut_04": helpers.KtRange(0.25, 6),
             },
             figure_kt_range=helpers.KtRange(0, 6.25),
             jet_R_str=jet_R_str,
@@ -2030,8 +2050,12 @@ jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / input_dir_tag / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
+_collision_systems_with_stats_tests_results = ["semi_central", "central"]
+_ks_test_results = {_k: {} for _k in _collision_systems_with_stats_tests_results}
+_chi2_test_results = {_k: {} for _k in _collision_systems_with_stats_tests_results}
 for grooming_method in grooming_methods:
-    plot_unfolding.plot_pp_PbPb_comparison(
+    logger.info(f"Processing {grooming_method}")
+    _ks_test_result, _chi2_test_result = plot_unfolding.plot_pp_PbPb_comparison(
         hists={
             "pp": pp_R02_unfolded_with_systematics[grooming_method],
             "semi_central": semi_central_R02_unfolded_with_systematics[grooming_method],
@@ -2049,9 +2073,23 @@ for grooming_method in grooming_methods:
         kt_display_range=(0.0, 6.25),
         jet_R_str=jet_R_str,
         alice_status=alice_status,
+        plausible_stat_test_parameters=[1.0, 2.0],
+        calculate_hist_stat_tests_KS_chi2=True,
     )
+    if _ks_test_result:
+        for _system in _collision_systems_with_stats_tests_results:
+            _ks_test_results[_system][grooming_method] = _ks_test_result[_system]
+    if _chi2_test_result:
+        for _system in _collision_systems_with_stats_tests_results:
+            _chi2_test_results[_system][grooming_method] = _chi2_test_result[_system]
 
 # %%
+import pprint
+pprint.pprint(_ks_test_results["semi_central"].keys())
+pprint.pprint([f"{v:.3}" for v in _ks_test_results["semi_central"].values()])
+pprint.pprint([f"{v:.3}" for v in _ks_test_results["central"].values()])
+pprint.pprint([f"{v:.3}" for v in _chi2_test_results["semi_central"].values()])
+pprint.pprint([f"{v:.3}" for v in _chi2_test_results["central"].values()])
 
 # %%
 
