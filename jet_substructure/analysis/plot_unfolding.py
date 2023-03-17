@@ -988,26 +988,68 @@ def _plot_single_system_comparison(
             if h.axes[0].bin_edges.shape != ratio_reference_hist.axes[0].bin_edges.shape or \
                 not np.allclose(h.axes[0].bin_edges, ratio_reference_hist.axes[0].bin_edges):
                 # TODO: Would be really nice if we could do this more gracefully! This is really hacky
+                _ratio_reference_values = ratio_reference_hist.values
+                _ratio_y_systematic = ratio_reference_hist.metadata["y_systematic"]["quadrature"]
                 # Attempt to rebin. It will warn if it won't work (eg. if the edges don't match up).
                 # First, we start with the rebinning the systematic since we'll lose the metadata after rebinning
                 # the main binned_data. As a hack, we create a new binned, rebin that, and then take the values out
-                _ratio_systematic_low = binned_data.BinnedData(
-                    axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
-                    values=ratio_reference_hist.metadata["y_systematic"]["quadrature"].low,
-                    variances=np.ones(len(ratio_reference_hist.values)),
-                )[::h.axes[0].bin_edges].values  # type: ignore[misc]
-                _ratio_systematic_high = binned_data.BinnedData(
-                    axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
-                    values=ratio_reference_hist.metadata["y_systematic"]["quadrature"].high,
-                    variances=np.ones(len(ratio_reference_hist.values)),
-                )[::h.axes[0].bin_edges].values  # type: ignore[misc]
+                # TODO: I don't think this really works...
+                #_ratio_systematic_low = binned_data.BinnedData(
+                #    axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
+                #    values=_ratio_y_systematic.low,
+                #    variances=np.ones(len(ratio_reference_hist.values)),
+                #)[::h.axes[0].bin_edges].values  # type: ignore[misc]
+                #_ratio_systematic_high = binned_data.BinnedData(
+                #    axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
+                #    values=_ratio_y_systematic.high,
+                #    variances=np.ones(len(ratio_reference_hist.values)),
+                #)[::h.axes[0].bin_edges].values  # type: ignore[misc]
                 # Now rebin the main hist.
                 ratio_reference_hist = ratio_reference_hist[::h.axes[0].bin_edges]  # type: ignore[misc]
                 # And store the updated systematic
+                #ratio_reference_hist.metadata["y_systematic"] = {
+                #    "quadrature": unfolding_base.AsymmetricErrors(
+                #        _ratio_systematic_low,
+                #        _ratio_systematic_high,
+                #    )
+                #}
+                # Calculate the error as if it
+                # Low
+                _test_ratio_systematic_low_last_bin = unfolding_base.relative_error(
+                    unfolding_base.ErrorInput(
+                        value=_ratio_reference_values[-2:-1],
+                        error=_ratio_y_systematic.low[-2:-1]
+                    ),
+                    unfolding_base.ErrorInput(
+                        value=_ratio_reference_values[-1:],
+                        error=_ratio_y_systematic.low[-1:]
+                    ),
+                )
+                _test_ratio_systematic_low = np.array(_ratio_y_systematic.low, copy=True)
+                _test_ratio_systematic_low = np.delete(_test_ratio_systematic_low, -1)
+                _test_ratio_systematic_low[-1:] = _test_ratio_systematic_low_last_bin
+                _test_ratio_systematic_low_values = _test_ratio_systematic_low * ratio_reference_hist.values
+                # High
+                _test_ratio_systematic_high_last_bin = unfolding_base.relative_error(
+                    unfolding_base.ErrorInput(
+                        value=_ratio_reference_values[-2:-1],
+                        error=_ratio_y_systematic.high[-2:-1]
+                    ),
+                    unfolding_base.ErrorInput(
+                        value=_ratio_reference_values[-1:],
+                        error=_ratio_y_systematic.high[-1:]
+                    ),
+                )
+                _test_ratio_systematic_high = np.array(_ratio_y_systematic.high, copy=True)
+                _test_ratio_systematic_high = np.delete(_test_ratio_systematic_high, -1)
+                _test_ratio_systematic_high[-1:] = _test_ratio_systematic_high_last_bin
+                _test_ratio_systematic_high_values = _test_ratio_systematic_high * ratio_reference_hist.values
+                #np.testing.assert_allclose(_ratio_y_systematic.low, _test_ratio_systematic_low)
+                #np.testing.assert_allclose(_ratio_systematic_low, _test_ratio_systematic_low)
                 ratio_reference_hist.metadata["y_systematic"] = {
                     "quadrature": unfolding_base.AsymmetricErrors(
-                        _ratio_systematic_low,
-                        _ratio_systematic_high,
+                        _test_ratio_systematic_low_values,
+                        _test_ratio_systematic_high_values,
                     )
                 }
 
