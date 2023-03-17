@@ -1135,7 +1135,7 @@ def plot_grooming_comparisons_for_single_system(
                             label=r"$\frac{\text{Method}}{\text{"
                             + grooming_styling[reference_grooming_method].label_short
                             + "}}$",
-                            range=(0.45, 1.55) if "soft_drop_z_cut_04" not in grooming_methods else (0.25, 1.55),
+                            range=(0.45, 1.55) if "soft_drop_z_cut_04" not in grooming_methods else (0.1, 1.55),
                             font_size=text_font_size,
                         ),
                     ],
@@ -1532,22 +1532,24 @@ def plot_pp_PbPb_comparison(
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
                             #range=(7e-3, 1),
-                            range=(3e-3, 1),
+                            range=(4e-3, 1),
                             font_size=text_font_size,
                         ),
                     ],
                     text=[
-                        pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
+                        pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
                         # Add the grooming label in a separate location in the bottom left
                         # Otherwise, it will overlap with the data
-                        pb.TextConfig(x=0.03, y=0.03, text=style.label, font_size=text_font_size),
+                        pb.TextConfig(x=0.02, y=0.02, text=style.label, font_size=text_font_size),
                     ],
-                    legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.0, 0.11), marker_label_spacing=0.05),
+                    legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.0, 0.10), marker_label_spacing=0.01),
                 ),
                 pb.Panel(
                     axes=[
                         pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
-                        pb.AxisConfig("y", label=r"$\frac{\text{Pb--Pb}}{\text{pp}}$", range=(0.45, 1.55), font_size=text_font_size),
+                        pb.AxisConfig("y", label=r"$\frac{\text{Pb--Pb}}{\text{pp}}$",
+                                      range=(0.1, 1.9) if "z_cut_04" in grooming_method else (0.3, 1.7),
+                                      font_size=text_font_size),
                     ],
                     legend=pb.LegendConfig(location="lower left", font_size=24, anchor=(0.01, 0.01), marker_label_spacing=0.05, label_spacing=0.1),
                 ),
