@@ -1542,7 +1542,7 @@ def plot_pp_PbPb_comparison(
                         # Otherwise, it will overlap with the data
                         pb.TextConfig(x=0.02, y=0.02, text=style.label, font_size=text_font_size),
                     ],
-                    legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.0, 0.10), marker_label_spacing=0.01),
+                    legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.0, 0.10), marker_label_spacing=-0.2),
                 ),
                 pb.Panel(
                     axes=[
