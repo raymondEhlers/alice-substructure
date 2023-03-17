@@ -1096,11 +1096,21 @@ def plot_grooming_comparisons_for_single_system(
     if label:
         label = f"_{label}"
 
+    # Add event activity to label if needed
+    event_activity = ""
+    _event_activity_label_map = {
+        "pp": "pp",
+        "central": r"0-10\%",
+        "semi_central": r"30-50\%",
+    }
+    if collision_system != "pp":
+        event_activity = f"{_event_activity_label_map[collision_system]} "
+
     grooming_styling = pb.define_grooming_styles()
     jet_pt_bin = next(iter(hists.values())).ranges[0]
 
     text = pb.label_to_display_string["ALICE"][alice_status]
-    text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
+    text += "\n" + event_activity + pb.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
@@ -1239,7 +1249,7 @@ def _plot_pp_PbPb_comparison(
     logger.info("Plotting grooming method comparison for kt with systematics")
 
     # Setup
-    event_activity_label_map = {
+    _event_activity_label_map = {
         "pp": "pp",
         "central": r"0-10\% $\text{Pb--Pb}$",
         "semi_central": r"30-50\% $\text{Pb--Pb}$",
@@ -1330,7 +1340,7 @@ def _plot_pp_PbPb_comparison(
                 markersize=11,
                 linestyle="",
                 linewidth=3,
-                label=event_activity_label_map[collision_system],
+                label=_event_activity_label_map[collision_system],
                 # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
                 zorder=3 + _plot_counter,
             )
