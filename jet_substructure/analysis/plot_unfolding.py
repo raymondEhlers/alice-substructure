@@ -81,9 +81,43 @@ def ks_test(
         return result.pvalue  # type: ignore[no-any-return]
 
 
-def plausible_stat_test() -> None:
-    # TODO: Implement
-    ...
+def plausible_stat_test(ratio: binned_data.BinnedData, n_samples: int, n_sigma_stat: float = 1.0) -> float:
+    """
+    Sample the number of counts stat as a Poisson distributions, and then compare to unity with the uncertainties being the systematic
+    (consistent if all points overlap with unity within one sigma)
+
+    In practice, I normalize very early on in grabbing my unfolding hists, so turn this off will be a pain in the ass. So we'll
+    instead assume Gaussian distributed counts.
+    """
+    samples = np.zeros((len(ratio.axes[0].bin_centers), n_samples), dtype=np.float32)
+    rng = np.random.default_rng()
+
+    # Sample possible values
+    for i, (value, error) in enumerate(zip(ratio.values, ratio.errors)):
+        #logger.debug(f"{i=}: {value=}, {error=}")
+        samples[i, :] = rng.normal(loc=value, scale=error * n_sigma_stat, size=n_samples)
+
+    # Generate the comparison
+    y_systematic: unfolding_base.AsymmetricErrors = ratio.metadata["y_systematic"]["quadrature"]
+    # Determine which values we need to grab
+    # When below 1, take the upper error, and do the opposite above 1
+    # NOTE: Shift up to 1 so we can make the comparison to the sampled values directly
+    # NOTE: We basically assume that they're one sigma
+    comparison_values_from_systematics = np.where(ratio.values <= 1, 1 - y_systematic.high, 1 + y_systematic.low)
+    #logger.debug(f"{comparison_values_from_systematics}")
+    comparison_values_from_systematics_promoted = comparison_values_from_systematics[:, np.newaxis]
+
+    results = np.where(
+        (ratio.values <= 1)[:, np.newaxis],
+        samples > comparison_values_from_systematics_promoted,
+        samples < comparison_values_from_systematics_promoted,
+    )
+
+    # Access the number of samples where all are within the comparison range
+    #logger.debug(f"{np.count_nonzero(results, axis=1)}")
+    passed = np.all(results, axis=0)
+    fraction_passed = np.count_nonzero(passed) / n_samples
+    return fraction_passed
 
 
 def plot_relative_individual_systematics(
@@ -1164,11 +1198,13 @@ def _plot_pp_PbPb_comparison(
     plot_config: pb.PlotConfig,
     output_dir: Path,
     models: Mapping[str, Mapping[str, binned_data.BinnedData]] | None = None,
+    plausible_stat_test_parameters: list[float] | None = None,
 ) -> None:
     """Plot PbPb with systematics compared to pp with systematics for a set of grooming methods."""
     # Validations
     if models is None:
         models = {}
+    _plausible_stat_test_results: dict[str, dict[float, float]] = {}
 
     logger.info("Plotting grooming method comparison for kt with systematics")
 
@@ -1354,6 +1390,12 @@ def _plot_pp_PbPb_comparison(
                 alpha=0.3,
             )
 
+            if plausible_stat_test_parameters is not None:
+                _plausible_stat_test_results[collision_system] = {}
+                for _param in plausible_stat_test_parameters:
+                    _result = plausible_stat_test(ratio=ratio, n_samples=int(1e6), n_sigma_stat=_param)
+                    _plausible_stat_test_results[collision_system][_param] = _result
+
         # Plot model comparison if available
         for model_name, model_with_all_grooming_methods in models.items():
             model = model_with_all_grooming_methods.get(grooming_method, None)
@@ -1375,6 +1417,9 @@ def _plot_pp_PbPb_comparison(
                 alpha=0.7,
                 **temp_kwargs,
             )
+
+    if _plausible_stat_test_results:
+        logger.info(f"Plausible stat test fractions: {_plausible_stat_test_results}")
 
     # Reference value for ratio
     ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
@@ -1400,6 +1445,7 @@ def plot_pp_PbPb_comparison(
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
     models: Mapping[str, Mapping[str, binned_data.BinnedData]] | None = None,
+    plausible_stat_test_parameters: list[float] | None = None,
 ) -> None:
     """Plot PbPb unfolded results with systematics."""
     jet_pt_bin = next(iter(hists.values())).ranges[0]
@@ -1422,6 +1468,7 @@ def plot_pp_PbPb_comparison(
         grooming_method=grooming_method,
         set_zero_to_nan=False,
         event_activity_to_kt_range=event_activity_to_kt_range,
+        plausible_stat_test_parameters=plausible_stat_test_parameters,
         plot_config=pb.PlotConfig(
             name=name,
             panels=[
