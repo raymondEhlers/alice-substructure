@@ -905,7 +905,7 @@ def _plot_single_system_comparison(
         # Use selected grooming method as a reference, but only in the range where the others are measured.
         ratio_reference_hist_unselected = hists[reference_grooming_method].data
 
-        for grooming_method in grooming_methods:
+        for _plot_counter, grooming_method in enumerate(grooming_methods):
             # Axes: jet_pt, attr_name
             h_input = hists[grooming_method].data
 
@@ -936,6 +936,8 @@ def _plot_single_system_comparison(
                 linestyle="",
                 linewidth=3,
                 label=grooming_styling[grooming_method].label_short,
+                # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+                zorder=3 + _plot_counter,
             )
 
             # Systematic uncertainty
@@ -955,6 +957,7 @@ def _plot_single_system_comparison(
                 color=p[0].get_color(),
                 linewidth=0,
                 alpha=0.3,
+                zorder=2,
             )
 
             # Ratio
@@ -1020,6 +1023,8 @@ def _plot_single_system_comparison(
                 markersize=11,
                 linestyle="",
                 linewidth=3,
+                # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+                zorder=3 + _plot_counter,
             )
             # Systematic errors.
             y_relative_error_low = unfolding_base.relative_error(
@@ -1063,6 +1068,7 @@ def _plot_single_system_comparison(
                 color=p[0].get_color(),
                 linewidth=0,
                 alpha=0.3,
+                zorder=2,
             )
 
     # Reference value for ratio
@@ -1313,7 +1319,7 @@ def _plot_pp_PbPb_comparison(
         ratio_reference_hist_unselected = hists["pp"].data
 
         # Collision system is a bit misleading because it's really just a high label, but good enough for a quick look.
-        for collision_system, hist in hists.items():
+        for _plot_counter, (collision_system, hist) in enumerate(hists.items()):
             # Axes: jet_pt, attr_name
             h = hist.data
 
@@ -1336,6 +1342,8 @@ def _plot_pp_PbPb_comparison(
                 linestyle="",
                 linewidth=3,
                 label=event_activity_label_map[collision_system],
+                # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+                zorder=3 + _plot_counter,
             )
 
             # Systematic uncertainty
@@ -1355,6 +1363,7 @@ def _plot_pp_PbPb_comparison(
                 color=p[0].get_color(),
                 linewidth=0,
                 alpha=0.3,
+                zorder=2,
             )
 
             # Ratio
@@ -1380,6 +1389,8 @@ def _plot_pp_PbPb_comparison(
                 markersize=11,
                 linestyle="",
                 linewidth=3,
+                # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+                zorder=3 + _plot_counter,
             )
             # Systematic errors.
             y_relative_error_low = unfolding_base.relative_error(
@@ -1423,6 +1434,7 @@ def _plot_pp_PbPb_comparison(
                 color=p[0].get_color(),
                 linewidth=0,
                 alpha=0.3,
+                zorder=2,
             )
 
             if plausible_stat_test_parameters is not None:
