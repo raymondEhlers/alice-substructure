@@ -1460,12 +1460,14 @@ def _plot_pp_PbPb_comparison(
             )
 
     # Test results
-    if _plausible_stat_test_results:
-        logger.info(f"Plausible stat test fractions: {_plausible_stat_test_results}")
-    if _chi2_test_results:
-        logger.info(f"Chi2 p value: {_chi2_test_results}")
-    if _ks_test_results:
-        logger.info(f"KS p value: {_ks_test_results}")
+    # Since we return the values, it's not so critical to print them most of them.
+    # Can always uncomment them again later if needed.
+    #if _plausible_stat_test_results:
+    #    logger.info(f"Plausible stat test fractions: {_plausible_stat_test_results}")
+    #if _chi2_test_results:
+    #    logger.info(f"Chi2 p value: {_chi2_test_results}")
+    #if _ks_test_results:
+    #    logger.info(f"KS p value: {_ks_test_results}")
 
     # Reference value for ratio
     ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
