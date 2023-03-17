@@ -1092,7 +1092,7 @@ def plot_grooming_comparisons_for_single_system(
 
     # Validation
     if isinstance(kt_range, helpers.KtRange):
-        kt_range = {grooming_method: kt_range for grooming_method in grooming_methods}
+        kt_range = {grooming_method: kt_range for grooming_method in [*grooming_methods, reference_grooming_method]}
     if label:
         label = f"_{label}"
 
@@ -1120,11 +1120,11 @@ def plot_grooming_comparisons_for_single_system(
                             "y",
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
-                            range=(3e-3, 1),
+                            range=(4e-3, 1),
                             font_size=text_font_size,
                         ),
                     ],
-                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
+                    text=pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
                     legend=pb.LegendConfig(location="lower left", font_size=round(text_font_size*0.8), anchor=(0.015, 0.025), marker_label_spacing=0.075),
                 ),
                 pb.Panel(
@@ -1135,7 +1135,7 @@ def plot_grooming_comparisons_for_single_system(
                             label=r"$\frac{\text{Method}}{\text{"
                             + grooming_styling[reference_grooming_method].label_short
                             + "}}$",
-                            range=(0.45, 1.55) if "soft_drop_z_cut_04" not in grooming_methods else (0.1, 1.55),
+                            range=(0.45, 1.55) if "soft_drop_z_cut_04" not in grooming_methods else (0.1, 1.9),
                             font_size=text_font_size,
                         ),
                     ],
