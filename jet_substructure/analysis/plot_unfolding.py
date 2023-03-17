@@ -596,6 +596,10 @@ def _plot_data_model_comparison_for_single_system(
         "dynamical_kt": "o",
         "dynamical_time": "o",
         "soft_drop_z_cut_02": "s",
+        "dynamical_core_z_cut_02": "o",
+        "dynamical_kt_z_cut_02": "o",
+        "dynamical_time_z_cut_02": "o",
+        "soft_drop_z_cut_04": "s",
     }
 
     with sns.color_palette("Set2"):
