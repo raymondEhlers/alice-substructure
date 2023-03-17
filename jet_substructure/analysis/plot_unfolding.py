@@ -981,6 +981,33 @@ def _plot_single_system_comparison(
                 h_input,
                 kt_range_for_comparison,
             )
+            # Check that binning matches up. If it doesn't attempt to rebin
+            if h.axes[0].bin_edges.shape != ratio_reference_hist.axes[0].bin_edges.shape or \
+                not np.allclose(h.axes[0].bin_edges, ratio_reference_hist.axes[0].bin_edges):
+                # TODO: Would be really nice if we could do this more gracefully! This is really hacky
+                # Attempt to rebin. It will warn if it won't work (eg. if the edges don't match up).
+                # First, we start with the rebinning the systematic since we'll lose the metadata after rebinning
+                # the main binned_data. As a hack, we create a new binned, rebin that, and then take the values out
+                _ratio_systematic_low = binned_data.BinnedData(
+                    axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
+                    values=ratio_reference_hist.metadata["y_systematic"]["quadrature"].low,
+                    variances=np.ones(len(ratio_reference_hist.values)),
+                )[::h.axes[0].bin_edges].values  # type: ignore[misc]
+                _ratio_systematic_high = binned_data.BinnedData(
+                    axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
+                    values=ratio_reference_hist.metadata["y_systematic"]["quadrature"].high,
+                    variances=np.ones(len(ratio_reference_hist.values)),
+                )[::h.axes[0].bin_edges].values  # type: ignore[misc]
+                # Now rebin the main hist.
+                ratio_reference_hist = ratio_reference_hist[::h.axes[0].bin_edges]  # type: ignore[misc]
+                # And store the updated systematic
+                ratio_reference_hist.metadata["y_systematic"] = {
+                    "quadrature": unfolding_base.AsymmetricErrors(
+                        _ratio_systematic_low,
+                        _ratio_systematic_high,
+                    )
+                }
+
             ratio = h / ratio_reference_hist
             # Ratio + statistical error bars
             ax_ratio.errorbar(
