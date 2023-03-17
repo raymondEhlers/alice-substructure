@@ -803,12 +803,12 @@ def plot_grooming_model_comparisons_for_single_system(
                             "y",
                             label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
                             log=True,
-                            range=(7e-3, 1),
+                            range=(4e-3, 1),
                             font_size=text_font_size,
                         ),
                     ],
-                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
-                    legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.015, 0.025), marker_label_spacing=0.075),
+                    text=pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
+                    legend=pb.LegendConfig(location="lower left", font_size=round(text_font_size*0.8), anchor=(0.015, 0.025), marker_label_spacing=0.075),
                 ),
                 pb.Panel(
                     axes=[
@@ -816,7 +816,7 @@ def plot_grooming_model_comparisons_for_single_system(
                         pb.AxisConfig(
                             "y",
                             label=r"$\frac{\text{Model}}{\text{Data}}$",
-                            range=(0.45, 1.55),
+                            range=(0.1, 1.9) if "soft_drop_z_cut_04" in grooming_methods else (0.45, 1.55),
                             font_size=text_font_size,
                         ),
                     ],
@@ -1246,7 +1246,7 @@ def plot_Rg_grooming_comparisons_for_single_system(
                             font_size=text_font_size,
                         ),
                     ],
-                    text=pb.TextConfig(x=0.97, y=0.97, text=text, font_size=text_font_size),
+                    text=pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
                     legend=pb.LegendConfig(location="lower left", font_size=round(text_font_size*0.8), anchor=(0.015, 0.025), marker_label_spacing=0.075),
                 ),
                 pb.Panel(
