@@ -31,40 +31,45 @@ logger = logging.getLogger(__name__)
 pachyderm.plot.configure()
 
 
-def ks_test(
-    unfolded_pp: unfolding_analysis.SingleResult,
-    unfolded_PbPb: unfolding_analysis.SingleResult,
+def hist_stat_tests_KS_chi2(
+    ratio: binned_data.BinnedData,
     use_ROOT: bool = True,
-) -> float:
-    import scipy.stats
-
-    # Input data
-    hist_pp = unfolded_pp.data
-    hist_PbPb = unfolded_PbPb.data
-
-    # Calculate the ratio histogram
-    # TODO: Error prop
-    hist = hist_PbPb / hist_pp
-
-    # Add the uncertainties in quadrature
-
-    # Create ROOT hist (:-()
+) -> tuple[float, float]:
     if use_ROOT:
+        # Create ROOT hist (:-()
         import ROOT
 
-        data_hist = ROOT.TH1D("data", "data", len(hist.axes[0].bin_edges) - 1, hist.axes[0].bin_edges)
+        #data_hist = ROOT.TH1D("data", "data", len(hist.axes[0].bin_edges) - 1, hist.axes[0].bin_edges)
 
+        #for i, (_value, _error) in enumerate(zip(hist.values, hist.errors), start=1):
+        #    data_hist.SetBinContent(i, _value)
+        #    data_hist.SetBinError(i, _error)
+        hist = ratio
+        data_hist = hist.to_ROOT()
+        # Add systematics in quadrature with stat
+        # Generate the comparison
+        y_systematic: unfolding_base.AsymmetricErrors = ratio.metadata["y_systematic"]["quadrature"]
+        # Determine which values we need to grab
+        # When below 1, take the upper error, and do the opposite above 1
+        # NOTE: We basically assume that they're one sigma
+        y_systematic_values = np.where(ratio.values <= 1, y_systematic.high, y_systematic.low)
         for i, (_value, _error) in enumerate(zip(hist.values, hist.errors), start=1):
-            data_hist.SetBinContent(i, _value)
-            data_hist.SetBinError(i, _error)
+            data_hist.SetBinError(i, np.sqrt(_error ** 2 + y_systematic_values[i-1] ** 2))
 
-        reference_hist = data_hist.Clone("reference").Reset()
+        reference_hist = data_hist.Clone("reference")
+        # Clear out the data, etc
+        reference_hist.Reset()
+        # And define at unity
         for i in range(1, reference_hist.GetXaxis().GetNbins() + 1):
             reference_hist.SetBinContent(i, 1)
             reference_hist.SetBinError(i, 0)
 
-        return data_hist.KolmogorovTest(reference_hist)  # type: ignore[no-any-return]
+        chi2_pvalue: float = data_hist.Chi2Test(reference_hist, "WW")
+        ks_test_pvalue: float = data_hist.KolmogorovTest(reference_hist)
+        return chi2_pvalue, ks_test_pvalue
     else:
+        import scipy.stats
+
         # Create distribution from histogram and bin edges
         # From: https://stackoverflow.com/a/72224046/12907985
         hist_dist = scipy.stats.rv_histogram(
@@ -1199,12 +1204,15 @@ def _plot_pp_PbPb_comparison(
     output_dir: Path,
     models: Mapping[str, Mapping[str, binned_data.BinnedData]] | None = None,
     plausible_stat_test_parameters: list[float] | None = None,
-) -> None:
+    calculate_hist_stat_tests_KS_chi2: bool = False,
+) -> tuple[dict[str, float], dict[str, float]]:
     """Plot PbPb with systematics compared to pp with systematics for a set of grooming methods."""
     # Validations
     if models is None:
         models = {}
     _plausible_stat_test_results: dict[str, dict[float, float]] = {}
+    _ks_test_results: dict[str, float] = {}
+    _chi2_test_results: dict[str, float] = {}
 
     logger.info("Plotting grooming method comparison for kt with systematics")
 
@@ -1396,6 +1404,11 @@ def _plot_pp_PbPb_comparison(
                     _result = plausible_stat_test(ratio=ratio, n_samples=int(1e6), n_sigma_stat=_param)
                     _plausible_stat_test_results[collision_system][_param] = _result
 
+            if calculate_hist_stat_tests_KS_chi2:
+                _chi2_res, _ks_res = hist_stat_tests_KS_chi2(ratio=ratio, use_ROOT=True)
+                _chi2_test_results[collision_system] = _chi2_res
+                _ks_test_results[collision_system] = _ks_res
+
         # Plot model comparison if available
         for model_name, model_with_all_grooming_methods in models.items():
             model = model_with_all_grooming_methods.get(grooming_method, None)
@@ -1418,8 +1431,13 @@ def _plot_pp_PbPb_comparison(
                 **temp_kwargs,
             )
 
+    # Test results
     if _plausible_stat_test_results:
         logger.info(f"Plausible stat test fractions: {_plausible_stat_test_results}")
+    if _chi2_test_results:
+        logger.info(f"Chi2 p value: {_chi2_test_results}")
+    if _ks_test_results:
+        logger.info(f"KS p value: {_ks_test_results}")
 
     # Reference value for ratio
     ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
@@ -1434,6 +1452,8 @@ def _plot_pp_PbPb_comparison(
     fig.savefig(output_dir / f"{filename}.pdf")
     plt.close(fig)
 
+    return _ks_test_results, _chi2_test_results
+
 
 def plot_pp_PbPb_comparison(
     hists: Mapping[str, unfolding_analysis.SingleResult],
@@ -1446,7 +1466,8 @@ def plot_pp_PbPb_comparison(
     text_font_size: int = 31,
     models: Mapping[str, Mapping[str, binned_data.BinnedData]] | None = None,
     plausible_stat_test_parameters: list[float] | None = None,
-) -> None:
+    calculate_hist_stat_tests_KS_chi2: bool = False,
+) -> tuple[dict[str, float], dict[str, float]]:
     """Plot PbPb unfolded results with systematics."""
     jet_pt_bin = next(iter(hists.values())).ranges[0]
     grooming_styling = pb.define_grooming_styles()
@@ -1462,13 +1483,14 @@ def plot_pp_PbPb_comparison(
     if models:
         name = f"unfolded_kt_pp_PbPb_models_comparison_{jet_R_str}"
 
-    _plot_pp_PbPb_comparison(
+    _results = _plot_pp_PbPb_comparison(
         hists=hists,
         models=models,
         grooming_method=grooming_method,
         set_zero_to_nan=False,
         event_activity_to_kt_range=event_activity_to_kt_range,
         plausible_stat_test_parameters=plausible_stat_test_parameters,
+        calculate_hist_stat_tests_KS_chi2=calculate_hist_stat_tests_KS_chi2,
         plot_config=pb.PlotConfig(
             name=name,
             panels=[
@@ -1504,6 +1526,8 @@ def plot_pp_PbPb_comparison(
         ),
         output_dir=output_dir,
     )
+
+    return _results
 
 
 def _plot_simple_kt_with_systematics(
