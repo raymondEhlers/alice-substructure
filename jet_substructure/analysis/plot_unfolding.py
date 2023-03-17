@@ -5148,12 +5148,14 @@ def steer_plotting_of_kt_unfolding_outputs(
     plot_systematics: bool,
     plot_closures: bool,
     unfolding_kt_display_range: dict[str, Tuple[float, float]] | Tuple[float, float],
-    prior_variation_output_name: str | None = None,
+    prior_variation_output_name: dict[str, str | None] | str | None = None,
     relative_individual_systematic_ratio_range: dict[str, Tuple[float, float]] | Tuple[float, float] | None = None,
 ) -> None:
     # Validation
     if isinstance(unfolding_kt_display_range, tuple):
         unfolding_kt_display_range = {grooming_method: unfolding_kt_display_range for grooming_method in grooming_methods}
+    if isinstance(prior_variation_output_name, str) or prior_variation_output_name is None:
+        prior_variation_output_name = {grooming_method: prior_variation_output_name for grooming_method in grooming_methods}
     if isinstance(relative_individual_systematic_ratio_range, tuple) or relative_individual_systematic_ratio_range is None:
         relative_individual_systematic_ratio_range = {
             grooming_method: relative_individual_systematic_ratio_range if relative_individual_systematic_ratio_range is not None else (0.5, 1.5)
@@ -5195,10 +5197,15 @@ def steer_plotting_of_kt_unfolding_outputs(
                 plot_png=plot_png,
             )
 
+        _prior_variation_name = prior_variation_output_name[grooming_method]
+        if _prior_variation_name is not None:
+            _prior_variation_output = unfolding_systematics_outputs[grooming_method][_prior_variation_name]
+        else:
+            _prior_variation_output = None
         plot_kt_unfolding(
             unfolding_output=unfolding_systematics_outputs[grooming_method]["default"],
             plot_png=plot_png,
-            prior_variation_output=unfolding_systematics_outputs[grooming_method][prior_variation_output_name] if prior_variation_output_name is not None else None,
+            prior_variation_output=_prior_variation_output,
             unfolding_kt_display_range=unfolding_kt_display_range[grooming_method],
         )
         for _outputs in [
