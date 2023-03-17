@@ -1041,18 +1041,7 @@ def _plot_single_system_comparison(
                     error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].high,
                 ),
             )
-            # Sanity check
-            # TODO: If this passes once, delete it. I've checked this a lot now...
-            test_relative_y_error_low = np.sqrt(
-                (h.metadata["y_systematic"]["quadrature"].low / h.values) ** 2
-                + (ratio_reference_hist.metadata["y_systematic"]["quadrature"].low / ratio_reference_hist.values) ** 2
-            )
-            test_relative_y_error_high = np.sqrt(
-                (h.metadata["y_systematic"]["quadrature"].high / h.values) ** 2
-                + (ratio_reference_hist.metadata["y_systematic"]["quadrature"].high / ratio_reference_hist.values) ** 2
-            )
-            np.testing.assert_allclose(y_relative_error_low, test_relative_y_error_low)
-            np.testing.assert_allclose(y_relative_error_high, test_relative_y_error_high)
+
             # Store the systematic.
             ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
                 low=y_relative_error_low * ratio.values,
