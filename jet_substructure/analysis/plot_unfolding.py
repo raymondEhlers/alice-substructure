@@ -1657,7 +1657,9 @@ def plot_pp_PbPb_comparison(
                         pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
                         pb.AxisConfig("y", label=r"$\frac{\text{Pb--Pb}}{\text{pp}}$",
                                       range=(0.1, 1.9) if "z_cut_04" in grooming_method else (0.3, 1.7),
-                                      font_size=text_font_size),
+                                      # Make the label a bit bigger since it's stack on top
+                                      font_size=text_font_size * 1.05
+                                      ),
                     ],
                     legend=pb.LegendConfig(location="lower left", font_size=24, anchor=(0.01, 0.01), marker_label_spacing=0.05, label_spacing=0.1),
                 ),
