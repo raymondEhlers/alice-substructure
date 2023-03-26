@@ -955,69 +955,6 @@ def _rebin_method_two(ratio_reference_hist: binned_data.BinnedData, h: binned_da
     return ratio_reference_hist
 
 
-def _rebin_method_three(ratio_reference_hist: binned_data.BinnedData, h: binned_data.BinnedData) -> binned_data.BinnedData:
-    # TODO: Would be really nice if we could do this more gracefully! This is really hacky
-    _ratio_reference_hist_bin_widths = ratio_reference_hist.axes[0].bin_widths
-    _ratio_reference_values = (ratio_reference_hist.values * _ratio_reference_hist_bin_widths)
-    _ratio_y_systematic = ratio_reference_hist.metadata["y_systematic"]["quadrature"]
-    # Now rebin the main hist.
-    ratio_reference_hist = (ratio_reference_hist * ratio_reference_hist.axes[0].bin_widths)[::h.axes[0].bin_edges]  # type: ignore[misc]
-    ratio_reference_hist /= ratio_reference_hist.axes[0].bin_widths
-    # And store the updated systematic
-    # Calculate the error as if it was a hist itself, but focusing only on the bins that we'll rebin (since I know what's coming...)
-    # Low
-    #_ratio_systematic_low_last_bin = unfolding_base.relative_error(
-    #    unfolding_base.ErrorInput(
-    #        value=_ratio_reference_values[-2:-1],
-    #        error=_ratio_y_systematic.low[-2:-1] * _ratio_reference_hist_bin_widths[-2:-1],
-    #    ),
-    #    unfolding_base.ErrorInput(
-    #        value=_ratio_reference_values[-1:],
-    #        error=_ratio_y_systematic.low[-1:] * _ratio_reference_hist_bin_widths[-1:],
-    #    ),
-    #)
-    _ratio_systematic_low_last_bin = sum([
-        _v.error/_v.value for _v in
-        [unfolding_base.ErrorInput(
-            value=_ratio_reference_values[-2:-1],
-            error=_ratio_y_systematic.low[-2:-1] * _ratio_reference_hist_bin_widths[-2:-1],
-        ),
-        unfolding_base.ErrorInput(
-            value=_ratio_reference_values[-1:],
-            error=_ratio_y_systematic.low[-1:] * _ratio_reference_hist_bin_widths[-1:],
-        ),]
-    ])
-    _ratio_systematic_low = np.array(_ratio_y_systematic.low * _ratio_reference_hist_bin_widths, copy=True)
-    _ratio_systematic_low = np.delete(_ratio_systematic_low, -1)
-    logger.info(f"{_ratio_systematic_low=}, {_ratio_systematic_low_last_bin=}")
-    _ratio_systematic_low[-1:] = (_ratio_systematic_low_last_bin * (ratio_reference_hist.values[-1] * ratio_reference_hist.axes[0].bin_widths[-1]))
-    _ratio_systematic_low_values = _ratio_systematic_low
-    # High
-    _test_ratio_systematic_high_last_bin = unfolding_base.relative_error(
-        unfolding_base.ErrorInput(
-            value=_ratio_reference_values[-2:-1],
-            error=_ratio_y_systematic.high[-2:-1] * _ratio_reference_hist_bin_widths[-2:-1],
-        ),
-        unfolding_base.ErrorInput(
-            value=_ratio_reference_values[-1:],
-            error=_ratio_y_systematic.high[-1:] * _ratio_reference_hist_bin_widths[-1:],
-        ),
-    )
-    _ratio_systematic_high = np.array(_ratio_y_systematic.high * _ratio_reference_hist_bin_widths, copy=True)
-    _ratio_systematic_high = np.delete(_ratio_systematic_high, -1)
-    _ratio_systematic_high[-1:] = (_test_ratio_systematic_high_last_bin * (ratio_reference_hist.values[-1] * ratio_reference_hist.axes[0].bin_widths[-1]))
-    _ratio_systematic_high_values = _ratio_systematic_high
-    #np.testing.assert_allclose(_ratio_y_systematic.low, _test_ratio_systematic_low)
-    #np.testing.assert_allclose(_ratio_systematic_low, _test_ratio_systematic_low)
-    ratio_reference_hist.metadata["y_systematic"] = {
-        "quadrature": unfolding_base.AsymmetricErrors(
-            _ratio_systematic_low_values / ratio_reference_hist.axes[0].bin_widths,
-            _ratio_systematic_high_values / ratio_reference_hist.axes[0].bin_widths,
-        )
-    }
-    return ratio_reference_hist
-
-
 def _plot_single_system_comparison(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
@@ -1193,25 +1130,12 @@ def _plot_single_system_comparison(
                     h=h,
                 )
 
-                _ratio_reference_hist_3 = _rebin_method_three(
-                    ratio_reference_hist=ratio_reference_hist.copy(),
-                    h=h,
-                )
-
                 # Bin edges
                 np.testing.assert_allclose(
                     _ratio_reference_hist_1.axes[0].bin_edges,
                     _ratio_reference_hist_2.axes[0].bin_edges,
                 )
-                np.testing.assert_allclose(
-                    _ratio_reference_hist_2.axes[0].bin_edges,
-                    _ratio_reference_hist_3.axes[0].bin_edges,
-                )
                 # Values
-                np.testing.assert_allclose(
-                    _ratio_reference_hist_1.values,
-                    _ratio_reference_hist_3.values,
-                )
                 np.testing.assert_allclose(
                     _ratio_reference_hist_1.values,
                     _ratio_reference_hist_2.values,
@@ -1219,33 +1143,18 @@ def _plot_single_system_comparison(
                 # Variances
                 np.testing.assert_allclose(
                     _ratio_reference_hist_1.variances,
-                    _ratio_reference_hist_3.variances,
-                )
-                np.testing.assert_allclose(
-                    _ratio_reference_hist_1.variances,
                     _ratio_reference_hist_2.variances,
                 )
                 # Systematics
-                #np.testing.assert_allclose(
-                #    _ratio_reference_hist_2.metadata["y_systematic"]["quadrature"].low,
-                #    _ratio_reference_hist_3.metadata["y_systematic"]["quadrature"].low,
-                #)
                 np.testing.assert_allclose(
                     _ratio_reference_hist_1.metadata["y_systematic"]["quadrature"].low,
                     _ratio_reference_hist_2.metadata["y_systematic"]["quadrature"].low,
                 )
                 np.testing.assert_allclose(
-                    _ratio_reference_hist_1.metadata["y_systematic"]["quadrature"].low,
-                    _ratio_reference_hist_3.metadata["y_systematic"]["quadrature"].low,
-                )
-                np.testing.assert_allclose(
-                    _ratio_reference_hist_1.metadata["y_systematic"]["quadrature"].high,
-                    _ratio_reference_hist_3.metadata["y_systematic"]["quadrature"].high,
-                )
-                np.testing.assert_allclose(
                     _ratio_reference_hist_1.metadata["y_systematic"]["quadrature"].high,
                     _ratio_reference_hist_2.metadata["y_systematic"]["quadrature"].high,
                 )
+                ratio_reference_hist = _ratio_reference_hist_1
 
             ratio = h / ratio_reference_hist
             # Ratio + statistical error bars
