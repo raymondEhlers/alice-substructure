@@ -121,6 +121,7 @@ class ErrorInput:
 
 
 def relative_error(*inputs: ErrorInput) -> npt.NDArray[np.float64]:
+    """ Specifically for ratios or individual values. """
     if len(inputs) == 0:
         raise ValueError("Must pass at least one ErrorInput")
     if len(inputs) > 1:
