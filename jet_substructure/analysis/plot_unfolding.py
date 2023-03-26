@@ -8,7 +8,7 @@ from __future__ import annotations
 import itertools
 import logging
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Protocol, Sequence, Tuple, Union
 
 import attrs
 import cycler
@@ -233,7 +233,7 @@ def load_analytical_calculations(
     return output
 
 
-def load_jetscape_data(filename: Path) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+def load_jetscape_data_jetscape_analysis(filename: Path) -> Dict[str, Dict[str, binned_data.BinnedData]]:
     """Load jetscape predictions for all jet R.
 
     Include DyG core, kt, and time, as well as SD z > 0.2.
@@ -306,12 +306,22 @@ def load_sherpa_predictions(
     return output
 
 
-@attrs.define
 class ModelInfo:
     # TODO: Implement this to wrap model predictions...
     label: str
     needs_normalization: bool = attrs.field(default=False)
     metadata: Dict[str, Any] = attrs.field(factory=dict)
+
+@attrs.define
+class Jetscape:
+    base_dir: Path
+    label: str = attrs.field(default="JETSCAPEv3.5 AA22")
+    needs_normalization: bool = attrs.field(default=False)
+    metadata: Dict[str, Any] = attrs.field(factory=dict)
+
+    def load_predictions(self, grooming_methods: list[str]) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+        input_dir = self.base_dir / ""
+        ...
 
 
 def _load_hybrid_model(
@@ -408,7 +418,7 @@ def _load_hybrid_model(
             )
             _relative_indices = _quantity_to_relative_index[quantity_to_retrieve]
             # (lower, upper)
-            # TODO: Need to update plotting to plot with fill_between
+            # Convert from bands to a symmetric uncertainty to simplify plotting
             band_indices = (
                 _offset_to_desired_quantities + _relative_indices[1],
                 _offset_to_desired_quantities + _relative_indices[0]
@@ -433,7 +443,7 @@ def _load_hybrid_model(
     return output
 
 
-def load_hybrid_model(
+def load_hybrid_model_QM22(
     base_dir: Path,
     bin_edges: Dict[str, Dict[str, npt.NDArray[np.float64]]],
     jet_R: str,
@@ -453,6 +463,48 @@ def load_hybrid_model(
     for include_moliere in [False, True]:
         dyg_filename_template: str = "3050_kT_{moliere_label}_WantWake_1_JetR_2_kT_DyG.dat"
         sd_filename_template: str = "3050_kT_{moliere_label}_WantWake_1_JetR_2_kT_SD.dat"
+
+        output[_moliere_output_label[include_moliere]] = _load_hybrid_model(
+            base_dir=base_dir,
+            dyg_filename=dyg_filename_template.format(moliere_label=_moliere_label[include_moliere]),
+            sd_filename=sd_filename_template.format(moliere_label=_moliere_label[include_moliere]),
+            bin_edges=bin_edges,
+            jet_R=jet_R,
+            jet_pt_bin=jet_pt_bin,
+            quantity_to_retrieve=quantity_to_retrieve,
+        )
+
+    return output
+
+
+def load_hybrid_model(
+    base_dir: Path,
+    bin_edges: Dict[str, Dict[str, npt.NDArray[np.float64]]],
+    jet_R: str,
+    jet_pt_bin: helpers.JetPtRange,
+    event_activity: str,
+    quantity_to_retrieve: str = "ratio",
+) -> Dict[str, Dict[str, Dict[str, binned_data.BinnedData]]]:
+    # Validation
+    centrality_label_map = {
+        "central": "010",
+        "semi_central": "3050",
+    }
+    centrality = centrality_label_map[event_activity]
+
+    _moliere_label = {
+        True: "WithElastic",
+        False: "NoElastic",
+    }
+    _moliere_output_label = {
+        True: "hybrid_moliere",
+        False: "hybrid_without_moliere",
+    }
+
+    output = {}
+    for include_moliere in [False, True]:
+        dyg_filename_template: str = "{centrality}_kT_{moliere_label}_WantWake_1_JetR_2_kT_DyG.dat"
+        sd_filename_template: str = "{centrality}_kT_{moliere_label}_WantWake_1_JetR_2_kT_SD.dat"
 
         output[_moliere_output_label[include_moliere]] = _load_hybrid_model(
             base_dir=base_dir,
