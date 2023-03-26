@@ -1125,6 +1125,8 @@ def _plot_single_system_comparison(
                     h=h,
                 )
 
+                # Cross check.
+                # TODO: Remove this post HP. It's not needed anymore...
                 _ratio_reference_hist_2 = _rebin_method_two(
                     ratio_reference_hist=ratio_reference_hist.copy(),
                     h=h,
