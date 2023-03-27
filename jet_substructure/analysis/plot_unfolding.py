@@ -1726,6 +1726,12 @@ def _plot_pp_PbPb_comparison(
         # Teal-ish
         "#59c28c",
     ]
+    # Use consistent colors by settings it via names
+    _p7_named = {
+        "pp": "#845cba",
+        "semi_central": "#FF8301",
+        "central": "#4bafd0",
+    }
 
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
@@ -1775,6 +1781,7 @@ def _plot_pp_PbPb_comparison(
                 label=_event_activity_label_map[collision_system],
                 # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
                 zorder=3 + _plot_counter,
+                color=_p7_named[collision_system],
             )
 
             # Systematic uncertainty
