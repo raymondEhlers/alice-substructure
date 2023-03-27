@@ -654,6 +654,38 @@ def _plot_data_model_comparison_for_single_system(
         "soft_drop_z_cut_04": "s",
     }
 
+    _palette_6_mod = {
+        "purple": "#7e459e",
+        "green": "#85aa55",
+        "blue": "#7385d9",
+        "magenta": "#b84c7d",
+        "teal": "#4cab98",
+        "orange": "#FF8301",
+    }
+    _extended_colors = {
+        "alt_purple": "#c09cd3",
+        # Generated
+        #"alt_green": "#3f591d",
+        "alt_green": "#517225",
+        # Already existing green
+        #"alt_green": "#55a270",
+        "alt_blue": "#4bafd0",
+    }
+
+    #_colors_for_assignments = []
+    #for _method in grooming_methods:
+    _method_to_color = {
+        "dynamical_core": _palette_6_mod["purple"],
+        "dynamical_kt": _palette_6_mod["green"],
+        "dynamical_time": _palette_6_mod["blue"],
+        "soft_drop_z_cut_02": _palette_6_mod["magenta"],
+        "dynamical_core_z_cut_02": _extended_colors["alt_purple"],
+        "dynamical_kt_z_cut_02": _extended_colors["alt_green"],
+        "dynamical_time_z_cut_02": _extended_colors["alt_blue"],
+        "soft_drop_z_cut_04": _palette_6_mod["orange"],
+    }
+    #_colors_for_assignments.append(_method_to_color[_method])
+
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
         # Size is specified to make it convenient to compare against Hard Probes plots.
@@ -695,7 +727,7 @@ def _plot_data_model_comparison_for_single_system(
                 linestyle="",
                 linewidth=3,
                 label=grooming_styling[grooming_method].label_short,
-                color=_palette_6_mod[_i],
+                color=_method_to_color[grooming_method],
             )
 
             # Systematic uncertainty
@@ -1002,13 +1034,50 @@ def _plot_single_system_comparison(
                   "#7385d9",
                   "#b84c7d",
                   "#4cab98"]
-    _palette_6_mod = [
-        "#7e459e",
-        "#85aa55",
-        "#7385d9",
-        "#b84c7d",
-        "#4cab98",
-    ]
+    _palette_6_mod = {
+        "purple": "#7e459e",
+        "green": "#85aa55",
+        "blue": "#7385d9",
+        "magenta": "#b84c7d",
+        "teal": "#4cab98",
+        "orange": "#FF8301",
+    }
+    _extended_colors = {
+        "alt_purple": "#c09cd3",
+        # Generated
+        #"alt_green": "#3f591d",
+        "alt_green": "#517225",
+        # Already existing green
+        #"alt_green": "#55a270",
+        "alt_blue": "#4bafd0",
+    }
+
+    _colors_for_assignments = []
+    for _method in grooming_methods:
+        _method_to_color = {
+            "dynamical_core": _palette_6_mod["purple"],
+            "dynamical_kt": _palette_6_mod["green"],
+            "dynamical_time": _palette_6_mod["blue"],
+            "soft_drop_z_cut_02": _palette_6_mod["magenta"],
+            "dynamical_core_z_cut_02": _extended_colors["alt_purple"],
+            "dynamical_kt_z_cut_02": _extended_colors["alt_green"],
+            "dynamical_time_z_cut_02": _extended_colors["alt_blue"],
+            "soft_drop_z_cut_04": _palette_6_mod["orange"],
+        }
+        _colors_for_assignments.append(_method_to_color[_method])
+        # if "dynamical_core" in _method:
+        #     _color_for_method = _palette_6_mod["purple"]
+        # elif "dynamical_kt" in _method:
+        #     _color_for_method = _palette_6_mod["green"]
+        # elif "dynamical_time" in _method:
+        #     _color_for_method = _palette_6_mod["blue"]
+        # elif _method == "soft_drop_z_cut_02":
+        #     _color_for_method = _palette_6_mod["magenta"]
+        # elif _method == "soft_drop_z_cut_04":
+        #     _color_for_method = _palette_6_mod["orange"]
+        # else:
+        #     raise ValueError(f"Could not assign color for method {_method}")
+        #_colors_for_assignments.append(_color_for_method)
 
     #_markers = ["D", "s", "o", "P", "o"]
     _markers = ["o", "o", "o", "s", "o"]
@@ -1026,8 +1095,10 @@ def _plot_single_system_comparison(
             sharex=True,
         )
 
-        ax.set_prop_cycle(cycler.cycler(color=_palette_6_mod) + cycler.cycler(marker=_markers))
-        ax_ratio.set_prop_cycle(cycler.cycler(color=_palette_6_mod) + cycler.cycler(marker=_markers_ratio))
+        #ax.set_prop_cycle(cycler.cycler(color=_palette_6_mod.values()) + cycler.cycler(marker=_markers))
+        #ax_ratio.set_prop_cycle(cycler.cycler(color=_palette_6_mod.values()) + cycler.cycler(marker=_markers_ratio))
+        ax.set_prop_cycle(cycler.cycler(color=_colors_for_assignments) + cycler.cycler(marker=_markers[:len(_colors_for_assignments)]))
+        ax_ratio.set_prop_cycle(cycler.cycler(color=_colors_for_assignments) + cycler.cycler(marker=_markers_ratio[:len(_colors_for_assignments)]))
 
         # Use selected grooming method as a reference, but only in the range where the others are measured.
         ratio_reference_hist_unselected = hists[reference_grooming_method].data
@@ -1115,7 +1186,7 @@ def _plot_single_system_comparison(
             if h.axes[0].bin_edges.shape != ratio_reference_hist.axes[0].bin_edges.shape or \
                 not np.allclose(h.axes[0].bin_edges, ratio_reference_hist.axes[0].bin_edges):
                 # Keep an original copy around for testing
-                # TODO: Remove when done testing
+                # TODO: Remove extra comparison code and original hist when done testing
                 ratio_reference_hist_original = ratio_reference_hist.copy()
                 logger.info(f"bin_edges: {ratio_reference_hist.axes[0].bin_edges}")
                 logger.info(f"Original: {ratio_reference_hist.values}")
