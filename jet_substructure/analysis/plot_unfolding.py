@@ -319,9 +319,216 @@ class Jetscape:
     needs_normalization: bool = attrs.field(default=False)
     metadata: Dict[str, Any] = attrs.field(factory=dict)
 
-    def load_predictions(self, grooming_methods: list[str]) -> Dict[str, Dict[str, binned_data.BinnedData]]:
-        input_dir = self.base_dir / ""
+    def load_predictions(self, grooming_methods: list[str] | None = None) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+        if grooming_methods is None:
+            grooming_methods = [
+                "dynamical_core",
+                "dynamical_kt",
+                "dynamical_time",
+                "soft_drop_z_cut_02",
+                "dynamical_core_z_cut_02",
+                "dynamical_kt_z_cut_02",
+                "dynamical_time_z_cut_02",
+                "soft_drop_z_cut_04",
+            ]
+        grooming_methods_to_parameters = {
+            # Here, (DyG a, z cut)
+            "dynamical_core": (0.5, 0.0),
+            "dynamical_kt": (1.0, 0.0),
+            "dynamical_time": (2.0, 0.0),
+            "dynamical_core_z_cut_02": (0.5, 0.2),
+            "dynamical_kt_z_cut_02": (1.0, 0.2),
+            "dynamical_time_z_cut_02": (2.0, 0.2),
+            # Here, (beta, z_cut)
+            "soft_drop_z_cut_02": (0.0, 0.2),
+            "soft_drop_z_cut_04": (0.0, 0.4),
+        }
+        _centrality_bins = {
+            "0-5": "pbpb0-5",
+            "5-10": "pbpb5-10",
+            "30-40": "pbpb30-40",
+            "40-50": "pbpb40-50",
+            "pp": "pp",
+        }
+        # First, try to grab the DyG predictions
+        values: dict[str, dict[str, binned_data.BinnedData]] = {}
+        for grooming_method in grooming_methods:
+            values[grooming_method] = {}
+
+            _grooming_param, _z_cut = grooming_methods_to_parameters[grooming_method]
+            _grooming_label = "DynamicalGroom" if "dynamical" in grooming_method else "SoftDropGroom"
+            _grooming_parameter_label = "aDyn" if "dynamical" in grooming_method else "beta"
+            input_dir = self.base_dir / "combined"
+            for _cent_bin, _cent_bin_label in _centrality_bins.items():
+                filename = f"{_cent_bin_label}_{_grooming_label}_ktG_jetr0.2_ptj60-80_rapj0.0-0.7_pt0.0-2510.0_rap0.0-1.1_{_grooming_parameter_label}{_grooming_param:.02f}_zCut{_z_cut:.02f}.txt"
+                logger.info(f"Loading {grooming_method}, {_cent_bin} from {filename}")
+                loaded_data = np.loadtxt(input_dir / _cent_bin_label / filename)
+                # Construct binned_data from input
+                logger.info(f"{loaded_data[:, 1]}")
+                bin_edges = np.concatenate([loaded_data[:, 1], loaded_data[-1:, 2]])
+                logger.info(f"{bin_edges=}")
+                data = binned_data.BinnedData(
+                    axes=bin_edges,
+                    values=loaded_data[:, 3],
+                    variances=(loaded_data[:, 4] ** 2),
+                )
+                values[grooming_method][_cent_bin] = data
+
+        # Merge relevant hists
+        return_values: dict[str, dict[str, binned_data.BinnedData]] = {}
+        # Handle by hand
+        # First, just handle pp
+        #return_values["pp"] = {
+        #    _method: values[_method]["pp"]
+        #    for _method in grooming_methods
+        #}
+        # Next, handle the PbPb
         ...
+
+        # Alternatively, Handle automatically for all
+        for collision_system, contributors in {
+            "pp": ["pp"],
+            "semi_central": ["30-40", "40-50"],
+            "central": ["0-5", "5-10"],
+        }.items():
+            # NOTE: len(contributors) assumes that there's the same number of events in each cent bin.
+            #       This should be approximately true, although it would be nicer if we could do this precisely.
+            return_values[collision_system] = {
+                _method: sum([  # type: ignore[misc]
+                    values[_method][contributor] for contributor in contributors
+                ]) / len(contributors)
+                for _method in grooming_methods
+            }
+
+            for _method in grooming_methods:
+                _data = return_values[collision_system][_method]
+                if self.needs_normalization:
+                    _data /= np.sum(_data.values)
+                # normalize by bin widths
+                _data /= _data.axes[0].bin_widths
+                return_values[collision_system][_method] = _data
+
+        return return_values
+
+@attrs.define
+class HybridModel:
+    base_dir: Path
+    label: str = attrs.field()
+    needs_normalization: bool = attrs.field(default=False)
+    metadata: Dict[str, Any] = attrs.field(factory=dict)
+
+    def load_predictions(self, grooming_methods: list[str] | None = None) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+        # NOTE: For now, only returns the ratio
+        if grooming_methods is None:
+            grooming_methods = [
+                "dynamical_core",
+                "dynamical_kt",
+                "dynamical_time",
+                "soft_drop_z_cut_02",
+                "dynamical_core_z_cut_02",
+                "dynamical_kt_z_cut_02",
+                "dynamical_time_z_cut_02",
+                "soft_drop_z_cut_04",
+            ]
+
+        grooming_methods_to_parameters = {
+            # Here, (DyG a, z cut)
+            "dynamical_core": (0.5, 0.0),
+            "dynamical_kt": (1.0, 0.0),
+            "dynamical_time": (2.0, 0.0),
+            "dynamical_core_z_cut_02": (0.5, 0.2),
+            "dynamical_kt_z_cut_02": (1.0, 0.2),
+            "dynamical_time_z_cut_02": (2.0, 0.2),
+            # Here, (beta, z_cut)
+            "soft_drop_z_cut_02": (0.0, 0.2),
+            "soft_drop_z_cut_04": (0.0, 0.4),
+        }
+        _soft_drop_prediction_indices = {
+            "soft_drop_z_cut_00": 0,
+            "soft_drop_z_cut_02": 1,
+            "soft_drop_z_cut_04": 1,
+        }
+        _dyg_prediction_indices = {
+            "dynamical_core": 0,
+            "dynamical_core_z_cut_02": 0,
+            "dynamical_kt": 1,
+            "dynamical_kt_z_cut_02": 1,
+            "dynamical_time": 2,
+            "dynamical_time_z_cut_02": 2,
+        }
+        _pt_bin_index = {
+            helpers.JetPtRange(60, 80): 2,
+        }
+        ...
+
+        _include_elastic_map = {
+            True: "Elastic",
+            False: "NoElastic",
+        }
+        _include_wake_map = {
+            True: "Wake_1",
+            True: "Wake_0",
+        }
+        _centrality_map = {
+            "semi_central": "3050",
+            "central": "010",
+        }
+
+        # Input options
+        include_elastic = self.metadata["include_elastic"]
+        include_wake = self.metadata["include_wake"]
+        bin_edges = self.metadata["bin_edges"]
+
+        # Bin edges
+        _axis = binned_data.Axis(bin_edges=bin_edges)
+        _bin_centers = _axis.bin_centers
+
+        values: dict[str, dict[str, binned_data.BinnedData]] = {}
+        for centrality_bin in ["central", "semi_central"]:
+            values[centrality_bin] = {}
+            for grooming_method in grooming_methods:
+                logger.info(f"Processing {centrality_bin}, {grooming_method}")
+                _centrality_label = _centrality_map[centrality_bin]
+                _elastic_label = _include_elastic_map[include_elastic]
+                _wake_label = _include_wake_map[include_wake]
+
+                _grooming_param, _z_cut = grooming_methods_to_parameters[grooming_method]
+                _grooming_method_label = "DyG" if "dynamical" in grooming_method else "SD"
+                _z_label_for_dyg = "_wzcut_" + ("1" if _z_cut > 0 else "0") if "dynamical" in grooming_method else ""
+                if "dynamical" in grooming_method:
+                    _second_grooming_label = "a_" + str(_dyg_prediction_indices[grooming_method])
+                else:
+                    _second_grooming_label = "Gro_" + str(_soft_drop_prediction_indices[grooming_method])
+
+                filename = f"HYBRID_Hadrons_{_elastic_label}_5020_{_centrality_label}_{_wake_label}_JetR_2_kT_{_grooming_method_label}{_z_label_for_dyg}_JetBin_2_{_second_grooming_label}.dat"
+
+                input_data = np.loadtxt(self.base_dir / filename)
+
+                # Validate bin_edges with bin_centers
+                bin_centers = input_data[:, 0]
+                if not np.allclose(bin_centers, _bin_centers):
+                    raise ValueError(f"bin edges don't match centers: In file: {bin_centers}. passed: {_bin_centers}")
+
+                ratio_upper_band = input_data[:, 5]
+                ratio_lower_band = input_data[:, 6]
+
+                # Convert from bands to a symmetric uncertainty to simplify plotting
+                central_values = (ratio_upper_band + ratio_lower_band) / 2
+                logger.info(f"{ratio_upper_band=}")
+                logger.info(f"{ratio_lower_band=}")
+                logger.info(f"{central_values=}")
+                # Make it symmetric by construction.
+                error_squared = (central_values - ratio_lower_band) ** 2
+                logger.info(f"{error_squared=}")
+                logger.info(f"{np.sqrt(error_squared)=}")
+                values[centrality_bin][grooming_method] = binned_data.BinnedData(
+                    axes=[bin_edges],
+                    values=central_values,
+                    variances=error_squared,
+                )
+
+        return values
+
 
 
 def _load_hybrid_model(
@@ -591,7 +798,7 @@ _models_styles = {
         color=_model_palette[6],
     ),
     "jetscape": dict(
-        label="JETSCAPE PP19",
+        label="JETSCAPEv3.5 AA22",
         linewidth=3,
         linestyle="--",
         marker="D",
@@ -1679,6 +1886,7 @@ def _plot_pp_PbPb_comparison(
             temp_kwargs["label"] = temp_kwargs["label"]
             temp_kwargs.pop("color")
             temp_kwargs.pop("marker")
+            logger.info(f"{model.values=}, {model.errors=}")
             ax_ratio.fill_between(
                 model.axes[0].bin_centers,
                 model.values - model.errors,
