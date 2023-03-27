@@ -1883,6 +1883,10 @@ def _plot_pp_PbPb_comparison(
                 )
                 continue
 
+            # Select the relevant kt range
+            model = unfolding_base.select_hist_range(
+                model, event_activity_to_kt_range[collision_system]
+            )
             # Fill between
             temp_kwargs = dict(_models_styles[model_name])
             temp_kwargs["label"] = temp_kwargs["label"]
