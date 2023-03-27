@@ -467,7 +467,7 @@ class HybridModel:
         }
         _include_wake_map = {
             True: "Wake_1",
-            True: "Wake_0",
+            False: "Wake_0",
         }
         _centrality_map = {
             "semi_central": "3050",
