@@ -2031,11 +2031,14 @@ def plot_pp_PbPb_comparison(
             return super().create_artists(legend, orig_handle, xdescent, xx, width, height, fontsize, trans)
 
     _ratio_range = (0.3, 1.7)
+    if "central" in hists and models:
+        _ratio_range = (0.1, 1.9)
     if "z_cut_04" in grooming_method:
         if models:
             _ratio_range = (-0.2, 2.2)
         else:
             _ratio_range = (0.1, 1.9)
+
 
     _results = _plot_pp_PbPb_comparison(
         hists=hists,
