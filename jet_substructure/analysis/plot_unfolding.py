@@ -1744,6 +1744,11 @@ def _plot_pp_PbPb_comparison(
         # Use pp as reference, but only in the range where the others are measured.
         ratio_reference_hist_unselected = hists["pp"].data
 
+        # Determine whether we should plot the ratio in black points and grey uncertainties
+        # We only want to do that if we have models for comparison and have just pp and one
+        # other collision system available
+        plot_ratio_black_and_white = (models and len(hists) == 2)
+
         # Collision system is a bit misleading because it's really just a high label, but good enough for a quick look.
         for _plot_counter, (collision_system, hist) in enumerate(hists.items()):
             # Axes: jet_pt, attr_name
@@ -1810,7 +1815,7 @@ def _plot_pp_PbPb_comparison(
                 ratio.values,
                 yerr=ratio.errors,
                 xerr=ratio.axes[0].bin_widths / 2,
-                color=p[0].get_color(),
+                color="black" if plot_ratio_black_and_white else p[0].get_color(),
                 marker="s" if "soft_drop" in grooming_method else "o",
                 markersize=11,
                 linestyle="",
@@ -1857,7 +1862,7 @@ def _plot_pp_PbPb_comparison(
                 y_data=ratio.values,
                 x_errors=ratio.axes[0].bin_widths / 2,
                 y_errors=np.array([y_systematic.low, y_systematic.high]),
-                color=p[0].get_color(),
+                color="grey" if plot_ratio_black_and_white else p[0].get_color(),
                 linewidth=0,
                 alpha=0.3,
                 zorder=2,
