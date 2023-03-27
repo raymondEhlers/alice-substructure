@@ -1887,7 +1887,7 @@ def _plot_pp_PbPb_comparison(
                 _ks_test_results[collision_system] = _ks_res
 
         # Plot model comparison if available
-        for model_name, model_with_all_grooming_methods in models.items():
+        for i_model, (model_name, model_with_all_grooming_methods) in enumerate(models.items()):
             model = model_with_all_grooming_methods.get(grooming_method, None)
             if not model:
                 logger.debug(
@@ -1899,10 +1899,38 @@ def _plot_pp_PbPb_comparison(
             model = unfolding_base.select_hist_range(
                 model, event_activity_to_kt_range[collision_system]
             )
+
+            # TODO: Cleanup - this is a mess! Just needed to move quickly for HP2023
+            # Colors (copied from elsewhere)
+            _palette_6_mod = {
+                #"purple": "#7e459e",
+                "green": "#85aa55",
+                #"blue": "#7385d9",
+                "magenta": "#b84c7d",
+                "teal": "#4cab98",
+                #"orange": "#FF8301",
+            }
+            _extended_colors = {
+                "purple": "#7e459e",
+                #"alt_purple": "#c09cd3",
+                # Generated
+                #"alt_green": "#3f591d",
+                #"alt_green": "#517225",
+                # Already existing green
+                #"alt_green": "#55a270",
+                #"alt_blue": "#4bafd0",
+                # random additions...
+                "teal": "#4cab98",
+                #"blue": "#7385d9",
+                #"alt_green_2": "#55a270",
+                #"alt_red": _model_palette[1],
+                "alt_red": _model_palette[1],
+            }
             # Fill between
             temp_kwargs = dict(_models_styles[model_name])
             temp_kwargs["label"] = temp_kwargs["label"]
-            temp_kwargs.pop("color")
+            temp_kwargs["facecolor"] = temp_kwargs.pop("color")
+            temp_kwargs["facecolor"] = list(reversed(_extended_colors.values()))[i_model]
             temp_kwargs.pop("marker")
             ax_ratio.fill_between(
                 model.axes[0].bin_centers,
