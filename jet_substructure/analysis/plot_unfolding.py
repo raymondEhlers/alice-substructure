@@ -1978,6 +1978,7 @@ def plot_pp_PbPb_comparison(
     models: Mapping[str, Mapping[str, binned_data.BinnedData]] | None = None,
     plausible_stat_test_parameters: list[float] | None = None,
     calculate_hist_stat_tests_KS_chi2: bool = False,
+    additional_label: str = "",
 ) -> tuple[dict[str, float], dict[str, float]]:
     """Plot PbPb unfolded results with systematics."""
     jet_pt_bin = next(iter(hists.values())).ranges[0]
@@ -1990,9 +1991,12 @@ def plot_pp_PbPb_comparison(
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
 
-    name = f"unfolded_kt_pp_PbPb_comparison_{jet_R_str}"
+    name = f"unfolded_kt_pp_PbPb"
+    if additional_label:
+        name += f"_{additional_label}"
     if models:
-        name = f"unfolded_kt_pp_PbPb_models_comparison_{jet_R_str}"
+        name += f"_models"
+    name += f"_comparison_{jet_R_str}"
 
     _results = _plot_pp_PbPb_comparison(
         hists=hists,
