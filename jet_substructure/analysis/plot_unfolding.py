@@ -514,13 +514,13 @@ class HybridModel:
 
                 # Convert from bands to a symmetric uncertainty to simplify plotting
                 central_values = (ratio_upper_band + ratio_lower_band) / 2
-                logger.info(f"{ratio_upper_band=}")
-                logger.info(f"{ratio_lower_band=}")
-                logger.info(f"{central_values=}")
                 # Make it symmetric by construction.
                 error_squared = (central_values - ratio_lower_band) ** 2
-                logger.info(f"{error_squared=}")
-                logger.info(f"{np.sqrt(error_squared)=}")
+                #logger.info(f"{ratio_upper_band=}")
+                #logger.info(f"{ratio_lower_band=}")
+                #logger.info(f"{central_values=}")
+                #logger.info(f"{error_squared=}")
+                #logger.info(f"{np.sqrt(error_squared)=}")
                 values[centrality_bin][grooming_method] = binned_data.BinnedData(
                     axes=[bin_edges],
                     values=central_values,
@@ -825,7 +825,9 @@ _models_styles = {
         #color=_model_palette[4],
         #color=_model_palette[8],
         #color=_model_palette[4],
-        color=_model_palette[6],
+
+        #color=_model_palette[6],
+        color=_model_palette[1],
     ),
 }
 
@@ -1886,7 +1888,6 @@ def _plot_pp_PbPb_comparison(
             temp_kwargs["label"] = temp_kwargs["label"]
             temp_kwargs.pop("color")
             temp_kwargs.pop("marker")
-            logger.info(f"{model.values=}, {model.errors=}")
             ax_ratio.fill_between(
                 model.axes[0].bin_centers,
                 model.values - model.errors,
