@@ -1954,10 +1954,33 @@ def _plot_pp_PbPb_comparison(
     ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
 
     # Labeling and presentation
+    ax_ratio_legend_config = None
+    ax_ratio_handles, ax_ratio_labels = ax_ratio.get_legend_handles_labels()
+    logger.info(f"{len(ax_ratio_handles)=}")
+    logger.info(f"{len(ax_ratio_labels)=}, {ax_ratio_labels=}")
+    if models and len(ax_ratio_handles) % 2 == 1:
+        logger.info("Handling manually")
+        # Pop out legend handler so that it skips due the plot config and
+        # and we can handle it manually
+        ax_ratio_legend_config = plot_config.panels[1].legend
+        plot_config.panels[1].legend = None
+        insert_position = round((len(ax_ratio_handles) + 1)/2)
+        ax_ratio_handles.insert(insert_position, ax_ratio.plot([], [], color=(0, 0, 0, 0), label=" ")[0])
+        ax_ratio_labels.insert(insert_position, "")
+        #ax_ratio_handles.insert(insert_position, ax_ratio_handles[0])
+        #ax_ratio_labels.insert(insert_position, ax_ratio_labels[0])
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
     # A few additional tweaks.
     ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
-    # ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=0.2))
+    # Need a manual hack here since the range has gotten so big with the models
+    if models and grooming_method == "soft_drop_z_cut_04":
+        ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
+    if ax_ratio_legend_config:
+        ax_ratio_legend_config.apply(
+            ax=ax_ratio,
+            legend_handles=ax_ratio_handles,
+            legend_labels=ax_ratio_labels,
+        )
 
     filename = f"{plot_config.name}_{grooming_method}"
     fig.savefig(output_dir / f"{filename}.pdf")
@@ -1998,6 +2021,22 @@ def plot_pp_PbPb_comparison(
         name += f"_models"
     name += f"_comparison_{jet_R_str}"
 
+    # from: https://stackoverflow.com/a/42170161
+    # doesn't seem to work...
+    from matplotlib.legend_handler import HandlerLine2D
+    import matplotlib.lines
+    class SymHandler2(HandlerLine2D):  # type: ignore[misc]
+        def create_artists(self, legend, orig_handle, xdescent, ydescent, width, height, fontsize, trans):  # type: ignore[no-untyped-def]
+            xx= 2.3*height
+            return super().create_artists(legend, orig_handle, xdescent, xx, width, height, fontsize, trans)
+
+    _ratio_range = (0.3, 1.7)
+    if "z_cut_04" in grooming_method:
+        if models:
+            _ratio_range = (-0.2, 2.2)
+        else:
+            _ratio_range = (0.1, 1.9)
+
     _results = _plot_pp_PbPb_comparison(
         hists=hists,
         models=models,
@@ -2033,12 +2072,17 @@ def plot_pp_PbPb_comparison(
                     axes=[
                         pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
                         pb.AxisConfig("y", label=r"$\frac{\text{Pb--Pb}}{\text{pp}}$",
-                                      range=(0.1, 1.9) if "z_cut_04" in grooming_method else (0.3, 1.7),
+                                      range=_ratio_range,
                                       # Make the label a bit bigger since it's stack on top
                                       font_size=text_font_size * 1.05
                                       ),
                     ],
-                    legend=pb.LegendConfig(location="lower left", font_size=24, anchor=(0.01, 0.01), marker_label_spacing=0.05, label_spacing=0.1),
+                    legend=pb.LegendConfig(location="lower left", font_size=22, anchor=(0.01, 0.02), ncol=2, marker_label_spacing=0.05, label_spacing=0.1, handle_height=1.3, column_spacing=0.30),
+                    #legend=pb.LegendConfig(location="lower left", font_size=24, anchor=(0.01, 0.01), ncol=2, marker_label_spacing=0.05, label_spacing=0.1, column_spacing=0.20,
+                    #    handler_map={
+                    #        matplotlib.lines.Line2D: SymHandler2()
+                    #    }
+                    #),
                 ),
             ],
             figure=pb.Figure(edge_padding=dict(left=0.15, bottom=0.095, top=0.975)),
