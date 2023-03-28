@@ -405,6 +405,8 @@ class Jetscape:
                 if self.needs_normalization:
                     _data /= np.sum(_data.values)
                 # normalize by bin widths
+                # NOTE: I will need to check if this is necessary to compare to the spectra,
+                #       but in any case, it's not critical for the ratio since it will cancel!
                 _data /= _data.axes[0].bin_widths
                 return_values[collision_system][_method] = _data
 
