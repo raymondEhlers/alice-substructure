@@ -10,13 +10,8 @@ from pathlib import Path
 from typing import (
     Any,
     Callable,
-    Dict,
-    List,
     Mapping,
-    Optional,
     Sequence,
-    Tuple,
-    Union,
 )
 
 import attrs
@@ -45,7 +40,7 @@ def hist_stat_tests_KS_chi2(
 ) -> tuple[float, float]:
     if use_ROOT:
         # Create ROOT hist (:-()
-        import ROOT
+        import ROOT  # noqa: F401
 
         #data_hist = ROOT.TH1D("data", "data", len(hist.axes[0].bin_edges) - 1, hist.axes[0].bin_edges)
 
@@ -223,14 +218,14 @@ def _load_analytical_calculations(filename: Path, bin_edges: npt.NDArray[np.floa
 
 
 def load_analytical_calculations(
-    path_to_calculations: Path, bin_edges: Dict[str, npt.NDArray[np.float64]]
-) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+    path_to_calculations: Path, bin_edges: dict[str, npt.NDArray[np.float64]]
+) -> dict[str, dict[str, binned_data.BinnedData]]:
     """Load analytical calculations for a collection of jet R, as determined by the bin edges dict."""
     _grooming_methods_to_files = {
         "dynamical_kt": "1",
         "dynamical_time": "2",
     }
-    output: Dict[str, Dict[str, binned_data.BinnedData]] = {}
+    output: dict[str, dict[str, binned_data.BinnedData]] = {}
 
     for jet_R_str, edges in bin_edges.items():
         output[jet_R_str] = {}
@@ -241,7 +236,7 @@ def load_analytical_calculations(
     return output
 
 
-def load_jetscape_data_jetscape_analysis(filename: Path) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+def load_jetscape_data_jetscape_analysis(filename: Path) -> dict[str, dict[str, binned_data.BinnedData]]:
     """Load jetscape predictions for all jet R.
 
     Include DyG core, kt, and time, as well as SD z > 0.2.
@@ -251,7 +246,7 @@ def load_jetscape_data_jetscape_analysis(filename: Path) -> Dict[str, Dict[str, 
         "010": "dynamical_kt",
         "020": "dynamical_time",
     }
-    output: Dict[str, Dict[str, binned_data.BinnedData]] = {}
+    output: dict[str, dict[str, binned_data.BinnedData]] = {}
     with uproot.open(filename) as f:
         for jet_R in ["02", "04", "05"]:
             output[f"R{jet_R}"] = {}
@@ -268,10 +263,10 @@ def load_jetscape_data_jetscape_analysis(filename: Path) -> Dict[str, Dict[str, 
 
 
 def calculate_jetscape_ratio(
-    pp: Dict[str, Dict[str, binned_data.BinnedData]], PbPb: Dict[str, Dict[str, binned_data.BinnedData]]
-) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+    pp: dict[str, dict[str, binned_data.BinnedData]], PbPb: dict[str, dict[str, binned_data.BinnedData]]
+) -> dict[str, dict[str, binned_data.BinnedData]]:
     """ Calculate jetscape predictions from the pp and PbPb kt spectra. """
-    output: Dict[str, Dict[str, binned_data.BinnedData]] = {}
+    output: dict[str, dict[str, binned_data.BinnedData]] = {}
     for jet_R, pp_R in pp.items():
         output[jet_R] = {}
         # Retrieve by hand just in case they're not in the same order...
@@ -289,8 +284,8 @@ def calculate_jetscape_ratio(
 
 
 def load_sherpa_predictions(
-    filename: Path, jet_R_values: Union[float, Sequence[float]]
-) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+    filename: Path, jet_R_values: float | Sequence[float]
+) -> dict[str, dict[str, binned_data.BinnedData]]:
     """Load sherpa predictions for a given jet R.
 
     Include DyG core, kt, and time, as well as SD z > 0.2.
@@ -303,7 +298,7 @@ def load_sherpa_predictions(
         "k2": "dynamical_time",
         "ksd": "soft_drop_z_cut_02",
     }
-    output: Dict[str, Dict[str, binned_data.BinnedData]] = {}
+    output: dict[str, dict[str, binned_data.BinnedData]] = {}
     with uproot.open(filename) as f:
         for jet_R in jet_R_values:
             jet_R_str = f"R{round(jet_R * 10):02}"
@@ -318,16 +313,16 @@ class ModelInfo:
     # TODO: Implement this to wrap model predictions...
     label: str
     needs_normalization: bool = attrs.field(default=False)
-    metadata: Dict[str, Any] = attrs.field(factory=dict)
+    metadata: dict[str, Any] = attrs.field(factory=dict)
 
 @attrs.define
 class Jetscape:
     base_dir: Path
     label: str = attrs.field(default="JETSCAPEv3.5 AA22")
     needs_normalization: bool = attrs.field(default=False)
-    metadata: Dict[str, Any] = attrs.field(factory=dict)
+    metadata: dict[str, Any] = attrs.field(factory=dict)
 
-    def load_predictions(self, grooming_methods: list[str] | None = None) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+    def load_predictions(self, grooming_methods: list[str] | None = None) -> dict[str, dict[str, binned_data.BinnedData]]:
         if grooming_methods is None:
             grooming_methods = [
                 "dynamical_core",
@@ -425,9 +420,9 @@ class HybridModel:
     base_dir: Path
     label: str = attrs.field()
     needs_normalization: bool = attrs.field(default=False)
-    metadata: Dict[str, Any] = attrs.field(factory=dict)
+    metadata: dict[str, Any] = attrs.field(factory=dict)
 
-    def load_predictions(self, grooming_methods: list[str] | None = None) -> Dict[str, Dict[str, binned_data.BinnedData]]:
+    def load_predictions(self, grooming_methods: list[str] | None = None) -> dict[str, dict[str, binned_data.BinnedData]]:
         # NOTE: For now, only returns the ratio
         if grooming_methods is None:
             grooming_methods = [
@@ -545,12 +540,12 @@ def _load_hybrid_model(
     base_dir: Path,
     dyg_filename: str,
     sd_filename: str,
-    bin_edges: Dict[str, Dict[str, npt.NDArray[np.float64]]],
+    bin_edges: dict[str, dict[str, npt.NDArray[np.float64]]],
     jet_R: str,
     jet_pt_bin: helpers.JetPtRange,
     quantity_to_retrieve: str = "ratio",
-) -> Dict[str, Dict[str, binned_data.BinnedData]]:
-    output: Dict[str, Dict[str, binned_data.BinnedData]] = {}
+) -> dict[str, dict[str, binned_data.BinnedData]]:
+    output: dict[str, dict[str, binned_data.BinnedData]] = {}
 
     # Encode the file specification below
     # First, the options in the filename
@@ -607,10 +602,7 @@ def _load_hybrid_model(
 
         # This isn't especially efficient, but good enough for now
         filename = base_dir
-        if "soft_drop" in grooming_method:
-            filename = base_dir / sd_filename
-        else:
-            filename = base_dir / dyg_filename
+        filename = base_dir / sd_filename if "soft_drop" in grooming_method else base_dir / dyg_filename
         data = np.loadtxt(filename)
 
         _axis = binned_data.Axis(bin_edges=bin_edges[jet_R][grooming_method])
@@ -662,11 +654,11 @@ def _load_hybrid_model(
 
 def load_hybrid_model_QM22(
     base_dir: Path,
-    bin_edges: Dict[str, Dict[str, npt.NDArray[np.float64]]],
+    bin_edges: dict[str, dict[str, npt.NDArray[np.float64]]],
     jet_R: str,
     jet_pt_bin: helpers.JetPtRange,
     quantity_to_retrieve: str = "ratio",
-) -> Dict[str, Dict[str, Dict[str, binned_data.BinnedData]]]:
+) -> dict[str, dict[str, dict[str, binned_data.BinnedData]]]:
     _moliere_label = {
         True: "WithElastic",
         False: "NoElastic",
@@ -696,12 +688,12 @@ def load_hybrid_model_QM22(
 
 def load_hybrid_model(
     base_dir: Path,
-    bin_edges: Dict[str, Dict[str, npt.NDArray[np.float64]]],
+    bin_edges: dict[str, dict[str, npt.NDArray[np.float64]]],
     jet_R: str,
     jet_pt_bin: helpers.JetPtRange,
     event_activity: str,
     quantity_to_retrieve: str = "ratio",
-) -> Dict[str, Dict[str, Dict[str, binned_data.BinnedData]]]:
+) -> dict[str, dict[str, dict[str, binned_data.BinnedData]]]:
     # Validation
     centrality_label_map = {
         "central": "010",
@@ -741,7 +733,7 @@ def load_hybrid_model(
 #_model_palette = sns.color_palette("colorblind", n_colors=10)
 #_model_palette = sns.color_palette("dark", n_colors=6)
 
-_model_palette: List[Tuple[float, float, float]] = [
+_model_palette: list[tuple[float, float, float]] = [
     (53, 73, 222),
     (170, 52, 222),
     (223, 82, 87),
@@ -762,83 +754,83 @@ _model_palette = [
 _model_palette = _model_palette[1:] + [_model_palette[0]]
 
 _models_styles = {
-    "pythia": dict(
-        label="PYTHIA8 Monash 2013",
-        linewidth=3,
-        linestyle="-",
-        marker="s",
-        color=_model_palette[0],
+    "pythia": {
+        "label": "PYTHIA8 Monash 2013",
+        "linewidth": 3,
+        "linestyle": "-",
+        "marker": "s",
+        "color": _model_palette[0],
         #color=_model_palette[7],
-        markerfacecolor="none",
+        "markerfacecolor": "none",
         #markerfacecolor="white",
-        markeredgewidth=3,
-    ),
-    "analytical": dict(
-        label="Caucal et al.",
-        linewidth=3,
-        linestyle="-.",
-        marker="P",
+        "markeredgewidth": 3,
+    },
+    "analytical": {
+        "label": "Caucal et al.",
+        "linewidth": 3,
+        "linestyle": "-.",
+        "marker": "P",
         #color=_model_palette[1],
         #color=_model_palette[5],
         #color=_model_palette[8],
         #color=_model_palette[4],
-        color=_model_palette[3],
-    ),
-    "sherpa_lund": dict(
-        label="SHERPA (Lund)",
+        "color": _model_palette[3],
+    },
+    "sherpa_lund": {
+        "label": "SHERPA (Lund)",
         # NOTE: This will overlap with jetscape, but we currently (8 July 2021) can't compare them, so it's fine.
         #       To be resolved when the plotting plans are a bit clearer.
-        linewidth=3,
-        linestyle="--",
-        marker="*",
+        "linewidth": 3,
+        "linestyle": "--",
+        "marker": "*",
         #color=_model_palette[2],
-        color=_model_palette[1],
+        "color": _model_palette[1],
         #color=_model_palette[5],
         #color=_model_palette[2],
-    ),
-    "sherpa_ahadic": dict(
-        label="SHERPA (AHADIC)",
-        linewidth=3,
-        linestyle=":",
-        marker="X",
+    },
+    "sherpa_ahadic": {
+        "label": "SHERPA (AHADIC)",
+        "linewidth": 3,
+        "linestyle": ":",
+        "marker": "X",
         #color=_model_palette[3],
         #color=_model_palette[7],
         #color=_model_palette[6],
         #color=_model_palette[3],
-        color=_model_palette[6],
-    ),
-    "jetscape": dict(
-        label="JETSCAPEv3.5 AA22",
-        linewidth=3,
-        linestyle="--",
-        marker="D",
+        "color": _model_palette[6],
+    },
+    "jetscape": {
+        "label": "JETSCAPEv3.5 AA22",
+        "linewidth": 3,
+        "linestyle": "--",
+        "marker": "D",
         #color=_model_palette[4],
         #color=_model_palette[8],
         #color=_model_palette[4],
-        color=_model_palette[3],
-    ),
-    "hybrid_moliere": dict(
-        label="Hybrid w/ wake + Moliere",
-        linewidth=3,
-        linestyle="--",
-        marker="D",
+        "color": _model_palette[3],
+    },
+    "hybrid_moliere": {
+        "label": "Hybrid w/ wake + Moliere",
+        "linewidth": 3,
+        "linestyle": "--",
+        "marker": "D",
         #color=_model_palette[4],
         #color=_model_palette[8],
         #color=_model_palette[4],
-        color=_model_palette[5],
-    ),
-    "hybrid_without_moliere": dict(
-        label="Hybrid w/ wake",
-        linewidth=3,
-        linestyle="--",
-        marker="D",
+        "color": _model_palette[5],
+    },
+    "hybrid_without_moliere": {
+        "label": "Hybrid w/ wake",
+        "linewidth": 3,
+        "linestyle": "--",
+        "marker": "D",
         #color=_model_palette[4],
         #color=_model_palette[8],
         #color=_model_palette[4],
 
         #color=_model_palette[6],
-        color=_model_palette[1],
-    ),
+        "color": _model_palette[1],
+    },
 }
 
 # Based on better colorblind presets
@@ -1074,7 +1066,7 @@ def plot_grooming_model_comparisons_for_single_system(
     collision_system: str,
     collision_system_key: str,
     output_dir: Path,
-    kt_range: Union[helpers.KtRange, Mapping[str, helpers.KtRange]],
+    kt_range: helpers.KtRange | Mapping[str, helpers.KtRange],
     figure_kt_range: helpers.KtRange = helpers.KtRange(1.5, 15),
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
@@ -1129,7 +1121,7 @@ def plot_grooming_model_comparisons_for_single_system(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(left=0.15, bottom=0.095, top=0.975)),
+            figure=pb.Figure(edge_padding={"left": 0.15, "bottom": 0.095, "top": 0.975}),
         ),
         output_dir=output_dir,
     )
@@ -1154,19 +1146,19 @@ def _rebin_method_one(ratio_reference_hist: binned_data.BinnedData, h: binned_da
         axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
         values=_ratio_y_systematic.low,
         variances=np.ones(len(ratio_reference_hist.values)),
-    )[::h.axes[0].bin_edges].values  # type: ignore[misc]
+    )[::h.axes[0].bin_edges].values
     _ratio_systematic_high = binned_data.BinnedData(
         axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
         values=_ratio_y_systematic.high,
         variances=np.ones(len(ratio_reference_hist.values)),
-    )[::h.axes[0].bin_edges].values  # type: ignore[misc]
+    )[::h.axes[0].bin_edges].values
     # Store the update systematics and scale back down by the bin widths
     _ratio_y_systematic = unfolding_base.AsymmetricErrors(
         _ratio_systematic_low / h.axes[0].bin_widths,
         _ratio_systematic_high / h.axes[0].bin_widths,
     )
     # And finally rebin the main data
-    ratio_reference_hist = ratio_reference_hist[::h.axes[0].bin_edges]  # type: ignore[misc]
+    ratio_reference_hist = ratio_reference_hist[::h.axes[0].bin_edges]
     # And scale back by the bin width
     ratio_reference_hist /= ratio_reference_hist.axes[0].bin_widths
     # And store the updated systematic
@@ -1187,14 +1179,14 @@ def _rebin_method_two(ratio_reference_hist: binned_data.BinnedData, h: binned_da
         axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
         values=_ratio_y_systematic.low * ratio_reference_hist.axes[0].bin_widths,
         variances=np.ones(len(ratio_reference_hist.values)),
-    )[::h.axes[0].bin_edges].values  # type: ignore[misc]
+    )[::h.axes[0].bin_edges].values
     _ratio_systematic_high = binned_data.BinnedData(
         axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
         values=_ratio_y_systematic.high * ratio_reference_hist.axes[0].bin_widths,
         variances=np.ones(len(ratio_reference_hist.values)),
-    )[::h.axes[0].bin_edges].values  # type: ignore[misc]
+    )[::h.axes[0].bin_edges].values
     # Now rebin the main hist.
-    ratio_reference_hist = (ratio_reference_hist * ratio_reference_hist.axes[0].bin_widths)[::h.axes[0].bin_edges]  # type: ignore[misc]
+    ratio_reference_hist = (ratio_reference_hist * ratio_reference_hist.axes[0].bin_widths)[::h.axes[0].bin_edges]
     ratio_reference_hist /= ratio_reference_hist.axes[0].bin_widths
     # And store the updated systematic
     ratio_reference_hist.metadata["y_systematic"] = {
@@ -1518,7 +1510,7 @@ def plot_grooming_comparisons_for_single_system(
     collision_system: str,
     collision_system_key: str,
     output_dir: Path,
-    kt_range: Union[helpers.KtRange, Mapping[str, helpers.KtRange]],
+    kt_range: helpers.KtRange | Mapping[str, helpers.KtRange],
     figure_kt_range: helpers.KtRange = helpers.KtRange(1.5, 15),
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
@@ -1588,7 +1580,7 @@ def plot_grooming_comparisons_for_single_system(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(left=0.15, bottom=0.095, top=0.975)),
+            figure=pb.Figure(edge_padding={"left": 0.15, "bottom": 0.095, "top": 0.975}),
         ),
         output_dir=output_dir,
     )
@@ -1600,7 +1592,7 @@ def plot_Rg_grooming_comparisons_for_single_system(
     collision_system: str,
     collision_system_key: str,
     output_dir: Path,
-    rg_range: Union[helpers.RgRange, Mapping[str, helpers.RgRange]],
+    rg_range: helpers.RgRange | Mapping[str, helpers.RgRange],
     figure_rg_range: helpers.RgRange = helpers.RgRange(0, 0.2),
     jet_R_str: str = "R02",
     alice_status: str = "work_in_progress",
@@ -1658,7 +1650,7 @@ def plot_Rg_grooming_comparisons_for_single_system(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(left=0.15, bottom=0.095, top=0.975)),
+            figure=pb.Figure(edge_padding={"left": 0.15, "bottom": 0.095, "top": 0.975}),
         ),
         output_dir=output_dir,
     )
@@ -2004,7 +1996,7 @@ def plot_pp_PbPb_comparison(
     grooming_method: str,
     output_dir: Path,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
-    kt_display_range: Tuple[float, float] = (1.5, 15),
+    kt_display_range: tuple[float, float] = (1.5, 15),
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
@@ -2024,17 +2016,16 @@ def plot_pp_PbPb_comparison(
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
 
-    name = f"unfolded_kt_pp_PbPb"
+    name = "unfolded_kt_pp_PbPb"
     if additional_label:
         name += f"_{additional_label}"
     if models:
-        name += f"_models"
+        name += "_models"
     name += f"_comparison_{jet_R_str}"
 
     # from: https://stackoverflow.com/a/42170161
     # doesn't seem to work...
     from matplotlib.legend_handler import HandlerLine2D
-    import matplotlib.lines
     class SymHandler2(HandlerLine2D):  # type: ignore[misc]
         def create_artists(self, legend, orig_handle, xdescent, ydescent, width, height, fontsize, trans):  # type: ignore[no-untyped-def]
             xx= 2.3*height
@@ -2044,10 +2035,7 @@ def plot_pp_PbPb_comparison(
     if "central" in hists and models:
         _ratio_range = (0.1, 1.9)
     if "z_cut_04" in grooming_method:
-        if models:
-            _ratio_range = (-0.2, 2.2)
-        else:
-            _ratio_range = (0.1, 1.9)
+        _ratio_range = (-0.2, 2.2) if models else (0.1, 1.9)
 
 
     _results = _plot_pp_PbPb_comparison(
@@ -2098,7 +2086,7 @@ def plot_pp_PbPb_comparison(
                     #),
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(left=0.15, bottom=0.095, top=0.975)),
+            figure=pb.Figure(edge_padding={"left": 0.15, "bottom": 0.095, "top": 0.975}),
         ),
         output_dir=output_dir,
     )
@@ -2192,7 +2180,7 @@ def plot_PbPb_systematics_simple(
     grooming_methods: Sequence[str],
     event_activity: str,
     output_dir: Path,
-    kt_range: Tuple[float, float] = (1.5, 15),
+    kt_range: tuple[float, float] = (1.5, 15),
     jet_R: str = "R04",
 ) -> None:
     """Plot PbPb unfolded results with systematics."""
@@ -2234,7 +2222,7 @@ def plot_PbPb_systematics_simple(
                     legend=pb.LegendConfig(location="lower left", font_size=22),
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.06)),
+            figure=pb.Figure(edge_padding={"left": 0.12, "bottom": 0.06}),
         ),
         output_dir=output_dir,
     )
@@ -2370,7 +2358,7 @@ def plot_PbPb_systematics(
     grooming_methods: Sequence[str],
     event_activity: str,
     output_dir: Path,
-    kt_range: Tuple[float, float] = (1.5, 15),
+    kt_range: tuple[float, float] = (1.5, 15),
     jet_R: str = "R04",
 ) -> None:
     """Plot PbPb unfolded results with systematics."""
@@ -2423,7 +2411,7 @@ def plot_PbPb_systematics(
                     ]
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(left=0.12, bottom=0.06)),
+            figure=pb.Figure(edge_padding={"left": 0.12, "bottom": 0.06}),
         ),
         output_dir=output_dir,
     )
@@ -2444,7 +2432,7 @@ def setup_unfolding_closures(
     output_dir: Path,
     pure_matches: bool = False,
     output_dir_tag: str | None = None,
-) -> Dict[str, unfolding_analysis.UnfoldingOutput]:
+) -> dict[str, unfolding_analysis.UnfoldingOutput]:
     # Setup the input files
     unfolding_outputs = {}
     unfolding_outputs["default"] = unfolding_analysis.UnfoldingOutput(
@@ -2616,11 +2604,11 @@ def setup_unfolding_outputs(  # noqa: C901
     output_dir: Path,
     truncation_shift: float = 5,
     displaced_untagged_above_range: bool = True,
-    displaced_extremum: Optional[float] = None,
+    displaced_extremum: float | None = None,
     skip_reweighted_prior_in_systematics: bool = False,
     output_dir_tag: str | None = None,
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
-) -> Dict[str, unfolding_analysis.UnfoldingOutput]:
+) -> dict[str, unfolding_analysis.UnfoldingOutput]:
     # Validation
     # Keep the truncation positive so we know how we've shifted.
     if truncation_shift < 0:
@@ -2711,7 +2699,7 @@ def setup_unfolding_outputs(  # noqa: C901
             label="truncation",
         )
     except FileNotFoundError:
-        logger.debug(f"Skipping truncation because the output file doesn't exist.")
+        logger.debug("Skipping truncation because the output file doesn't exist.")
 
     try:
         unfolding_outputs["random_binning"] = unfolding_analysis.UnfoldingOutput(
@@ -2736,7 +2724,7 @@ def setup_unfolding_outputs(  # noqa: C901
 
     try:
         # If the untagged bin is disabled, then skip this
-        if not smeared_untagged_var.min == smeared_untagged_var.max:
+        if smeared_untagged_var.min != smeared_untagged_var.max:
             if displaced_untagged_above_range:
                 displaced_untagged_var = helpers.KtRange(smeared_var_range.max, displaced_extremum)
             else:
@@ -2879,7 +2867,7 @@ def _load_unfolded_outputs(
     skip_reweighted_prior_in_systematics: bool = False,
     output_dir_tag: str | None = None,
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
-) -> Tuple[Dict[str, unfolding_analysis.UnfoldingOutput], Dict[str, unfolding_analysis.UnfoldingOutput], Dict[str, unfolding_analysis.UnfoldingOutput]]:
+) -> tuple[dict[str, unfolding_analysis.UnfoldingOutput], dict[str, unfolding_analysis.UnfoldingOutput], dict[str, unfolding_analysis.UnfoldingOutput]]:
     # Validation
     suffix = f"{event_activity}_{jet_R_str}"
     if tag_after_suffix:
@@ -2951,26 +2939,26 @@ def _load_unfolded_outputs(
 def load_unfolded_outputs(
     grooming_methods: Sequence[str],
     substructure_variable: str,
-    smeared_var_range: Union[helpers.KtRange, Mapping[str, helpers.KtRange]],
-    smeared_untagged_var: Union[helpers.KtRange, Mapping[str, helpers.KtRange]],
+    smeared_var_range: helpers.KtRange | Mapping[str, helpers.KtRange],
+    smeared_untagged_var: helpers.KtRange | Mapping[str, helpers.KtRange],
     smeared_jet_pt_range: helpers.JetPtRange,
     collision_system: str,
     event_activity: str,
     jet_R_str: str,
-    n_iter_compare: Union[int, Mapping[str, int]],
+    n_iter_compare: int | Mapping[str, int],
     truncation_shift: int,
     displaced_extremum: float,
-    input_dir_tag: Dict[str, str] | str,
+    input_dir_tag: dict[str, str] | str,
     output_dir: Path,
-    tag_after_suffix: Union[str, Mapping[str, str]] = "",
+    tag_after_suffix: str | Mapping[str, str] = "",
     double_counting_cut: dict[str, str] | str = "",
     displaced_untagged_above_range: bool = True,
     skip_reweighted_prior_in_systematics: bool = False,
-    output_dir_tag: Dict[str, str | None] | str | None = None,
-    max_n_iter: Dict[str, int | None] | int | None = None,
+    output_dir_tag: dict[str, str | None] | str | None = None,
+    max_n_iter: dict[str, int | None] | int | None = None,
     model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration | None] | unfolding_analysis.ModelDependenceConfiguration | None = None,
-) -> Tuple[
-    Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]], Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]], Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]]
+) -> tuple[
+    dict[str, dict[str, unfolding_analysis.UnfoldingOutput]], dict[str, dict[str, unfolding_analysis.UnfoldingOutput]], dict[str, dict[str, unfolding_analysis.UnfoldingOutput]]
 ]:
     # Validation
     # Copy for every grooming method
@@ -3033,12 +3021,12 @@ def load_unfolded_outputs(
 
 def _unfolded_outputs_with_systematics(
     grooming_method: str,
-    unfolding_systematics_outputs: Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]],
+    unfolding_systematics_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: unfolding_analysis.NonClosureConfiguration | None = None,
     background_subtraction_configuration: unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
-) -> Tuple[unfolding_analysis.SingleResult, binned_data.BinnedData]:
+) -> tuple[unfolding_analysis.SingleResult, binned_data.BinnedData]:
     logger.info(f"Calculating systematics for {grooming_method}")
     unfolded = unfolded_substructure_results(
         unfolding_outputs=unfolding_systematics_outputs[grooming_method],
@@ -3064,13 +3052,13 @@ def _unfolded_outputs_with_systematics(
 
 def unfolded_outputs_with_systematics(
     grooming_methods: Sequence[str],
-    unfolding_systematics_outputs: Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]],
-    unfolding_closure_outputs: Dict[str, Dict[str, unfolding_analysis.UnfoldingOutput]],
+    unfolding_systematics_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
+    unfolding_closure_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
-    model_dependence_configuration: Dict[str, unfolding_analysis.ModelDependenceConfiguration | None] | unfolding_analysis.ModelDependenceConfiguration | None = None,
-    non_closure_configuration: Dict[str, unfolding_analysis.NonClosureConfiguration | None] | unfolding_analysis.NonClosureConfiguration | None = None,
-    background_subtraction_configuration: Dict[str, unfolding_analysis.BackgroundSubtractionConfiguration | None] | unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
-) -> Tuple[Dict[str, unfolding_analysis.SingleResult], Dict[str, binned_data.BinnedData]]:
+    model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration | None] | unfolding_analysis.ModelDependenceConfiguration | None = None,
+    non_closure_configuration: dict[str, unfolding_analysis.NonClosureConfiguration | None] | unfolding_analysis.NonClosureConfiguration | None = None,
+    background_subtraction_configuration: dict[str, unfolding_analysis.BackgroundSubtractionConfiguration | None] | unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
+) -> tuple[dict[str, unfolding_analysis.SingleResult], dict[str, binned_data.BinnedData]]:
     # Validation
     if isinstance(model_dependence_configuration, unfolding_analysis.ModelDependenceConfiguration) or model_dependence_configuration is None:
         model_dependence_configuration = {grooming_method: model_dependence_configuration for grooming_method in grooming_methods}
@@ -3106,7 +3094,7 @@ def unfolded_substructure_results(
     unfolding_outputs: Mapping[str, unfolding_analysis.UnfoldingOutput],
     true_jet_pt_range: helpers.JetPtRange,
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
-) -> Dict[str, unfolding_analysis.SingleResult]:
+) -> dict[str, unfolding_analysis.SingleResult]:
     """Convert unfolded results into individual unfolded substructure results (selecting a particular iteration).
 
     This is useful for working with substructure systematics.
@@ -3159,7 +3147,7 @@ def _calculate_max_relative_error_from_contributions(
 ) -> npt.NDArray[np.float64]:
     """Simple helper for calculating the maximum contribution bin-by-bin"""
     final_relative_uncertainty = np.zeros(n_values, dtype=np.float64)
-    for name, relative_uncertainty in relative_uncertainty_by_contribution.items():
+    for _name, relative_uncertainty in relative_uncertainty_by_contribution.items():
         entry_has_larger_uncertainties_mask = np.abs(relative_uncertainty) > np.abs(final_relative_uncertainty)
         final_relative_uncertainty[entry_has_larger_uncertainties_mask] = relative_uncertainty[entry_has_larger_uncertainties_mask]
         #logger.debug(f"Contribution {name} has contributions at {entry_has_larger_uncertainties_mask}")
@@ -3315,7 +3303,7 @@ def calculate_systematics(  # noqa: C901
         #    f'high relative: {unfolded["default"].data.metadata["y_systematic"]["background_sub"].high / unfolded["default"].data.values}'
         #)
     else:
-        logger.info(f"Skipping background subtraction because background sub config was not passed.")
+        logger.info("Skipping background subtraction because background sub config was not passed.")
 
     # Non-closure
     # This is treated as a symmetric uncertainty.
@@ -3364,7 +3352,7 @@ def calculate_systematics(  # noqa: C901
             non_closure_sym_relative * unfolded["default"].data.values,
         )
     else:
-        logger.info(f"Skipping non closure systematic because no configuration was provided.")
+        logger.info("Skipping non closure systematic because no configuration was provided.")
 
     # Model dependence.
     # The output should include _either_ the model dependence or the prior
@@ -3457,20 +3445,16 @@ def calculate_systematics(  # noqa: C901
 
     # Cross check to make sure that I haven't copied and pasted incorrectly.
     assert not any(
-        [
-            np.allclose(a.low, b.low)
+        np.allclose(a.low, b.low)
             for k_a, a in unfolded["default"].data.metadata["y_systematic"].items()
             for k_b, b in unfolded["default"].data.metadata["y_systematic"].items()
             if k_a != k_b
-        ]
     )
     assert not any(
-        [
-            np.allclose(a.high, b.high)
+        np.allclose(a.high, b.high)
             for k_a, a in unfolded["default"].data.metadata["y_systematic"].items()
             for k_b, b in unfolded["default"].data.metadata["y_systematic"].items()
             if k_a != k_b
-        ]
     )
 
     # Sum in quadrature
@@ -3934,7 +3918,7 @@ def plot_select_iteration(
     plot_config: pb.PlotConfig,
     output_dir: Path,
     plot_png: bool = False,
-    prior_variation_output: Optional[unfolding_analysis.UnfoldingOutput] = None,
+    prior_variation_output: unfolding_analysis.UnfoldingOutput | None = None,
 ) -> None:
     """Plot selected iteration."""
     logger.debug(f"Plotting {plot_config.name.replace('_', ' ')}")
@@ -3974,7 +3958,7 @@ def plot_select_iteration(
 
         # Calculate and store regularization error
         regularization_value = np.sum(
-            (
+
                 np.divide(
                     np.maximum(
                         np.abs(previous_iter_hist.values - current_iter_hist.values),
@@ -3986,7 +3970,7 @@ def plot_select_iteration(
                     out=np.zeros_like(current_iter_hist.values),
                     where=current_iter_hist.values != 0,
                 )
-            )
+
         )
         hist_reg.values[i] = regularization_value
         # Calculate and store stat error
@@ -4073,8 +4057,8 @@ def plot_select_iteration(
 def plot_kt_unfolding(
     unfolding_output: unfolding_analysis.UnfoldingOutput,
     plot_png: bool = False,
-    prior_variation_output: Optional[unfolding_analysis.UnfoldingOutput] = None,
-    unfolding_kt_display_range: Optional[Tuple[float, float]] = None,
+    prior_variation_output: unfolding_analysis.UnfoldingOutput | None = None,
+    unfolding_kt_display_range: tuple[float, float] | None = None,
 ) -> Path:
     if unfolding_kt_display_range is None:
         unfolding_kt_display_range = (-0.5, unfolding_output.smeared_var_range.max)
@@ -4139,7 +4123,7 @@ def plot_kt_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -4201,7 +4185,7 @@ def plot_kt_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -4263,7 +4247,7 @@ def plot_kt_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -4318,7 +4302,7 @@ def plot_kt_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -4374,7 +4358,7 @@ def plot_kt_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -4419,7 +4403,7 @@ def plot_kt_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -4465,7 +4449,7 @@ def plot_kt_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -4519,7 +4503,7 @@ def plot_kt_unfolding(
                         ],
                     ),
                 ],
-                figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+                figure=pb.Figure(edge_padding={"bottom": 0.06}),
             ),
             plot_png=plot_png,
         )
@@ -5111,8 +5095,8 @@ def run(collision_system: str) -> None:
 def plot_delta_R_unfolding(
     unfolding_output: unfolding_analysis.UnfoldingOutput,
     plot_png: bool = False,
-    prior_variation_output: Optional[unfolding_analysis.UnfoldingOutput] = None,
-    unfolding_Rg_display_range: Optional[Tuple[float, float]] = None,
+    prior_variation_output: unfolding_analysis.UnfoldingOutput | None = None,
+    unfolding_Rg_display_range: tuple[float, float] | None = None,
 ) -> Path:
     if unfolding_Rg_display_range is None:
         unfolding_Rg_display_range = (-0.5, unfolding_output.smeared_var_range.max)
@@ -5172,7 +5156,7 @@ def plot_delta_R_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -5230,7 +5214,7 @@ def plot_delta_R_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -5288,7 +5272,7 @@ def plot_delta_R_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -5342,7 +5326,7 @@ def plot_delta_R_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -5397,7 +5381,7 @@ def plot_delta_R_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -5440,7 +5424,7 @@ def plot_delta_R_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -5486,7 +5470,7 @@ def plot_delta_R_unfolding(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding=dict(bottom=0.06)),
+            figure=pb.Figure(edge_padding={"bottom": 0.06}),
         ),
         plot_png=plot_png,
     )
@@ -5691,9 +5675,9 @@ def steer_plotting_of_kt_unfolding_outputs(
     plot_systematic_breakdown: bool,
     plot_systematics: bool,
     plot_closures: bool,
-    unfolding_kt_display_range: dict[str, Tuple[float, float]] | Tuple[float, float],
+    unfolding_kt_display_range: dict[str, tuple[float, float]] | tuple[float, float],
     prior_variation_output_name: dict[str, str | None] | str | None = None,
-    relative_individual_systematic_ratio_range: dict[str, Tuple[float, float]] | Tuple[float, float] | None = None,
+    relative_individual_systematic_ratio_range: dict[str, tuple[float, float]] | tuple[float, float] | None = None,
 ) -> None:
     # Validation
     if isinstance(unfolding_kt_display_range, tuple):
