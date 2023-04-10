@@ -5,10 +5,19 @@
 
 from __future__ import annotations
 
-import itertools
 import logging
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Mapping, MutableMapping, Optional, Protocol, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import attrs
 import cycler
@@ -21,10 +30,9 @@ import seaborn as sns
 import uproot
 from pachyderm import binned_data
 
-from jet_substructure.analysis import plot_base as pb, unfolding_analysis
-from jet_substructure.analysis import unfolding_base
+from jet_substructure.analysis import plot_base as pb
+from jet_substructure.analysis import unfolding_analysis, unfolding_base
 from jet_substructure.base import helpers
-
 
 logger = logging.getLogger(__name__)
 
@@ -67,13 +75,13 @@ def hist_stat_tests_KS_chi2(
         chi2_pvalue: float = data_hist.Chi2Test(reference_hist, "WW")
         ks_test_pvalue: float = data_hist.KolmogorovTest(reference_hist)
         return chi2_pvalue, ks_test_pvalue
-    else:
+    else:  # noqa: RET505
         import scipy.stats
 
         # Create distribution from histogram and bin edges
         # From: https://stackoverflow.com/a/72224046/12907985
         hist_dist = scipy.stats.rv_histogram(
-            (hist.values, hist.axes[0].bin_edges)
+            (ratio.values, ratio.axes[0].bin_edges)
         )
 
         # Perform the test
