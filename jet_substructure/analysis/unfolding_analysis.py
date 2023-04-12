@@ -18,7 +18,6 @@ from pachyderm import binned_data
 
 from jet_substructure.base import helpers
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -258,7 +257,7 @@ class UnfoldingOutput:
     def max_n_iter(self) -> int:
         if hasattr(self, "_max_n_iter") and self._max_n_iter is not None:
             return self._max_n_iter
-        else:
+        else:  # noqa: RET505
             n = 1
             for hist_name in self.hists:
                 # We could equally use the unfolded.
@@ -392,7 +391,7 @@ class ModelDependenceConfiguration:
 
     @property
     def all_models(self) -> list[str]:
-        return [self.nominal] + self.variations
+        return [self.nominal, *self.variations]
 
 
 @attrs.define

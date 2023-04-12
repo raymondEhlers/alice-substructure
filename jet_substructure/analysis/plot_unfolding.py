@@ -16,7 +16,7 @@ from typing import (
 
 import attrs
 import cycler
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
@@ -125,7 +125,7 @@ def plausible_stat_test(ratio: binned_data.BinnedData, n_samples: int, n_sigma_s
     #logger.debug(f"{np.count_nonzero(results, axis=1)}")
     passed = np.all(results, axis=0)
     fraction_passed = np.count_nonzero(passed) / n_samples
-    return fraction_passed
+    return fraction_passed  # noqa: RET504
 
 
 def plot_relative_individual_systematics(
@@ -512,7 +512,8 @@ class HybridModel:
                 # Validate bin_edges with bin_centers
                 bin_centers = input_data[:, 0]
                 if not np.allclose(bin_centers, _bin_centers):
-                    raise ValueError(f"bin edges don't match centers: In file: {bin_centers}. passed: {_bin_centers}")
+                    _msg = f"bin edges don't match centers: In file: {bin_centers}. passed: {_bin_centers}"
+                    raise ValueError(_msg)
 
                 ratio_upper_band = input_data[:, 5]
                 ratio_lower_band = input_data[:, 6]
@@ -614,9 +615,8 @@ def _load_hybrid_model(
             _bin_center = row[_kt_bin_center_index]
             # Assuming these all match up, we can just use the provided bin centers
             if _bin_center != _bin_centers[i_kt]:
-                raise ValueError(
-                    f"Mismatch between file bin center {_bin_center} and provided bin center: {_bin_centers[i_kt]}"
-                )
+                _msg = f"Mismatch between file bin center {_bin_center} and provided bin center: {_bin_centers[i_kt]}"
+                raise ValueError(_msg)
 
             _pt_bin_offset = _pt_bin_index[jet_pt_bin] * 6
             _offset_for_bin_center = 1
@@ -699,7 +699,7 @@ def load_hybrid_model(
         "central": "010",
         "semi_central": "3050",
     }
-    centrality = centrality_label_map[event_activity]
+    centrality = centrality_label_map[event_activity]  # noqa: F841
 
     _moliere_label = {
         True: "WithElastic",
@@ -1051,8 +1051,8 @@ def _plot_data_model_comparison_for_single_system(
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
     # A few additional tweaks.
-    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
-    # ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=0.2))
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    # ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.2))
 
     filename = f"{plot_config.name}"
     fig.savefig(output_dir / f"{filename}.pdf")
@@ -1067,7 +1067,7 @@ def plot_grooming_model_comparisons_for_single_system(
     collision_system_key: str,
     output_dir: Path,
     kt_range: helpers.KtRange | Mapping[str, helpers.KtRange],
-    figure_kt_range: helpers.KtRange = helpers.KtRange(1.5, 15),
+    figure_kt_range: helpers.KtRange | None = None,
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
@@ -1075,6 +1075,8 @@ def plot_grooming_model_comparisons_for_single_system(
     """Plot comparison of grooming methods for a single system."""
 
     # Validation
+    if figure_kt_range is None:
+        figure_kt_range = helpers.KtRange(1.5, 15)
     if isinstance(kt_range, helpers.KtRange):
         kt_range = {grooming_method: kt_range for grooming_method in grooming_methods}
 
@@ -1085,7 +1087,7 @@ def plot_grooming_model_comparisons_for_single_system(
     text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
     _plot_data_model_comparison_for_single_system(
         hists=hists,
         models=models,
@@ -1495,8 +1497,8 @@ def _plot_single_system_comparison(
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
     # A few additional tweaks.
-    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
-    # ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=0.2))
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    # ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.2))
 
     filename = f"{plot_config.name}"
     fig.savefig(output_dir / f"{filename}.pdf")
@@ -1511,7 +1513,7 @@ def plot_grooming_comparisons_for_single_system(
     collision_system_key: str,
     output_dir: Path,
     kt_range: helpers.KtRange | Mapping[str, helpers.KtRange],
-    figure_kt_range: helpers.KtRange = helpers.KtRange(1.5, 15),
+    figure_kt_range: helpers.KtRange | None = None,
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
@@ -1520,6 +1522,8 @@ def plot_grooming_comparisons_for_single_system(
     """Plot comparison of grooming methods for a single system."""
 
     # Validation
+    if figure_kt_range is None:
+        figure_kt_range = helpers.KtRange(1.5, 15)
     if isinstance(kt_range, helpers.KtRange):
         kt_range = {grooming_method: kt_range for grooming_method in [*grooming_methods, reference_grooming_method]}
     if label:
@@ -1542,7 +1546,7 @@ def plot_grooming_comparisons_for_single_system(
     text += "\n" + event_activity + pb.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
     _plot_single_system_comparison(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -1593,7 +1597,7 @@ def plot_Rg_grooming_comparisons_for_single_system(
     collision_system_key: str,
     output_dir: Path,
     rg_range: helpers.RgRange | Mapping[str, helpers.RgRange],
-    figure_rg_range: helpers.RgRange = helpers.RgRange(0, 0.2),
+    figure_rg_range: helpers.RgRange | None = None,
     jet_R_str: str = "R02",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
@@ -1602,6 +1606,8 @@ def plot_Rg_grooming_comparisons_for_single_system(
     """Plot comparison of grooming methods for a single system."""
 
     # Validation
+    if figure_rg_range is None:
+        figure_rg_range = helpers.RgRange(0, 0.2)
     if isinstance(rg_range, helpers.RgRange):
         rg_range = {grooming_method: rg_range for grooming_method in grooming_methods}
     if label:
@@ -1614,7 +1620,7 @@ def plot_Rg_grooming_comparisons_for_single_system(
     text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
     _plot_single_system_comparison(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -1656,7 +1662,7 @@ def plot_Rg_grooming_comparisons_for_single_system(
     )
 
 
-def _plot_pp_PbPb_comparison(
+def _plot_pp_PbPb_comparison(  # noqa: C901
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_method: str,
     set_zero_to_nan: bool,
@@ -1973,10 +1979,10 @@ def _plot_pp_PbPb_comparison(
         #ax_ratio_labels.insert(insert_position, ax_ratio_labels[0])
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
     # A few additional tweaks.
-    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
     # Need a manual hack here since the range has gotten so big with the models
     if models and grooming_method == "soft_drop_z_cut_04":
-        ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
+        ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
     if ax_ratio_legend_config:
         ax_ratio_legend_config.apply(
             ax=ax_ratio,
@@ -2014,7 +2020,7 @@ def plot_pp_PbPb_comparison(
     text += "\n" + pb.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
 
     name = "unfolded_kt_pp_PbPb"
     if additional_label:
@@ -2027,7 +2033,7 @@ def plot_pp_PbPb_comparison(
     # doesn't seem to work...
     from matplotlib.legend_handler import HandlerLine2D
     class SymHandler2(HandlerLine2D):  # type: ignore[misc]
-        def create_artists(self, legend, orig_handle, xdescent, ydescent, width, height, fontsize, trans):  # type: ignore[no-untyped-def]
+        def create_artists(self, legend, orig_handle, xdescent, ydescent, width, height, fontsize, trans):  # type: ignore[no-untyped-def] # noqa: ARG002
             xx= 2.3*height
             return super().create_artists(legend, orig_handle, xdescent, xx, width, height, fontsize, trans)
 
@@ -2081,7 +2087,7 @@ def plot_pp_PbPb_comparison(
                     legend=pb.LegendConfig(location="lower left", font_size=22, anchor=(0.01, 0.02), ncol=2, marker_label_spacing=0.05, label_spacing=0.1, handle_height=1.3, column_spacing=0.30),
                     #legend=pb.LegendConfig(location="lower left", font_size=24, anchor=(0.01, 0.01), ncol=2, marker_label_spacing=0.05, label_spacing=0.1, column_spacing=0.20,
                     #    handler_map={
-                    #        matplotlib.lines.Line2D: SymHandler2()
+                    #        mpl.lines.Line2D: SymHandler2()
                     #    }
                     #),
                 ),
@@ -2091,7 +2097,7 @@ def plot_pp_PbPb_comparison(
         output_dir=output_dir,
     )
 
-    return _results
+    return _results  # noqa: RET504
 
 
 def _plot_simple_kt_with_systematics(
@@ -2167,8 +2173,8 @@ def _plot_simple_kt_with_systematics(
     # Labeling and presentation
     plot_config.apply(fig=fig, ax=ax)
     # A few additional tweaks.
-    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
-    # ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=0.2))
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    # ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.2))
 
     filename = f"{plot_config.name}"
     fig.savefig(output_dir / f"{filename}.pdf")
@@ -2199,7 +2205,7 @@ def plot_PbPb_systematics_simple(
         text += "\n" + pb.label_to_display_string["collision_system"]["pp_5TeV"]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
     _plot_simple_kt_with_systematics(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -2377,7 +2383,7 @@ def plot_PbPb_systematics(
         text += "\n" + pb.label_to_display_string["collision_system"]["pp_5TeV"]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
     _plot_compare_kt_with_systematics(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -2783,8 +2789,9 @@ def setup_unfolding_outputs(  # noqa: C901
     if model_dependence_configuration is not None:
         for model_name in model_dependence_configuration.all_models:
             # Validation
-            if model_name == "" and not model_dependence_configuration.legacy_production:
-                raise ValueError("Only allowed to load unlabeled model dependence if using a legacy production. Please check settings!")
+            if not model_name and not model_dependence_configuration.legacy_production:
+                _msg = "Only allowed to load unlabeled model dependence if using a legacy production. Please check settings!"
+                raise ValueError(_msg)
 
             # Handle the special case where the nominal is the default. In this case, no need to load it twice.
             if model_name == "default":
@@ -2792,7 +2799,7 @@ def setup_unfolding_outputs(  # noqa: C901
 
             label = ""
             # Handle the legacy case of the nominal being
-            if model_name != "":
+            if model_name:
                 label = f"_{model_name}"
             else:
                 logger.warning("Loading unlabeled model dependence via legacy production.")
@@ -2907,7 +2914,7 @@ def _load_unfolded_outputs(
             double_counting_cut=double_counting_cut,
             pure_matches=True,
         )
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         logger.debug("Skipping pure matches because the output file doesn't exist.")
         unfolding_closure_pure_matches_outputs = {}
 
@@ -3402,7 +3409,7 @@ def calculate_systematics(  # noqa: C901
 
             # Retrieve common values and calculate relative uncertainties
             _nominal_name_label = model_dependence_configuration.nominal
-            if _nominal_name_label != "":
+            if _nominal_name_label:
                 _nominal_name_label = f"_{_nominal_name_label}"
 
             nominal_values = unfolded[f"model_dependence{_nominal_name_label}"].data.values
@@ -3410,7 +3417,7 @@ def calculate_systematics(  # noqa: C901
             # We loop here since we could imagine multiple possible model dependence contributions.
             for model_name in model_dependence_configuration.variations:
                 # Intermediate step: Find the asymmetric relative errors of each model variation
-                _model_name_label = f"_{model_name}" if model_name != "" else ""
+                _model_name_label = f"_{model_name}" if model_name else ""
                 relative_errors_by_model[model_name] = (
                     unfolded[f"model_dependence{_model_name_label}"].data.values - nominal_values
                 ) / nominal_values
@@ -3810,7 +3817,7 @@ def plot_response(
         h.axes[0].bin_edges.T,
         h.axes[1].bin_edges.T,
         h.values.T,
-        norm=matplotlib.colors.LogNorm(**z_axis_range),
+        norm=mpl.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -3852,7 +3859,7 @@ def plot_jet_pt_vs_substructure(
         h.axes[0].bin_edges.T,
         h.axes[1].bin_edges.T,
         h.values.T,
-        norm=matplotlib.colors.LogNorm(**z_axis_range),
+        norm=mpl.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -4043,7 +4050,7 @@ def plot_select_iteration(
     # Label and layout
     plot_config.apply(fig=fig, ax=ax)
     # Additional tweaks
-    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=2.0))
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=2.0))
 
     figure_name = f"{plot_config.name}"
     fig.savefig(output_dir / f"{figure_name}.pdf")
