@@ -1128,7 +1128,7 @@ def plot_grooming_model_comparisons_for_single_system(
         output_dir=output_dir,
     )
 
-def _rebin_method_one(ratio_reference_hist: binned_data.BinnedData, h: binned_data.BinnedData) -> binned_data.BinnedData:
+def rebin_ratio_according_to_wider_binning(ratio_reference_hist: binned_data.BinnedData, h: binned_data.BinnedData) -> binned_data.BinnedData:
     # NOTE: This may not be the 100% most efficient way, but it's conceptually simple
     # First, undo the bin width scaling
     # For the main hist
@@ -1168,35 +1168,6 @@ def _rebin_method_one(ratio_reference_hist: binned_data.BinnedData, h: binned_da
         "quadrature": _ratio_y_systematic
     }
 
-    return ratio_reference_hist
-
-def _rebin_method_two(ratio_reference_hist: binned_data.BinnedData, h: binned_data.BinnedData) -> binned_data.BinnedData:
-    # TODO: Would be really nice if we could do this more gracefully! This is really hacky
-    _ratio_y_systematic = ratio_reference_hist.metadata["y_systematic"]["quadrature"]
-    # Attempt to rebin. It will warn if it won't work (eg. if the edges don't match up).
-    # First, we start with the rebinning the systematic since we'll lose the metadata after rebinning
-    # the main binned_data. As a hack, we create a new binned, rebin that, and then take the values out
-    # TODO: I don't think this really works...
-    _ratio_systematic_low = binned_data.BinnedData(
-        axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
-        values=_ratio_y_systematic.low * ratio_reference_hist.axes[0].bin_widths,
-        variances=np.ones(len(ratio_reference_hist.values)),
-    )[::h.axes[0].bin_edges].values
-    _ratio_systematic_high = binned_data.BinnedData(
-        axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
-        values=_ratio_y_systematic.high * ratio_reference_hist.axes[0].bin_widths,
-        variances=np.ones(len(ratio_reference_hist.values)),
-    )[::h.axes[0].bin_edges].values
-    # Now rebin the main hist.
-    ratio_reference_hist = (ratio_reference_hist * ratio_reference_hist.axes[0].bin_widths)[::h.axes[0].bin_edges]
-    ratio_reference_hist /= ratio_reference_hist.axes[0].bin_widths
-    # And store the updated systematic
-    ratio_reference_hist.metadata["y_systematic"] = {
-        "quadrature": unfolding_base.AsymmetricErrors(
-            _ratio_systematic_low / ratio_reference_hist.axes[0].bin_widths,
-            _ratio_systematic_high / ratio_reference_hist.axes[0].bin_widths,
-        )
-    }
     return ratio_reference_hist
 
 
@@ -1398,49 +1369,11 @@ def _plot_single_system_comparison(
             # Check that binning matches up. If it doesn't attempt to rebin
             if h.axes[0].bin_edges.shape != ratio_reference_hist.axes[0].bin_edges.shape or \
                 not np.allclose(h.axes[0].bin_edges, ratio_reference_hist.axes[0].bin_edges):
-                # Keep an original copy around for testing
-                # TODO: Remove extra comparison code and original hist when done testing
-                ratio_reference_hist_original = ratio_reference_hist.copy()
-                logger.info(f"bin_edges: {ratio_reference_hist.axes[0].bin_edges}")
-                logger.info(f"Original: {ratio_reference_hist.values}")
-
-                _ratio_reference_hist_1 = _rebin_method_one(
+                # Rebin according to the data which we are supposed to be plotting
+                ratio_reference_hist = rebin_ratio_according_to_wider_binning(
                     ratio_reference_hist=ratio_reference_hist.copy(),
                     h=h,
                 )
-
-                # Cross check.
-                # TODO: Remove this post HP. It's not needed anymore...
-                _ratio_reference_hist_2 = _rebin_method_two(
-                    ratio_reference_hist=ratio_reference_hist.copy(),
-                    h=h,
-                )
-
-                # Bin edges
-                np.testing.assert_allclose(
-                    _ratio_reference_hist_1.axes[0].bin_edges,
-                    _ratio_reference_hist_2.axes[0].bin_edges,
-                )
-                # Values
-                np.testing.assert_allclose(
-                    _ratio_reference_hist_1.values,
-                    _ratio_reference_hist_2.values,
-                )
-                # Variances
-                np.testing.assert_allclose(
-                    _ratio_reference_hist_1.variances,
-                    _ratio_reference_hist_2.variances,
-                )
-                # Systematics
-                np.testing.assert_allclose(
-                    _ratio_reference_hist_1.metadata["y_systematic"]["quadrature"].low,
-                    _ratio_reference_hist_2.metadata["y_systematic"]["quadrature"].low,
-                )
-                np.testing.assert_allclose(
-                    _ratio_reference_hist_1.metadata["y_systematic"]["quadrature"].high,
-                    _ratio_reference_hist_2.metadata["y_systematic"]["quadrature"].high,
-                )
-                ratio_reference_hist = _ratio_reference_hist_1
 
             ratio = h / ratio_reference_hist
             # Ratio + statistical error bars
