@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from functools import reduce
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 import attrs
 import numpy as np
@@ -15,7 +15,6 @@ import numpy.typing as npt
 from pachyderm import binned_data
 
 from jet_substructure.base import helpers
-
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ class AsymmetricErrors:
 
     @classmethod
     def calculate_errors(
-        cls: Type[AsymmetricErrors], errors_one: npt.NDArray[np.float64], errors_two: Optional[npt.NDArray[np.float64]] = None
+        cls: type[AsymmetricErrors], errors_one: npt.NDArray[np.float64], errors_two: npt.NDArray[np.float64] | None = None
     ) -> AsymmetricErrors:
         """Calculate asymmetric errors from given errors.
 
@@ -101,7 +100,7 @@ class AsymmetricErrors:
         low_is_all_zero = np.allclose(low, np.zeros(len(low)), atol=1e-17)
         high_is_all_zero = np.allclose(high, np.zeros(len(high)), atol=1e-17)
         if np.any(low_is_all_zero & high_is_all_zero):
-            logger.warning(f"Errors are all identically zero for this calculation! Check this carefully!")
+            logger.warning("Errors are all identically zero for this calculation! Check this carefully!")
         # If it's one sided, then we always should have only one non-zero error.
         if one_sided:
             low_is_zero_array = np.isclose(low, np.zeros(len(low)), atol=1e-17)
@@ -123,7 +122,8 @@ class ErrorInput:
 def relative_error(*inputs: ErrorInput) -> npt.NDArray[np.float64]:
     """ Specifically for ratios or individual values. """
     if len(inputs) == 0:
-        raise ValueError("Must pass at least one ErrorInput")
+        _msg = "Must pass at least one ErrorInput"
+        raise ValueError(_msg)
     if len(inputs) > 1:
         relative_error_squared: npt.NDArray[np.float64] = reduce(lambda x, y: ((x.error / x.value) ** 2) + ((y.error / y.value) ** 2), inputs)  # type: ignore[arg-type, no-any-return, attr-defined]
     else:
@@ -134,7 +134,8 @@ def relative_error(*inputs: ErrorInput) -> npt.NDArray[np.float64]:
 def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelector) -> binned_data.BinnedData:
     # Sanity check
     if len(hist.axes) > 1:
-        raise ValueError("Can only handle 1D histogram")
+        _msg = "Can only handle 1D histogram"
+        raise ValueError(_msg)
 
     bin_center_mask = (hist.axes[0].bin_centers >= x_range.min) & (hist.axes[0].bin_centers <= x_range.max)
     first_bin_edge = np.where(bin_center_mask)[0][0]
@@ -146,7 +147,7 @@ def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelect
         last_bin_edge = None
 
     # Handle metadata
-    metadata: Dict[str, Any] = {}
+    metadata: dict[str, Any] = {}
     for k, v in hist.metadata.items():
         if k == "y_systematic":
             y_systematic = {}
