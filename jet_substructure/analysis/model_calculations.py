@@ -24,8 +24,10 @@ logger = logging.getLogger(__name__)
 @attrs.define
 class ModelCalculation:
     name: str
-    label: str
+    label_pp: str
+    label_AA: str
     normalized: bool
+    grooming_methods: list[str]
     metadata: dict[str, Any] = attrs.field(factory=dict)
     pp: dict[str, binned_data.BinnedData] = attrs.field(factory=dict)
     semi_central: dict[str, binned_data.BinnedData] = attrs.field(factory=dict)
@@ -35,23 +37,27 @@ class ModelCalculation:
 
 
 class Model(Protocol):
+    """ Loader for model calculations.
+
+    This could basically be a function, but it's a bit convenient to able to keep
+    track of everything in one object with a uniform interface, so we keep it this
+    way for now (April 2023).
+    """
     base_dir: Path
-    label: str
     needs_normalization: bool
     metadata: dict[str, Any]
 
-    def load_predictions(self, grooming_methods: list[str] | None = None) -> dict[str, dict[str, binned_data.BinnedData]]:
+    def load_predictions(self, grooming_methods: list[str] | None = None) -> ModelCalculation:
         ...
 
 
 @attrs.define
 class Jetscape:
     base_dir: Path
-    label: str = attrs.field(default="JETSCAPEv3.5 AA22")
     needs_normalization: bool = attrs.field(default=False)
     metadata: dict[str, Any] = attrs.field(factory=dict)
 
-    def load_predictions(self, grooming_methods: list[str] | None = None) -> dict[str, dict[str, binned_data.BinnedData]]:
+    def load_predictions(self, grooming_methods: list[str] | None = None) -> ModelCalculation:
         if grooming_methods is None:
             grooming_methods = [
                 "dynamical_core",
@@ -106,18 +112,8 @@ class Jetscape:
                 )
                 values[grooming_method][_cent_bin] = data
 
-        # Merge relevant hists
-        return_values: dict[str, dict[str, binned_data.BinnedData]] = {}
-        # Handle by hand
-        # First, just handle pp
-        #return_values["pp"] = {
-        #    _method: values[_method]["pp"]
-        #    for _method in grooming_methods
-        #}
-        # Next, handle the PbPb
-        ...
-
-        # Alternatively, Handle automatically for all
+        # Merge relevant hists to extract the predictions
+        predictions: dict[str, dict[str, binned_data.BinnedData]] = {}
         for collision_system, contributors in {
             "pp": ["pp"],
             "semi_central": ["30-40", "40-50"],
@@ -125,7 +121,9 @@ class Jetscape:
         }.items():
             # NOTE: len(contributors) assumes that there's the same number of events in each cent bin.
             #       This should be approximately true, although it would be nicer if we could do this precisely.
-            return_values[collision_system] = {
+            #       Unfortunately, it doesn't appear that we have this information available in the output,
+            #       so we do the best we can with what we have.
+            predictions[collision_system] = {
                 _method: sum([  # type: ignore[misc]
                     values[_method][contributor] for contributor in contributors
                 ]) / len(contributors)
@@ -133,16 +131,38 @@ class Jetscape:
             }
 
             for _method in grooming_methods:
-                _data = return_values[collision_system][_method]
+                _data = predictions[collision_system][_method]
+                # Normalize the predictions if requested
                 if self.needs_normalization:
                     _data /= np.sum(_data.values)
-                # normalize by bin widths
+                # Normalize by bin widths
                 # NOTE: I will need to check if this is necessary to compare to the spectra,
                 #       but in any case, it's not critical for the ratio since it will cancel!
                 _data /= _data.axes[0].bin_widths
-                return_values[collision_system][_method] = _data
+                predictions[collision_system][_method] = _data
 
-        return return_values
+        # Now, calculate the ratios based on the predictions
+        ratios = {
+            _system: {
+                _method: predictions[_system][_method] / predictions["pp"][_method]
+                for _method in grooming_methods
+            }
+            for _system in ["central", "semi_central"]
+        }
+
+        return ModelCalculation(
+            name="jetscape",
+            label_pp="JETSCAPE PP19",
+            label_AA="JETSCAPEv3.5 AA22",
+            normalized=self.needs_normalization,
+            grooming_methods=grooming_methods,
+            pp=predictions["pp"],
+            semi_central=predictions["semi_central"],
+            semi_central_ratio=ratios["semi_central"],
+            central=predictions["central"],
+            central_ratio=ratios["central"],
+        )
+
 
 @attrs.define
 class HybridModel:
