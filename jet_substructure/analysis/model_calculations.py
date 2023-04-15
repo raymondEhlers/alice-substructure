@@ -20,6 +20,17 @@ from jet_substructure.base import helpers
 
 logger = logging.getLogger(__name__)
 
+_full_grooming_methods_list = [
+    "dynamical_core",
+    "dynamical_kt",
+    "dynamical_time",
+    "soft_drop_z_cut_02",
+    "dynamical_core_z_cut_02",
+    "dynamical_kt_z_cut_02",
+    "dynamical_time_z_cut_02",
+    "soft_drop_z_cut_04",
+]
+
 
 @attrs.define
 class ModelCalculation:
@@ -35,8 +46,17 @@ class ModelCalculation:
     central: dict[str, binned_data.BinnedData] = attrs.field(factory=dict)
     central_ratio: dict[str, binned_data.BinnedData] = attrs.field(factory=dict)
 
+    def ratio(self, event_activity: str) -> dict[str, binned_data.BinnedData]:
+        """Helper so we can select with strings. """
+        if event_activity == "central":
+            return self.central_ratio
+        if event_activity == "semi_central":
+            return self.semi_central_ratio
+        _msg = f"Unrecognized event activity {event_activity}"
+        raise ValueError(_msg)
 
-class Model(Protocol):
+
+class ModelLoader(Protocol):
     """ Loader for model calculations.
 
     This could basically be a function, but it's a bit convenient to able to keep
@@ -59,16 +79,7 @@ class Jetscape:
 
     def load_predictions(self, grooming_methods: list[str] | None = None) -> ModelCalculation:
         if grooming_methods is None:
-            grooming_methods = [
-                "dynamical_core",
-                "dynamical_kt",
-                "dynamical_time",
-                "soft_drop_z_cut_02",
-                "dynamical_core_z_cut_02",
-                "dynamical_kt_z_cut_02",
-                "dynamical_time_z_cut_02",
-                "soft_drop_z_cut_04",
-            ]
+            grooming_methods = list(_full_grooming_methods_list)
         grooming_methods_to_parameters = {
             # Here, (DyG a, z cut)
             "dynamical_core": (0.5, 0.0),
@@ -88,7 +99,7 @@ class Jetscape:
             "40-50": "pbpb40-50",
             "pp": "pp",
         }
-        # First, try to grab the DyG predictions
+        # After setup, grab the predictions
         values: dict[str, dict[str, binned_data.BinnedData]] = {}
         for grooming_method in grooming_methods:
             values[grooming_method] = {}
@@ -99,12 +110,13 @@ class Jetscape:
             input_dir = self.base_dir / "combined"
             for _cent_bin, _cent_bin_label in _centrality_bins.items():
                 filename = f"{_cent_bin_label}_{_grooming_label}_ktG_jetr0.2_ptj60-80_rapj0.0-0.7_pt0.0-2510.0_rap0.0-1.1_{_grooming_parameter_label}{_grooming_param:.02f}_zCut{_z_cut:.02f}.txt"
-                logger.info(f"Loading {grooming_method}, {_cent_bin} from {filename}")
+                #logger.debug(f"Loading {grooming_method}, {_cent_bin} from {filename}")
                 loaded_data = np.loadtxt(input_dir / _cent_bin_label / filename)
                 # Construct binned_data from input
-                logger.info(f"{loaded_data[:, 1]}")
+                # For the bin edges, we take all of the lower edges, and then cap it off with the last value
+                # from the upper edges.
                 bin_edges = np.concatenate([loaded_data[:, 1], loaded_data[-1:, 2]])
-                logger.info(f"{bin_edges=}")
+                #logger.debug(f"{bin_edges=}")
                 data = binned_data.BinnedData(
                     axes=bin_edges,
                     values=loaded_data[:, 3],
@@ -164,27 +176,31 @@ class Jetscape:
         )
 
 
+def _convert_hybrid_inputs_to_binned_data(bin_edges: npt.NDArray[np.float64], lower_band: npt.NDArray[np.float64], upper_band: npt.NDArray[np.float64]) -> binned_data.BinnedData:
+    # Convert from bands to a symmetric uncertainty to simplify plotting
+    central_values = (upper_band + lower_band) / 2
+    # Make it symmetric by construction.
+    # We take the square since we want to store the variance (ie. it's convenient for binned data)
+    error_squared = (central_values - lower_band) ** 2
+    return binned_data.BinnedData(
+        axes=[bin_edges],
+        values=central_values,
+        variances=error_squared,
+    )
+
 @attrs.define
 class HybridModel:
     base_dir: Path
-    label: str = attrs.field()
     needs_normalization: bool = attrs.field(default=False)
     metadata: dict[str, Any] = attrs.field(factory=dict)
 
-    def load_predictions(self, grooming_methods: list[str] | None = None) -> dict[str, dict[str, binned_data.BinnedData]]:
-        # NOTE: For now, only returns the ratio
+    def load_predictions(self, grooming_methods: list[str] | None = None) -> ModelCalculation:
+        # Validation
         if grooming_methods is None:
-            grooming_methods = [
-                "dynamical_core",
-                "dynamical_kt",
-                "dynamical_time",
-                "soft_drop_z_cut_02",
-                "dynamical_core_z_cut_02",
-                "dynamical_kt_z_cut_02",
-                "dynamical_time_z_cut_02",
-                "soft_drop_z_cut_04",
-            ]
+            grooming_methods = list(_full_grooming_methods_list)
 
+        # Parameters for loading the calculation
+        # These are all conventions defined by Daniel
         grooming_methods_to_parameters = {
             # Here, (DyG a, z cut)
             "dynamical_core": (0.5, 0.0),
@@ -210,11 +226,18 @@ class HybridModel:
             "dynamical_time": 2,
             "dynamical_time_z_cut_02": 2,
         }
-        _pt_bin_index = {
+        # Calculation parameters
+        _jet_pt_bin_index_map = {
             helpers.JetPtRange(60, 80): 2,
         }
-        ...
-
+        _jet_R_index_map = {
+            0.2: 2,
+        }
+        _centrality_map = {
+            "central": "010",
+            "semi_central": "3050",
+        }
+        # Model options
         _include_elastic_map = {
             True: "Elastic",
             False: "NoElastic",
@@ -223,30 +246,42 @@ class HybridModel:
             True: "Wake_1",
             False: "Wake_0",
         }
-        _centrality_map = {
-            "semi_central": "3050",
-            "central": "010",
-        }
 
         # Input options
         include_elastic = self.metadata["include_elastic"]
         include_wake = self.metadata["include_wake"]
-        bin_edges = self.metadata["bin_edges"]
+        # This binning was provided to Dani when I requested calculations
+        bin_edges = np.array(
+            self.metadata.get("bin_edges", [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2.0, 3.0, 4., 5., 6., 7., 8.]),
+            dtype=np.float64
+        )
+        # We are less likely to vary these values, but we make them settable for good measure
+        jet_pt_bin = self.metadata.get("jet_pt_bin", helpers.JetPtRange(60, 80))
+        jet_R = self.metadata.get("jet_R", 0.2)
 
         # Bin edges
+        # Convert into axis solely for convenience methods
         _axis = binned_data.Axis(bin_edges=bin_edges)
         _bin_centers = _axis.bin_centers
 
-        values: dict[str, dict[str, binned_data.BinnedData]] = {}
+        predictions: dict[str, dict[str, binned_data.BinnedData]] = {}
+        ratios: dict[str, dict[str, binned_data.BinnedData]] = {}
+        # Setup for pp individually since we don't loop over it below. We grab the values as we grab the AA.
+        predictions["pp"] = {}
         for centrality_bin in ["central", "semi_central"]:
-            values[centrality_bin] = {}
+            predictions[centrality_bin] = {}
+            ratios[centrality_bin] = {}
             for grooming_method in grooming_methods:
-                logger.info(f"Processing {centrality_bin}, {grooming_method}")
+                #logger.debug(f"Processing {centrality_bin}, {grooming_method}")
+                # Put parameters into the form needed to determine the filename from Dani.
+                # Inputs
+                _jet_R_index = _jet_R_index_map[jet_R]
+                _jet_pt_index = _jet_pt_bin_index_map[jet_pt_bin]
                 _centrality_label = _centrality_map[centrality_bin]
                 _elastic_label = _include_elastic_map[include_elastic]
                 _wake_label = _include_wake_map[include_wake]
-
-                _grooming_param, _z_cut = grooming_methods_to_parameters[grooming_method]
+                # Formatting based on provided parameters
+                _, _z_cut = grooming_methods_to_parameters[grooming_method]
                 _grooming_method_label = "DyG" if "dynamical" in grooming_method else "SD"
                 _z_label_for_dyg = "_wzcut_" + ("1" if _z_cut > 0 else "0") if "dynamical" in grooming_method else ""
                 if "dynamical" in grooming_method:
@@ -254,38 +289,152 @@ class HybridModel:
                 else:
                     _second_grooming_label = "Gro_" + str(_soft_drop_prediction_indices[grooming_method])
 
-                filename = f"HYBRID_Hadrons_{_elastic_label}_5020_{_centrality_label}_{_wake_label}_JetR_2_kT_{_grooming_method_label}{_z_label_for_dyg}_JetBin_2_{_second_grooming_label}.dat"
-
+                # Load the data
+                filename = f"HYBRID_Hadrons_{_elastic_label}_5020_{_centrality_label}_{_wake_label}_JetR_{_jet_R_index}_kT_{_grooming_method_label}{_z_label_for_dyg}_JetBin_{_jet_pt_index}_{_second_grooming_label}.dat"
                 input_data = np.loadtxt(self.base_dir / filename)
 
-                # Validate bin_edges with bin_centers
+                # Validate bin_edges with bin_centers as a cross check.
+                # NOTE: We have to provide the edges since it's not binned uniformly, so we would have
+                #       to guess if we only had the bin centers.
                 bin_centers = input_data[:, 0]
                 if not np.allclose(bin_centers, _bin_centers):
                     _msg = f"bin edges don't match centers: In file: {bin_centers}. passed: {_bin_centers}"
                     raise ValueError(_msg)
 
+                # NOTE: The pp is stored in both the semi-central and the central. In both cases, it's identical (ie. they contain
+                #       redundant information). Thus, we only have to fill it up once. After it's loaded, we can skip it the next time.
+                if not predictions["pp"].get(grooming_method):
+                    # NOTE: In principle, we could pass these values without the intermediate. But I find the order that the values
+                    #       were written to be a bit counterintuitive, so I would rather label them explicitly via the variable names.
+                    #       Nothing here is computationally expensive, so it's fine.
+                    pp_upper_band = input_data[:, 1]
+                    pp_lower_band = input_data[:, 2]
+                    predictions["pp"][grooming_method] = _convert_hybrid_inputs_to_binned_data(
+                        bin_edges=bin_edges,
+                        lower_band=pp_lower_band,
+                        upper_band=pp_upper_band,
+                    )
+
+                # Now, onto the AA
+                # NOTE: The above note about intermediate variable definitions applies equally here.
+                PbPb_upper_band = input_data[:, 3]
+                PbPb_lower_band = input_data[:, 4]
+                predictions[centrality_bin][grooming_method] = _convert_hybrid_inputs_to_binned_data(
+                    bin_edges=bin_edges,
+                    lower_band=PbPb_lower_band,
+                    upper_band=PbPb_upper_band,
+                )
+                # And ratio
                 ratio_upper_band = input_data[:, 5]
                 ratio_lower_band = input_data[:, 6]
-
-                # Convert from bands to a symmetric uncertainty to simplify plotting
-                central_values = (ratio_upper_band + ratio_lower_band) / 2
-                # Make it symmetric by construction.
-                error_squared = (central_values - ratio_lower_band) ** 2
-                #logger.info(f"{ratio_upper_band=}")
-                #logger.info(f"{ratio_lower_band=}")
-                #logger.info(f"{central_values=}")
-                #logger.info(f"{error_squared=}")
-                #logger.info(f"{np.sqrt(error_squared)=}")
-                values[centrality_bin][grooming_method] = binned_data.BinnedData(
-                    axes=[bin_edges],
-                    values=central_values,
-                    variances=error_squared,
+                ratios[centrality_bin][grooming_method] = _convert_hybrid_inputs_to_binned_data(
+                    bin_edges=bin_edges,
+                    lower_band=ratio_lower_band,
+                    upper_band=ratio_upper_band,
                 )
 
-        return values
+        # Determine the AA label based on the provided parameters
+        label_AA = "Hybrid"
+        if include_wake:
+            label_AA += " w/ wake"
+            if include_elastic:
+                label_AA += " + Moliere"
+        else:
+            if include_elastic:
+                label_AA += " w/ Moliere"
+
+        return ModelCalculation(
+            name="hybrid",
+            label_pp="Hybrid",
+            label_AA=label_AA,
+            normalized=self.needs_normalization,
+            grooming_methods=grooming_methods,
+            metadata=dict(self.metadata),
+            pp=predictions["pp"],
+            semi_central=predictions["semi_central"],
+            semi_central_ratio=ratios["semi_central"],
+            central=predictions["central"],
+            central_ratio=ratios["central"],
+        )
 
 
-def _load_hybrid_model(
+def _load_caucal_analytical_calculations(filename: Path, bin_edges: npt.NDArray[np.float64]) -> binned_data.BinnedData:
+    """Load analytical calculations for a given jet R, as determined by the filename."""
+    # May not be terribly efficient, but it works automatically and it's a small amount of data, so it's good enough.
+    arr = np.loadtxt(filename)
+    central_values = arr[:, 0]
+    lower_bounds = arr[:, 1]
+    upper_bounds = arr[:, 2]
+
+    # Since the non-perturbative contributions are treated as systematic uncertainties, we follow suit.
+    # We treat it as having no statistical error, so we just pass zeros for the variance.
+    h = binned_data.BinnedData(
+        axes=bin_edges,
+        values=central_values,
+        variances=np.zeros(len(central_values)),
+    )
+    h.metadata["y_systematic"] = {
+        # The asymmetric errors are expected to be absolute differences from the central values
+        "quadrature": unfolding_base.AsymmetricErrors(
+            low=central_values-lower_bounds,
+            high=upper_bounds-central_values,
+        )
+    }
+    return h
+
+
+@attrs.define
+class CaucalAnalyticalCalculations:
+    """Load analytical calculations for a collection of jet R, as determined by the bin edges dict."""
+    base_dir: Path
+    needs_normalization: bool = attrs.field(default=False)
+    metadata: dict[str, Any] = attrs.field(factory=dict)
+
+    def load_predictions(self, grooming_methods: list[str] | None = None) -> ModelCalculation:
+        # Validation
+        if grooming_methods is None:
+            grooming_methods = list(_full_grooming_methods_list)
+
+        # Setup
+        _grooming_methods_to_files = {
+            "dynamical_kt": "1",
+            "dynamical_time": "2",
+        }
+        bin_edges = np.array(self.metadata["bin_edges"], dtype=np.float64)
+        jet_R = self.metadata.get("jet_R", 0.4)
+        jet_R_str = f"R{jet_R*10:02g}"
+
+        # NOTE: As of April 2023, we only have the pp calculations for R=0.4 for DyG kt and DyG time,
+        #       so it's important that we catch for missing files.
+        predictions: dict[str, dict[str, binned_data.BinnedData]] = {}
+        for collision_system in ["pp"]:
+            predictions[collision_system] = {}
+            for grooming_method in grooming_methods:
+                _grooming_label = _grooming_methods_to_files.get(grooming_method, "")
+                try:  # noqa: SIM105
+                    predictions[collision_system][grooming_method] = _load_caucal_analytical_calculations(
+                        filename=self.base_dir / jet_R_str / f"ktg_a{_grooming_label}.dat", bin_edges=bin_edges
+                    )
+                except FileNotFoundError:
+                    #logger.debug(f"Skipping {grooming_method} due to missing file (probably expected).")
+                    pass
+
+        # NOTE: We don't just blindly take grooming_methods here since we don't have predictions for all methods
+        loaded_grooming_methods = list(predictions['pp'])
+        logger.info(f"Successfully loaded: {loaded_grooming_methods}")
+
+        return ModelCalculation(
+            name="analytical_calculation_caucal",
+            label_pp="Caucal et al.",
+            label_AA="Caucal et al.",
+            normalized=self.needs_normalization,
+            grooming_methods=loaded_grooming_methods,
+            metadata=dict(self.metadata),
+            pp=predictions["pp"],
+        )
+
+
+def _load_hybrid_model_QM22(
     base_dir: Path,
     dyg_filename: str,
     sd_filename: str,
@@ -407,6 +556,12 @@ def load_hybrid_model_QM22(
     jet_pt_bin: helpers.JetPtRange,
     quantity_to_retrieve: str = "ratio",
 ) -> dict[str, dict[str, dict[str, binned_data.BinnedData]]]:
+    """Load hybrid model predictions for QM22
+
+    NOTE:
+        Since this corresponds to older Hybrid model predictions, I didn't update this interface.
+        All of these possible values are superseded by the new predictions.
+    """
     _moliere_label = {
         True: "WithElastic",
         False: "NoElastic",
@@ -421,7 +576,7 @@ def load_hybrid_model_QM22(
         dyg_filename_template: str = "3050_kT_{moliere_label}_WantWake_1_JetR_2_kT_DyG.dat"
         sd_filename_template: str = "3050_kT_{moliere_label}_WantWake_1_JetR_2_kT_SD.dat"
 
-        output[_moliere_output_label[include_moliere]] = _load_hybrid_model(
+        output[_moliere_output_label[include_moliere]] = _load_hybrid_model_QM22(
             base_dir=base_dir,
             dyg_filename=dyg_filename_template.format(moliere_label=_moliere_label[include_moliere]),
             sd_filename=sd_filename_template.format(moliere_label=_moliere_label[include_moliere]),
@@ -434,46 +589,6 @@ def load_hybrid_model_QM22(
     return output
 
 
-def _load_analytical_calculations(filename: Path, bin_edges: npt.NDArray[np.float64]) -> binned_data.BinnedData:
-    """Load analytical calculations for a given jet R, as determined by the filename."""
-    # May not be terribly efficient, but it works automatically and it's a small amount of data, so it's good enough.
-    arr = np.loadtxt(filename)
-    central_values = arr[:, 0]
-    lower_bounds = arr[:, 1]
-    upper_bounds = arr[:, 2]
-
-    h = binned_data.BinnedData(
-        axes=bin_edges,
-        values=central_values,
-        variances=np.zeros(len(central_values)),
-    )
-    h.metadata["y_systematic"] = {
-        # The asymmetric errors are expected to be differences
-        "quadrature": unfolding_base.AsymmetricErrors(
-            low=central_values-lower_bounds,
-            high=upper_bounds-central_values,
-        )
-    }
-    return h
-
-
-def load_analytical_calculations(
-    path_to_calculations: Path, bin_edges: dict[str, npt.NDArray[np.float64]]
-) -> dict[str, dict[str, binned_data.BinnedData]]:
-    """Load analytical calculations for a collection of jet R, as determined by the bin edges dict."""
-    _grooming_methods_to_files = {
-        "dynamical_kt": "1",
-        "dynamical_time": "2",
-    }
-    output: dict[str, dict[str, binned_data.BinnedData]] = {}
-
-    for jet_R_str, edges in bin_edges.items():
-        output[jet_R_str] = {}
-        for grooming_method, label in _grooming_methods_to_files.items():
-            output[jet_R_str][grooming_method] = _load_analytical_calculations(
-                filename=path_to_calculations / jet_R_str / f"ktg_a{label}.dat", bin_edges=edges
-            )
-    return output
 
 
 def load_jetscape_data_jetscape_analysis(filename: Path) -> dict[str, dict[str, binned_data.BinnedData]]:
