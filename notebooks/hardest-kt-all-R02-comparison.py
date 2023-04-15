@@ -32,7 +32,7 @@ from mammoth import helpers as mammoth_helpers
 
 import jet_substructure.analysis.plot_base as pb
 from jet_substructure.base import helpers, notebook_utils as nb_utils
-from jet_substructure.analysis import new_plot_comparison, plot_from_skim, plot_paper, plot_unfolding, plot_unfolding_1D, unfolding_analysis, unfolding_base
+from jet_substructure.analysis import model_calculations, new_plot_comparison, plot_from_skim, plot_paper, plot_unfolding, plot_unfolding_1D, unfolding_analysis, unfolding_base
 
 # %load_ext autoreload
 # %autoreload 2
@@ -790,22 +790,12 @@ jetscape_central = plot_unfolding.load_jetscape_data_jetscape_analysis(
 # Provided for HP 2023 for R = 0.2
 
 # %%
-jetscape = plot_unfolding.Jetscape(
+jetscape = model_calculations.Jetscape(
     base_dir=Path("output/comparison/models/jetscape/2023-03-23-yasuki"),
     needs_normalization=False,
+    metadata={"jet_R": 0.2},
 )
 jetscape_predictions = jetscape.load_predictions()
-
-
-# %%
-# Calculate ratios
-jetscape_predictions_ratios = {
-    _system: {
-        _method: jetscape_predictions[_system][_method] / jetscape_predictions["pp"][_method]
-        for _method in grooming_methods
-    }
-    for _system in ["central", "semi_central"]
-}
 
 # %% [markdown]
 # ### Sherpa
@@ -819,16 +809,23 @@ sherpa_lund = plot_unfolding.load_sherpa_predictions(
 )
 
 # %% [markdown]
-# ### Analytical Calculations
+# ### Caucal et al. Analytical Calculations
 
 # %%
-_bin_edges = {
-    # NOTE: Equivalent to [0.5, 1, 2, 4, 6, 8]
-    "R04": pp_R04_unfolded_with_systematics["dynamical_kt"].data.axes[0].bin_edges[2:-1]
-}
-analytical_pp = plot_unfolding.load_analytical_calculations(
-    path_to_calculations= output_dir / "comparison" / "models" / "analytical", bin_edges=_bin_edges,
-) 
+# NOTE: We only have R=0.4 for DyG kt and DyG time as of April 2023
+caucal_analytical_pp_R04 = model_calculations.CaucalAnalyticalCalculations(
+    base_dir=output_dir / "comparison" / "models" / "caucal_analytical",
+    needs_normalization=False,
+    metadata={
+        # NOTE: Equivalent to [0.5, 1, 2, 4, 6, 8]
+        #"bin_edges": pp_R04_unfolded_with_systematics["dynamical_kt"].data.axes[0].bin_edges[2:-1]
+        "bin_edges": [0.5, 1, 2, 4, 6, 8]
+    },
+)
+caucal_analytical_pp_R04_predictions = caucal_analytical_pp_R04.load_predictions()
+
+# %%
+caucal_analytical_pp_R04_predictions
 
 # %% [markdown] toc-hr-collapsed=true
 # ### Hybrid model
@@ -874,29 +871,27 @@ print(_d05, _d1)
 #       And since we don't the data by the ratio, we can just use whatever binning,
 #       including the same for central and semi-central!
 bin_edges = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2.0, 3.0, 4., 5., 6., 7., 8.]
-hybrid_model_with_wake_with_moliere_ratio = plot_unfolding.HybridModel(
+hybrid_model_with_wake_with_moliere = model_calculations.HybridModel(
     base_dir=Path("/Users/REhlers/software/dev/substructure/output/comparison/models/hybrid/HP2023/ForRaymond/results_kt_raymond"),
-    label="Hybrid w/ wake + elastic",
     metadata={
         "include_elastic": True,
         "include_wake": True,
         "bin_edges": bin_edges,
     },
 )
-hybrid_model_with_wake_with_moliere_ratio_predictions = hybrid_model_with_wake_with_moliere_ratio.load_predictions()
-hybrid_model_with_wake_without_moliere_ratio = plot_unfolding.HybridModel(
+hybrid_model_with_wake_with_moliere_predictions = hybrid_model_with_wake_with_moliere.load_predictions()
+hybrid_model_with_wake_without_moliere = model_calculations.HybridModel(
     base_dir=Path("/Users/REhlers/software/dev/substructure/output/comparison/models/hybrid/HP2023/ForRaymond/results_kt_raymond"),
-    label="Hybrid w/ wake",
     metadata={
         "include_elastic": False,
         "include_wake": True,
         "bin_edges": bin_edges,
     },
 )
-hybrid_model_with_wake_without_moliere_ratio_predictions = hybrid_model_with_wake_without_moliere_ratio.load_predictions()
+hybrid_model_with_wake_without_moliere_predictions = hybrid_model_with_wake_without_moliere.load_predictions()
 
 # %%
-hybrid_model_with_wake_without_moliere_ratio_predictions["semi_central"]["soft_drop_z_cut_04"]
+hybrid_model_with_wake_without_moliere_predictions.semi_central_ratio["soft_drop_z_cut_04"]
 
 # %% [markdown]
 # # Plots
@@ -1207,13 +1202,13 @@ plot_paper.plot_pp_grooming_comparison_with_models(
 # #### R = 0.4
 
 # %%
-analytical_pp["R04"]["dynamical_kt"].axes[0].bin_centers, pp_R04_unfolded_with_systematics["dynamical_kt"].data.axes[0].bin_edges
+caucal_analytical_pp_R04.pp["dynamical_kt"].axes[0].bin_centers, pp_R04_unfolded_with_systematics["dynamical_kt"].data.axes[0].bin_edges
 
 # %%
 import numpy as np
 
 # %%
-unfolding_base.select_hist_range(analytical_pp["R04"]["dynamical_kt"], helpers.KtRange(0.5, 8))
+unfolding_base.select_hist_range(caucal_analytical_pp_R04["dynamical_kt"], helpers.KtRange(0.5, 8))
 #x_range = helpers.KtRange(0.5, 8)
 #temp_bin_centers = analytical_pp["R04"]["dynamical_kt"].axes[0].bin_centers
 #bin_center_mask = (temp_bin_centers >= x_range.min) & (temp_bin_centers <= x_range.max)
@@ -1233,7 +1228,7 @@ plot_paper.plot_pp_grooming_comparison_with_models(
     reference_grooming_method="soft_drop_z_cut_02",
     models={
         ##"jetscape": jetscape_pp["R04"],
-        "analytical": analytical_pp["R04"],
+        "analytical": caucal_analytical_pp_R04,
         "sherpa_ahadic": sherpa_ahadic["R04"],
         "sherpa_lund": sherpa_lund["R04"],
         "pythia": pp_R04_true_reference,
@@ -2176,31 +2171,38 @@ jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / input_dir_tag / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
-for grooming_method in grooming_methods:
-    plot_unfolding.plot_pp_PbPb_comparison(
-        hists={
-            "pp": pp_R02_unfolded_with_systematics[grooming_method],
-            #"semi_central": semi_central_R02_unfolded_with_systematics[grooming_method],
+#for event_activity in ["semi_central", "central"]:
+for event_activity in ["central"]:
+    for grooming_method in grooming_methods:
+        _additional_hists = {
+            "semi_central": semi_central_R02_unfolded_with_systematics[grooming_method],
             "central": central_R02_unfolded_with_systematics[grooming_method],
-        },
-        models={
-            #"hybrid_without_moliere": semi_central_hybrid_model_ratio["hybrid_without_moliere"][jet_R_str],
-            #"hybrid_moliere": semi_central_hybrid_model_ratio["hybrid_moliere"][jet_R_str],
-            #"jetscape": jetscape_predictions_ratios["semi_central"],
-            "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_ratio_predictions["central"],
-            "hybrid_moliere": hybrid_model_with_wake_with_moliere_ratio_predictions["central"],
-            "jetscape": jetscape_predictions_ratios["central"],
-        },
-        grooming_method=grooming_method,
-        output_dir=_output_dir,
-        event_activity_to_kt_range={
-            "pp": helpers.KtRange(0.25, 6),
-            "semi_central": helpers.KtRange(0.25, 6) if "z_cut" in grooming_method else helpers.KtRange(2, 6),
-            "central": helpers.KtRange(0.25, 6) if "z_cut" in grooming_method else helpers.KtRange(3, 6),
-        },
-        kt_display_range=(0.0, 6.25),
-        jet_R_str=jet_R_str,
-        alice_status=alice_status,
-    )
+        }
+        plot_unfolding.plot_pp_PbPb_comparison(
+            hists={
+                "pp": pp_R02_unfolded_with_systematics[grooming_method],
+                event_activity: _additional_hists[event_activity],
+                #"semi_central": semi_central_R02_unfolded_with_systematics[grooming_method],
+                #"central": central_R02_unfolded_with_systematics[grooming_method],
+            },
+            models={
+                #"hybrid_without_moliere": semi_central_hybrid_model_ratio["hybrid_without_moliere"][jet_R_str],
+                #"hybrid_moliere": semi_central_hybrid_model_ratio["hybrid_moliere"][jet_R_str],
+                "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions.ratio(event_activity),
+                "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions.ratio(event_activity),
+                "jetscape": jetscape_predictions.ratio(event_activity),
+            },
+            grooming_method=grooming_method,
+            output_dir=_output_dir,
+            event_activity_to_kt_range={
+                "pp": helpers.KtRange(0.25, 6),
+                "semi_central": helpers.KtRange(0.25, 6) if "z_cut" in grooming_method else helpers.KtRange(2, 6),
+                "central": helpers.KtRange(0.25, 6) if "z_cut" in grooming_method else helpers.KtRange(3, 6),
+            },
+            kt_display_range=(0.0, 6.25),
+            jet_R_str=jet_R_str,
+            alice_status=alice_status,
+            additional_label=event_activity
+        )
 
 # %%
