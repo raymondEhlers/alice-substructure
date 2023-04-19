@@ -2307,13 +2307,14 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
     conda_environment_name = "substructure_c_24_06"
     # base_dataset_name = "PbPb_central_R02_pass1"
     # base_dataset_name = "PbPb_central_R02_pass3"
-    base_dataset_name = "PbPb_semi_central_R02_pass3"
-    # base_dataset_name = "pp_R02"
+    #base_dataset_name = "PbPb_semi_central_R02_pass3"
+    base_dataset_name = "pp_R02"
     # base_dataset_name = "pp_R04_validation"
     # base_dataset_name = "PbPb_semi_central_R04_validation"
     # dataset_type = "rmax_070"
     dataset_type = "nominal"
-    collision_system = "PbPb"
+    #collision_system = "PbPb"
+    collision_system = "pp"
 
     # Job settings
     jobs_to_execute = [
@@ -2339,9 +2340,11 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
         # "soft_drop_z_cut_04",
     ]
     unfolding_runtime_settings = UnfoldingRuntimeSettings(
+        #variable_to_unfold="delta_R",
+        variable_to_unfold="kt",
         selected_settings=[
-            # TODO: Re-run pp with a different split MC fraction...
             "default",
+            #"peter_binning",
             # Soft Drop z > 0.2 tests for min kt
             # "default_z_cut_02_kt_0.5",
             # "default_z_cut_02_kt_0.5_reweight_prior",
@@ -2431,4 +2434,6 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
 
 
 if __name__ == "__main__":
-    run(job_framework=job_utils.JobFramework.dask_delayed)
+    #run(job_framework=job_utils.JobFramework.immediate_execution_debug)
+    #run(job_framework=job_utils.JobFramework.dask_delayed)
+    run(job_framework=job_utils.JobFramework.parsl)
