@@ -19,7 +19,7 @@ import numpy as np
 import pachyderm.plot
 from pachyderm import binned_data
 
-from jet_substructure.analysis.plot_base import (
+from jet_substructure.analysis.plot_style import (
     AxisConfig,
     Figure,
     LegendConfig,

@@ -15,7 +15,7 @@ import pachyderm.plot
 import uproot3
 from pachyderm import binned_data
 
-import jet_substructure.analysis.plot_base as pb
+import jet_substructure.analysis.plot_style as pb
 from jet_substructure.analysis.full_results_helpers import (
     AsymmetricErrors,
     ErrorInput,

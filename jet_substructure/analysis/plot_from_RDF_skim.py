@@ -69,7 +69,7 @@ def plot_PbPb_embedded_comparison() -> None:
 
     try:
         # May not want to import if developing.
-        import jet_substructure.analysis.plot_base as pb  # noqa: F401
+        import jet_substructure.analysis.plot_style as pb  # noqa: F401
         from jet_substructure.analysis import plot_from_skim  # noqa: F401
     except SyntaxError:
         logger.info("Couldn't load plot_from_skim due to syntax error. You need to load it.")

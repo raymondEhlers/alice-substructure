@@ -23,7 +23,7 @@ import seaborn as sns
 from pachyderm import binned_data
 
 from jet_substructure.analysis import full_results_helpers, unfolding_analysis
-from jet_substructure.analysis import plot_base as pb
+from jet_substructure.analysis import plot_style as pb
 from jet_substructure.base import helpers
 
 logger = logging.getLogger(__name__)

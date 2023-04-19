@@ -14,16 +14,16 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
+import pachyderm.plot as pb
 import seaborn as sns
 from pachyderm import binned_data
 
-from jet_substructure.analysis import full_results_helpers, plot_unfolding, unfolding_analysis
-from jet_substructure.analysis import plot_base as pb
+from jet_substructure.analysis import full_results_helpers, plot_style, plot_unfolding, unfolding_analysis
 from jet_substructure.base import helpers
 
 logger = logging.getLogger(__name__)
 
-pachyderm.plot.configure()
+pb.configure()
 
 
 def adjust_lightness(color: str | tuple[float, float, float], amount: float = 0.5) -> tuple[float, float, float]:
@@ -55,7 +55,7 @@ def _plot_pp_grooming_comparison_with_models_2022(  # noqa: C901
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
-    grooming_styling = pb.define_grooming_styles()
+    grooming_styling = plot_style.define_grooming_styles()
 
     name_of_grooming_method_to_draw_models = ""
     for grooming_method in grooming_methods:
@@ -441,7 +441,7 @@ def plot_pp_grooming_comparison_with_models_2022(
     if figure_kt_range is None:
         figure_kt_range = helpers.KtRange(1.5, 15)
 
-    grooming_styling = pb.define_grooming_styles()
+    grooming_styling = plot_style.define_grooming_styles()
     jet_pt_bin = next(iter(hists.values())).ranges[0]
 
     # Grooming method panels
@@ -496,10 +496,10 @@ def plot_pp_grooming_comparison_with_models_2022(
         ),
     ]
 
-    text = pb.label_to_display_string["ALICE"]["work_in_progress"]
-    text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
-    text += "\n" + pb.label_to_display_string["jets"]["general"]
-    text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
+    text = plot_style.label_to_display_string["ALICE"]["work_in_progress"]
+    text += "\n" + plot_style.label_to_display_string["collision_system"][collision_system_key]
+    text += "\n" + plot_style.label_to_display_string["jets"]["general"]
+    text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
     _plot_pp_grooming_comparison_with_models_2022(
         hists=hists,
@@ -560,7 +560,7 @@ def _plot_single_system_comparison(
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
-    grooming_styling = pb.define_grooming_styles()
+    grooming_styling = plot_style.define_grooming_styles()
 
     # Blue, Purple, Green, Red
     _palette = ["#5a97d3",
@@ -852,13 +852,13 @@ def plot_grooming_comparisons_for_single_system(
     if collision_system != "pp":
         event_activity = f"{_event_activity_label_map[collision_system]} "
 
-    grooming_styling = pb.define_grooming_styles()
+    grooming_styling = plot_style.define_grooming_styles()
     jet_pt_bin = next(iter(hists.values())).ranges[0]
 
-    text = pb.label_to_display_string["ALICE"][alice_status]
-    text += "\n" + event_activity + pb.label_to_display_string["collision_system"][collision_system_key]
-    text += "\n" + pb.label_to_display_string["jets"]["general"]
-    text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
+    text = plot_style.label_to_display_string["ALICE"][alice_status]
+    text += "\n" + event_activity + plot_style.label_to_display_string["collision_system"][collision_system_key]
+    text += "\n" + plot_style.label_to_display_string["jets"]["general"]
+    text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
     _plot_single_system_comparison(
         hists=hists,

@@ -16,7 +16,7 @@ import numpy as np
 import pachyderm.plot
 from pachyderm import binned_data
 
-import jet_substructure.analysis.plot_base as pb
+import jet_substructure.analysis.plot_style as pb
 from jet_substructure.analysis import plot_from_skim
 from jet_substructure.base import helpers
 

@@ -18,7 +18,7 @@ import pachyderm.plot
 import uproot
 from pachyderm import binned_data
 
-from jet_substructure.analysis import plot_base as pb
+from jet_substructure.analysis import plot_style as pb
 
 
 pachyderm.plot.configure()
