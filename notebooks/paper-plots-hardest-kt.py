@@ -14,25 +14,27 @@
 # ---
 
 # %% [markdown]
-# # Comparison for $R=0.2$ pp, semi-central, central
+# # Paper plots for hardest kt pp, semi-central, central
 #
 
 # %%
+from __future__ import annotations
+
 # Setup
 import logging
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Sequence
 
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
-import seaborn as sns
-import uproot
-from pachyderm import binned_data
+import pachyderm.plot as pb
 from mammoth import helpers as mammoth_helpers
 
-import jet_substructure.analysis.plot_base as pb
-from jet_substructure.base import helpers, notebook_utils as nb_utils
-from jet_substructure.analysis import model_calculations, new_plot_comparison, plot_from_skim, plot_paper, plot_unfolding, plot_unfolding_1D, unfolding_analysis, unfolding_base
+from jet_substructure.analysis import (
+    model_calculations,
+    plot_unfolding,
+    unfolding_analysis,
+)
+from jet_substructure.base import helpers
 
 # %load_ext autoreload
 # %autoreload 2
@@ -42,7 +44,7 @@ from jet_substructure.analysis import model_calculations, new_plot_comparison, p
 # Don't show mpl images inline. We'll handle displaying them separately.
 plt.ioff()
 # Ensure the axes are legible on a dark background
-matplotlib.rcParams['figure.facecolor'] = 'w'
+mpl.rcParams['figure.facecolor'] = 'w'
 
 mammoth_helpers.setup_logging(level=logging.DEBUG)
 # Quiet down the matplotlib logging
@@ -112,7 +114,7 @@ _output_dir.mkdir(parents=True, exist_ok=True)
 # pp
 collision_system = "pp"
 event_activity = "pp"
-_smeared_var_range = helpers.KtRange(0.25, 6)
+_smeared_var_range: helpers.KtRange | dict[str, helpers.KtRange] = helpers.KtRange(0.25, 6)
 _smeared_jet_pt_range = helpers.JetPtRange(20, 85)
 _truncation_shift = 3
 _displaced_extremum = 10
@@ -129,7 +131,7 @@ _input_dir_tag = {
 _input_dir_tag.update({
     _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
 })
-_output_dir_tag = {
+_output_dir_tag: dict[str, str | None] = {
     _method: input_dir_tag + "-from-QM22-results"
     for _method in _grooming_methods_using_qm_result_conventions
 }
@@ -173,7 +175,7 @@ if _use_qm22_inputs:
         "dynamical_time": 3,
         "soft_drop_z_cut_02": 3,
     })
-_max_n_iter = {
+_max_n_iter: dict[str, int | None] = {
     # Need +1 for convenience with range iteration
     "soft_drop_z_cut_04": 30,
 }
@@ -182,7 +184,7 @@ _max_n_iter.update({
 })
 # Model dependence.
 # Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
-_model_dependence_configuration = {
+_model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration | None] = {
     _method: unfolding_analysis.ModelDependenceConfiguration(
         # We want to load without a suffix, so the nominal needs to be empty. The actual name only
         # matters for loading the data. Everything else for the legacy production is handled manually.
@@ -200,7 +202,7 @@ _model_dependence_configuration.update({
 # Non-closure
 # Apparently I used this non-closure for QM. I don't think it's necessary now since I better understand
 # the uncertainties. Also, the stat clearly covers it.
-non_closure_configuration = {
+non_closure_configuration: dict[str, unfolding_analysis.NonClosureConfiguration | None] = {
     _method: unfolding_analysis.NonClosureConfiguration(
         contributors=["reweight_pseudo_data"],
         approach_to_combining="max",
@@ -707,7 +709,7 @@ pp_R04_unfolded_with_systematics, pp_R04_true_reference = plot_unfolding.unfolde
     unfolding_systematics_outputs=pp_R04_unfolding_systematics_outputs,
     true_jet_pt_range=true_jet_pt_range,
 )
-    
+
 if plot:
     for grooming_method in grooming_methods:
         # Plot the individual relative systematics
@@ -733,7 +735,7 @@ if plot:
             output_dir = pp_R04_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
             plot_png = True,
         )
-        
+
         #plot_unfolding.plot_kt_unfolding(
         #    unfolding_output=semi_central_R02_unfolding_systematics_outputs[grooming_method]["default"],
         #    plot_png=True,
@@ -769,25 +771,9 @@ list(pp_R04_unfolded_with_systematics.keys())
 #
 
 # %% [markdown]
-# #### 2021 files from James (jetscape-analysis)
+# #### R = 0.2
 #
-# Includes both R = 0.2 and R = 0.4, but wasn't comprehensive (and probably had a bug in my implementation)
-
-# %%
-jetscape_pp = plot_unfolding.load_jetscape_data_jetscape_analysis(
-    output_dir / "comparison" / "models" / "jetscape" / "5020_PP_Colorless" / "AnalysisResultsFinal.root"
-)
-jetscape_semi_central = plot_unfolding.load_jetscape_data_jetscape_analysis(
-    output_dir / "comparison" / "models" / "jetscape" / "5020_PbPb_30-50_0.30_2.0_1" / "AnalysisResultsFinal.root"
-)
-jetscape_central = plot_unfolding.load_jetscape_data_jetscape_analysis(
-    output_dir / "comparison" / "models" / "jetscape" / "5020_PbPb_0-10_0.30_2.0_1" / "AnalysisResultsFinal.root"
-)
-
-# %% [markdown]
-# #### Predictions from Yasuki
-#
-# Provided for HP 2023 for R = 0.2
+# Predictions from Yasuki provided for HP 2023 for R = 0.2
 
 # %%
 jetscape = model_calculations.Jetscape(
@@ -798,7 +784,19 @@ jetscape = model_calculations.Jetscape(
 jetscape_predictions = jetscape.load_predictions()
 
 # %% [markdown]
+# #### R = 0.4, TBD
+
+# %% [markdown]
 # ### Sherpa
+#
+
+# %% [markdown]
+# #### R = 0.2, TBD
+
+# %% [markdown]
+# #### R = 0.4
+#
+# R = 0.4 predctions performed by Leticia
 
 # %%
 sherpa_ahadic = plot_unfolding.load_sherpa_predictions(
@@ -810,6 +808,14 @@ sherpa_lund = plot_unfolding.load_sherpa_predictions(
 
 # %% [markdown]
 # ### Caucal et al. Analytical Calculations
+
+# %% [markdown]
+# #### R = 0.2, TBD
+
+# %% [markdown]
+# #### R = 0.4
+#
+# Provided by Alba et al for DyG a=1.0, 2.0
 
 # %%
 # NOTE: We only have R=0.4 for DyG kt and DyG time as of April 2023
@@ -830,44 +836,13 @@ caucal_analytical_pp_R04_predictions
 # %% [markdown] toc-hr-collapsed=true
 # ### Hybrid model
 
-# %%
-from importlib import reload
-reload(plot_unfolding)
-
 # %% [markdown]
-# #### QM 2022
+# #### R = 0.2
+#
+# Provided by Dani for Hard Probes 2023
 
 # %%
-_bin_edges = {
-    #"R02": {
-    #    grooming_method: semi_central_R02_unfolded_with_systematics[grooming_method].data.axes[0].bin_edges[:]
-    #    for grooming_method in grooming_methods
-    #}
-    "R02": {
-        "soft_drop_z_cut_02": [0.25, 0.5, 1, 1.5, 2, 3, 4, 6],
-        "dynamical_core": [2, 3, 4, 6],
-        "dynamical_kt": [2, 3, 4, 6],
-        "dynamical_time": [2, 3, 4, 6],
-    }
-}
-semi_central_hybrid_model_ratio = plot_unfolding.load_hybrid_model_QM22(
-    #base_dir=output_dir / "comparison" / "models" / "hybrid" / "ForRaymond_kT" / "kT_raymond",
-    base_dir=output_dir / "comparison" / "models" / "hybrid" / "HP2023" / "ForRaymond_kT" / "results_kT_raymond",
-    bin_edges=_bin_edges,
-    jet_R=jet_R_str,
-    jet_pt_bin=true_jet_pt_range,
-) 
-
-# %%
-_d05 = semi_central_hybrid_model_ratio["hybrid_moliere"]["R02"]["dynamical_core"].values, semi_central_hybrid_model_ratio["hybrid_moliere"]["R02"]["dynamical_core"].errors
-_d1 = semi_central_hybrid_model_ratio["hybrid_moliere"]["R02"]["dynamical_kt"].values, semi_central_hybrid_model_ratio["hybrid_moliere"]["R02"]["dynamical_kt"].errors
-print(_d05, _d1)
-
-# %% [markdown]
-# #### HP 2023
-
-# %%
-# NOTE: We use the narrower bin edges since we're just plotting a ratio.
+# NOTE: We use the narrower bin edges than the data since we're just plotting a ratio.
 #       And since we don't the data by the ratio, we can just use whatever binning,
 #       including the same for central and semi-central!
 bin_edges = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2.0, 3.0, 4., 5., 6., 7., 8.]
@@ -897,1083 +872,7 @@ hybrid_model_with_wake_without_moliere_predictions.semi_central_ratio["soft_drop
 # # Plots
 
 # %%
-grooming_methods = ["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"]
-
-# %% [markdown]
-# ## pp grooming methods comparison
-
-# %% [markdown]
-# ### R = 0.2
-
-# %%
-jet_R = 0.2
-jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-plot_unfolding.plot_grooming_comparisons_for_single_system(
-    hists=pp_R02_unfolded_with_systematics,
-    grooming_methods=grooming_methods,
-    reference_grooming_method="dynamical_core",
-    collision_system="pp",
-    collision_system_key="pp_5TeV",
-    output_dir=_output_dir,
-    kt_range=helpers.KtRange(0.25, 6),
-    figure_kt_range=helpers.KtRange(0, 6.25),
-    jet_R_str=jet_R_str,
-)
-
-# %% [markdown]
-# ### R = 0.4
-
-# %% jupyter={"outputs_hidden": true}
-jet_R = 0.4
-jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-plot_unfolding.plot_grooming_comparisons_for_single_system(
-    hists=pp_R04_unfolded_with_systematics,
-    grooming_methods=grooming_methods,
-    reference_grooming_method="dynamical_core",
-    collision_system="pp",
-    collision_system_key="pp_5TeV",
-    output_dir=_output_dir,
-    kt_range=helpers.KtRange(0.25, 8),
-    figure_kt_range=helpers.KtRange(0, 8.25),
-    jet_R_str=jet_R_str,
-)
-
-# %% [markdown]
-# ## pp comparisons to models
-
-# %% [markdown]
-# ### R = 0.2
-
-# %%
-reload(plot_unfolding)
-
-# %%
-jet_R = 0.2
-jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-plot_unfolding.plot_grooming_model_comparisons_for_single_system(
-    hists=pp_R02_unfolded_with_systematics,
-    models={
-        # TODO: Need to update the jetscape binning. Whoops...
-        #"jetscape": jetscape_pp["R02"],
-        "pythia": pp_R02_true_reference,
-    },
-    grooming_methods=grooming_methods,
-    collision_system="pp",
-    collision_system_key="pp_5TeV",
-    output_dir=_output_dir,
-    kt_range=helpers.KtRange(0.25, 6),
-    figure_kt_range=helpers.KtRange(0, 6.25),
-    jet_R_str=jet_R_str,
-)
-
-# %% [markdown]
-# ### R = 0.4
-
-# %% jupyter={"outputs_hidden": true}
-jet_R = 0.4
-jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-plot_unfolding.plot_grooming_model_comparisons_for_single_system(
-    hists=pp_R04_unfolded_with_systematics,
-    models={
-        # TODO: Need to update the jetscape binning. Whoops...
-        #"jetscape": jetscape_pp["R04"],
-        "pythia": pp_R04_true_reference,
-    },
-    grooming_methods=grooming_methods,
-    collision_system="pp",
-    collision_system_key="pp_5TeV",
-    output_dir=_output_dir,
-    kt_range=helpers.KtRange(0.25, 8),
-    figure_kt_range=helpers.KtRange(0, 8.25),
-    jet_R_str=jet_R_str,
-)
-
-# %% [markdown]
-# ## PbPb grooming methods comparison
-
-# %%
-reload(plot_unfolding)
-
-# %%
-jet_R = 0.2
-jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / input_dir_tag / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-plot_unfolding.plot_grooming_comparisons_for_single_system(
-    hists=semi_central_R02_unfolded_with_systematics,
-    grooming_methods=grooming_methods,
-    reference_grooming_method="dynamical_kt_z_cut_02",
-    collision_system="semi_central",
-    collision_system_key="PbPb",
-    output_dir=_output_dir,
-    kt_range={
-        "dynamical_core": helpers.KtRange(2, 6),
-        "dynamical_kt": helpers.KtRange(2, 6),
-        "dynamical_time": helpers.KtRange(2, 6),
-        "soft_drop_z_cut_02": helpers.KtRange(0.25, 6),
-        "soft_drop_z_cut_04": helpers.KtRange(0.25, 6),
-        "dynamical_core_z_cut_02": helpers.KtRange(0.25, 6),
-        "dynamical_kt_z_cut_02": helpers.KtRange(0.25, 6),
-        "dynamical_time_z_cut_02": helpers.KtRange(0.25, 6),
-    },
-    figure_kt_range=helpers.KtRange(0, 6.25),
-    jet_R_str=jet_R_str,
-)
-
-# %%
-jet_R = 0.2
-jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-_temp_grooming_methods = grooming_methods
-grooming_methods = ["soft_drop_z_cut_02", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"]
-
-plot_unfolding.plot_grooming_comparisons_for_single_system(
-    hists=central_R02_unfolded_with_systematics,
-    grooming_methods=grooming_methods,
-    reference_grooming_method="dynamical_core",
-    collision_system="central",
-    collision_system_key="PbPb",
-    output_dir=_output_dir,
-    kt_range={
-        "dynamical_core": helpers.KtRange(3, 6),
-        "dynamical_kt": helpers.KtRange(3, 6),
-        # TODO: These will need to be revised
-        "dynamical_time": helpers.KtRange(2, 6),
-        "soft_drop_z_cut_02": helpers.KtRange(0.25, 6),
-    },
-    figure_kt_range=helpers.KtRange(0, 6.25),
-    jet_R_str=jet_R_str,
-)
-# Undoes the temporary restriction of grooming methods due to the data which is available
-grooming_methods = _temp_grooming_methods
-
-# %% [markdown]
-# ## PbPb comparisons to models
-
-# %% [markdown]
-# NOTE: Semi-central doesn't have a meaningful model comparison yet. Still waiting on JS and analytical calculations
-
-# %%
-jet_R = 0.2
-jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-plot_unfolding.plot_grooming_model_comparisons_for_single_system(
-    hists=semi_central_R02_unfolded_with_systematics,
-    models={
-        # NOTE: Jetscape isn't yet available for semi-central
-        "jetscape": jetscape_semi_central["R02"],
-    },
-    grooming_methods=grooming_methods,
-    collision_system="semi_central",
-    collision_system_key="PbPb",
-    output_dir=_output_dir,
-    kt_range={
-        "dynamical_core": helpers.KtRange(2, 6),
-        "dynamical_kt": helpers.KtRange(2, 6),
-        # TODO: This may need to be revised
-        "dynamical_time": helpers.KtRange(2, 6),
-        "soft_drop_z_cut_02": helpers.KtRange(0.25, 6),
-    },
-    figure_kt_range=helpers.KtRange(0, 6.25),
-    jet_R_str=jet_R_str,
-)
-
-# %%
-jet_R = 0.2
-jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-_temp_grooming_methods = grooming_methods
-grooming_methods = ["dynamical_core", "dynamical_kt"]
-
-plot_unfolding.plot_grooming_model_comparisons_for_single_system(
-    hists=central_R02_unfolded_with_systematics,
-    models={
-        # NOTE: Jetscape isn't yet available for semi-central
-        "jetscape": jetscape_central["R02"],
-    },
-    grooming_methods=grooming_methods,
-    collision_system="central",
-    collision_system_key="PbPb",
-    output_dir=_output_dir,
-    kt_range={
-        "dynamical_core": helpers.KtRange(3, 6),
-        "dynamical_kt": helpers.KtRange(3, 6),
-        # TODO: These will need to be revised
-        "dynamical_time": helpers.KtRange(3, 6),
-        "soft_drop_z_cut_02": helpers.KtRange(0.25, 6),
-    },
-    figure_kt_range=helpers.KtRange(0, 6.25),
-    jet_R_str=jet_R_str,
-)
-# Undoes the temporary restriction of grooming methods due to the data which is available
-grooming_methods = _temp_grooming_methods
-
-# %% [markdown]
-# ## Compare collision systems
-
-# %%
-from importlib import reload
-reload(plot_unfolding)
-
-# %%
-# TODO: Need to make this more configurable...
-#for grooming_method in ["soft_drop_z_cut_02"]:
-for grooming_method in grooming_methods:
-    plot_unfolding.plot_pp_PbPb_comparison(
-        hists={
-            "pp": pp_R02_unfolded_with_systematics[grooming_method],
-            "semi_central": semi_central_R02_unfolded_with_systematics[grooming_method],
-            #"central": central_R02_unfolded_with_systematics[grooming_method],
-        },
-        grooming_method=grooming_method,
-        output_dir=_output_dir,
-        event_activity_to_kt_range={
-            "pp": helpers.KtRange(0.25, 6),
-            "semi_central": helpers.KtRange(2, 6) if "soft_drop" not in grooming_method else helpers.KtRange(0.25, 6),
-        },
-        kt_display_range=(0.0, 6.25),
-        jet_R_str=jet_R_str,
-    )
-
-# %%
-
-# %%
-
-# %% [markdown]
-# ## Paper plots
-
-# %% [markdown]
-# ### pp grooming method comparison with models
-
-# %% [markdown]
-# #### R = 0.2
-
-# %%
-jet_R = 0.2
-jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-plot_paper.plot_pp_grooming_comparison_with_models(
-    hists=pp_R02_unfolded_with_systematics,
-    grooming_methods=grooming_methods,
-    reference_grooming_method="soft_drop_z_cut_02",
-    models={
-        "jetscape": jetscape_pp["R02"],
-        "pythia": pp_R02_true_reference,
-        #"sherpa_ahadic": sherpa_ahadic["R02"],
-        #"sherpa_lund": sherpa_lund["R02"],
-    },
-    collision_system="pp",
-    collision_system_key="pp_5TeV",
-    output_dir=_output_dir,
-    kt_range=helpers.KtRange(0.25, 6),
-    kt_ranges_for_models={
-        # TODO: Update jetscape range when binning is fixed.
-        #       For now, overlap between 2 and 6
-        "jetscape": helpers.KtRange(2, 6),
-        "pythia": helpers.KtRange(0.25, 6),
-        "sherpa_ahadic": helpers.KtRange(0.25, 6),
-        "sherpa_lund": helpers.KtRange(0.25, 6),
-    },
-    models_to_normalize=["jetscape"],
-    figure_kt_range=helpers.KtRange(0, 6.25),
-    jet_R_str=jet_R_str,
-)
-
-# %% [markdown]
-# #### R = 0.4
-
-# %%
-caucal_analytical_pp_R04.pp["dynamical_kt"].axes[0].bin_centers, pp_R04_unfolded_with_systematics["dynamical_kt"].data.axes[0].bin_edges
-
-# %%
-import numpy as np
-
-# %%
-unfolding_base.select_hist_range(caucal_analytical_pp_R04["dynamical_kt"], helpers.KtRange(0.5, 8))
-#x_range = helpers.KtRange(0.5, 8)
-#temp_bin_centers = analytical_pp["R04"]["dynamical_kt"].axes[0].bin_centers
-#bin_center_mask = (temp_bin_centers >= x_range.min) & (temp_bin_centers <= x_range.max)
-#bin_center_mask
-#np.where(bin_center_mask)[0][0]
-#np.where(bin_center_mask[::-1])
-
-# %%
-jet_R = 0.4
-jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-plot_paper.plot_pp_grooming_comparison_with_models(
-    hists=pp_R04_unfolded_with_systematics,
-    grooming_methods=grooming_methods,
-    reference_grooming_method="soft_drop_z_cut_02",
-    models={
-        ##"jetscape": jetscape_pp["R04"],
-        "analytical": caucal_analytical_pp_R04,
-        "sherpa_ahadic": sherpa_ahadic["R04"],
-        "sherpa_lund": sherpa_lund["R04"],
-        "pythia": pp_R04_true_reference,
-    },
-    collision_system="pp",
-    collision_system_key="pp_5TeV",
-    output_dir=_output_dir,
-    kt_range=helpers.KtRange(0.25, 8),
-    kt_ranges_for_models={
-        # TODO: Update jetscape range when binning is fixed.
-        #       For now, there is basically no overlap :-(
-        ##"jetscape": helpers.KtRange(2, 8),
-        "analytical": helpers.KtRange(0.5, 8),
-        "sherpa_ahadic": helpers.KtRange(0.25, 8),
-        "sherpa_lund": helpers.KtRange(0.25, 8),
-        "pythia": helpers.KtRange(0.25, 8),
-    },
-    models_to_normalize=["jetscape", "sherpa_lund", "sherpa_ahadic"],
-    figure_kt_range=helpers.KtRange(0, 8.25),
-    jet_R_str=jet_R_str,
-)
-
-# %%
-#sns.color_palette("Accent", n_colors=12)
-sns.color_palette(plot_unfolding._model_palette)
-
-# %%
-import matplotlib.colors
-
-# %%
-t = matplotlib.colors.LinearSegmentedColormap.from_list("test", N=6, colors=[(1, 1, 1), sns.color_palette("colorblind")[0]])
-t
-
-# %%
-t(2)
-
-# %% [markdown]
-# # DyG kt
-
-# %%
-# General setup
-plot = False
-substructure_variable = "kt"
-true_jet_pt_range = helpers.JetPtRange(60, 80)
-jet_R = 0.2
-jet_R_str = f"R{int(jet_R*10):02}"
-grooming_methods = ["dynamical_kt"]
-
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-# %% [markdown]
-# ## pp
-
-# %% tags=["remove_cell"]
-# pp
-collision_system = "pp"
-event_activity = "pp"
-_smeared_var_range = helpers.KtRange(0.25, 6)
-_smeared_untagged_var = helpers.KtRange(0.25, 0.25)
-_smeared_jet_pt_range = helpers.JetPtRange(20, 85)
-# _tag_after_suffix = "2_4_split"
-_n_iter_compare = 3
-_truncation_shift = 3
-_displaced_extremum = 10
-
-# %% tags=["remove_cell"]
-# Initially load data
-pp_R02_unfolding_closure_outputs, pp_R02_unfolding_closure_pure_matches_outputs, pp_R02_unfolding_systematics_outputs = plot_unfolding.load_unfolded_outputs(
-    grooming_methods=grooming_methods,
-    substructure_variable=substructure_variable,
-    smeared_var_range=_smeared_var_range,
-    smeared_untagged_var=_smeared_untagged_var,
-    smeared_jet_pt_range=_smeared_jet_pt_range,
-    collision_system=collision_system,
-    event_activity=event_activity,
-    jet_R_str=jet_R_str,
-    n_iter_compare=_n_iter_compare,
-    truncation_shift=_truncation_shift,
-    displaced_extremum=_displaced_extremum,
-    output_dir=output_dir,
-    # tag_after_suffix=_tag_after_suffix,
-)
-#for grooming_method in grooming_methods:
-#    print(f"running {grooming_method}")
-
-# Add in the closure test to provide the non-closure uncertainty
-for grooming_method in grooming_methods:
-    pp_R02_unfolding_systematics_outputs[grooming_method]["non_closure"] = pp_R02_unfolding_closure_outputs[grooming_method]["reweight_response"]
-
-# Focus down onto just the unfolded distributions
-pp_R02_unfolded_with_systematics, pp_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
-    grooming_methods=grooming_methods,
-    unfolding_systematics_outputs=pp_R02_unfolding_systematics_outputs,
-    true_jet_pt_range=true_jet_pt_range,
-)
-
-if plot:
-    for grooming_method in grooming_methods:
-        # Plot the individual relative systematics
-        plot_unfolding.plot_relative_individual_systematics(
-            unfolded=pp_R02_unfolded_with_systematics[grooming_method],
-            plot_config=pb.PlotConfig(
-                name="unfolded_systematic_relative",
-                panels=[
-                    pb.Panel(
-                        axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0.5, 6)),
-                            pb.AxisConfig(
-                                "y",
-                                label="Relative error",
-                                range=[0.5, 1.5],
-                            ),
-                        ],
-                        legend=pb.LegendConfig(location="upper right", ncol=2),
-                        #text=pb.TextConfig(text, 0.97, 0.97),
-                    ),
-                ],
-            ),
-            output_dir = pp_R02_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-            plot_png = True,
-        )
-    
-## Fully process systematics
-#for grooming_method in grooming_methods:
-#    pp_R04_unfolded[grooming_method] = plot_unfolding.unfolded_substructure_results(
-#        unfolding_outputs=pp_R04_unfolding_systematics_outputs[grooming_method],
-#        true_jet_pt_range=true_jet_pt_range,
-#    )
-#
-#    pp_R04_unfolded_with_systematics[grooming_method] = plot_unfolding.calculate_systematics(
-#        unfolded=pp_R04_unfolded[grooming_method],
-#        unfolding_outputs=pp_R04_unfolding_systematics_outputs[grooming_method],
-#        true_jet_pt_range=true_jet_pt_range,
-#    )
-#
-#    pp_R04_true_reference[grooming_method] = pp_R04_unfolding_systematics_outputs[grooming_method]["default"].true_substructure(
-#        pp_R04_unfolding_systematics_outputs[grooming_method]["default"].true_hist_name, true_jet_pt_range=true_jet_pt_range
-#    )
-#
-#    # Plot the individual relative systematics
-#    if plot:
-#        plot_unfolding.plot_relative_individual_systematics(
-#            unfolded=pp_R04_unfolded_with_systematics[grooming_method],
-#            plot_config=pb.PlotConfig(
-#                name="unfolded_systematic_relative",
-#                panels=[
-#                    pb.Panel(
-#                        axes=[
-#                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(1.5, 15)),
-#                            pb.AxisConfig(
-#                                "y",
-#                                label="Relative error",
-#                                range=[0, 1],
-#                            ),
-#                        ],
-#                        legend=pb.LegendConfig(location="upper right"),
-#                        #text=pb.TextConfig(text, 0.97, 0.97),
-#                    ),
-#                ],
-#            ),
-#            output_dir = pp_R04_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-#            plot_png = True,
-#        )
-#
-## Plot full systematics for multiple grooming methods on one plot.
-#if plot:
-#    plot_unfolding.plot_PbPb_systematics(
-#        hists=pp_R04_unfolded_with_systematics,
-#        reference=pp_R04_true_reference,
-#        grooming_methods=grooming_methods,
-#        event_activity=event_activity,
-#        kt_range=[2, 15],
-#        # Arbitrarily take the first grooming method for the output dir
-#        output_dir=pp_R04_unfolding_systematics_outputs[grooming_methods[0]]["default"].output_dir,
-#    )
-
-# %% [markdown]
-# ## Semi-central
-
-# %% tags=["remove_cell"]
-collision_system = "PbPb"
-event_activity = "semi_central"
-_tag_after_suffix = "pass3"
-_smeared_var_range = helpers.KtRange(1, 8)
-_smeared_untagged_var = helpers.KtRange(0, 1)
-_smeared_jet_pt_range = helpers.JetPtRange(40, 120)
-_n_iter_compare = 3
-_truncation_shift = 5
-_displaced_extremum = 10
-
-# %% tags=["remove_cell"]
-# Initially load data
-semi_central_R02_unfolding_closure_outputs, semi_central_R02_unfolding_closure_pure_matches_outputs, semi_central_R02_unfolding_systematics_outputs = plot_unfolding.load_unfolded_outputs(
-    grooming_methods=grooming_methods,
-    substructure_variable=substructure_variable,
-    smeared_var_range=_smeared_var_range,
-    smeared_untagged_var=_smeared_untagged_var,
-    smeared_jet_pt_range=_smeared_jet_pt_range,
-    collision_system=collision_system,
-    event_activity=event_activity,
-    jet_R_str=jet_R_str,
-    n_iter_compare=_n_iter_compare,
-    truncation_shift=_truncation_shift,
-    displaced_extremum=_displaced_extremum,
-    output_dir=output_dir,
-    tag_after_suffix=_tag_after_suffix,
-)
-
-# Add in the closure test to provide the non-closure uncertainty
-for grooming_method in grooming_methods:
-    semi_central_R02_unfolding_systematics_outputs[grooming_method]["non_closure"] = \
-        semi_central_R02_unfolding_closure_outputs[grooming_method]["reweight_response"]
-        #semi_central_R02_unfolding_closure_outputs[grooming_method]["reweight_pseudo_data"]
-
-# Focus down onto just the unfolded distributions
-semi_central_R02_unfolded_with_systematics, semi_central_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
-    grooming_methods=grooming_methods,
-    unfolding_systematics_outputs=semi_central_R02_unfolding_systematics_outputs,
-    true_jet_pt_range=true_jet_pt_range,
-)
-
-if plot:
-    for grooming_method in grooming_methods:
-        # Plot the individual relative systematics
-        plot_unfolding.plot_relative_individual_systematics(
-            unfolded=semi_central_R02_unfolded_with_systematics[grooming_method],
-            plot_config=pb.PlotConfig(
-                name="unfolded_systematic_relative",
-                panels=[
-                    pb.Panel(
-                        axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0.5, 6)),
-                            pb.AxisConfig(
-                                "y",
-                                label="Relative error",
-                                range=[0.25, 1.75],
-                            ),
-                        ],
-                        legend=pb.LegendConfig(location="upper right", ncol=2),
-                        #text=pb.TextConfig(text, 0.97, 0.97),
-                    ),
-                ],
-            ),
-            output_dir = semi_central_R02_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-            plot_png = True,
-        )
-
-# %% [markdown]
-# ## Central
-
-# %% tags=["remove_cell"]
-collision_system = "PbPb"
-event_activity = "central"
-_tag_after_suffix = "pass3"
-_smeared_var_range = helpers.KtRange(1.5, 8)
-_smeared_untagged_var = helpers.KtRange(0, 1.5)
-_smeared_jet_pt_range = helpers.JetPtRange(40, 120)
-_n_iter_compare = 10
-_truncation_shift = 5
-_displaced_extremum = 10
-
-# %% tags=["remove_cell"]
-# Initially load data
-central_R02_unfolding_closure_outputs, central_R02_unfolding_closure_pure_matches_outputs, central_R02_unfolding_systematics_outputs = plot_unfolding.load_unfolded_outputs(
-    grooming_methods=grooming_methods,
-    substructure_variable=substructure_variable,
-    smeared_var_range=_smeared_var_range,
-    smeared_untagged_var=_smeared_untagged_var,
-    smeared_jet_pt_range=_smeared_jet_pt_range,
-    collision_system=collision_system,
-    event_activity=event_activity,
-    jet_R_str=jet_R_str,
-    n_iter_compare=_n_iter_compare,
-    truncation_shift=_truncation_shift,
-    displaced_extremum=_displaced_extremum,
-    output_dir=output_dir,
-    tag_after_suffix=_tag_after_suffix,
-)
-
-# Add in the closure test to provide the non-closure uncertainty
-for grooming_method in grooming_methods:
-    central_R02_unfolding_systematics_outputs[grooming_method]["non_closure"] = central_R02_unfolding_closure_outputs[grooming_method]["reweight_response"]
-
-# Focus down onto just the unfolded distributions
-central_R02_unfolded_with_systematics, central_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
-    grooming_methods=grooming_methods,
-    unfolding_systematics_outputs=central_R02_unfolding_systematics_outputs,
-    true_jet_pt_range=true_jet_pt_range,
-)
-
-if plot:
-    for grooming_method in grooming_methods:
-        # Plot the individual relative systematics
-        plot_unfolding.plot_relative_individual_systematics(
-            unfolded=central_R02_unfolded_with_systematics[grooming_method],
-            plot_config=pb.PlotConfig(
-                name="unfolded_systematic_relative",
-                panels=[
-                    pb.Panel(
-                        axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0.5, 6)),
-                            pb.AxisConfig(
-                                "y",
-                                label="Relative error",
-                                range=[0.25, 1.75],
-                            ),
-                        ],
-                        legend=pb.LegendConfig(location="upper right", ncol=2),
-                        #text=pb.TextConfig(text, 0.97, 0.97),
-                    ),
-                ],
-            ),
-            output_dir = central_R02_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-            plot_png = True,
-        )
-
-# %%
-for grooming_method in grooming_methods:
-    plot_unfolding.plot_pp_PbPb_comparison(
-        hists={
-            "pp": pp_R02_unfolded_with_systematics[grooming_method],
-            "semi_central": semi_central_R02_unfolded_with_systematics[grooming_method],
-            "central": central_R02_unfolded_with_systematics[grooming_method],
-        },
-        grooming_method=grooming_method,
-        output_dir=_output_dir,
-        kt_range=(0.25, 6.25),
-        jet_R_str=jet_R_str,
-    )
-
-# %%
-
-# %% [markdown]
-# # Soft Drop z > 0.2
-
-# %%
-# General setup
-plot = False
-substructure_variable = "kt"
-true_jet_pt_range = helpers.JetPtRange(60, 80)
-jet_R = 0.2
-jet_R_str = f"R{int(jet_R*10):02}"
-grooming_methods = ["soft_drop_z_cut_02"]
-
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-# %% [markdown]
-# ## pp
-
-# %% tags=["remove_cell"]
-# pp
-collision_system = "pp"
-event_activity = "pp"
-_smeared_var_range = helpers.KtRange(0.25, 6)
-_smeared_untagged_var = helpers.KtRange(0, 0.25)
-_smeared_jet_pt_range = helpers.JetPtRange(20, 85)
-_tag_after_suffix = "z_cut_02_kt_0.25"
-_n_iter_compare = 3
-_truncation_shift = 3
-_displaced_extremum = 10
-
-# %% jupyter={"outputs_hidden": true} tags=["remove_cell"]
-# Initially load data
-pp_R02_unfolding_closure_outputs, pp_R02_unfolding_closure_pure_matches_outputs, pp_R02_unfolding_systematics_outputs = plot_unfolding.load_unfolded_outputs(
-    grooming_methods=grooming_methods,
-    substructure_variable=substructure_variable,
-    smeared_var_range=_smeared_var_range,
-    smeared_untagged_var=_smeared_untagged_var,
-    smeared_jet_pt_range=_smeared_jet_pt_range,
-    collision_system=collision_system,
-    event_activity=event_activity,
-    jet_R_str=jet_R_str,
-    n_iter_compare=_n_iter_compare,
-    truncation_shift=_truncation_shift,
-    displaced_extremum=_displaced_extremum,
-    output_dir=output_dir,
-    tag_after_suffix=_tag_after_suffix,
-)
-#for grooming_method in grooming_methods:
-#    print(f"running {grooming_method}")
-
-# Add in the closure test to provide the non-closure uncertainty
-for grooming_method in grooming_methods:
-    pp_R02_unfolding_systematics_outputs[grooming_method]["non_closure"] = pp_R02_unfolding_closure_outputs[grooming_method]["reweight_response"]
-
-# Focus down onto just the unfolded distributions
-pp_R02_unfolded_with_systematics, pp_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
-    grooming_methods=grooming_methods,
-    unfolding_systematics_outputs=pp_R02_unfolding_systematics_outputs,
-    true_jet_pt_range=true_jet_pt_range,
-)
-
-if plot:
-    for grooming_method in grooming_methods:
-        # Plot the individual relative systematics
-        plot_unfolding.plot_relative_individual_systematics(
-            unfolded=pp_R02_unfolded_with_systematics[grooming_method],
-            plot_config=pb.PlotConfig(
-                name="unfolded_systematic_relative",
-                panels=[
-                    pb.Panel(
-                        axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0.5, 6)),
-                            pb.AxisConfig(
-                                "y",
-                                label="Relative error",
-                                range=[0.5, 1.5],
-                            ),
-                        ],
-                        legend=pb.LegendConfig(location="upper right", ncol=2),
-                        #text=pb.TextConfig(text, 0.97, 0.97),
-                    ),
-                ],
-            ),
-            output_dir = pp_R02_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-            plot_png = True,
-        )
-    
-## Fully process systematics
-#for grooming_method in grooming_methods:
-#    pp_R04_unfolded[grooming_method] = plot_unfolding.unfolded_substructure_results(
-#        unfolding_outputs=pp_R04_unfolding_systematics_outputs[grooming_method],
-#        true_jet_pt_range=true_jet_pt_range,
-#    )
-#
-#    pp_R04_unfolded_with_systematics[grooming_method] = plot_unfolding.calculate_systematics(
-#        unfolded=pp_R04_unfolded[grooming_method],
-#        unfolding_outputs=pp_R04_unfolding_systematics_outputs[grooming_method],
-#        true_jet_pt_range=true_jet_pt_range,
-#    )
-#
-#    pp_R04_true_reference[grooming_method] = pp_R04_unfolding_systematics_outputs[grooming_method]["default"].true_substructure(
-#        pp_R04_unfolding_systematics_outputs[grooming_method]["default"].true_hist_name, true_jet_pt_range=true_jet_pt_range
-#    )
-#
-#    # Plot the individual relative systematics
-#    if plot:
-#        plot_unfolding.plot_relative_individual_systematics(
-#            unfolded=pp_R04_unfolded_with_systematics[grooming_method],
-#            plot_config=pb.PlotConfig(
-#                name="unfolded_systematic_relative",
-#                panels=[
-#                    pb.Panel(
-#                        axes=[
-#                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(1.5, 15)),
-#                            pb.AxisConfig(
-#                                "y",
-#                                label="Relative error",
-#                                range=[0, 1],
-#                            ),
-#                        ],
-#                        legend=pb.LegendConfig(location="upper right"),
-#                        #text=pb.TextConfig(text, 0.97, 0.97),
-#                    ),
-#                ],
-#            ),
-#            output_dir = pp_R04_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-#            plot_png = True,
-#        )
-#
-## Plot full systematics for multiple grooming methods on one plot.
-#if plot:
-#    plot_unfolding.plot_PbPb_systematics(
-#        hists=pp_R04_unfolded_with_systematics,
-#        reference=pp_R04_true_reference,
-#        grooming_methods=grooming_methods,
-#        event_activity=event_activity,
-#        kt_range=[2, 15],
-#        # Arbitrarily take the first grooming method for the output dir
-#        output_dir=pp_R04_unfolding_systematics_outputs[grooming_methods[0]]["default"].output_dir,
-#    )
-
-# %% [markdown]
-# ## Semi-central
-
-# %% tags=["remove_cell"]
-collision_system = "PbPb"
-event_activity = "semi_central"
-_tag_after_suffix = "pass3_z_cut_02_kt_0.25"
-_smeared_var_range = helpers.KtRange(0.25, 8)
-_smeared_untagged_var = helpers.KtRange(0, 0.25)
-_smeared_jet_pt_range = helpers.JetPtRange(40, 120)
-_n_iter_compare = 3
-_truncation_shift = 5
-_displaced_extremum = 10
-
-# %% tags=["remove_cell"]
-# Initially load data
-semi_central_R02_unfolding_closure_outputs, semi_central_R02_unfolding_closure_pure_matches_outputs, semi_central_R02_unfolding_systematics_outputs = plot_unfolding.load_unfolded_outputs(
-    grooming_methods=grooming_methods,
-    substructure_variable=substructure_variable,
-    smeared_var_range=_smeared_var_range,
-    smeared_untagged_var=_smeared_untagged_var,
-    smeared_jet_pt_range=_smeared_jet_pt_range,
-    collision_system=collision_system,
-    event_activity=event_activity,
-    jet_R_str=jet_R_str,
-    n_iter_compare=_n_iter_compare,
-    truncation_shift=_truncation_shift,
-    displaced_extremum=_displaced_extremum,
-    output_dir=output_dir,
-    tag_after_suffix=_tag_after_suffix,
-)
-
-# Add in the closure test to provide the non-closure uncertainty
-for grooming_method in grooming_methods:
-    semi_central_R02_unfolding_systematics_outputs[grooming_method]["non_closure"] = \
-        semi_central_R02_unfolding_closure_outputs[grooming_method]["reweight_response"]
-        #semi_central_R02_unfolding_closure_outputs[grooming_method]["reweight_pseudo_data"]
-
-# Focus down onto just the unfolded distributions
-semi_central_R02_unfolded_with_systematics, semi_central_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
-    grooming_methods=grooming_methods,
-    unfolding_systematics_outputs=semi_central_R02_unfolding_systematics_outputs,
-    true_jet_pt_range=true_jet_pt_range,
-)
-
-if plot:
-    for grooming_method in grooming_methods:
-        # Plot the individual relative systematics
-        plot_unfolding.plot_relative_individual_systematics(
-            unfolded=semi_central_R02_unfolded_with_systematics[grooming_method],
-            plot_config=pb.PlotConfig(
-                name="unfolded_systematic_relative",
-                panels=[
-                    pb.Panel(
-                        axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0.5, 6)),
-                            pb.AxisConfig(
-                                "y",
-                                label="Relative error",
-                                range=[0.25, 1.75],
-                            ),
-                        ],
-                        legend=pb.LegendConfig(location="upper right", ncol=2),
-                        #text=pb.TextConfig(text, 0.97, 0.97),
-                    ),
-                ],
-            ),
-            output_dir = semi_central_R02_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-            plot_png = True,
-        )
-
-# %% [markdown]
-# ## Central
-
-# %% tags=["remove_cell"]
-collision_system = "PbPb"
-event_activity = "central"
-_tag_after_suffix = "pass3"
-_smeared_var_range = helpers.KtRange(1.5, 8)
-_smeared_untagged_var = helpers.KtRange(0, 1.5)
-_smeared_jet_pt_range = helpers.JetPtRange(40, 120)
-_n_iter_compare = 10
-_truncation_shift = 5
-_displaced_extremum = 10
-
-# %% tags=["remove_cell"]
-# Initially load data
-central_R02_unfolding_closure_outputs, central_R02_unfolding_closure_pure_matches_outputs, central_R02_unfolding_systematics_outputs = plot_unfolding.load_unfolded_outputs(
-    grooming_methods=grooming_methods,
-    substructure_variable=substructure_variable,
-    smeared_var_range=_smeared_var_range,
-    smeared_untagged_var=_smeared_untagged_var,
-    smeared_jet_pt_range=_smeared_jet_pt_range,
-    collision_system=collision_system,
-    event_activity=event_activity,
-    jet_R_str=jet_R_str,
-    n_iter_compare=_n_iter_compare,
-    truncation_shift=_truncation_shift,
-    displaced_extremum=_displaced_extremum,
-    output_dir=output_dir,
-    tag_after_suffix=_tag_after_suffix,
-)
-
-# Add in the closure test to provide the non-closure uncertainty
-for grooming_method in grooming_methods:
-    central_R02_unfolding_systematics_outputs[grooming_method]["non_closure"] = central_R02_unfolding_closure_outputs[grooming_method]["reweight_response"]
-
-# Focus down onto just the unfolded distributions
-central_R02_unfolded_with_systematics, central_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
-    grooming_methods=grooming_methods,
-    unfolding_systematics_outputs=central_R02_unfolding_systematics_outputs,
-    true_jet_pt_range=true_jet_pt_range,
-)
-
-if plot:
-    for grooming_method in grooming_methods:
-        # Plot the individual relative systematics
-        plot_unfolding.plot_relative_individual_systematics(
-            unfolded=central_R02_unfolded_with_systematics[grooming_method],
-            plot_config=pb.PlotConfig(
-                name="unfolded_systematic_relative",
-                panels=[
-                    pb.Panel(
-                        axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0.5, 6)),
-                            pb.AxisConfig(
-                                "y",
-                                label="Relative error",
-                                range=[0.25, 1.75],
-                            ),
-                        ],
-                        legend=pb.LegendConfig(location="upper right", ncol=2),
-                        #text=pb.TextConfig(text, 0.97, 0.97),
-                    ),
-                ],
-            ),
-            output_dir = central_R02_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-            plot_png = True,
-        )
-
-# %%
-for grooming_method in grooming_methods:
-    plot_unfolding.plot_pp_PbPb_comparison(
-        hists={
-            "pp": pp_R02_unfolded_with_systematics[grooming_method],
-            "semi_central": semi_central_R02_unfolded_with_systematics[grooming_method],
-            #"central": central_R02_unfolded_with_systematics[grooming_method],
-        },
-        grooming_method=grooming_method,
-        output_dir=_output_dir,
-        kt_range=(0.25, 6.25),
-        jet_R_str=jet_R_str,
-    )
-
-# %%
-
-# %% [markdown]
-# # Compare Grooming Methods for pp
-
-# %%
-# General setup
-plot = True
-substructure_variable = "kt"
-true_jet_pt_range = helpers.JetPtRange(60, 80)
-jet_R = 0.2
-jet_R_str = f"R{int(jet_R*10):02}"
-grooming_methods = ["dynamical_core", "dynamical_kt"]
-
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-# %% [markdown]
-# ## pp
-
-# %% tags=["remove_cell"]
-# pp
-collision_system = "pp"
-event_activity = "pp"
-_smeared_var_range = helpers.KtRange(0.25, 6)
-_smeared_untagged_var = helpers.KtRange(0.25, 0.25)
-_smeared_jet_pt_range = helpers.JetPtRange(20, 85)
-#_tag_after_suffix = "2_4_split"
-_n_iter_compare = {
-    "dynamical_core": 3,
-    "dynamical_kt": 3,
-}
-_truncation_shift = 3
-_displaced_extremum = 10
-
-# %% jupyter={"outputs_hidden": true} tags=["remove_cell"]
-# Initially load data
-pp_R02_unfolding_closure_outputs, pp_R02_unfolding_closure_pure_matches_outputs, pp_R02_unfolding_systematics_outputs = plot_unfolding.load_unfolded_outputs(
-    grooming_methods=grooming_methods,
-    substructure_variable=substructure_variable,
-    smeared_var_range=_smeared_var_range,
-    smeared_untagged_var=_smeared_untagged_var,
-    smeared_jet_pt_range=_smeared_jet_pt_range,
-    collision_system=collision_system,
-    event_activity=event_activity,
-    jet_R_str=jet_R_str,
-    n_iter_compare=_n_iter_compare,
-    truncation_shift=_truncation_shift,
-    displaced_extremum=_displaced_extremum,
-    output_dir=output_dir,
-    #tag_after_suffix=_tag_after_suffix,
-)
-#for grooming_method in grooming_methods:
-#    print(f"running {grooming_method}")
-
-# Add in the closure test to provide the non-closure uncertainty
-for grooming_method in grooming_methods:
-    pp_R02_unfolding_systematics_outputs[grooming_method]["non_closure"] = pp_R02_unfolding_closure_outputs[grooming_method]["reweight_response"]
-
-# Focus down onto just the unfolded distributions
-pp_R02_unfolded_with_systematics, pp_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
-    grooming_methods=grooming_methods,
-    unfolding_systematics_outputs=pp_R02_unfolding_systematics_outputs,
-    true_jet_pt_range=true_jet_pt_range,
-)
-    
-if plot:
-    for grooming_method in grooming_methods:
-        # Plot the individual relative systematics
-        plot_unfolding.plot_relative_individual_systematics(
-            unfolded=pp_R02_unfolded_with_systematics[grooming_method],
-            plot_config=pb.PlotConfig(
-                name="unfolded_systematic_relative",
-                panels=[
-                    pb.Panel(
-                        axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0.5, 6)),
-                            pb.AxisConfig(
-                                "y",
-                                label="Relative error",
-                                range=[0.5, 1.5],
-                            ),
-                        ],
-                        legend=pb.LegendConfig(location="upper right", ncol=2),
-                        #text=pb.TextConfig(text, 0.97, 0.97),
-                    ),
-                ],
-            ),
-            output_dir = pp_R02_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-            plot_png = True,
-        )
-
-# %%
-list(pp_R02_unfolded_with_systematics.keys())
-
-# %%
-plot_unfolding.plot_grooming_comparisons_for_single_system(
-    hists=pp_R02_unfolded_with_systematics,
-    grooming_methods=grooming_methods,
-    reference_grooming_method="dynamical_core",
-    collision_system="pp",
-    collision_system_key="pp_5TeV",
-    output_dir=_output_dir,
-    kt_range=(0.25, 6.25),
-    jet_R_str=jet_R_str,
-)
-
-# %%
-
-# %%
-
-# %% [markdown]
-# # QM 2022 + HP 2023 Plots
-
-# %%
-#alice_status = "work_in_progress"
-alice_status = "preliminary"
+alice_status = "final"
 
 # %% [markdown]
 # ## pp grooming methods comparison
@@ -1983,6 +882,7 @@ alice_status = "preliminary"
 
 # %%
 from importlib import reload
+
 reload(plot_unfolding)
 
 # %%
@@ -2022,6 +922,7 @@ for _temp_grooming_methods, _reference_method, _label in [
 
 # %%
 from importlib import reload
+
 reload(plot_unfolding)
 
 # %%
@@ -2055,6 +956,7 @@ plot_unfolding.plot_grooming_model_comparisons_for_single_system(
 
 # %%
 from importlib import reload
+
 reload(plot_unfolding)
 
 # %%
@@ -2105,6 +1007,7 @@ for _collision_system, _hists in [
 
 # %%
 from importlib import reload
+
 reload(plot_unfolding)
 
 # %%
@@ -2148,6 +1051,7 @@ for grooming_method in grooming_methods:
 
 # %%
 import pprint
+
 pprint.pprint(_ks_test_results["semi_central"].keys())
 pprint.pprint([f"{v:.3}" for v in _ks_test_results["semi_central"].values()])
 pprint.pprint([f"{v:.3}" for v in _ks_test_results["central"].values()])
@@ -2163,6 +1067,7 @@ pprint.pprint([f"{v:.3}" for v in _chi2_test_results["central"].values()])
 
 # %%
 from importlib import reload
+
 reload(plot_unfolding)
 
 # %%
