@@ -43,7 +43,7 @@ def adjust_lightness(color: str | tuple[float, float, float], amount: float = 0.
     return colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
 
 
-def _plot_pp_grooming_comparison_with_models_2022(  # noqa: C901
+def _plot_pp_grooming_comparison_with_models_2022(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
     reference_grooming_method: str,
