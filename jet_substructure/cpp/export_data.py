@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pachyderm import binned_data
 
-from jet_substructure.analysis import unfolding_base
+from jet_substructure.analysis import full_results_helpers
 from jet_substructure.base import helpers
 
 
@@ -19,7 +19,7 @@ def convert_measured_data_to_TGraphs(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Select the range
-    hist = unfolding_base.select_hist_range(hist=hist, x_range=kt_range)
+    hist = full_results_helpers.select_hist_range(hist=hist, x_range=kt_range)
 
     # Delay import to avoid direct dependence.
     import ROOT

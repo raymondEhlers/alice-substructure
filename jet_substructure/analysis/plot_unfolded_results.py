@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, Sequence
 
 import attr
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
@@ -16,9 +16,13 @@ import uproot3
 from pachyderm import binned_data
 
 import jet_substructure.analysis.plot_base as pb
-from jet_substructure.analysis.unfolding_base import AsymmetricErrors, ErrorInput, relative_error, select_hist_range
+from jet_substructure.analysis.full_results_helpers import (
+    AsymmetricErrors,
+    ErrorInput,
+    relative_error,
+    select_hist_range,
+)
 from jet_substructure.base import helpers
-
 
 logger = logging.getLogger(__name__)
 
@@ -215,8 +219,8 @@ def plot_comparison_pythia(
     # Apply the PlotConfig
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
     # A few additional tweaks.
-    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
-    ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=0.2))
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.2))
 
     # filename = f"{plot_config.name}_{jet_pt_bin}{grooming_methods_filename_label}_{identifiers}_iterative_splittings"
     filename = f"{plot_config.name}"
@@ -389,8 +393,8 @@ def plot_comparison(
     # Apply the PlotConfig
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
     # A few additional tweaks.
-    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
-    ax_ratio.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=0.2))
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.2))
 
     # filename = f"{plot_config.name}_{jet_pt_bin}{grooming_methods_filename_label}_{identifiers}_iterative_splittings"
     filename = f"{plot_config.name}"
@@ -428,7 +432,7 @@ def run() -> None:
     text += "\n" + pb.label_to_display_string["collision_system"]["pp_5TeV"]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"]["R04"]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
     plot_comparison_pythia(
         hists=hists,
         grooming_methods=list(hists.keys()),
@@ -468,12 +472,12 @@ def run() -> None:
         ),
         output_dir=output_dir,
     )
-    for grooming_method in hists.keys():
+    for grooming_method in hists:
         single_grooming_method_text = text
         if grooming_method == "leading_kt_z_cut_02":
             # Add tagged fraction
             single_grooming_method_text += (
-                "\n"
+                "\n"  # noqa: ISC003
                 + r"$f_{\text{tagged}}^{\text{PYTHIA}} = 0.89$"
                 + "\n"
                 + r"$f_{\text{tagged}}^{\text{data}} = 0.84$"

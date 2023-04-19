@@ -15,7 +15,7 @@ import numpy.typing as npt
 import uproot
 from pachyderm import binned_data
 
-from jet_substructure.analysis import unfolding_base
+from jet_substructure.analysis import full_results_helpers
 from jet_substructure.base import helpers
 
 logger = logging.getLogger(__name__)
@@ -375,7 +375,7 @@ def _load_caucal_analytical_calculations(filename: Path, bin_edges: npt.NDArray[
     )
     h.metadata["y_systematic"] = {
         # The asymmetric errors are expected to be absolute differences from the central values
-        "quadrature": unfolding_base.AsymmetricErrors(
+        "quadrature": full_results_helpers.AsymmetricErrors(
             low=central_values-lower_bounds,
             high=upper_bounds-central_values,
         )

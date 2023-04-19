@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+import cycler
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,8 +17,8 @@ import pachyderm.plot
 import seaborn as sns
 from pachyderm import binned_data
 
+from jet_substructure.analysis import full_results_helpers, plot_unfolding, unfolding_analysis
 from jet_substructure.analysis import plot_base as pb
-from jet_substructure.analysis import plot_unfolding, unfolding_analysis, unfolding_base
 from jet_substructure.base import helpers
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ def adjust_lightness(color: str | tuple[float, float, float], amount: float = 0.
     return colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
 
 
-def _plot_pp_grooming_comparison_with_models(  # noqa: C901
+def _plot_pp_grooming_comparison_with_models_2022(  # noqa: C901
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
     reference_grooming_method: str,
@@ -90,7 +91,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
             h_input = hists[grooming_method].data
 
             # Select range to display.
-            h = unfolding_base.select_hist_range(h_input, kt_range[grooming_method])
+            h = full_results_helpers.select_hist_range(h_input, kt_range[grooming_method])
 
             # Set 0s to NaN
             if set_zero_to_nan:
@@ -143,11 +144,11 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                     kt_range_max = kt_range_for_reference.max
                 kt_range_for_comparison = helpers.KtRange(kt_range_min, kt_range_max)
                 logger.info(f"kt_range_for_comparison: {kt_range_for_comparison}")
-                ratio_reference_hist = unfolding_base.select_hist_range(
+                ratio_reference_hist = full_results_helpers.select_hist_range(
                     ratio_reference_hist_unselected,
                     kt_range_for_comparison,
                 )
-                h_for_ratio = unfolding_base.select_hist_range(
+                h_for_ratio = full_results_helpers.select_hist_range(
                     h_input,
                     kt_range_for_comparison,
                 )
@@ -166,22 +167,22 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                     linewidth=3,
                 )
                 # Systematic errors.
-                y_relative_error_low = unfolding_base.relative_error(
-                    unfolding_base.ErrorInput(value=h_for_ratio.values, error=h_for_ratio.metadata["y_systematic"]["quadrature"].low),
-                    unfolding_base.ErrorInput(
+                y_relative_error_low = full_results_helpers.relative_error(
+                    full_results_helpers.ErrorInput(value=h_for_ratio.values, error=h_for_ratio.metadata["y_systematic"]["quadrature"].low),
+                    full_results_helpers.ErrorInput(
                         value=ratio_reference_hist.values,
                         error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].low,
                     ),
                 )
-                y_relative_error_high = unfolding_base.relative_error(
-                    unfolding_base.ErrorInput(value=h_for_ratio.values, error=h_for_ratio.metadata["y_systematic"]["quadrature"].high),
-                    unfolding_base.ErrorInput(
+                y_relative_error_high = full_results_helpers.relative_error(
+                    full_results_helpers.ErrorInput(value=h_for_ratio.values, error=h_for_ratio.metadata["y_systematic"]["quadrature"].high),
+                    full_results_helpers.ErrorInput(
                         value=ratio_reference_hist.values,
                         error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].high,
                     ),
                 )
                 # Store the systematic.
-                ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
+                ratio.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
                     low=y_relative_error_low * ratio.values,
                     high=y_relative_error_high * ratio.values,
                 )
@@ -204,14 +205,14 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
 
             # First, plot the data systematics at 1. We only want to do this once.
             # To do so, we need the relative systematic errors.
-            y_relative_error_low = unfolding_base.relative_error(
-                unfolding_base.ErrorInput(
+            y_relative_error_low = full_results_helpers.relative_error(
+                full_results_helpers.ErrorInput(
                     value=h.values,
                     error=h.metadata["y_systematic"]["quadrature"].low,
                 ),
             )
-            y_relative_error_high = unfolding_base.relative_error(
-                unfolding_base.ErrorInput(
+            y_relative_error_high = full_results_helpers.relative_error(
+                full_results_helpers.ErrorInput(
                     value=h.values,
                     error=h.metadata["y_systematic"]["quadrature"].high,
                 ),
@@ -262,7 +263,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
 
                     # Normalize over the kt range for plotting.
                     _temp_range = kt_ranges_for_models[model_name]
-                    model_for_normalization = unfolding_base.select_hist_range(model, _temp_range)
+                    model_for_normalization = full_results_helpers.select_hist_range(model, _temp_range)
                     _normalization_value = np.sum(model_for_normalization.values)
                     logger.warning(f"Restricted range normalization value: {_normalization_value}")
                     #model /= _normalization_value
@@ -291,7 +292,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 logger.info(f"kt_range_for_model: {kt_range_for_model}")
 
                 # And select the same range.
-                model_kt_range_selected = unfolding_base.select_hist_range(model, kt_range_for_model)  # noqa: F841
+                model_kt_range_selected = full_results_helpers.select_hist_range(model, kt_range_for_model)  # noqa: F841
 
                 # And plot
                 # Make sure we copy the settings so we can modify them
@@ -320,11 +321,11 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
 
                 # _temp_i += 1
 
-                model_for_ratio = unfolding_base.select_hist_range(
+                model_for_ratio = full_results_helpers.select_hist_range(
                     model,
                     kt_range_for_model_comparison,
                 )
-                h_for_model_ratio = unfolding_base.select_hist_range(
+                h_for_model_ratio = full_results_helpers.select_hist_range(
                     h_input,
                     kt_range_for_model_comparison,
                 )
@@ -361,21 +362,21 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 # we need to propagate the systematics. It's a bit awkward since the systematic bar is already
                 # plotted, but I don't see an obviously better way forward
                 if "y_systematic" in model_for_ratio.metadata:
-                    y_relative_error_low = unfolding_base.relative_error(
-                        unfolding_base.ErrorInput(value=h_for_model_ratio.values, error=h_for_model_ratio.metadata["y_systematic"]["quadrature"].low),
-                        unfolding_base.ErrorInput(
+                    y_relative_error_low = full_results_helpers.relative_error(
+                        full_results_helpers.ErrorInput(value=h_for_model_ratio.values, error=h_for_model_ratio.metadata["y_systematic"]["quadrature"].low),
+                        full_results_helpers.ErrorInput(
                             value=model_for_ratio.values,
                             error=model_for_ratio.metadata["y_systematic"]["quadrature"].low,
                         ),
                     )
-                    y_relative_error_high = unfolding_base.relative_error(
-                        unfolding_base.ErrorInput(value=h_for_model_ratio.values, error=h_for_model_ratio.metadata["y_systematic"]["quadrature"].high),
-                        unfolding_base.ErrorInput(
+                    y_relative_error_high = full_results_helpers.relative_error(
+                        full_results_helpers.ErrorInput(value=h_for_model_ratio.values, error=h_for_model_ratio.metadata["y_systematic"]["quadrature"].high),
+                        full_results_helpers.ErrorInput(
                             value=model_for_ratio.values,
                             error=model_for_ratio.metadata["y_systematic"]["quadrature"].high,
                         ),
                     )
-                    model_systematic = unfolding_base.AsymmetricErrors(
+                    model_systematic = full_results_helpers.AsymmetricErrors(
                         low=y_relative_error_low * ratio.values,
                         high=y_relative_error_high * ratio.values,
                     )
@@ -419,7 +420,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
     plt.close(fig)
 
 
-def plot_pp_grooming_comparison_with_models(
+def plot_pp_grooming_comparison_with_models_2022(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
     reference_grooming_method: str,
@@ -501,7 +502,7 @@ def plot_pp_grooming_comparison_with_models(
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
-    _plot_pp_grooming_comparison_with_models(
+    _plot_pp_grooming_comparison_with_models_2022(
         hists=hists,
         grooming_methods=grooming_methods,
         reference_grooming_method=reference_grooming_method,
@@ -546,6 +547,358 @@ def plot_pp_grooming_comparison_with_models(
                 *grooming_method_panels
             ],
             figure=pb.Figure(edge_padding={"left": 0.13, "bottom": 0.06}),
+        ),
+        output_dir=output_dir,
+    )
+
+
+def _plot_single_system_comparison(
+    hists: Mapping[str, unfolding_analysis.SingleResult],
+    grooming_methods: Sequence[str],
+    reference_grooming_method: str,
+    set_zero_to_nan: bool,
+    kt_range: Mapping[str, helpers.KtRange | helpers.RgRange],
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+) -> None:
+    grooming_styling = pb.define_grooming_styles()
+
+    # Blue, Purple, Green, Red
+    _palette = ["#5a97d3",
+                "#9671c3",
+                "#69a75f",
+                "#cc5366",
+                "#c758a9"]
+    # Pink, Green, Purple, Orange
+    _palette_2 = ["#c85a9b",
+                 "#78a352",
+                 "#787bcf",
+                 "#ca6d42"]
+    # Orange, Purple, Green, Pink, Teal
+    _palette_3 = [#"#c57b3d",
+                  "#946fc7",
+                  "#7aa444",
+                  "#ca5477",
+                  "#4cab98"]
+    # Green, purple, orange, teal, red/pink
+    _palette_4 = ["#72a553",
+                  "#a265c2",
+                  "#c57c3d",
+                  "#6097ce",
+                  "#ca5572"]
+    # Pastel
+    _palette_5 = ["#c7d49f",
+                  "#d3b3e3",
+                  "#93dacb",
+                  "#ebb0a4",
+                  "#82c7eb"]
+    #
+    _palette_6 = [#"#ba543d",
+                  "#7e459e",
+                  "#85aa55",
+                  "#7385d9",
+                  "#b84c7d",
+                  "#4cab98"]
+    _palette_6_mod = {
+        "purple": "#7e459e",
+        "green": "#85aa55",
+        "blue": "#7385d9",
+        "magenta": "#b84c7d",
+        "teal": "#4cab98",
+        "orange": "#FF8301",
+    }
+    _extended_colors = {
+        "alt_purple": "#c09cd3",
+        # Generated
+        #"alt_green": "#3f591d",
+        "alt_green": "#517225",
+        # Already existing green
+        #"alt_green": "#55a270",
+        "alt_blue": "#4bafd0",
+    }
+
+    _colors_for_assignments = []
+    for _method in grooming_methods:
+        _method_to_color = {
+            "dynamical_core": _palette_6_mod["purple"],
+            "dynamical_kt": _palette_6_mod["green"],
+            "dynamical_time": _palette_6_mod["blue"],
+            "soft_drop_z_cut_02": _palette_6_mod["magenta"],
+            "dynamical_core_z_cut_02": _extended_colors["alt_purple"],
+            "dynamical_kt_z_cut_02": _extended_colors["alt_green"],
+            "dynamical_time_z_cut_02": _extended_colors["alt_blue"],
+            "soft_drop_z_cut_04": _palette_6_mod["orange"],
+        }
+        _colors_for_assignments.append(_method_to_color[_method])
+        # if "dynamical_core" in _method:
+        #     _color_for_method = _palette_6_mod["purple"]
+        # elif "dynamical_kt" in _method:
+        #     _color_for_method = _palette_6_mod["green"]
+        # elif "dynamical_time" in _method:
+        #     _color_for_method = _palette_6_mod["blue"]
+        # elif _method == "soft_drop_z_cut_02":
+        #     _color_for_method = _palette_6_mod["magenta"]
+        # elif _method == "soft_drop_z_cut_04":
+        #     _color_for_method = _palette_6_mod["orange"]
+        # else:
+        #     raise ValueError(f"Could not assign color for method {_method}")
+        #_colors_for_assignments.append(_color_for_method)
+
+    #_markers = ["D", "s", "o", "P", "o"]
+    _markers = ["o", "o", "o", "s", "o"]
+    # Need to rotate down one since we plot one less
+    _markers_ratio = ["o", "o", "s", "o", "o"]
+
+    with sns.color_palette("Set2"):
+        # fig, ax = plt.subplots(figsize=(9, 10))
+        # Size is specified to make it convenient to compare against Hard Probes plots.
+        fig, (ax, ax_ratio) = plt.subplots(
+            2,
+            1,
+            figsize=(10, 10),
+            gridspec_kw={"height_ratios": [3, 1]},
+            sharex=True,
+        )
+
+        #ax.set_prop_cycle(cycler.cycler(color=_palette_6_mod.values()) + cycler.cycler(marker=_markers))
+        #ax_ratio.set_prop_cycle(cycler.cycler(color=_palette_6_mod.values()) + cycler.cycler(marker=_markers_ratio))
+        ax.set_prop_cycle(cycler.cycler(color=_colors_for_assignments) + cycler.cycler(marker=_markers[:len(_colors_for_assignments)]))
+        ax_ratio.set_prop_cycle(cycler.cycler(color=_colors_for_assignments) + cycler.cycler(marker=_markers_ratio[:len(_colors_for_assignments)]))
+
+        # Use selected grooming method as a reference, but only in the range where the others are measured.
+        ratio_reference_hist_unselected = hists[reference_grooming_method].data
+
+        for _plot_counter, grooming_method in enumerate(grooming_methods):
+            # Axes: jet_pt, attr_name
+            h_input = hists[grooming_method].data
+
+            # Select range to display.
+            h = full_results_helpers.select_hist_range(h_input, kt_range[grooming_method])
+
+            # Set 0s to NaN
+            if set_zero_to_nan:
+                h.errors[h.values == 0] = np.nan
+                h.values[h.values == 0] = np.nan
+
+            ## Plot options
+            #kwargs = {
+            #    "markerfacecolor": "white" if style.fillstyle == "none" else style.color,
+            #    "alpha": 1 if style.fillstyle == "none" else 0.8,
+            #}
+            #if style.fillstyle != "none":
+            #    kwargs["markeredgewidth"] = 0
+
+            # Main data points
+            p = ax.errorbar(
+                h.axes[0].bin_centers,
+                h.values,
+                yerr=h.errors,
+                xerr=h.axes[0].bin_widths / 2,
+                #marker="o",
+                markersize=11,
+                linestyle="",
+                linewidth=3,
+                label=grooming_styling[grooming_method].label_short,
+                # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+                zorder=3 + _plot_counter,
+            )
+
+            # Systematic uncertainty
+            pachyderm.plot.error_boxes(
+                ax=ax,
+                x_data=h.axes[0].bin_centers,
+                y_data=h.values,
+                x_errors=h.axes[0].bin_widths / 2,
+                y_errors=np.array(
+                    [
+                        h.metadata["y_systematic"]["quadrature"].low,
+                        h.metadata["y_systematic"]["quadrature"].high,
+                    ]
+                ),
+                # y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+                # color=style.color,
+                color=p[0].get_color(),
+                linewidth=0,
+                alpha=0.3,
+                zorder=2,
+            )
+
+            # Ratio
+            # Skip pp because it's not meaningful.
+            if grooming_method == reference_grooming_method:
+                continue
+
+            # Ensure the ratio is defined over the same range.
+            # TODO: Refactor when more awake...
+            kt_range_for_current_grooming_method = kt_range[grooming_method]
+            kt_range_for_reference = kt_range[reference_grooming_method]
+            kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)  # type: ignore[arg-type, var-annotated]
+            if kt_range_min < kt_range_for_reference.min:
+                kt_range_min = kt_range_for_reference.min
+            if kt_range_max > kt_range_for_reference.max:
+                kt_range_max = kt_range_for_reference.max
+            kt_range_for_comparison = helpers.KtRange(kt_range_min, kt_range_max)
+            logger.info(f"kt_range_for_comparison: {kt_range_for_comparison}")
+            ratio_reference_hist = full_results_helpers.select_hist_range(
+                ratio_reference_hist_unselected,
+                kt_range_for_comparison,
+            )
+            h = full_results_helpers.select_hist_range(
+                h_input,
+                kt_range_for_comparison,
+            )
+            # Check that binning matches up. If it doesn't attempt to rebin
+            if h.axes[0].bin_edges.shape != ratio_reference_hist.axes[0].bin_edges.shape or \
+                not np.allclose(h.axes[0].bin_edges, ratio_reference_hist.axes[0].bin_edges):
+                # Rebin according to the data which we are supposed to be plotting
+                ratio_reference_hist = full_results_helpers.rebin_ratio_according_to_wider_binning(
+                    ratio_reference_hist=ratio_reference_hist.copy(),
+                    h=h,
+                )
+
+            ratio = h / ratio_reference_hist
+            # Ratio + statistical error bars
+            ax_ratio.errorbar(
+                ratio.axes[0].bin_centers,
+                ratio.values,
+                yerr=ratio.errors,
+                xerr=ratio.axes[0].bin_widths / 2,
+                color=p[0].get_color(),
+                #marker="o",
+                markersize=11,
+                linestyle="",
+                linewidth=3,
+                # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+                zorder=3 + _plot_counter,
+            )
+            # Systematic errors.
+            y_relative_error_low = full_results_helpers.relative_error(
+                full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
+                full_results_helpers.ErrorInput(
+                    value=ratio_reference_hist.values,
+                    error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].low,
+                ),
+            )
+            y_relative_error_high = full_results_helpers.relative_error(
+                full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
+                full_results_helpers.ErrorInput(
+                    value=ratio_reference_hist.values,
+                    error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].high,
+                ),
+            )
+
+            # Store the systematic.
+            ratio.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
+                low=y_relative_error_low * ratio.values,
+                high=y_relative_error_high * ratio.values,
+            )
+            y_systematic = ratio.metadata["y_systematic"]["quadrature"]
+            pachyderm.plot.error_boxes(
+                ax=ax_ratio,
+                x_data=ratio.axes[0].bin_centers,
+                y_data=ratio.values,
+                x_errors=ratio.axes[0].bin_widths / 2,
+                y_errors=np.array([y_systematic.low, y_systematic.high]),
+                color=p[0].get_color(),
+                linewidth=0,
+                alpha=0.3,
+                zorder=2,
+            )
+
+    # Reference value for ratio
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
+
+    # Labeling and presentation
+    plot_config.apply(fig=fig, axes=[ax, ax_ratio])
+    # A few additional tweaks.
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    # ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.2))
+
+    filename = f"{plot_config.name}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def plot_grooming_comparisons_for_single_system(
+    hists: Mapping[str, unfolding_analysis.SingleResult],
+    grooming_methods: Sequence[str],
+    reference_grooming_method: str,
+    collision_system: str,
+    collision_system_key: str,
+    output_dir: Path,
+    kt_range: helpers.KtRange | Mapping[str, helpers.KtRange],
+    figure_kt_range: helpers.KtRange | None = None,
+    jet_R_str: str = "R04",
+    alice_status: str = "work_in_progress",
+    text_font_size: int = 31,
+    label: str = "",
+) -> None:
+    """Plot comparison of grooming methods for a single system."""
+
+    # Validation
+    if figure_kt_range is None:
+        figure_kt_range = helpers.KtRange(1.5, 15)
+    if isinstance(kt_range, helpers.KtRange):
+        kt_range = {grooming_method: kt_range for grooming_method in [*grooming_methods, reference_grooming_method]}
+    if label:
+        label = f"_{label}"
+
+    # Add event activity to label if needed
+    event_activity = ""
+    _event_activity_label_map = {
+        "pp": "pp",
+        "central": r"0-10\%",
+        "semi_central": r"30-50\%",
+    }
+    if collision_system != "pp":
+        event_activity = f"{_event_activity_label_map[collision_system]} "
+
+    grooming_styling = pb.define_grooming_styles()
+    jet_pt_bin = next(iter(hists.values())).ranges[0]
+
+    text = pb.label_to_display_string["ALICE"][alice_status]
+    text += "\n" + event_activity + pb.label_to_display_string["collision_system"][collision_system_key]
+    text += "\n" + pb.label_to_display_string["jets"]["general"]
+    text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    _plot_single_system_comparison(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        reference_grooming_method=reference_grooming_method,
+        set_zero_to_nan=False,
+        kt_range=kt_range,
+        plot_config=pb.PlotConfig(
+            name=f"unfolded_kt_{collision_system}_comparison_{jet_R_str}{label}",
+            panels=[
+                # Main panel
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
+                            log=True,
+                            range=(4e-3, 1),
+                            font_size=text_font_size,
+                        ),
+                    ],
+                    text=pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
+                    legend=pb.LegendConfig(location="lower left", font_size=round(text_font_size*0.8), anchor=(0.015, 0.025), marker_label_spacing=0.075),
+                ),
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=text_font_size),  # type: ignore[arg-type]
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$\frac{\text{Method}}{\text{"
+                            + grooming_styling[reference_grooming_method].label_short
+                            + "}}$",
+                            range=(0.45, 1.55) if "soft_drop_z_cut_04" not in grooming_methods else (0.1, 1.9),
+                            font_size=text_font_size,
+                        ),
+                    ],
+                ),
+            ],
+            figure=pb.Figure(edge_padding={"left": 0.15, "bottom": 0.095, "top": 0.975}),
         ),
         output_dir=output_dir,
     )
