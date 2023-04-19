@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from functools import reduce
-from typing import Any
+from typing import Any, TypeVar
 
 import attrs
 import numpy as np
@@ -129,6 +129,17 @@ def relative_error(*inputs: ErrorInput) -> npt.NDArray[np.float64]:
     else:
         relative_error_squared = (inputs[0].error / inputs[0].value) ** 2
     return np.sqrt(relative_error_squared)
+
+
+_T_RangeSelector = TypeVar("_T_RangeSelector", bound=helpers.RangeSelector)
+
+def determine_overlapping_range(current_range: _T_RangeSelector, reference: _T_RangeSelector) -> _T_RangeSelector:
+    range_min, range_max = tuple(current_range)
+    if range_min < reference.min:
+        range_min = reference.min
+    if range_max > reference.max:
+        range_max = reference.max
+    return type(current_range)(range_min, range_max)
 
 
 def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelector) -> binned_data.BinnedData:
