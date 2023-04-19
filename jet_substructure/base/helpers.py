@@ -14,6 +14,7 @@ from typing import (
     Any,
     Collection,
     Iterable,
+    Iterator,
     Mapping,
     NoReturn,
     Sequence,
@@ -302,7 +303,7 @@ class RangeSelector:
     def display_str(self, label: str = "") -> str:
         return fr"{self.min} < {self._display_name}^{{\text{{{label}}}}} < {self.max}"
 
-    def __iter__(self) -> Iterable[float]:
+    def __iter__(self) -> Iterator[float]:
         yield self.min
         yield self.max
 
