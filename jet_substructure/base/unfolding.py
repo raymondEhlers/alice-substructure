@@ -8,14 +8,13 @@ from __future__ import annotations
 import functools
 import logging
 from pathlib import Path
-from typing import Any, List, Literal, Mapping, Sequence, Type
+from typing import Any, Literal, Mapping, Sequence
 
 import attr
 import numpy as np
 import numpy.typing as npt
 
 from jet_substructure.base import helpers
-
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,7 @@ class AdditionalVariableCut:
 
     @property
     def enabled(self) -> bool:
-        return self.name != ""
+        return self.name != ""  # noqa: PLC1901
 
     @property
     def encode(self) -> str:
@@ -99,11 +98,11 @@ class JetPtSettings2D(ParameterSettings2D):
         smeared_jet_pt = helpers.JetPtRange(min=self.smeared_bins[0], max=self.smeared_bins[-1])
         # description += f"_smeared_{smeared_jet_pt.zero_padded_str(self.filename_padding_factor)}"
         description = f"_smeared_{smeared_jet_pt}"
-        return description
+        return description  # noqa: RET504
 
     @classmethod
     def from_binning(
-        cls: Type[JetPtSettings2D],
+        cls: type[JetPtSettings2D],
         true_bins: npt.NDArray[np.float64],
         smeared_bins: npt.NDArray[np.float64],
         true_min_pt: float | None = None,
@@ -172,7 +171,7 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
 
     @classmethod
     def from_binning(
-        cls: Type[SubstructureVariableSettings2D],
+        cls: type[SubstructureVariableSettings2D],
         true_bins: npt.NDArray[np.float64],
         smeared_bins: npt.NDArray[np.float64],
         name: str,
@@ -194,7 +193,7 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
         }
         range_class_name = _variable_to_range_class_name[variable_name]
         range_class_name += "Range"
-        range_class: Type[helpers.RangeSelector] = getattr(helpers, range_class_name)
+        range_class: type[helpers.RangeSelector] = getattr(helpers, range_class_name)
 
         # Modify name when needed
         if normalize_by_jet_pt:
@@ -213,10 +212,7 @@ class SubstructureVariableSettings2D(ParameterSettings2D):
         # we need to drop that from the smeared_bins so we have valid binning.
         smeared_bins_selection = slice(None, None)
         if untagged_bin.min == untagged_bin.max:
-            if untagged_bin_below_range:
-                smeared_bins_selection = slice(1, None)
-            else:
-                smeared_bins_selection = slice(None, -1)
+            smeared_bins_selection = slice(1, None) if untagged_bin_below_range else slice(None, -1)
 
         return cls(
             true_bins=true_bins,
@@ -317,7 +313,7 @@ def _get_possible_parameter_from_settings(
     settings: Mapping[str, Any],
     parameter_path: Sequence[str],
     key_name: str
-) -> List[float] | Any | None:
+) -> list[float] | Any | None:
     # Setup
     binning = None
     parameter_path = list(parameter_path)
@@ -328,7 +324,7 @@ def _get_possible_parameter_from_settings(
         binning = possible_mapping_with_property.get(key_name, None)
         if binning:
             break
-        else:
+        else:  # noqa: RET508
             # We need to remove the second to last element because the last element identifies the
             # variable that we actually want to retrieve!
             # NOTE: We can't use pop because we want to preserve the last element.
@@ -405,7 +401,8 @@ def get_config_property_stored_in_binning(
 
     # Final validation. We must find the parameter somewhere!
     if must_find_parameter and not parameter:
-        raise ValueError(f"Unable to find parameter for parameter path: {parameter_path}, property_name: {property_name}")
+        _msg = f"Unable to find parameter for parameter path: {parameter_path}, property_name: {property_name}"
+        raise ValueError(_msg)
 
     return parameter
 
