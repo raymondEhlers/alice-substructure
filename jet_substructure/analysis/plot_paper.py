@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Mapping, Sequence, Union
+from typing import Any, Mapping, Sequence
 
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
@@ -19,7 +19,6 @@ from pachyderm import binned_data
 from jet_substructure.analysis import plot_base as pb
 from jet_substructure.analysis import plot_unfolding, unfolding_analysis, unfolding_base
 from jet_substructure.base import helpers
-
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +31,9 @@ def adjust_lightness(color: str | tuple[float, float, float], amount: float = 0.
 
     TODO: Cleanup
     """
-    import matplotlib.colors as mc
     import colorsys
+
+    import matplotlib.colors as mc
     try:
         c = mc.cnames[color]
     except:
@@ -59,9 +59,9 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
 
     name_of_grooming_method_to_draw_models = ""
     for grooming_method in grooming_methods:
-        res = [grooming_method in model_predictions for model_predictions in models.values()]
+        res = [grooming_method in model_predictions for model_predictions in models.values()]  # noqa: F841
         all_models_contain_grooming_method = all(
-            [grooming_method in model_predictions for model_predictions in models.values()]
+            grooming_method in model_predictions for model_predictions in models.values()
         )
         if all_models_contain_grooming_method:
             name_of_grooming_method_to_draw_models = grooming_method
@@ -230,9 +230,9 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
             )
 
             #_temp_i = 0
-            colors = ["Blues_r", "Oranges_r", "Greens_r", "Reds_r"]
+            colors = ["Blues_r", "Oranges_r", "Greens_r", "Reds_r"]  # noqa: F841
             #colors_for_models = sns.color_palette(colors[i_grooming_method], n_colors = 6)
-            t = matplotlib.colors.LinearSegmentedColormap.from_list(
+            t = mpl.colors.LinearSegmentedColormap.from_list(
                 f"{grooming_method}_col",
                 N=6,
                 # From white to the plotted color
@@ -252,7 +252,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                     continue
 
                 # Then, plot the model
-                model_style = grooming_styling[f"{grooming_method}_compare"]
+                model_style = grooming_styling[f"{grooming_method}_compare"]  # noqa: F841
                 # Get the model hist
                 model = binned_data.BinnedData.from_existing_data(model)
                 # TEMP: Try to undo normalization, then normalize
@@ -291,7 +291,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
                 logger.info(f"kt_range_for_model: {kt_range_for_model}")
 
                 # And select the same range.
-                model_kt_range_selected = unfolding_base.select_hist_range(model, kt_range_for_model)
+                model_kt_range_selected = unfolding_base.select_hist_range(model, kt_range_for_model)  # noqa: F841
 
                 # And plot
                 # Make sure we copy the settings so we can modify them
@@ -396,11 +396,11 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
     ax_ratio_models = ax_grooming_methods[grooming_methods.index(name_of_grooming_method_to_draw_models)]
     models_legend = ax_ratio_models.legend(frameon=False, loc="lower left", fontsize=22)
     handles, labels = ax_ratio_models.get_legend_handles_labels()
-    print(f"models_legend handles: {ax_ratio_models.get_legend_handles_labels()}")
+    logger.info(f"models_legend handles: {ax_ratio_models.get_legend_handles_labels()}")
     #ax_ratio_models.legend().set_visible(False)
     # Remove from the existing axis.
     models_legend.remove()
-    print(f"models_legend: {models_legend}")
+    logger.info(f"models_legend: {models_legend}")
     # Make the legend on the main axis.
     models_legend = ax.legend(handles=handles, labels=labels, frameon=False, loc="lower left", fontsize=22)
 
@@ -410,7 +410,7 @@ def _plot_pp_grooming_comparison_with_models(  # noqa: C901
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=[ax, ax_ratio_data, *ax_grooming_methods])
     # A few additional tweaks.
-    ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(base=1.0))
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
     # Add the second legend
     ax.add_artist(models_legend)
 
@@ -428,16 +428,18 @@ def plot_pp_grooming_comparison_with_models(
     collision_system_key: str,
     jet_R_str: str,
     output_dir: Path,
-    kt_range: Union[helpers.KtRange, Mapping[str, helpers.KtRange]],
+    kt_range: helpers.KtRange | Mapping[str, helpers.KtRange],
     kt_ranges_for_models: Mapping[str, helpers.KtRange],
     models_to_normalize: Sequence[str],
-    figure_kt_range: helpers.KtRange = helpers.KtRange(1.5, 15),
+    figure_kt_range: helpers.KtRange | None = None,
 ) -> None:
     """Plot comparison of grooming methods, along with models, for pp."""
 
     # Validation
     if isinstance(kt_range, helpers.KtRange):
         kt_range = {grooming_method: kt_range for grooming_method in grooming_methods}
+    if figure_kt_range is None:
+        figure_kt_range = helpers.KtRange(1.5, 15)
 
     grooming_styling = pb.define_grooming_styles()
     jet_pt_bin = next(iter(hists.values())).ranges[0]
@@ -446,7 +448,7 @@ def plot_pp_grooming_comparison_with_models(
     grooming_method_panels = [
         pb.Panel(
             axes=[
-                #pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
+                #pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore[arg-type]
                 pb.AxisConfig(
                     "y",
                     label=r"$\frac{\text{Model}}{\text{DyG}\;a=0.5}$",
@@ -458,7 +460,7 @@ def plot_pp_grooming_comparison_with_models(
         ),
         pb.Panel(
             axes=[
-                #pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
+                #pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore[arg-type]
                 pb.AxisConfig(
                     "y",
                     label=r"$\frac{\text{Model}}{\text{DyG}\;a=1}$",
@@ -470,7 +472,7 @@ def plot_pp_grooming_comparison_with_models(
         ),
         pb.Panel(
             axes=[
-                #pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore
+                #pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=tuple(figure_kt_range), font_size=22),  # type: ignore[arg-type]
                 pb.AxisConfig(
                     "y",
                     label=r"$\frac{\text{Model}}{\text{DyG}\;a=2}$",
@@ -498,7 +500,7 @@ def plot_pp_grooming_comparison_with_models(
     text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
     _plot_pp_grooming_comparison_with_models(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -543,7 +545,7 @@ def plot_pp_grooming_comparison_with_models(
                 # Grooming method specific panels
                 *grooming_method_panels
             ],
-            figure=pb.Figure(edge_padding=dict(left=0.13, bottom=0.06)),
+            figure=pb.Figure(edge_padding={"left": 0.13, "bottom": 0.06}),
         ),
         output_dir=output_dir,
     )
