@@ -13,14 +13,10 @@ from pathlib import Path
 from typing import (
     Any,
     Collection,
-    Dict,
     Iterable,
-    List,
     Mapping,
     NoReturn,
-    Optional,
     Sequence,
-    Tuple,
     TypeVar,
     Union,
 )
@@ -70,7 +66,7 @@ class UprootArray(Collection[T]):
         ...
 
     @typing.overload
-    def __getitem__(self, key: Tuple[slice, slice]) -> UprootArray[T]:
+    def __getitem__(self, key: tuple[slice, slice]) -> UprootArray[T]:
         ...
 
     @typing.overload
@@ -88,25 +84,25 @@ class UprootArray(Collection[T]):
     def __getitem__(self, key):  # type: ignore[no-untyped-def]
         raise NotImplementedError(_msg_just_typing_information)
 
-    def __add__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
+    def __add__(self, other: UprootArray[T] | int | float) -> UprootArray[T]:
         raise NotImplementedError(_msg_just_typing_information)
 
-    def __radd__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
+    def __radd__(self, other: UprootArray[T] | int | float) -> UprootArray[T]:
         raise NotImplementedError(_msg_just_typing_information)
 
-    def __sub__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
+    def __sub__(self, other: UprootArray[T] | int | float) -> UprootArray[T]:
         raise NotImplementedError(_msg_just_typing_information)
 
-    def __rsub__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
+    def __rsub__(self, other: UprootArray[T] | int | float) -> UprootArray[T]:
         raise NotImplementedError(_msg_just_typing_information)
 
-    def __mul__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
+    def __mul__(self, other: UprootArray[T] | int | float) -> UprootArray[T]:
         raise NotImplementedError(_msg_just_typing_information)
 
-    def __rmul__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
+    def __rmul__(self, other: UprootArray[T] | int | float) -> UprootArray[T]:
         raise NotImplementedError(_msg_just_typing_information)
 
-    def __truediv__(self, other: Union[float, UprootArray[T]]) -> UprootArray[T]:
+    def __truediv__(self, other: float | UprootArray[T]) -> UprootArray[T]:
         raise NotImplementedError(_msg_just_typing_information)
 
     def __pow__(self, p: float) -> UprootArray[T]:
@@ -118,7 +114,7 @@ class UprootArray(Collection[T]):
     def offsets(self) -> npt.NDArray[np.int64]:
         raise NotImplementedError(_msg_just_typing_information)
 
-    def flatten(self, axis: Optional[int] = ...) -> npt.NDArray[Any]:
+    def flatten(self, axis: int | None = ...) -> npt.NDArray[Any]:
         raise NotImplementedError(_msg_just_typing_information)
 
     @property
@@ -131,16 +127,16 @@ class UprootArray(Collection[T]):
     def counts(self) -> UprootArray[int]:
         raise NotImplementedError(_msg_just_typing_information)
 
-    def __lt__(self, other: Union[UprootArray[T], float]) -> UprootArray[bool]:
+    def __lt__(self, other: UprootArray[T] | float) -> UprootArray[bool]:
         raise NotImplementedError(_msg_just_typing_information)
 
-    def __le__(self, other: Union[UprootArray[T], float]) -> UprootArray[bool]:
+    def __le__(self, other: UprootArray[T] | float) -> UprootArray[bool]:
         raise NotImplementedError(_msg_just_typing_information)
 
-    def __gt__(self, other: Union[UprootArray[T], float]) -> UprootArray[bool]:
+    def __gt__(self, other: UprootArray[T] | float) -> UprootArray[bool]:
         raise NotImplementedError(_msg_just_typing_information)
 
-    def __ge__(self, other: Union[UprootArray[T], float]) -> UprootArray[bool]:
+    def __ge__(self, other: UprootArray[T] | float) -> UprootArray[bool]:
         raise NotImplementedError(_msg_just_typing_information)
 
     def __and__(self, other: UprootArray[bool]) -> UprootArray[bool]:
@@ -212,7 +208,7 @@ def pretty_print_tree(d: Mapping[int, Any], indent: int = 0) -> None:
             print("\t" * (indent + 1) + str(value))  # noqa: T201
 
 
-def convert_flat_to_tree(parent_label: int, relationships: Sequence[Tuple[int, int]]) -> Dict[int, Any]:
+def convert_flat_to_tree(parent_label: int, relationships: Sequence[tuple[int, int]]) -> dict[int, Any]:
     """Convert the flat array to the tree.
 
     Slightly modified from: https://stackoverflow.com/a/43728268
@@ -229,7 +225,7 @@ def convert_flat_to_tree(parent_label: int, relationships: Sequence[Tuple[int, i
     }
 
 
-def dict_product(input_dict: Dict[str, List[Any]]) -> Iterable[Dict[str, Any]]:
+def dict_product(input_dict: dict[str, list[Any]]) -> Iterable[dict[str, Any]]:
     """Like `itertools.product`, but with a dictionary containing lists.
 
     By way of example:
@@ -362,12 +358,12 @@ def _AliEmcalList_to_TList(
 
 
 def split_tree(  # noqa: C901
-    filenames: Sequence[Union[str, Path]],
+    filenames: Sequence[str | Path],
     tree_name: str = "AliAnalysisTaskJetDynamicalGrooming_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl",
     number_of_chunks: int = -1,
     chunk_size: float = 200e6,
     n_cores: int = 1,
-) -> Dict[Path, List[Path]]:
+) -> dict[Path, list[Path]]:
     """Split tree into a given number of chunks.
 
     It will also skip storing bad entries in the new files.
@@ -417,7 +413,7 @@ def split_tree(  # noqa: C901
     # Just in case we enable multithreading later.
     ROOT.ROOT.EnableImplicitMT(n_cores)
     # Finish setup
-    output_filenames: Dict[Path, List[Path]] = {}
+    output_filenames: dict[Path, list[Path]] = {}
     progress_manager = enlighten.get_manager()
 
     with progress_manager.counter(total=len(validated_filenames), desc="Processing", unit="file") as file_counter:
@@ -554,7 +550,7 @@ def split_tree_entry_point() -> None:
     logger.info(f"File output: {pprint.pformat(output_filenames)}")
 
 
-def merge_ROOT_files(dir: Path, n_merged_files: int = 5) -> Dict[Path, List[Path]]:
+def merge_ROOT_files(dir: Path, n_merged_files: int = 5) -> dict[Path, list[Path]]:
     # Setup.
     merged_dir = dir / "merged"
     merged_dir.mkdir(parents=True, exist_ok=True)
@@ -570,7 +566,7 @@ def merge_ROOT_files(dir: Path, n_merged_files: int = 5) -> Dict[Path, List[Path
     ROOT.ROOT.EnableImplicitMT()
 
     # To get started, we need to know which files are of interest.
-    output_filenames: Dict[Path, List[Path]] = {}
+    output_filenames: dict[Path, list[Path]] = {}
     input_files = list(dir.glob("*.root"))
     progress_manager = enlighten.get_manager()
 
