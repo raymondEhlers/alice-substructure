@@ -188,7 +188,7 @@ def rebin_ratio_according_to_wider_binning(ratio_reference_hist: binned_data.Bin
     # Next, rebin this hist
     # First, the systematic, so we don't lose track of it in reassigning the main object
     # We construct an additional hist with the uncertainties so that they're handled properly
-    # TODO: Would be really nice if we could do this more gracefully! This is really hacky
+    # NOTE: It would be really nice if we could do this more gracefully! This is really hacky
     _ratio_systematic_low = binned_data.BinnedData(
         axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
         values=_ratio_y_systematic.low,
