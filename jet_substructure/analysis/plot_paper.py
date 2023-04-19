@@ -27,10 +27,9 @@ pachyderm.plot.configure()
 
 
 def adjust_lightness(color: str | tuple[float, float, float], amount: float = 0.5) -> tuple[float, float, float]:
-    """
-    From: https://stackoverflow.com/a/49601444/12907985
+    """Adjust lightness of a given color
 
-    TODO: Cleanup
+    From: https://stackoverflow.com/a/49601444/12907985
     """
     import colorsys
 
