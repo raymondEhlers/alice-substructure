@@ -188,3 +188,24 @@ def define_grooming_styles() -> dict[str, GroomingMethodStyle]:
         styles.update(grooming_styling)
 
     return styles
+
+
+def adjust_lightness(color: str | tuple[float, float, float], amount: float = 0.5) -> tuple[float, float, float]:
+    """Adjust lightness of a given color.
+
+    From: https://stackoverflow.com/a/49601444/12907985
+
+    NOTE:
+        As I recall in April 2023, this didn't really work as well as I hoped. If I need it further, it may need
+        more debugging.
+    """
+    import colorsys
+
+    import matplotlib.colors as mc
+    try:
+        c = mc.cnames[color]
+    except:
+        c = color
+    #c = colorsys.rgb_to_hls(*mc.to_rgb(c))
+    c = colorsys.rgb_to_hls(*c)
+    return colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])

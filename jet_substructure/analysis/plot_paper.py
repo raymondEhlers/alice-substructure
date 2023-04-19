@@ -26,23 +26,6 @@ logger = logging.getLogger(__name__)
 pb.configure()
 
 
-def adjust_lightness(color: str | tuple[float, float, float], amount: float = 0.5) -> tuple[float, float, float]:
-    """Adjust lightness of a given color
-
-    From: https://stackoverflow.com/a/49601444/12907985
-    """
-    import colorsys
-
-    import matplotlib.colors as mc
-    try:
-        c = mc.cnames[color]
-    except:
-        c = color
-    #c = colorsys.rgb_to_hls(*mc.to_rgb(c))
-    c = colorsys.rgb_to_hls(*c)
-    return colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
-
-
 def _plot_pp_grooming_comparison_with_models_2022(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
