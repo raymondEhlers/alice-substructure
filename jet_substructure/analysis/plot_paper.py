@@ -133,15 +133,10 @@ def _plot_pp_grooming_comparison_with_models_2022(  # noqa: C901
             # Skip drawing the reference grooming method in the data ratio because it's not meaningful.
             if grooming_method != reference_grooming_method:
                 # Ensure the ratio is defined over the same range.
-                # TODO: Refactor when more awake...
-                kt_range_for_current_grooming_method = kt_range[grooming_method]
-                kt_range_for_reference = kt_range[reference_grooming_method]
-                kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)  # type: ignore[var-annotated, arg-type]
-                if kt_range_min < kt_range_for_reference.min:
-                    kt_range_min = kt_range_for_reference.min
-                if kt_range_max > kt_range_for_reference.max:
-                    kt_range_max = kt_range_for_reference.max
-                kt_range_for_comparison = helpers.KtRange(kt_range_min, kt_range_max)
+                kt_range_for_comparison = full_results_helpers.determine_overlapping_range(
+                    current_range=kt_range[grooming_method],
+                    reference=kt_range[reference_grooming_method]
+                )
                 logger.info(f"kt_range_for_comparison: {kt_range_for_comparison}")
                 ratio_reference_hist = full_results_helpers.select_hist_range(
                     ratio_reference_hist_unselected,
@@ -255,43 +250,25 @@ def _plot_pp_grooming_comparison_with_models_2022(  # noqa: C901
                 model_style = grooming_styling[f"{grooming_method}_compare"]  # noqa: F841
                 # Get the model hist
                 model = binned_data.BinnedData.from_existing_data(model)
-                # TEMP: Try to undo normalization, then normalize
-                if "sherpa" in model_name:
-                    model *= model.axes[0].bin_widths
-                    logger.warning(f"normalization for sherpa: {np.sum(model.values)}")
-
-                    # Normalize over the kt range for plotting.
-                    _temp_range = kt_ranges_for_models[model_name]
-                    model_for_normalization = full_results_helpers.select_hist_range(model, _temp_range)
-                    _normalization_value = np.sum(model_for_normalization.values)
-                    logger.warning(f"Restricted range normalization value: {_normalization_value}")
-                    #model /= _normalization_value
-                    #model /= model.axes[0].bin_widths
-                # ENDTEMP
 
                 # Then normalize as appropriate
-                # TODO: Careful, pythia is already normalized, but jetscape wasn't. So we only want to normalize in some cases
+                # NOTE: Careful, pythia is already normalized, but jetscape wasn't. So we only want to normalize in some cases
                 if model_name in models_to_normalize:
                     model /= np.sum(model.values)
                     model /= model.axes[0].bin_widths
 
                 # Determine the overlapping range, since not all of them are the same...
-                # TODO: Refactor when more awake...
-                kt_range_for_current_grooming_method = kt_range[grooming_method]
-                kt_range_for_model = kt_ranges_for_models[model_name]
-                kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)  # type: ignore[arg-type]
-                if kt_range_min < kt_range_for_model.min:
-                    kt_range_min = kt_range_for_model.min
-                if kt_range_max > kt_range_for_model.max:
-                    kt_range_max = kt_range_for_model.max
-                kt_range_for_model_comparison = helpers.KtRange(kt_range_min, kt_range_max)
+                kt_range_for_model_comparison = full_results_helpers.determine_overlapping_range(
+                    current_range=kt_range[grooming_method],
+                    reference=kt_ranges_for_models[reference_grooming_method]
+                )
                 logger.info(
                     f"kt_range_for_model_comparison: {kt_range_for_model_comparison}, {grooming_method}, {model_name}"
                 )
-                logger.info(f"kt_range_for_model: {kt_range_for_model}")
+                logger.info(f"kt_range_for_model: {kt_ranges_for_models[reference_grooming_method]}")
 
                 # And select the same range.
-                model_kt_range_selected = full_results_helpers.select_hist_range(model, kt_range_for_model)  # noqa: F841
+                model_kt_range_selected = full_results_helpers.select_hist_range(model, kt_range_for_model_comparison)  # noqa: F841
 
                 # And plot
                 # Make sure we copy the settings so we can modify them
@@ -303,9 +280,7 @@ def _plot_pp_grooming_comparison_with_models_2022(  # noqa: C901
                 # ax.errorbar(
                 #     model_kt_range_selected.axes[0].bin_centers + (0.1 * _temp_i),
                 #     model_kt_range_selected.values,
-                #     # TODO: TEMP, show errors
-                #     yerr=model_kt_range_selected.errors,
-                #     # ENDTEMP
+                #     # yerr=model_kt_range_selected.errors,
                 #     # xerr=model.axes[0].bin_widths / 2,
                 #     #color=grooming_styling[grooming_method].color,
                 #     color=p[0].get_color(),
@@ -337,7 +312,7 @@ def _plot_pp_grooming_comparison_with_models_2022(  # noqa: C901
                 temp_kwargs["label"] = (
                     # For all in one panel
                     temp_kwargs["label"] if grooming_method == name_of_grooming_method_to_draw_models else None
-                    # TODO: Generalize if this looks okay...
+                    # NOTE: Could generalize if this looks okay...
                     #temp_kwargs["label"] if (model_name in ["pythia", "sherpa_ahadic", "sherpa_lund"] and grooming_method == "dynamical_core") or (model_name in ["analytical", "jetscape"] and grooming_method == "dynamical_kt") else None
                     # For one label per axis
                     #temp_kwargs["label"] if (model_name == list(models)[i_grooming_method]) else None
@@ -728,15 +703,10 @@ def _plot_single_system_comparison(
                 continue
 
             # Ensure the ratio is defined over the same range.
-            # TODO: Refactor when more awake...
-            kt_range_for_current_grooming_method = kt_range[grooming_method]
-            kt_range_for_reference = kt_range[reference_grooming_method]
-            kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)  # type: ignore[arg-type, var-annotated]
-            if kt_range_min < kt_range_for_reference.min:
-                kt_range_min = kt_range_for_reference.min
-            if kt_range_max > kt_range_for_reference.max:
-                kt_range_max = kt_range_for_reference.max
-            kt_range_for_comparison = helpers.KtRange(kt_range_min, kt_range_max)
+            kt_range_for_comparison = full_results_helpers.determine_overlapping_range(
+                current_range=kt_range[grooming_method],
+                reference=kt_range[reference_grooming_method]
+            )
             logger.info(f"kt_range_for_comparison: {kt_range_for_comparison}")
             ratio_reference_hist = full_results_helpers.select_hist_range(
                 ratio_reference_hist_unselected,
