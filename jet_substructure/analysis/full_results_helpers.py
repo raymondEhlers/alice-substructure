@@ -171,3 +171,46 @@ def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelect
         variances=hist.variances[bin_center_mask],
         metadata=metadata,
     )
+
+
+def rebin_ratio_according_to_wider_binning(ratio_reference_hist: binned_data.BinnedData, h: binned_data.BinnedData) -> binned_data.BinnedData:
+    # NOTE: This may not be the 100% most efficient way, but it's conceptually simple
+    # First, undo the bin width scaling
+    # For the main hist
+    ratio_reference_hist *= ratio_reference_hist.axes[0].bin_widths
+    # And the metadata
+    _ratio_y_systematic = ratio_reference_hist.metadata["y_systematic"]["quadrature"]
+    _ratio_y_systematic = AsymmetricErrors(
+        low=_ratio_y_systematic.low * ratio_reference_hist.axes[0].bin_widths,
+        high=_ratio_y_systematic.high * ratio_reference_hist.axes[0].bin_widths,
+    )
+    #ratio_reference_hist.metadata["y_systematic"]["quadrature"] = _ratio_y_systematic
+    # Next, rebin this hist
+    # First, the systematic, so we don't lose track of it in reassigning the main object
+    # We construct an additional hist with the uncertainties so that they're handled properly
+    # TODO: Would be really nice if we could do this more gracefully! This is really hacky
+    _ratio_systematic_low = binned_data.BinnedData(
+        axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
+        values=_ratio_y_systematic.low,
+        variances=np.ones(len(ratio_reference_hist.values)),
+    )[::h.axes[0].bin_edges].values
+    _ratio_systematic_high = binned_data.BinnedData(
+        axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
+        values=_ratio_y_systematic.high,
+        variances=np.ones(len(ratio_reference_hist.values)),
+    )[::h.axes[0].bin_edges].values
+    # Store the update systematics and scale back down by the bin widths
+    _ratio_y_systematic = AsymmetricErrors(
+        _ratio_systematic_low / h.axes[0].bin_widths,
+        _ratio_systematic_high / h.axes[0].bin_widths,
+    )
+    # And finally rebin the main data
+    ratio_reference_hist = ratio_reference_hist[::h.axes[0].bin_edges]
+    # And scale back by the bin width
+    ratio_reference_hist /= ratio_reference_hist.axes[0].bin_widths
+    # And store the updated systematic
+    ratio_reference_hist.metadata["y_systematic"] = {
+        "quadrature": _ratio_y_systematic
+    }
+
+    return ratio_reference_hist

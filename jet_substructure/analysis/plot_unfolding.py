@@ -22,8 +22,8 @@ import pachyderm.plot
 import seaborn as sns
 from pachyderm import binned_data
 
+from jet_substructure.analysis import full_results_helpers, unfolding_analysis
 from jet_substructure.analysis import plot_base as pb
-from jet_substructure.analysis import unfolding_analysis, unfolding_base
 from jet_substructure.base import helpers
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ def hist_stat_tests_KS_chi2(
         data_hist = hist.to_ROOT()
         # Add systematics in quadrature with stat
         # Generate the comparison
-        y_systematic: unfolding_base.AsymmetricErrors = ratio.metadata["y_systematic"]["quadrature"]
+        y_systematic: full_results_helpers.AsymmetricErrors = ratio.metadata["y_systematic"]["quadrature"]
         # Determine which values we need to grab
         # When below 1, take the upper error, and do the opposite above 1
         # NOTE: We basically assume that they're one sigma
@@ -103,7 +103,7 @@ def plausible_stat_test(ratio: binned_data.BinnedData, n_samples: int, n_sigma_s
         samples[i, :] = rng.normal(loc=value, scale=error * n_sigma_stat, size=n_samples)
 
     # Generate the comparison
-    y_systematic: unfolding_base.AsymmetricErrors = ratio.metadata["y_systematic"]["quadrature"]
+    y_systematic: full_results_helpers.AsymmetricErrors = ratio.metadata["y_systematic"]["quadrature"]
     # Determine which values we need to grab
     # When below 1, take the upper error, and do the opposite above 1
     # NOTE: Shift up to 1 so we can make the comparison to the sampled values directly
@@ -384,7 +384,7 @@ def _plot_data_model_comparison_for_single_system(
             h = hists[grooming_method].data
 
             # Select range to display.
-            h = unfolding_base.select_hist_range(h, kt_range[grooming_method])
+            h = full_results_helpers.select_hist_range(h, kt_range[grooming_method])
 
             # Set 0s to NaN
             if set_zero_to_nan:
@@ -442,7 +442,7 @@ def _plot_data_model_comparison_for_single_system(
                 #####model /= np.sum(model.values)
                 #####model /= model.axes[0].bin_widths
                 # And select the same range.
-                model = unfolding_base.select_hist_range(model, kt_range[grooming_method])
+                model = full_results_helpers.select_hist_range(model, kt_range[grooming_method])
 
                 # And plot
                 # Make sure we copy the settings so we can modify them
@@ -469,7 +469,7 @@ def _plot_data_model_comparison_for_single_system(
 
                 # Ratio
                 # Could move down here if you want to see the entire range
-                model = unfolding_base.select_hist_range(model, kt_range[grooming_method])
+                model = full_results_helpers.select_hist_range(model, kt_range[grooming_method])
                 ratio = model / h
 
                 # Ratio + statistical error bars
@@ -485,15 +485,15 @@ def _plot_data_model_comparison_for_single_system(
                     linewidth=3,
                 )
                 # Systematic errors.
-                y_relative_error_low = unfolding_base.relative_error(
-                    unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
+                y_relative_error_low = full_results_helpers.relative_error(
+                    full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
                 )
-                y_relative_error_high = unfolding_base.relative_error(
-                    unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
+                y_relative_error_high = full_results_helpers.relative_error(
+                    full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
                 )
                 # From error prop, pythia has no systematic error, so we just convert the relative errors.
                 ratio.metadata["y_systematic"] = {}
-                ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
+                ratio.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
                     low=y_relative_error_low * ratio.values,
                     high=y_relative_error_high * ratio.values,
                 )
@@ -592,47 +592,6 @@ def plot_grooming_model_comparisons_for_single_system(
         output_dir=output_dir,
     )
 
-def rebin_ratio_according_to_wider_binning(ratio_reference_hist: binned_data.BinnedData, h: binned_data.BinnedData) -> binned_data.BinnedData:
-    # NOTE: This may not be the 100% most efficient way, but it's conceptually simple
-    # First, undo the bin width scaling
-    # For the main hist
-    ratio_reference_hist *= ratio_reference_hist.axes[0].bin_widths
-    # And the metadata
-    _ratio_y_systematic = ratio_reference_hist.metadata["y_systematic"]["quadrature"]
-    _ratio_y_systematic = unfolding_base.AsymmetricErrors(
-        low=_ratio_y_systematic.low * ratio_reference_hist.axes[0].bin_widths,
-        high=_ratio_y_systematic.high * ratio_reference_hist.axes[0].bin_widths,
-    )
-    #ratio_reference_hist.metadata["y_systematic"]["quadrature"] = _ratio_y_systematic
-    # Next, rebin this hist
-    # First, the systematic, so we don't lose track of it in reassigning the main object
-    # We construct an additional hist with the uncertainties so that they're handled properly
-    # TODO: Would be really nice if we could do this more gracefully! This is really hacky
-    _ratio_systematic_low = binned_data.BinnedData(
-        axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
-        values=_ratio_y_systematic.low,
-        variances=np.ones(len(ratio_reference_hist.values)),
-    )[::h.axes[0].bin_edges].values
-    _ratio_systematic_high = binned_data.BinnedData(
-        axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
-        values=_ratio_y_systematic.high,
-        variances=np.ones(len(ratio_reference_hist.values)),
-    )[::h.axes[0].bin_edges].values
-    # Store the update systematics and scale back down by the bin widths
-    _ratio_y_systematic = unfolding_base.AsymmetricErrors(
-        _ratio_systematic_low / h.axes[0].bin_widths,
-        _ratio_systematic_high / h.axes[0].bin_widths,
-    )
-    # And finally rebin the main data
-    ratio_reference_hist = ratio_reference_hist[::h.axes[0].bin_edges]
-    # And scale back by the bin width
-    ratio_reference_hist /= ratio_reference_hist.axes[0].bin_widths
-    # And store the updated systematic
-    ratio_reference_hist.metadata["y_systematic"] = {
-        "quadrature": _ratio_y_systematic
-    }
-
-    return ratio_reference_hist
 
 
 def _plot_single_system_comparison(
@@ -756,7 +715,7 @@ def _plot_single_system_comparison(
             h_input = hists[grooming_method].data
 
             # Select range to display.
-            h = unfolding_base.select_hist_range(h_input, kt_range[grooming_method])
+            h = full_results_helpers.select_hist_range(h_input, kt_range[grooming_method])
 
             # Set 0s to NaN
             if set_zero_to_nan:
@@ -822,11 +781,11 @@ def _plot_single_system_comparison(
                 kt_range_max = kt_range_for_reference.max
             kt_range_for_comparison = helpers.KtRange(kt_range_min, kt_range_max)
             logger.info(f"kt_range_for_comparison: {kt_range_for_comparison}")
-            ratio_reference_hist = unfolding_base.select_hist_range(
+            ratio_reference_hist = full_results_helpers.select_hist_range(
                 ratio_reference_hist_unselected,
                 kt_range_for_comparison,
             )
-            h = unfolding_base.select_hist_range(
+            h = full_results_helpers.select_hist_range(
                 h_input,
                 kt_range_for_comparison,
             )
@@ -834,7 +793,7 @@ def _plot_single_system_comparison(
             if h.axes[0].bin_edges.shape != ratio_reference_hist.axes[0].bin_edges.shape or \
                 not np.allclose(h.axes[0].bin_edges, ratio_reference_hist.axes[0].bin_edges):
                 # Rebin according to the data which we are supposed to be plotting
-                ratio_reference_hist = rebin_ratio_according_to_wider_binning(
+                ratio_reference_hist = full_results_helpers.rebin_ratio_according_to_wider_binning(
                     ratio_reference_hist=ratio_reference_hist.copy(),
                     h=h,
                 )
@@ -855,23 +814,23 @@ def _plot_single_system_comparison(
                 zorder=3 + _plot_counter,
             )
             # Systematic errors.
-            y_relative_error_low = unfolding_base.relative_error(
-                unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
-                unfolding_base.ErrorInput(
+            y_relative_error_low = full_results_helpers.relative_error(
+                full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
+                full_results_helpers.ErrorInput(
                     value=ratio_reference_hist.values,
                     error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].low,
                 ),
             )
-            y_relative_error_high = unfolding_base.relative_error(
-                unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
-                unfolding_base.ErrorInput(
+            y_relative_error_high = full_results_helpers.relative_error(
+                full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
+                full_results_helpers.ErrorInput(
                     value=ratio_reference_hist.values,
                     error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].high,
                 ),
             )
 
             # Store the systematic.
-            ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
+            ratio.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
                 low=y_relative_error_low * ratio.values,
                 high=y_relative_error_high * ratio.values,
             )
@@ -1166,7 +1125,7 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
             h = hist.data
 
             # Select range to display.
-            h = unfolding_base.select_hist_range(h, event_activity_to_kt_range[collision_system])
+            h = full_results_helpers.select_hist_range(h, event_activity_to_kt_range[collision_system])
 
             # Set 0s to NaN
             if set_zero_to_nan:
@@ -1215,7 +1174,7 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
                 continue
 
             # Ensure the ratio is defined over the same range.
-            ratio_reference_hist = unfolding_base.select_hist_range(
+            ratio_reference_hist = full_results_helpers.select_hist_range(
                 ratio_reference_hist_unselected, event_activity_to_kt_range[collision_system]
             )
             logger.debug(f"h: {h.axes[0].bin_edges}")
@@ -1236,16 +1195,16 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
                 zorder=3 + _plot_counter,
             )
             # Systematic errors.
-            y_relative_error_low = unfolding_base.relative_error(
-                unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
-                unfolding_base.ErrorInput(
+            y_relative_error_low = full_results_helpers.relative_error(
+                full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
+                full_results_helpers.ErrorInput(
                     value=ratio_reference_hist.values,
                     error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].low,
                 ),
             )
-            y_relative_error_high = unfolding_base.relative_error(
-                unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
-                unfolding_base.ErrorInput(
+            y_relative_error_high = full_results_helpers.relative_error(
+                full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
+                full_results_helpers.ErrorInput(
                     value=ratio_reference_hist.values,
                     error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].high,
                 ),
@@ -1263,7 +1222,7 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
             np.testing.assert_allclose(y_relative_error_low, test_relative_y_error_low)
             np.testing.assert_allclose(y_relative_error_high, test_relative_y_error_high)
             # Store the systematic.
-            ratio.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
+            ratio.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
                 low=y_relative_error_low * ratio.values,
                 high=y_relative_error_high * ratio.values,
             )
@@ -1301,7 +1260,7 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
                 continue
 
             # Select the relevant kt range
-            model = unfolding_base.select_hist_range(
+            model = full_results_helpers.select_hist_range(
                 model, event_activity_to_kt_range[collision_system]
             )
 
@@ -1722,14 +1681,14 @@ def _plot_compare_kt_with_systematics(
             **kwargs,
         )
         # Systematic errors.
-        y_relative_error_low = unfolding_base.relative_error(
-            unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low)
+        y_relative_error_low = full_results_helpers.relative_error(
+            full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low)
         )
-        y_relative_error_high = unfolding_base.relative_error(
-            unfolding_base.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high)
+        y_relative_error_high = full_results_helpers.relative_error(
+            full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high)
         )
         # From error prop, pythia has no systematic error, so we just convert the relative errors.
-        ratio.metadata["y_systematic"] = unfolding_base.AsymmetricErrors(
+        ratio.metadata["y_systematic"] = full_results_helpers.AsymmetricErrors(
             low=y_relative_error_low * ratio.values,
             high=y_relative_error_high * ratio.values,
         )
@@ -2600,7 +2559,7 @@ def calculate_systematics(  # noqa: C901
         # NOTE: Unlike the others, we take the abs and set the values here directly because
         #       we want them to be symmetric.
         tracking_efficiency_sym = np.abs(unfolded["tracking_efficiency"].data.values - unfolded["default"].data.values)
-        unfolded["default"].data.metadata["y_systematic"]["tracking_efficiency"] = unfolding_base.AsymmetricErrors(
+        unfolded["default"].data.metadata["y_systematic"]["tracking_efficiency"] = full_results_helpers.AsymmetricErrors(
             tracking_efficiency_sym, tracking_efficiency_sym
         )
     except KeyError as e:
@@ -2611,7 +2570,7 @@ def calculate_systematics(  # noqa: C901
     try:
         unfolded["default"].data.metadata["y_systematic"][
             "truncation"
-        ] = unfolding_base.AsymmetricErrors.calculate_errors(
+        ] = full_results_helpers.AsymmetricErrors.calculate_errors(
             unfolded["truncation_low"].data.values - unfolded["default"].data.values,
             unfolded["truncation_high"].data.values - unfolded["default"].data.values,
         )
@@ -2622,7 +2581,7 @@ def calculate_systematics(  # noqa: C901
     # +/- iterations
     unfolded["default"].data.metadata["y_systematic"][
         "regularization"
-    ] = unfolding_base.AsymmetricErrors.calculate_errors(
+    ] = full_results_helpers.AsymmetricErrors.calculate_errors(
         unfolded["default"].data.values
         - unfolding_outputs["default"]
         .unfolded_substructure(
@@ -2646,7 +2605,7 @@ def calculate_systematics(  # noqa: C901
         random_binning_sym = unfolded["random_binning"].data.values - unfolded["default"].data.values
         unfolded["default"].data.metadata["y_systematic"][
             "random_binning"
-        ] = unfolding_base.AsymmetricErrors(
+        ] = full_results_helpers.AsymmetricErrors(
             random_binning_sym, random_binning_sym,
         )
     except KeyError as e:
@@ -2657,7 +2616,7 @@ def calculate_systematics(  # noqa: C901
     try:
         unfolded["default"].data.metadata["y_systematic"][
             "untagged_bin"
-        ] = unfolding_base.AsymmetricErrors.calculate_errors(
+        ] = full_results_helpers.AsymmetricErrors.calculate_errors(
             unfolded["untagged_bin"].data.values - unfolded["default"].data.values
         )
     except KeyError as e:
@@ -2668,7 +2627,7 @@ def calculate_systematics(  # noqa: C901
     try:
         unfolded["default"].data.metadata["y_systematic"][
             "reweight_prior"
-        ] = unfolding_base.AsymmetricErrors.calculate_errors(
+        ] = full_results_helpers.AsymmetricErrors.calculate_errors(
             unfolded["reweight_prior"].data.values - unfolded["default"].data.values
         )
     except KeyError as e:
@@ -2696,7 +2655,7 @@ def calculate_systematics(  # noqa: C901
             _background_subtraction_values.append(*_background_subtraction_values)
         unfolded["default"].data.metadata["y_systematic"][
             "background_sub"
-        ] = unfolding_base.AsymmetricErrors.calculate_errors(
+        ] = full_results_helpers.AsymmetricErrors.calculate_errors(
             *_background_subtraction_values
         )
         #logger.info(f"Bin edges: {unfolded['default'].data.axes[0].bin_edges}")
@@ -2751,7 +2710,7 @@ def calculate_systematics(  # noqa: C901
             raise NotImplementedError(_msg)
 
         # Treat symmetrically since we don't have an obvious source of this non-closure
-        unfolded["default"].data.metadata["y_systematic"]["non_closure"] = unfolding_base.AsymmetricErrors(
+        unfolded["default"].data.metadata["y_systematic"]["non_closure"] = full_results_helpers.AsymmetricErrors(
             non_closure_sym_relative * unfolded["default"].data.values,
             non_closure_sym_relative * unfolded["default"].data.values,
         )
@@ -2786,7 +2745,7 @@ def calculate_systematics(  # noqa: C901
             #    f"\nmodel_dependence bin_edges: {graph.axes[0].bin_edges}"
             #    f"\nnominal bin_edges: {unfolded['default'].data.axes[0].bin_edges}"
             #)
-            unfolded["default"].data.metadata["y_systematic"]["model_dependence"] = unfolding_base.AsymmetricErrors(
+            unfolded["default"].data.metadata["y_systematic"]["model_dependence"] = full_results_helpers.AsymmetricErrors(
                 relative_errors_on_model_dependence_low * unfolded["default"].data.values,
                 relative_errors_on_model_dependence_high * unfolded["default"].data.values,
             )
@@ -2835,7 +2794,7 @@ def calculate_systematics(  # noqa: C901
             # Treat asymmetrically since the model goes in a particular direction
             unfolded["default"].data.metadata["y_systematic"][
                 "model_dependence"
-            ] = unfolding_base.AsymmetricErrors.calculate_errors(
+            ] = full_results_helpers.AsymmetricErrors.calculate_errors(
                 # We need the absolute error, so multiply the difference by the default value
                 model_dependence_relative * unfolded["default"].data.values,
             )
@@ -2863,7 +2822,7 @@ def calculate_systematics(  # noqa: C901
 
     # Sum in quadrature
     # We protect against including quadrature in case we already calculated the systematics.
-    unfolded["default"].data.metadata["y_systematic"]["quadrature"] = unfolding_base.AsymmetricErrors(
+    unfolded["default"].data.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
         low=np.sqrt(
             np.sum(
                 [
