@@ -21,16 +21,14 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
-    Type,
     TypeVar,
     Union,
 )
 
-import attr
+import attrs
 import numpy as np
 import numpy.typing as npt
 from mammoth.framework.utils import ensure_and_expand_paths, expand_wildcards_in_filenames  # noqa: F401
-
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +46,10 @@ def assert_never(value: NoReturn) -> NoReturn:
     Args:
         value: Value to check for exhaustiveness.
     """
-    assert False, f"Unhandled value: {value} ({type(value).__name__})"
+    assert False, f"Unhandled value: {value} ({type(value).__name__})"  # noqa: B011,PT015
 
+
+_msg_just_typing_information = "Just typing information."
 
 class UprootArray(Collection[T]):
     """Effectively a protocol for the UprootArray type.
@@ -86,74 +86,74 @@ class UprootArray(Collection[T]):
         ...
 
     def __getitem__(self, key):  # type: ignore[no-untyped-def]
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __add__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __radd__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __sub__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __rsub__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __mul__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __rmul__(self, other: Union[UprootArray[T], int, float]) -> UprootArray[T]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __truediv__(self, other: Union[float, UprootArray[T]]) -> UprootArray[T]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __pow__(self, p: float) -> UprootArray[T]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def argmax(self) -> UprootArray[int]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def offsets(self) -> npt.NDArray[np.int64]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def flatten(self, axis: Optional[int] = ...) -> npt.NDArray[Any]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     @property
     def localindex(self) -> UprootArray[int]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def count_nonzero(self) -> UprootArray[int]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def counts(self) -> UprootArray[int]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __lt__(self, other: Union[UprootArray[T], float]) -> UprootArray[bool]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __le__(self, other: Union[UprootArray[T], float]) -> UprootArray[bool]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __gt__(self, other: Union[UprootArray[T], float]) -> UprootArray[bool]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __ge__(self, other: Union[UprootArray[T], float]) -> UprootArray[bool]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __and__(self, other: UprootArray[bool]) -> UprootArray[bool]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __or__(self, other: UprootArray[bool]) -> UprootArray[bool]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def __invert__(self) -> UprootArray[bool]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def pad(self, value: int) -> UprootArray[T]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def fillna(self, value: Any) -> UprootArray[T]:
         """Fill na values with the given values.
@@ -163,10 +163,10 @@ class UprootArray(Collection[T]):
             but including such types makes it a good deal more complicated. So we just don't
             mention the other values. In practice, they will usually be the same type.
         """
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
     def ones_like(self) -> UprootArray[int]:
-        raise NotImplementedError("Just typing information.")
+        raise NotImplementedError(_msg_just_typing_information)
 
 
 # Additional typing helpers
@@ -205,11 +205,11 @@ def pretty_print_tree(d: Mapping[int, Any], indent: int = 0) -> None:
         None.
     """
     for key, value in d.items():
-        print("\t" * indent + str(key))
+        print("\t" * indent + str(key))  # noqa: T201
         if isinstance(value, Mapping):
             pretty_print_tree(value, indent + 1)
         else:
-            print("\t" * (indent + 1) + str(value))
+            print("\t" * (indent + 1) + str(value))  # noqa: T201
 
 
 def convert_flat_to_tree(parent_label: int, relationships: Sequence[Tuple[int, int]]) -> Dict[int, Any]:
@@ -249,12 +249,12 @@ def dict_product(input_dict: Dict[str, List[Any]]) -> Iterable[Dict[str, Any]]:
     return (dict(zip(input_dict.keys(), values)) for values in itertools.product(*input_dict.values()))
 
 
-@attr.s(frozen=True)
+@attrs.frozen
 class RangeSelector:
-    min: float = attr.ib()
-    max: float = attr.ib()
-    _variable_name = "jet_pt"
-    _display_name = r"p_{\text{T,ch jet}}"
+    min: float = attrs.field()
+    max: float = attrs.field()
+    _variable_name: str = "jet_pt"
+    _display_name: str = r"p_{\text{T,ch jet}}"
 
     def mask_attribute(self, df: UprootArrays, attribute_name: str) -> UprootArray[bool]:
         """Create a mask to given attribute to the provided range.
@@ -273,7 +273,7 @@ class RangeSelector:
         return (array >= self.min) & (array < self.max)
 
     @classmethod
-    def full_range_over_selections(cls: Type["RangeSelector"], selections: Sequence[RangeSelector]) -> "RangeSelector":
+    def full_range_over_selections(cls: type[RangeSelector], selections: Sequence[RangeSelector]) -> RangeSelector:
         """Extract the min and max range value over all of the selections.
 
         The DataFrames can be reduced to only contain these values.
@@ -311,24 +311,24 @@ class RangeSelector:
         yield self.max
 
 
-@attr.s(frozen=True)
+@attrs.frozen
 class JetPtRange(RangeSelector):
     ...
 
 
-@attr.s(frozen=True)
+@attrs.frozen
 class KtRange(RangeSelector):
     _variable_name = "kt"
     _display_name = r"k_{\text{T}}"
 
 
-@attr.s(frozen=True)
+@attrs.frozen
 class RgRange(RangeSelector):
     _variable_name = "delta_R"
     _display_name = r"{\Delta R}"
 
 
-@attr.s(frozen=True)
+@attrs.frozen
 class ZgRange(RangeSelector):
     _variable_name = "zg"
     _display_name = r"z_{\text{g}}"
