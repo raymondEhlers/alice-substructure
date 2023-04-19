@@ -8,29 +8,25 @@ Defines utilizes and settings.
 from __future__ import annotations
 
 import logging
-from typing import Dict, Mapping, Optional, Sequence, Tuple, Union
 
 import attr
-import matplotlib
-import numpy as np
 import pachyderm.plot
 import seaborn as sns
-from pachyderm.plot import AxisConfig, Figure, LegendConfig, Panel, PlotConfig, TextConfig
-
+from pachyderm.plot import AxisConfig, Figure, LegendConfig, Panel, PlotConfig, TextConfig  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
 pachyderm.plot.configure()
 
 
-label_to_display_string: Dict[str, Dict[str, str]] = {
-    "ALICE": dict(
+label_to_display_string: dict[str, dict[str, str]] = {
+    "ALICE": dict(  # noqa: C408
         work_in_progress="ALICE Work in Progress",
         preliminary="ALICE Preliminary",
         final="ALICE",
         simulation="ALICE Simulation",
     ),
-    "collision_system": dict(
+    "collision_system": dict(  # noqa: C408
         PbPb_5TeV=r"$\text{Pb--Pb}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV",
         embedPythia_5TeV=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
         embed_pythia_5TeV=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
@@ -44,7 +40,7 @@ label_to_display_string: Dict[str, Dict[str, str]] = {
         embedPythia=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
         embed_pythia=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
     ),
-    "jets": {f"R0{i}": (f"$R=0.{i}," + fr"\:|\eta_{{\text{{jet}}}}| < 0.{9-i}$") for i in range(1, 7)},
+    "jets": {f"R0{i}": (f"$R=0.{i}," + fr"\:|\eta_{{\text{{jet}}}}| < 0.{9-i}$") for i in range(1, 7)},  # noqa: ISC003
 }
 label_to_display_string["jets"]["general"] = r"$\text{Anti-}k_{\text{T}}\:\text{ch-particle jets}$"
 
@@ -59,7 +55,7 @@ class GroomingMethodStyle:
     zorder: int = attr.ib()
 
 
-def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
+def define_grooming_styles() -> dict[str, GroomingMethodStyle]:
     # Setup
     styles = {}
 
@@ -70,7 +66,7 @@ def define_grooming_styles() -> Dict[str, GroomingMethodStyle]:
     blues = sns.color_palette("Blues_r", 3)
     oranges = sns.color_palette("Oranges_r", 3)
     for label in ["", "_compare"]:
-        if label == "":
+        if not label:
             # These are our main colors.
             # The methods are similar, but different, so we want to spread out the colors.
             # dynamical_grooming_colors = sns.color_palette(f"GnBu_d", 3)
