@@ -8,9 +8,9 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.14.5
 #   kernelspec:
-#     display_name: substructure_c_24_06
+#     display_name: Substructure w/ ROOT 6.24.06, conda
 #     language: python
-#     name: python3
+#     name: substructure_c_24_06
 # ---
 
 # %% [markdown]
@@ -104,7 +104,7 @@ _use_qm22_inputs = True
 _grooming_methods_using_qm_result_conventions = _OG_grooming_methods if _use_qm22_inputs else []
 _grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inputs else grooming_methods
 
-_output_dir = output_dir / "comparison" / "unfolding" / input_dir_tag / jet_R_str
+_output_dir = output_dir / "comparison" / "unfolding" / "2023-paper-plots" / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
 # %% [markdown]
@@ -132,7 +132,8 @@ _input_dir_tag.update({
     _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
 })
 _output_dir_tag: dict[str, str | None] = {
-    _method: input_dir_tag + "-from-QM22-results"
+    #_method: input_dir_tag + "-from-QM22-results"
+    _method: "2023-paper-plots-from-QM22-results"
     for _method in _grooming_methods_using_qm_result_conventions
 }
 _output_dir_tag.update({
@@ -314,7 +315,8 @@ _input_dir_tag.update({
     _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
 })
 _output_dir_tag = {
-    _method: input_dir_tag + "-from-QM22-results"
+    #_method: input_dir_tag + "-from-QM22-results"
+    _method: "2023-paper-plots-from-QM22-results"
     for _method in _grooming_methods_using_qm_result_conventions
 }
 _output_dir_tag.update({
@@ -642,9 +644,38 @@ substructure_variable = "kt"
 true_jet_pt_range = helpers.JetPtRange(60, 80)
 jet_R = 0.4
 jet_R_str = f"R{int(jet_R*10):02}"
-grooming_methods = ["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"]
+grooming_methods = [
+    "dynamical_core",
+    "dynamical_kt",
+    "dynamical_time",
+    "soft_drop_z_cut_02",
+    "dynamical_core_z_cut_02",
+    "dynamical_kt_z_cut_02",
+    "dynamical_time_z_cut_02",
+    "soft_drop_z_cut_04",
+]
+_OG_grooming_methods = [
+    "dynamical_core",
+    "dynamical_kt",
+    "dynamical_time",
+    "soft_drop_z_cut_02",
+]
+_new_grooming_methods = [
+    "dynamical_core_z_cut_02",
+    "dynamical_kt_z_cut_02",
+    "dynamical_time_z_cut_02",
+    "soft_drop_z_cut_04",
+]
+input_dir_tag = "2023-02-HP"
+###################
+# Setup I/O options
+###################
+# NOTE: Technically, these are HP2020 results rather than QM2022, but good enough
+_use_qm22_inputs = True
+_grooming_methods_using_qm_result_conventions = _OG_grooming_methods if _use_qm22_inputs else []
+_grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inputs else grooming_methods
 
-_output_dir = output_dir / "comparison" / "unfolding" / jet_R_str
+_output_dir = output_dir / "comparison" / "unfolding" / "2023-paper-plots" / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
 # %% [markdown]
@@ -654,28 +685,112 @@ _output_dir.mkdir(parents=True, exist_ok=True)
 # pp
 collision_system = "pp"
 event_activity = "pp"
-_smeared_var_range = helpers.KtRange(0.25, 8)
+_smeared_var_range: helpers.KtRange | dict[str, helpers.KtRange] = helpers.KtRange(0.25, 8)
 _smeared_jet_pt_range = helpers.JetPtRange(20, 85)
-#_tag_after_suffix = "2_4_split"
 _truncation_shift = 3
-_displaced_extremum = 20
+_displaced_extremum = 10
+#_displaced_extremum = 20
 
+###################
+# Setup I/O options
+###################
+# Input directory location
+# Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
+# TODO: I don't think this is correct. Just need to re
+_input_dir_tag = {
+    _method: "parsl"
+    for _method in _grooming_methods_using_qm_result_conventions
+}
+_input_dir_tag.update({
+    _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
+})
+_output_dir_tag: dict[str, str | None] = {
+    #_method: input_dir_tag + "-from-QM22-results"
+    _method: "2023-paper-plots-from-HP20-results"
+    for _method in _grooming_methods_using_qm_result_conventions
+}
+_output_dir_tag.update({
+    _method: input_dir_tag for _method in _grooming_methods_using_new_conventions
+})
+#_tag_after_suffix = "2_4_split"
+_tag_after_suffix = {
+    grooming_method: "" for grooming_method in grooming_methods
+}
+####################################
 # Grooming method dependent settings
+####################################
 _smeared_untagged_var = {
     "dynamical_core": helpers.KtRange(0.25, 0.25),
     "dynamical_kt": helpers.KtRange(0.25, 0.25),
     "dynamical_time": helpers.KtRange(0.25, 0.25),
     "soft_drop_z_cut_02": helpers.KtRange(0, 0.25),
+    "dynamical_core_z_cut_02": helpers.KtRange(0.0, 0.25),
+    "dynamical_kt_z_cut_02": helpers.KtRange(0.0, 0.25),
+    "dynamical_time_z_cut_02": helpers.KtRange(0.0, 0.25),
+    "soft_drop_z_cut_04": helpers.KtRange(0, 0.25),
 }
-# TODO: To be checked!
 _n_iter_compare = {
+    # TODO: To be optimized!
+    "dynamical_core": 5,
+    "dynamical_kt": 5,
+    "dynamical_time": 5,
+    "soft_drop_z_cut_02": 5,
     "dynamical_core": 5,
     "dynamical_kt": 5,
     "dynamical_time": 5,
     "soft_drop_z_cut_02": 5,
 }
+if _use_qm22_inputs:
+    _n_iter_compare.update({
+        "dynamical_core": 5,
+        "dynamical_kt": 5,
+        "dynamical_time": 5,
+        "soft_drop_z_cut_02": 5,
+    })
+_max_n_iter: dict[str, int | None] = {
+    # Need +1 for convenience with range iteration
+    # TODO: Update this once we've rerun it.
+    #"soft_drop_z_cut_04": 30,
+    "soft_drop_z_cut_04": 20,
+}
+_max_n_iter.update({
+    grooming_method: 20 for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
+})
 
-# TODO: Should be changed to True once we add the model dependency...
+# Model dependence.
+# Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
+_model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration | None] = {
+    _method: unfolding_analysis.ModelDependenceConfiguration(
+        # We want to load without a suffix, so the nominal needs to be empty. The actual name only
+        # matters for loading the data. Everything else for the legacy production is handled manually.
+        nominal="",
+        variations=[],
+        legacy_production=True,
+    ) for _method in _grooming_methods_using_qm_result_conventions
+}
+_model_dependence_configuration.update({
+    _method: unfolding_analysis.ModelDependenceConfiguration(
+        nominal="pythia_fastsim",
+        variations=["herwig_fastsim"],
+    ) for _method in _grooming_methods_using_new_conventions
+})
+# Non-closure
+# Apparently I used this non-closure for QM. I don't think it's necessary now since I better understand
+# the uncertainties. Also, the stat clearly covers it.
+non_closure_configuration: dict[str, unfolding_analysis.NonClosureConfiguration | None] = {
+    _method: unfolding_analysis.NonClosureConfiguration(
+        contributors=["reweight_pseudo_data"],
+        approach_to_combining="max",
+    ) for _method in _grooming_methods_using_qm_result_conventions
+}
+non_closure_configuration.update({
+    _method: None
+    for _method in _grooming_methods_using_new_conventions
+})
+
+# Either take model dependence or reweighted prior
+# Model dependence is always preferred, but it may not have been analyzed yet for the a particular configuration
+# (or in PbPb, it likely isn't possible since we don't have a reliable MC)
 skip_reweighted_prior_in_systematics = True
 
 # %% tags=["remove_cell"]
@@ -690,73 +805,65 @@ pp_R04_unfolding_closure_outputs, pp_R04_unfolding_closure_pure_matches_outputs,
     event_activity=event_activity,
     jet_R_str=jet_R_str,
     n_iter_compare=_n_iter_compare,
+    max_n_iter=_max_n_iter,
     truncation_shift=_truncation_shift,
     displaced_extremum=_displaced_extremum,
+    input_dir_tag=_input_dir_tag,
+    output_dir_tag=_output_dir_tag,
     output_dir=output_dir,
-    #tag_after_suffix=_tag_after_suffix,
+    tag_after_suffix=_tag_after_suffix,
     skip_reweighted_prior_in_systematics=skip_reweighted_prior_in_systematics,
+    model_dependence_configuration=_model_dependence_configuration,
 )
-#for grooming_method in grooming_methods:
-#    print(f"running {grooming_method}")
-
-# Add in the closure test to provide the non-closure uncertainty
-for grooming_method in grooming_methods:
-    pp_R04_unfolding_systematics_outputs[grooming_method]["non_closure"] = pp_R04_unfolding_closure_outputs[grooming_method]["reweight_response"]
 
 # Focus down onto just the unfolded distributions
 pp_R04_unfolded_with_systematics, pp_R04_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
     grooming_methods=grooming_methods,
     unfolding_systematics_outputs=pp_R04_unfolding_systematics_outputs,
+    unfolding_closure_outputs=pp_R04_unfolding_closure_outputs,
     true_jet_pt_range=true_jet_pt_range,
+    model_dependence_configuration=_model_dependence_configuration,
+    non_closure_configuration=non_closure_configuration,
+    background_subtraction_configuration=None,
 )
 
-if plot:
-    for grooming_method in grooming_methods:
-        # Plot the individual relative systematics
-        plot_unfolding.plot_relative_individual_systematics(
-            unfolded=pp_R04_unfolded_with_systematics[grooming_method],
-            plot_config=pb.PlotConfig(
-                name="unfolded_systematic_relative",
-                panels=[
-                    pb.Panel(
-                        axes=[
-                            pb.AxisConfig("x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$", range=(0.5, 6)),
-                            pb.AxisConfig(
-                                "y",
-                                label="Relative error",
-                                range=[0.5, 1.5],
-                            ),
-                        ],
-                        legend=pb.LegendConfig(location="upper right", ncol=2),
-                        #text=pb.TextConfig(text, 0.97, 0.97),
-                    ),
-                ],
-            ),
-            output_dir = pp_R04_unfolding_systematics_outputs[grooming_method]["default"].output_dir,
-            plot_png = True,
-        )
-
-        #plot_unfolding.plot_kt_unfolding(
-        #    unfolding_output=semi_central_R02_unfolding_systematics_outputs[grooming_method]["default"],
-        #    plot_png=True,
-        #    reweighted_prior_output=semi_central_R02_unfolding_systematics_outputs[grooming_method]["reweight_prior"],
-        #    unfolding_kt_display_range=(0.5, 6),
-        #)
-#
-## Plot full systematics for multiple grooming methods on one plot.
-#if plot:
-#    plot_unfolding.plot_PbPb_systematics(
-#        hists=pp_R04_unfolded_with_systematics,
-#        reference=pp_R04_true_reference,
-#        grooming_methods=grooming_methods,
-#        event_activity=event_activity,
-#        kt_range=[2, 15],
-#        # Arbitrarily take the first grooming method for the output dir
-#        output_dir=pp_R04_unfolding_systematics_outputs[grooming_methods[0]]["default"].output_dir,
-#    )
+# %%
+print(pp_R04_unfolding_systematics_outputs["dynamical_core"].keys())
+print(pp_R04_unfolded_with_systematics["dynamical_core"].data.metadata["y_systematic"].keys())
 
 # %%
-list(pp_R04_unfolded_with_systematics.keys())
+plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
+    #grooming_methods=grooming_methods,
+    grooming_methods=_grooming_methods_using_qm_result_conventions,
+    unfolded_with_systematics=pp_R04_unfolded_with_systematics,
+    unfolding_systematics_outputs=pp_R04_unfolding_systematics_outputs,
+    unfolding_closure_outputs=pp_R04_unfolding_closure_outputs,
+    plot=True,
+    plot_png=False,
+    plot_systematic_breakdown=True,
+    plot_systematics=False,
+    plot_closures=False,
+    # NOTE: For the prior variation, passing the HERwIG model dependence includes both:
+    #       - HERWIG vs PYTHIA
+    #       - fastsim vs full sim as well as whatever HERWIG
+    #       Consequently, the fastsim output may not be the most accurate overall magnitude, but we can
+    #       still use it to look at the shape for selecting the iteration. Alternatively, we can switch
+    #       back to the reweighted_prior, but that output is less satisfying for pp.
+    # NOTE: We can't remove the fastsim vs full sim dependence at the moment because we would need
+    #       the full UnfoldingOutput object, which we don't have available since the model dependence here
+    #       is constructed by transferring the differences from the fastsim outputs to the default.
+    #       We could do this, but it's more tricky (eg. can refolded be treated the same way?
+    #       Probably, but would need to be checked), so we just stick with the HERWIG model dependence.
+    prior_variation_output_name="model_dependence_herwig_fastsim",
+    #prior_variation_output_name="reweight_prior",
+    unfolding_kt_display_range={
+        grooming_method: (0.25, 8)
+        for grooming_method in grooming_methods
+    },
+    relative_individual_systematic_ratio_range={
+        grooming_method: (0.5, 1.5) for grooming_method in grooming_methods
+    }
+)
 
 # %% [markdown]
 # ## Models
