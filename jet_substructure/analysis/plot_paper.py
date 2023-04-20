@@ -723,7 +723,7 @@ def _plot_data_model_comparison_for_single_system(
 
     filename = f"{plot_config.name}"
     if len(list(grooming_methods)) == 1:
-        filename += f"_{grooming_method[0]}"
+        filename += f"_{grooming_methods[0]}"
     fig.savefig(output_dir / f"{filename}.pdf")
     plt.close(fig)
 
