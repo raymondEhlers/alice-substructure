@@ -147,10 +147,9 @@ class Jetscape:
                 # Normalize the predictions if requested
                 if self.needs_normalization:
                     _data /= np.sum(_data.values)
-                # Normalize by bin widths
-                # NOTE: I will need to check if this is necessary to compare to the spectra,
-                #       but in any case, it's not critical for the ratio since it will cancel!
-                _data /= _data.axes[0].bin_widths
+                # NOTE: Doesn't need additional normalization by bin width
+                #       (without bin width norm., the data is well described, but if add additional
+                #       bin width normalization, the description of the data gets much worse!)
                 predictions[collision_system][_method] = _data
 
         # Now, calculate the ratios based on the predictions
