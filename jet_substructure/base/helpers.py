@@ -12,6 +12,7 @@ import typing
 from pathlib import Path
 from typing import (
     Any,
+    ClassVar,
     Collection,
     Iterable,
     Iterator,
@@ -250,8 +251,8 @@ def dict_product(input_dict: dict[str, list[Any]]) -> Iterable[dict[str, Any]]:
 class RangeSelector:
     min: float = attrs.field()
     max: float = attrs.field()
-    _variable_name: str = "jet_pt"
-    _display_name: str = r"p_{\text{T,ch jet}}"
+    _variable_name: ClassVar[str] = "jet_pt"
+    _display_name: ClassVar[str] = r"p_{\text{T,ch jet}}"
 
     def mask_attribute(self, df: UprootArrays, attribute_name: str) -> UprootArray[bool]:
         """Create a mask to given attribute to the provided range.
@@ -315,20 +316,20 @@ class JetPtRange(RangeSelector):
 
 @attrs.frozen
 class KtRange(RangeSelector):
-    _variable_name = "kt"
-    _display_name = r"k_{\text{T}}"
+    _variable_name: ClassVar[str] = "kt"
+    _display_name: ClassVar[str] = r"k_{\text{T}}"
 
 
 @attrs.frozen
 class RgRange(RangeSelector):
-    _variable_name = "delta_R"
-    _display_name = r"{\Delta R}"
+    _variable_name: ClassVar[str] = "delta_R"
+    _display_name: ClassVar[str] = r"{\Delta R}"
 
 
 @attrs.frozen
 class ZgRange(RangeSelector):
-    _variable_name = "zg"
-    _display_name = r"z_{\text{g}}"
+    _variable_name: ClassVar[str] = "zg"
+    _display_name: ClassVar[str] = r"z_{\text{g}}"
 
 
 def _AliEmcalList_to_TList(
