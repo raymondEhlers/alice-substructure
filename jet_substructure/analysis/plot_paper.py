@@ -648,11 +648,10 @@ def _plot_data_model_comparison_for_single_system(
 
                 # And plot
                 # Make sure we copy the settings so we can modify them
-                #temp_kwargs = dict(plot_style.models_styles[model_name])
-                #temp_kwargs["label"] = temp_kwargs["label"] if plotting_last_method else None
-                #temp_kwargs.pop("color")
-                #temp_kwargs.pop("marker")
-                temp_kwargs: dict[str, Any] = {}
+                temp_kwargs = dict(plot_style.models_styles[model_name])
+                temp_kwargs["label"] = temp_kwargs["label"] if plotting_last_method else None
+                temp_kwargs.pop("color")
+                temp_kwargs.pop("marker")
                 ax.errorbar(
                     model.axes[0].bin_centers,
                     model.values,
