@@ -509,6 +509,300 @@ def plot_pp_grooming_comparison_with_models_2022(
     )
 
 
+def _plot_data_model_comparison_for_single_system(
+    hists: Mapping[str, unfolding_analysis.SingleResult],
+    models: Mapping[str, Mapping[str, binned_data.BinnedData]],
+    grooming_methods: Sequence[str],
+    set_zero_to_nan: bool,
+    kt_range: Mapping[str, helpers.KtRange],
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+) -> None:
+    grooming_styling = plot_style.define_grooming_styles()
+
+    _markers_by_grooming_method = {
+        "dynamical_core": "o",
+        "dynamical_kt": "o",
+        "dynamical_time": "o",
+        "soft_drop_z_cut_02": "s",
+        "dynamical_core_z_cut_02": "o",
+        "dynamical_kt_z_cut_02": "o",
+        "dynamical_time_z_cut_02": "o",
+        "soft_drop_z_cut_04": "s",
+    }
+
+    _palette_6_mod = {
+        "purple": "#7e459e",
+        "green": "#85aa55",
+        "blue": "#7385d9",
+        "magenta": "#b84c7d",
+        "teal": "#4cab98",
+        "orange": "#FF8301",
+    }
+    _extended_colors = {
+        "alt_purple": "#c09cd3",
+        # Generated
+        #"alt_green": "#3f591d",
+        "alt_green": "#517225",
+        # Already existing green
+        #"alt_green": "#55a270",
+        "alt_blue": "#4bafd0",
+    }
+
+    #_colors_for_assignments = []
+    #for _method in grooming_methods:
+    _method_to_color = {
+        "dynamical_core": _palette_6_mod["purple"],
+        "dynamical_kt": _palette_6_mod["green"],
+        "dynamical_time": _palette_6_mod["blue"],
+        "soft_drop_z_cut_02": _palette_6_mod["magenta"],
+        "dynamical_core_z_cut_02": _extended_colors["alt_purple"],
+        "dynamical_kt_z_cut_02": _extended_colors["alt_green"],
+        "dynamical_time_z_cut_02": _extended_colors["alt_blue"],
+        "soft_drop_z_cut_04": _palette_6_mod["orange"],
+    }
+    #_colors_for_assignments.append(_method_to_color[_method])
+
+    with sns.color_palette("Set2"):
+        # fig, ax = plt.subplots(figsize=(9, 10))
+        # Size is specified to make it convenient to compare against Hard Probes plots.
+        fig, (ax, ax_ratio) = plt.subplots(
+            2,
+            1,
+            figsize=(10, 10),
+            gridspec_kw={"height_ratios": [3, 1]},
+            sharex=True,
+        )
+
+        #ax.set_prop_cycle(cycler.cycler(color=_palette_6_mod) + cycler.cycler(marker=_markers))
+        #ax_ratio.set_prop_cycle(cycler.cycler(color=_palette_6_mod) + cycler.cycler(marker=_markers_ratio))
+        #ax.set_prop_cycle(cycler.cycler(marker=_markers))
+        #ax_ratio.set_prop_cycle(cycler.cycler(marker=_markers_ratio))
+
+        for _i, grooming_method in enumerate(grooming_methods):
+            plotting_last_method = grooming_method == grooming_methods[-1]
+
+            # First, the data
+            h = hists[grooming_method].data
+
+            # Select range to display.
+            h = full_results_helpers.select_hist_range(h, kt_range[grooming_method])
+
+            # Set 0s to NaN
+            if set_zero_to_nan:
+                h.errors[h.values == 0] = np.nan
+                h.values[h.values == 0] = np.nan
+
+            # Main data points
+            p = ax.errorbar(
+                h.axes[0].bin_centers,
+                h.values,
+                yerr=h.errors,
+                xerr=h.axes[0].bin_widths / 2,
+                marker=_markers_by_grooming_method[grooming_method],
+                markersize=11,
+                linestyle="",
+                linewidth=3,
+                label=grooming_styling[grooming_method].label_short,
+                color=_method_to_color[grooming_method],
+            )
+
+            # Systematic uncertainty
+            pachyderm.plot.error_boxes(
+                ax=ax,
+                x_data=h.axes[0].bin_centers,
+                y_data=h.values,
+                x_errors=h.axes[0].bin_widths / 2,
+                y_errors=np.array(
+                    [
+                        h.metadata["y_systematic"]["quadrature"].low,
+                        h.metadata["y_systematic"]["quadrature"].high,
+                    ]
+                ),
+                # y_errors=np.array([y_systematic_errors.low, y_systematic_errors.high]),
+                # color=style.color,
+                color=p[0].get_color(),
+                linewidth=0,
+                alpha=0.3,
+            )
+
+            for model_name, model_with_all_grooming_methods in models.items():
+                model = model_with_all_grooming_methods.get(grooming_method, None)
+                if not model:
+                    logger.debug(
+                        f"Skipping model {model_name}, grooming method: {grooming_method} because predictions aren't available"
+                    )
+                    continue
+
+                # Then, plot the model
+                model_style = grooming_styling[f"{grooming_method}_compare"]
+                # Get the model for the reference.
+                model = binned_data.BinnedData.from_existing_data(model)
+                # TODO: Careful, pythia is already normalized, but jetscape wasn't. So we need to resolve this...
+                #       Probably best to have some kind of "prepare model" function, which we can decide to use or not.
+                # Then normalize
+                #####model /= np.sum(model.values)
+                #####model /= model.axes[0].bin_widths
+                # And select the same range.
+                model = full_results_helpers.select_hist_range(model, kt_range[grooming_method])
+
+                # And plot
+                # Make sure we copy the settings so we can modify them
+                #temp_kwargs = dict(plot_style.models_styles[model_name])
+                #temp_kwargs["label"] = temp_kwargs["label"] if plotting_last_method else None
+                #temp_kwargs.pop("color")
+                #temp_kwargs.pop("marker")
+                temp_kwargs: dict[str, Any] = {}
+                ax.errorbar(
+                    model.axes[0].bin_centers,
+                    model.values,
+                    # yerr=model.errors,
+                    # xerr=model.axes[0].bin_widths / 2,
+                    # TODO: This isn't right if there are multiple models, but let's me get through the previews
+                    color=p[0].get_color(),
+                    #color=grooming_styling[grooming_method].color,
+                    # marker=style.marker,
+                    # fillstyle=grooming_styling[grooming_method].fillstyle,
+                    # linestyle="",
+                    # label=_models_styles[model_name]["label"] if plotting_last_method else None,
+                    zorder=model_style.zorder,
+                    alpha=0.7,
+                    **temp_kwargs,
+                )
+
+                # Ratio
+                # Could move down here if you want to see the entire range
+                model = full_results_helpers.select_hist_range(model, kt_range[grooming_method])
+                ratio = model / h
+
+                # Ratio + statistical error bars
+                ax_ratio.errorbar(
+                    ratio.axes[0].bin_centers,
+                    ratio.values,
+                    yerr=ratio.errors,
+                    xerr=ratio.axes[0].bin_widths / 2,
+                    color=p[0].get_color(),
+                    marker=_markers_by_grooming_method[grooming_method],
+                    markersize=11,
+                    linestyle="",
+                    linewidth=3,
+                )
+                # Systematic errors.
+                y_relative_error_low = full_results_helpers.relative_error(
+                    full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
+                )
+                y_relative_error_high = full_results_helpers.relative_error(
+                    full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
+                )
+                # From error prop, pythia has no systematic error, so we just convert the relative errors.
+                ratio.metadata["y_systematic"] = {}
+                ratio.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
+                    low=y_relative_error_low * ratio.values,
+                    high=y_relative_error_high * ratio.values,
+                )
+                y_systematic = ratio.metadata["y_systematic"]["quadrature"]
+                pachyderm.plot.error_boxes(
+                    ax=ax_ratio,
+                    x_data=ratio.axes[0].bin_centers,
+                    y_data=ratio.values,
+                    x_errors=ratio.axes[0].bin_widths / 2,
+                    y_errors=np.array([y_systematic.low, y_systematic.high]),
+                    color=p[0].get_color(),
+                    linewidth=0,
+                    alpha=0.3,
+                )
+
+    # reference value for ratio
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
+
+    # Labeling and presentation
+    plot_config.apply(fig=fig, axes=[ax, ax_ratio])
+    # A few additional tweaks.
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    # ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.2))
+
+    filename = f"{plot_config.name}"
+    if len(list(grooming_methods)) == 1:
+        filename += f"_{grooming_method[0]}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def plot_grooming_model_comparisons_for_single_system(
+    hists: Mapping[str, unfolding_analysis.SingleResult],
+    models: Mapping[str, Mapping[str, binned_data.BinnedData]],
+    grooming_methods: Sequence[str],
+    collision_system: str,
+    collision_system_key: str,
+    output_dir: Path,
+    kt_range: helpers.KtRange | Mapping[str, helpers.KtRange],
+    figure_kt_range: helpers.KtRange | None = None,
+    jet_R_str: str = "R04",
+    alice_status: str = "work_in_progress",
+    text_font_size: int = 31,
+) -> None:
+    """Plot comparison of grooming methods for a single system."""
+
+    # Validation
+    if figure_kt_range is None:
+        figure_kt_range = helpers.KtRange(1.5, 15)
+    if isinstance(kt_range, helpers.KtRange):
+        kt_range = {grooming_method: kt_range for grooming_method in grooming_methods}
+
+    # grooming_styling = pb.define_grooming_styles()
+    jet_pt_bin = next(iter(hists.values())).ranges[0]
+
+    text = plot_style.label_to_display_string["ALICE"][alice_status]
+    text += "\n" + plot_style.label_to_display_string["collision_system"][collision_system_key]
+    text += "\n" + plot_style.label_to_display_string["jets"]["general"]
+    text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    _plot_data_model_comparison_for_single_system(
+        hists=hists,
+        models=models,
+        grooming_methods=grooming_methods,
+        set_zero_to_nan=False,
+        kt_range=kt_range,
+        plot_config=pb.PlotConfig(
+            name=f"unfolded_kt_{collision_system}_model_comparison_{jet_R_str}",
+            panels=[
+                # Main panel
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
+                            log=True,
+                            range=(4e-3, 1),
+                            font_size=text_font_size,
+                        ),
+                    ],
+                    text=pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
+                    legend=pb.LegendConfig(location="lower left", font_size=round(text_font_size*0.8), anchor=(0.015, 0.025), marker_label_spacing=0.075),
+                ),
+                pb.Panel(
+                    axes=[
+                        pb.AxisConfig(
+                            "x",
+                            label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$",
+                            range=tuple(figure_kt_range),  # type: ignore[arg-type]
+                            font_size=text_font_size,
+                        ),
+                        pb.AxisConfig(
+                            "y",
+                            label=r"$\frac{\text{Model}}{\text{Data}}$",
+                            range=(0.1, 1.9) if "soft_drop_z_cut_04" in grooming_methods else (0.45, 1.55),
+                            font_size=text_font_size,
+                        ),
+                    ],
+                ),
+            ],
+            figure=pb.Figure(edge_padding={"left": 0.15, "bottom": 0.095, "top": 0.975}),
+        ),
+        output_dir=output_dir,
+    )
+
+
 def _plot_single_system_comparison(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],

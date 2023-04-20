@@ -771,15 +771,10 @@ def _plot_single_system_comparison(
                 continue
 
             # Ensure the ratio is defined over the same range.
-            # TODO: Refactor when more awake...
-            kt_range_for_current_grooming_method = kt_range[grooming_method]
-            kt_range_for_reference = kt_range[reference_grooming_method]
-            kt_range_min, kt_range_max = tuple(kt_range_for_current_grooming_method)  # type: ignore[arg-type, var-annotated]
-            if kt_range_min < kt_range_for_reference.min:
-                kt_range_min = kt_range_for_reference.min
-            if kt_range_max > kt_range_for_reference.max:
-                kt_range_max = kt_range_for_reference.max
-            kt_range_for_comparison = helpers.KtRange(kt_range_min, kt_range_max)
+            kt_range_for_comparison = full_results_helpers.determine_overlapping_range(
+                current_range=kt_range[grooming_method],
+                reference=kt_range[reference_grooming_method],
+            )
             logger.info(f"kt_range_for_comparison: {kt_range_for_comparison}")
             ratio_reference_hist = full_results_helpers.select_hist_range(
                 ratio_reference_hist_unselected,

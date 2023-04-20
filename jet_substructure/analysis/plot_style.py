@@ -209,3 +209,104 @@ def adjust_lightness(color: str | tuple[float, float, float], amount: float = 0.
     #c = colorsys.rgb_to_hls(*mc.to_rgb(c))
     c = colorsys.rgb_to_hls(*c)
     return colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
+
+
+_model_palette: list[tuple[float, float, float]] = [
+    (53, 73, 222),
+    (170, 52, 222),
+    (223, 82, 87),
+    (225, 220, 103),
+    (90, 224, 102),
+    (57, 225, 215),
+    (137, 185, 224),
+    (89, 147, 223),
+    (223, 34, 219),
+    (216, 142, 224),
+    (223, 124, 53),
+    (108, 223, 41),
+]
+_model_palette = [
+    (color[0] / 254, color[1] / 254, color[2] / 254)
+    for color in _model_palette
+]
+_model_palette = _model_palette[1:] + [_model_palette[0]]
+
+models_styles = {
+    "pythia": {
+        "label": "PYTHIA8 Monash 2013",
+        "linewidth": 3,
+        "linestyle": "-",
+        "marker": "s",
+        "color": _model_palette[0],
+        #color=_model_palette[7],
+        "markerfacecolor": "none",
+        #markerfacecolor="white",
+        "markeredgewidth": 3,
+    },
+    "analytical": {
+        "label": "Caucal et al.",
+        "linewidth": 3,
+        "linestyle": "-.",
+        "marker": "P",
+        #color=_model_palette[1],
+        #color=_model_palette[5],
+        #color=_model_palette[8],
+        #color=_model_palette[4],
+        "color": _model_palette[3],
+    },
+    "sherpa_lund": {
+        "label": "SHERPA (Lund)",
+        # NOTE: This will overlap with jetscape, but we currently (8 July 2021) can't compare them, so it's fine.
+        #       To be resolved when the plotting plans are a bit clearer.
+        "linewidth": 3,
+        "linestyle": "--",
+        "marker": "*",
+        #color=_model_palette[2],
+        "color": _model_palette[1],
+        #color=_model_palette[5],
+        #color=_model_palette[2],
+    },
+    "sherpa_ahadic": {
+        "label": "SHERPA (AHADIC)",
+        "linewidth": 3,
+        "linestyle": ":",
+        "marker": "X",
+        #color=_model_palette[3],
+        #color=_model_palette[7],
+        #color=_model_palette[6],
+        #color=_model_palette[3],
+        "color": _model_palette[6],
+    },
+    "jetscape": {
+        "label": "JETSCAPEv3.5 AA22",
+        "linewidth": 3,
+        "linestyle": "--",
+        "marker": "D",
+        #color=_model_palette[4],
+        #color=_model_palette[8],
+        #color=_model_palette[4],
+        "color": _model_palette[3],
+    },
+    "hybrid_moliere": {
+        "label": "Hybrid w/ wake + Moliere",
+        "linewidth": 3,
+        "linestyle": "--",
+        "marker": "D",
+        #color=_model_palette[4],
+        #color=_model_palette[8],
+        #color=_model_palette[4],
+        "color": _model_palette[5],
+    },
+    "hybrid_without_moliere": {
+        "label": "Hybrid w/ wake",
+        "linewidth": 3,
+        "linestyle": "--",
+        "marker": "D",
+        #color=_model_palette[4],
+        #color=_model_palette[8],
+        #color=_model_palette[4],
+
+        #color=_model_palette[6],
+        "color": _model_palette[1],
+    },
+}
