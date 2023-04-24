@@ -788,9 +788,9 @@ def _plot_single_system_comparison(
             if h.axes[0].bin_edges.shape != ratio_reference_hist.axes[0].bin_edges.shape or \
                 not np.allclose(h.axes[0].bin_edges, ratio_reference_hist.axes[0].bin_edges):
                 # Rebin according to the data which we are supposed to be plotting
-                ratio_reference_hist = full_results_helpers.rebin_ratio_according_to_wider_binning(
-                    ratio_reference_hist=ratio_reference_hist.copy(),
-                    h=h,
+                ratio_reference_hist = full_results_helpers.rebin_bin_width_scaled_hist(
+                    h_to_rebin=ratio_reference_hist.copy(),
+                    h_target=h,
                 )
 
             ratio = h / ratio_reference_hist
