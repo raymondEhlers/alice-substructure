@@ -553,11 +553,13 @@ def _plot_data_model_comparison_for_single_system(
     #for _method in grooming_methods:
     _method_to_color = {
         "dynamical_core": _palette_6_mod["purple"],
-        "dynamical_kt": _palette_6_mod["green"],
+        #"dynamical_kt": _palette_6_mod["green"],
+        "dynamical_kt": _extended_colors["alt_green"],
         "dynamical_time": _palette_6_mod["blue"],
         "soft_drop_z_cut_02": _palette_6_mod["magenta"],
         "dynamical_core_z_cut_02": _extended_colors["alt_purple"],
-        "dynamical_kt_z_cut_02": _extended_colors["alt_green"],
+        #"dynamical_kt_z_cut_02": _extended_colors["alt_green"],
+        "dynamical_kt_z_cut_02": _palette_6_mod["green"],
         "dynamical_time_z_cut_02": _extended_colors["alt_blue"],
         "soft_drop_z_cut_04": _palette_6_mod["orange"],
     }
@@ -626,6 +628,35 @@ def _plot_data_model_comparison_for_single_system(
                 alpha=0.3,
             )
 
+            # Next, draw the data and uncertainties at one as black and grey boxes
+            # Ratio + statistical error bars at one
+            ax_ratio.errorbar(
+                h.axes[0].bin_centers,
+                np.ones_like(h.axes[0].bin_centers),
+                yerr=h.errors / h.values,
+                xerr=h.axes[0].bin_widths / 2,
+                color="black",
+                marker=_markers_by_grooming_method[grooming_method],
+                markersize=11,
+                linestyle="",
+                linewidth=3,
+            )
+            pachyderm.plot.error_boxes(
+                ax=ax_ratio,
+                x_data=h.axes[0].bin_centers,
+                y_data=np.ones_like(h.values),
+                x_errors=h.axes[0].bin_widths / 2,
+                y_errors=np.array(
+                    [
+                        h.metadata["y_systematic"]["quadrature"].low / h.values,
+                        h.metadata["y_systematic"]["quadrature"].high / h.values,
+                    ]
+                ),
+                color="black",
+                linewidth=0,
+                alpha=0.3,
+            )
+
             for model_name, model_with_all_grooming_methods in models.items():
                 model = model_with_all_grooming_methods.get(grooming_method, None)
                 if not model:
@@ -638,13 +669,19 @@ def _plot_data_model_comparison_for_single_system(
                 model_style = grooming_styling[f"{grooming_method}_compare"]
                 # Get the model for the reference.
                 model = binned_data.BinnedData.from_existing_data(model)
-                # TODO: Careful, pythia is already normalized, but jetscape wasn't. So we need to resolve this...
-                #       Probably best to have some kind of "prepare model" function, which we can decide to use or not.
-                # Then normalize
-                #####model /= np.sum(model.values)
-                #####model /= model.axes[0].bin_widths
                 # And select the same range.
                 model = full_results_helpers.select_hist_range(model, kt_range[grooming_method])
+
+                # Check that binning matches up. If it doesn't attempt to rebin
+                if h.axes[0].bin_edges.shape != model.axes[0].bin_edges.shape or \
+                    not np.allclose(h.axes[0].bin_edges, model.axes[0].bin_edges):
+                    # Rebin according to the data which we are supposed to be plotting
+                    model = full_results_helpers.rebin_bin_width_scaled_hist(
+                        h_to_rebin=model,
+                        h_target=h,
+                        # This is okay since the model doesn't usually have a systematic uncertainty.
+                        okay_for_systematic_not_to_exist=True,
+                    )
 
                 # And plot
                 # Make sure we copy the settings so we can modify them
@@ -670,46 +707,63 @@ def _plot_data_model_comparison_for_single_system(
                 )
 
                 # Ratio
-                # Could move down here if you want to see the entire range
-                model = full_results_helpers.select_hist_range(model, kt_range[grooming_method])
+                # Could move down the range selection down here if you want to see the entire range above,
+                # although careful about binning differences!
                 ratio = model / h
 
-                # Ratio + statistical error bars
                 ax_ratio.errorbar(
                     ratio.axes[0].bin_centers,
                     ratio.values,
-                    yerr=ratio.errors,
-                    xerr=ratio.axes[0].bin_widths / 2,
+                    # yerr=model.errors,
+                    # xerr=model.axes[0].bin_widths / 2,
+                    # TODO: This isn't right if there are multiple models, but let's me get through the previews
                     color=p[0].get_color(),
-                    marker=_markers_by_grooming_method[grooming_method],
-                    markersize=11,
-                    linestyle="",
-                    linewidth=3,
+                    #color=grooming_styling[grooming_method].color,
+                    # marker=style.marker,
+                    # fillstyle=grooming_styling[grooming_method].fillstyle,
+                    # linestyle="",
+                    # label=_models_styles[model_name]["label"] if plotting_last_method else None,
+                    zorder=model_style.zorder,
+                    alpha=0.7,
+                    **temp_kwargs,
                 )
-                # Systematic errors.
-                y_relative_error_low = full_results_helpers.relative_error(
-                    full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
-                )
-                y_relative_error_high = full_results_helpers.relative_error(
-                    full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
-                )
-                # From error prop, pythia has no systematic error, so we just convert the relative errors.
-                ratio.metadata["y_systematic"] = {}
-                ratio.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
-                    low=y_relative_error_low * ratio.values,
-                    high=y_relative_error_high * ratio.values,
-                )
-                y_systematic = ratio.metadata["y_systematic"]["quadrature"]
-                pachyderm.plot.error_boxes(
-                    ax=ax_ratio,
-                    x_data=ratio.axes[0].bin_centers,
-                    y_data=ratio.values,
-                    x_errors=ratio.axes[0].bin_widths / 2,
-                    y_errors=np.array([y_systematic.low, y_systematic.high]),
-                    color=p[0].get_color(),
-                    linewidth=0,
-                    alpha=0.3,
-                )
+
+                ## Ratio + statistical error bars at one
+                #ax_ratio.errorbar(
+                #    ratio.axes[0].bin_centers,
+                #    ratio.values,
+                #    yerr=ratio.errors,
+                #    xerr=ratio.axes[0].bin_widths / 2,
+                #    color=p[0].get_color(),
+                #    marker=_markers_by_grooming_method[grooming_method],
+                #    markersize=11,
+                #    linestyle="",
+                #    linewidth=3,
+                #)
+                ## Systematic errors.
+                #y_relative_error_low = full_results_helpers.relative_error(
+                #    full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
+                #)
+                #y_relative_error_high = full_results_helpers.relative_error(
+                #    full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
+                #)
+                ## From error prop, pythia has no systematic error, so we just convert the relative errors.
+                #ratio.metadata["y_systematic"] = {}
+                #ratio.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
+                #    low=y_relative_error_low * ratio.values,
+                #    high=y_relative_error_high * ratio.values,
+                #)
+                #y_systematic = ratio.metadata["y_systematic"]["quadrature"]
+                #pachyderm.plot.error_boxes(
+                #    ax=ax_ratio,
+                #    x_data=ratio.axes[0].bin_centers,
+                #    y_data=ratio.values,
+                #    x_errors=ratio.axes[0].bin_widths / 2,
+                #    y_errors=np.array([y_systematic.low, y_systematic.high]),
+                #    color=p[0].get_color(),
+                #    linewidth=0,
+                #    alpha=0.3,
+                #)
 
     # reference value for ratio
     ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
