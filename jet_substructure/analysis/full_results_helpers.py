@@ -143,45 +143,67 @@ def determine_overlapping_range(current_range: _T_RangeSelector, reference: _T_R
 
 
 def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelector) -> binned_data.BinnedData:
-    # Sanity check
+    """Select a histogram with a new range, including the systematics.
+
+    NOTE:
+        This doesn't belong in binned_data precisely because it uses our systematic uncertainty conventions here.
+        Otherwise, it's just relying on standard functionality.
+    """
+    # Cross check
     if len(hist.axes) > 1:
         _msg = "Can only handle 1D histogram"
         raise ValueError(_msg)
+    # Setup
+    # We'll use a consistent slice throughout. This does mean that we have to create additional binned_data objects
+    # just to do the selection, but I think that tradeoff is worth it to use a consistent code path for all selections.
+    # NOTE: We could refactor the selection, but we would need the binning and the values, and so we're already most of
+    #       the way there. By using the existing code, we don't have to worry about any subtle issues.
+    selected_range = slice(x_range.min * 1j, x_range.max * 1j)
 
-    bin_center_mask = (hist.axes[0].bin_centers >= x_range.min) & (hist.axes[0].bin_centers <= x_range.max)
-    first_bin_edge = np.where(bin_center_mask)[0][0]
-    last_bin_edge = -1 * np.where(bin_center_mask[::-1])[0][0]
-    # If everything is in range, then we'll get 0 for the last bin edge. However, this would translate to no
-    # range included. In that case, we want to include everything on the upper edge, and so we need to set
-    # it to None.
-    if last_bin_edge == 0:
-        last_bin_edge = None
+    # First, we handle the main hist
+    h = hist[selected_range]
 
-    # Handle metadata
+    # Then handle the metadata
     metadata: dict[str, Any] = {}
+    # These will be the same for each case, so no need to repeatedly recreate the objects
+    _axes = binned_data.Axis(hist.axes[0].bin_edges)
+    _empty_variances = np.zeros(len(hist.values))
     for k, v in hist.metadata.items():
         if k == "y_systematic":
             y_systematic = {}
             for k_sys, v_sys in v.items():
                 if isinstance(v_sys, AsymmetricErrors):
                     y_systematic[k_sys] = AsymmetricErrors(
-                        low=v_sys.low[bin_center_mask],
-                        high=v_sys.high[bin_center_mask],
+                        low=binned_data.BinnedData(
+                            axes=_axes,
+                            values=v_sys.low,
+                            variances=_empty_variances,
+                        )[selected_range].values,
+                        high=binned_data.BinnedData(
+                            axes=_axes,
+                            values=v_sys.high,
+                            variances=_empty_variances,
+                        )[selected_range].values,
                     )
             metadata["y_systematic"] = y_systematic
         else:
             if isinstance(v, AsymmetricErrors):
                 metadata[k] = AsymmetricErrors(
-                    low=v.low[bin_center_mask],
-                    high=v.high[bin_center_mask],
+                    low=binned_data.BinnedData(
+                        axes=_axes,
+                        values=v.low,
+                        variances=_empty_variances,
+                    )[selected_range].values,
+                    high=binned_data.BinnedData(
+                        axes=_axes,
+                        values=v.high,
+                        variances=_empty_variances,
+                    )[selected_range].values,
                 )
+    h.metadata = metadata
 
-    return binned_data.BinnedData(
-        axes=[hist.axes[0].bin_edges[first_bin_edge:last_bin_edge]],
-        values=hist.values[bin_center_mask],
-        variances=hist.variances[bin_center_mask],
-        metadata=metadata,
-    )
+    return h
+
 
 
 def rebin_ratio_according_to_wider_binning(ratio_reference_hist: binned_data.BinnedData, h: binned_data.BinnedData) -> binned_data.BinnedData:
