@@ -46,6 +46,11 @@ class ModelCalculation:
     central: dict[str, binned_data.BinnedData] = attrs.field(factory=dict)
     central_ratio: dict[str, binned_data.BinnedData] = attrs.field(factory=dict)
 
+    def label(self, collision_system: str) -> str:
+        if collision_system == "pp":
+            return self.label_pp
+        return self.label_AA
+
     def ratio(self, event_activity: str) -> dict[str, binned_data.BinnedData]:
         """Helper so we can select with strings. """
         if event_activity == "central":
