@@ -205,45 +205,53 @@ def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelect
     return h
 
 
+def rebin_bin_width_scaled_hist(h_to_rebin: binned_data.BinnedData, h_target: binned_data.BinnedData, okay_for_systematic_not_to_exist: bool = False) -> binned_data.BinnedData:
+    # Validation and setup
+    has_systematic = "y_systematic" in h_to_rebin.metadata and "quadrature" in h_to_rebin.metadata["y_systematic"]
+    if not has_systematic and not okay_for_systematic_not_to_exist:
+        _msg = f"Expected y systematic for rebinning, but it wasn't found. Please check input: {h_to_rebin=}"
+        raise ValueError(_msg)
 
-def rebin_ratio_according_to_wider_binning(ratio_reference_hist: binned_data.BinnedData, h: binned_data.BinnedData) -> binned_data.BinnedData:
     # NOTE: This may not be the 100% most efficient way, but it's conceptually simple
     # First, undo the bin width scaling
     # For the main hist
-    ratio_reference_hist *= ratio_reference_hist.axes[0].bin_widths
+    h_to_rebin *= h_to_rebin.axes[0].bin_widths
     # And the metadata
-    _ratio_y_systematic = ratio_reference_hist.metadata["y_systematic"]["quadrature"]
-    _ratio_y_systematic = AsymmetricErrors(
-        low=_ratio_y_systematic.low * ratio_reference_hist.axes[0].bin_widths,
-        high=_ratio_y_systematic.high * ratio_reference_hist.axes[0].bin_widths,
-    )
-    #ratio_reference_hist.metadata["y_systematic"]["quadrature"] = _ratio_y_systematic
-    # Next, rebin this hist
-    # First, the systematic, so we don't lose track of it in reassigning the main object
-    # We construct an additional hist with the uncertainties so that they're handled properly
-    # NOTE: It would be really nice if we could do this more gracefully! This is really hacky
-    _ratio_systematic_low = binned_data.BinnedData(
-        axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
-        values=_ratio_y_systematic.low,
-        variances=np.ones(len(ratio_reference_hist.values)),
-    )[::h.axes[0].bin_edges].values
-    _ratio_systematic_high = binned_data.BinnedData(
-        axes=binned_data.Axis(ratio_reference_hist.axes[0].bin_edges),
-        values=_ratio_y_systematic.high,
-        variances=np.ones(len(ratio_reference_hist.values)),
-    )[::h.axes[0].bin_edges].values
-    # Store the update systematics and scale back down by the bin widths
-    _ratio_y_systematic = AsymmetricErrors(
-        _ratio_systematic_low / h.axes[0].bin_widths,
-        _ratio_systematic_high / h.axes[0].bin_widths,
-    )
-    # And finally rebin the main data
-    ratio_reference_hist = ratio_reference_hist[::h.axes[0].bin_edges]
-    # And scale back by the bin width
-    ratio_reference_hist /= ratio_reference_hist.axes[0].bin_widths
-    # And store the updated systematic
-    ratio_reference_hist.metadata["y_systematic"] = {
-        "quadrature": _ratio_y_systematic
-    }
+    if has_systematic:
+        _ratio_y_systematic = h_to_rebin.metadata["y_systematic"]["quadrature"]
+        _ratio_y_systematic = AsymmetricErrors(
+            low=_ratio_y_systematic.low * h_to_rebin.axes[0].bin_widths,
+            high=_ratio_y_systematic.high * h_to_rebin.axes[0].bin_widths,
+        )
+        #ratio_reference_hist.metadata["y_systematic"]["quadrature"] = _ratio_y_systematic
+        # Next, rebin this hist
+        # First, the systematic, so we don't lose track of it in reassigning the main object
+        # We construct an additional hist with the uncertainties so that they're handled properly
+        # NOTE: It would be really nice if we could do this more gracefully! This is really hacky
+        _ratio_systematic_low = binned_data.BinnedData(
+            axes=binned_data.Axis(h_to_rebin.axes[0].bin_edges),
+            values=_ratio_y_systematic.low,
+            variances=np.ones(len(h_to_rebin.values)),
+        )[::h_target.axes[0].bin_edges].values
+        _ratio_systematic_high = binned_data.BinnedData(
+            axes=binned_data.Axis(h_to_rebin.axes[0].bin_edges),
+            values=_ratio_y_systematic.high,
+            variances=np.ones(len(h_to_rebin.values)),
+        )[::h_target.axes[0].bin_edges].values
+        # Store the update systematics and scale back down by the bin widths
+        _ratio_y_systematic = AsymmetricErrors(
+            _ratio_systematic_low / h_target.axes[0].bin_widths,
+            _ratio_systematic_high / h_target.axes[0].bin_widths,
+        )
 
-    return ratio_reference_hist
+    # And finally rebin the main data
+    h_to_rebin = h_to_rebin[::h_target.axes[0].bin_edges]
+    # And scale back by the bin width
+    h_to_rebin /= h_to_rebin.axes[0].bin_widths
+    # And store the updated systematic
+    if has_systematic:
+        h_to_rebin.metadata["y_systematic"] = {
+            "quadrature": _ratio_y_systematic
+        }
+
+    return h_to_rebin
