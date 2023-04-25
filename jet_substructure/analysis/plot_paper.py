@@ -518,52 +518,32 @@ def _plot_data_model_comparison_for_single_system(
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
-    grooming_styling = plot_style.define_grooming_styles()
+    grooming_styles = plot_style.define_paper_grooming_styles()
 
-    _markers_by_grooming_method = {
-        "dynamical_core": "o",
-        "dynamical_kt": "o",
-        "dynamical_time": "o",
-        "soft_drop_z_cut_02": "s",
-        "dynamical_core_z_cut_02": "o",
-        "dynamical_kt_z_cut_02": "o",
-        "dynamical_time_z_cut_02": "o",
-        "soft_drop_z_cut_04": "s",
-    }
-
-    _palette_6_mod = {
-        "purple": "#7e459e",
-        "green": "#85aa55",
-        "blue": "#7385d9",
-        "magenta": "#b84c7d",
-        "teal": "#4cab98",
-        "orange": "#FF8301",
-    }
-    _extended_colors = {
-        "alt_purple": "#c09cd3",
-        # Generated
-        #"alt_green": "#3f591d",
-        "alt_green": "#517225",
-        # Already existing green
-        #"alt_green": "#55a270",
-        "alt_blue": "#4bafd0",
-    }
-
-    #_colors_for_assignments = []
-    #for _method in grooming_methods:
-    _method_to_color = {
-        "dynamical_core": _palette_6_mod["purple"],
-        #"dynamical_kt": _palette_6_mod["green"],
-        "dynamical_kt": _extended_colors["alt_green"],
-        "dynamical_time": _palette_6_mod["blue"],
-        "soft_drop_z_cut_02": _palette_6_mod["magenta"],
-        "dynamical_core_z_cut_02": _extended_colors["alt_purple"],
-        #"dynamical_kt_z_cut_02": _extended_colors["alt_green"],
-        "dynamical_kt_z_cut_02": _palette_6_mod["green"],
-        "dynamical_time_z_cut_02": _extended_colors["alt_blue"],
-        "soft_drop_z_cut_04": _palette_6_mod["orange"],
-    }
-    #_colors_for_assignments.append(_method_to_color[_method])
+    #_method_to_color = dict(zip(
+    #    [
+    #        "dynamical_core",
+    #        "dynamical_core_z_cut_02",
+    #        "dynamical_kt",
+    #        "dynamical_kt_z_cut_02",
+    #        "dynamical_time",
+    #        "dynamical_time_z_cut_02",
+    #        "soft_drop_z_cut_02",
+    #        "soft_drop_z_cut_04",
+    #    ],
+    #    [
+    #        # https://colorkit.co/palette/7e459e-c09cd3-7385d9-4bafd0-517225-85aa55-b84c7d-FF8301/
+    #        #"#7e459e","#c09cd3","#7385d9","#4bafd0","#517225","#85aa55","#b84c7d","#FF8301"
+    #        # 5 looks good
+    #        #"#7e459e","#cda9e0","#7385d9","#4bafd0","#367325","#7fad93","#b84c7d","#FF8301"
+    #        # 5 looks even better here...
+    #        #"#7e459e","#cda9e0","#7385d9","#4bafd0","#147736","#7fad93","#b84c7d","#FF8301"
+    #        # Tweaking 6. Tempting... #01 sent to Hannah + Laura
+    #        "#7e459e","#cda9e0","#7385d9","#4bafd0","#147736","#2ecc71","#b84c7d","#FF8301"
+    #        #"#7e459e","#cda9e0","#7385d9","#4bafd0","#147736","#27ae60","#b84c7d","#FF8301"
+    #    ]
+    #    # Nice teal: 008585
+    #))
 
     with sns.color_palette("Set2"):
         # fig, ax = plt.subplots(figsize=(9, 10))
@@ -581,7 +561,7 @@ def _plot_data_model_comparison_for_single_system(
         #ax.set_prop_cycle(cycler.cycler(marker=_markers))
         #ax_ratio.set_prop_cycle(cycler.cycler(marker=_markers_ratio))
 
-        for _i, grooming_method in enumerate(grooming_methods):
+        for _plot_counter, grooming_method in enumerate(grooming_methods):
             plotting_last_method = grooming_method == grooming_methods[-1]
 
             # First, the data
@@ -601,12 +581,14 @@ def _plot_data_model_comparison_for_single_system(
                 h.values,
                 yerr=h.errors,
                 xerr=h.axes[0].bin_widths / 2,
-                marker=_markers_by_grooming_method[grooming_method],
+                marker=grooming_styles[grooming_method].marker,
                 markersize=11,
                 linestyle="",
                 linewidth=3,
-                label=grooming_styling[grooming_method].label_short,
-                color=_method_to_color[grooming_method],
+                label=grooming_styles[grooming_method].label_short,
+                color=grooming_styles[grooming_method].color,
+                # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+                zorder=3 + _plot_counter,
             )
 
             # Systematic uncertainty
@@ -636,7 +618,7 @@ def _plot_data_model_comparison_for_single_system(
                 yerr=h.errors / h.values,
                 xerr=h.axes[0].bin_widths / 2,
                 color="black",
-                marker=_markers_by_grooming_method[grooming_method],
+                marker=grooming_styles[grooming_method].marker,
                 markersize=11,
                 linestyle="",
                 linewidth=3,
@@ -666,7 +648,6 @@ def _plot_data_model_comparison_for_single_system(
                     continue
 
                 # Then, plot the model
-                model_style = grooming_styling[f"{grooming_method}_compare"]
                 # Get the model for the reference.
                 model = binned_data.BinnedData.from_existing_data(model)
                 # And select the same range.
@@ -701,7 +682,7 @@ def _plot_data_model_comparison_for_single_system(
                     # fillstyle=grooming_styling[grooming_method].fillstyle,
                     # linestyle="",
                     # label=_models_styles[model_name]["label"] if plotting_last_method else None,
-                    zorder=model_style.zorder,
+                    zorder=5,
                     alpha=0.7,
                     **temp_kwargs,
                 )
@@ -723,7 +704,7 @@ def _plot_data_model_comparison_for_single_system(
                     # fillstyle=grooming_styling[grooming_method].fillstyle,
                     # linestyle="",
                     # label=_models_styles[model_name]["label"] if plotting_last_method else None,
-                    zorder=model_style.zorder,
+                    zorder=5,
                     alpha=0.7,
                     **temp_kwargs,
                 )
@@ -775,8 +756,8 @@ def _plot_data_model_comparison_for_single_system(
     # ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.2))
 
     filename = f"{plot_config.name}"
-    if len(list(grooming_methods)) == 1:
-        filename += f"_{grooming_methods[0]}"
+    if len(list(grooming_methods)) < 5:
+        filename += f"_{'_'.join(grooming_methods)}"
     fig.savefig(output_dir / f"{filename}.pdf")
     plt.close(fig)
 

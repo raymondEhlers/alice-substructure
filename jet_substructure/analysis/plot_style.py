@@ -310,3 +310,75 @@ models_styles = {
         "color": _model_palette[1],
     },
 }
+
+
+def define_paper_grooming_styles() -> dict[str, GroomingMethodStyle]:
+    # Setup
+    styles = {}
+
+    markers = ["o", "d", "s"]
+    grooming_styling = {
+        "dynamical_core": GroomingMethodStyle(
+            color="#b84c7d",
+            marker=markers[2], fillstyle="full",
+            label=r"Dynamical grooming $a = 0.5$",
+            label_short=r"DyG $a = 0.5$",
+            zorder=10,
+        ),
+        "dynamical_kt": GroomingMethodStyle(
+            color="#2980b9",
+            marker=markers[0], fillstyle="full",
+            label="Dynamical grooming $a = 1.0$",
+            label_short=r"DyG $a = 1.0$",
+            zorder=10,
+        ),
+        "dynamical_time": GroomingMethodStyle(
+            color="#147736",
+            marker=markers[2], fillstyle="full",
+            label=r"Dynamical grooming $a = 2.0$",
+            label_short=r"DyG $a = 2.0$",
+            zorder=10,
+        ),
+        # With zcut
+        "dynamical_core_z_cut_02": GroomingMethodStyle(
+            color="#ff6361",
+            marker=markers[2],
+            fillstyle="none",
+            label=r"Dynamical grooming $a = 0.5$, $z = 0.2$",
+            label_short=r"DyG $a = 0.5$, $z = 0.2$",
+            zorder=10,
+        ),
+        "dynamical_kt_z_cut_02": GroomingMethodStyle(
+            color="#8bc1e5",
+            marker=markers[0],
+            fillstyle="none",
+            label=r"Dynamical grooming $a = 1.0$, $z = 0.2$",
+            label_short=r"DyG $a = 1.0$, $z = 0.2$",
+            zorder=10,
+        ),
+        "dynamical_time_z_cut_02": GroomingMethodStyle(
+            color="#2ecc71",
+            marker=markers[2],
+            fillstyle="none",
+            label=r"Dynamical grooming $a = 2.0$, $z = 0.2$",
+            label_short=r"DyG $a = 2.0$, $z = 0.2$",
+            zorder=10,
+        ),
+        "soft_drop_z_cut_02": GroomingMethodStyle(
+            color="#FF8301",
+            marker=markers[1], fillstyle="none",
+            label=r"Soft drop $z_{\text{cut}} = 0.2$",
+            label_short=r"SD $z_{\text{cut}} = 0.2$",
+            zorder=4,
+        ),
+        "soft_drop_z_cut_04": GroomingMethodStyle(
+            color="#ffb567",
+            marker=markers[2], fillstyle="full",
+            label=r"Soft drop $z_{\text{cut}} = 0.4$",
+            label_short=r"SD $z_{\text{cut}} = 0.4$",
+            zorder=5,
+        ),
+    }
+    styles.update(grooming_styling)
+
+    return styles
