@@ -8,8 +8,9 @@ Defines utilizes and settings.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
-import attr
+import attrs
 import pachyderm.plot
 import seaborn as sns
 from pachyderm.plot import AxisConfig, Figure, LegendConfig, Panel, PlotConfig, TextConfig  # noqa: F401
@@ -45,14 +46,14 @@ label_to_display_string: dict[str, dict[str, str]] = {
 label_to_display_string["jets"]["general"] = r"$\text{Anti-}k_{\text{T}}\:\text{ch-particle jets}$"
 
 
-@attr.s
+@attrs.define
 class GroomingMethodStyle:
-    color: str = attr.ib()
-    marker: str = attr.ib()
-    fillstyle: str = attr.ib()
-    label: str = attr.ib()
-    label_short: str = attr.ib()
-    zorder: int = attr.ib()
+    color: str
+    marker: str
+    fillstyle: str
+    label: str
+    label_short: str
+    zorder: int
 
 
 def define_grooming_styles() -> dict[str, GroomingMethodStyle]:
@@ -382,3 +383,68 @@ def define_paper_grooming_styles() -> dict[str, GroomingMethodStyle]:
     styles.update(grooming_styling)
 
     return styles
+
+
+def define_paper_model_styles() -> dict[str, dict[str, Any]]:
+    paper_model_styles = {}
+
+    paper_model_styles = {
+        "pp_pythia": {
+            "label": "PYTHIA8 Monash 2013",
+            "linewidth": 3,
+            "linestyle": "-",
+            "marker": "s",
+            "color": "#3498db",
+            "markerfacecolor": "none",
+            "markeredgewidth": 3,
+        },
+        "pp_caucal_analytical": {
+            "label": "Caucal et al.",
+            "linewidth": 3,
+            "linestyle": "-.",
+            "marker": "P",
+            "color": "#1abc9c",
+        },
+        "pp_sherpa_lund": {
+            "label": "SHERPA (Lund)",
+            "linewidth": 3,
+            "linestyle": "--",
+            "marker": "*",
+            "color": "#f39c12",
+        },
+        "pp_sherpa_ahadic": {
+            "label": "SHERPA (AHADIC)",
+            "linewidth": 3,
+            "linestyle": ":",
+            "marker": "X",
+            "color": "#d35400",
+        },
+        "pp_jetscape": {
+            "linewidth": 3,
+            "linestyle": "--",
+            "marker": "D",
+            #"color": "#008585",
+            "color": "#4cab98",
+        },
+        "pp_hybrid": {
+            "linewidth": 3,
+            "linestyle": "--",
+            "marker": "D",
+            "color": "#DF5257",
+        },
+        "AA_hybrid_moliere": {
+            "linewidth": 3,
+            "linestyle": "--",
+            "marker": "D",
+            #"color": "#4cab98",
+            "color": "#DF5257",
+        },
+        "AA_hybrid_without_moliere": {
+            "linewidth": 3,
+            "linestyle": "--",
+            "marker": "D",
+            "color": "#7e459e",
+        },
+    }
+
+    return paper_model_styles

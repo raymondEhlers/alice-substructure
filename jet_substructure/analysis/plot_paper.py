@@ -18,7 +18,13 @@ import pachyderm.plot as pb
 import seaborn as sns
 from pachyderm import binned_data
 
-from jet_substructure.analysis import full_results_helpers, plot_style, plot_unfolding, unfolding_analysis
+from jet_substructure.analysis import (
+    full_results_helpers,
+    model_calculations,
+    plot_style,
+    plot_unfolding,
+    unfolding_analysis,
+)
 from jet_substructure.base import helpers
 
 logger = logging.getLogger(__name__)
@@ -511,14 +517,16 @@ def plot_pp_grooming_comparison_with_models_2022(
 
 def _plot_data_model_comparison_for_single_system(
     hists: Mapping[str, unfolding_analysis.SingleResult],
-    models: Mapping[str, Mapping[str, binned_data.BinnedData]],
+    models: Mapping[str, tuple[model_calculations.ModelCalculation, Mapping[str, binned_data.BinnedData]]],
     grooming_methods: Sequence[str],
+    collision_system: str,
     set_zero_to_nan: bool,
     kt_range: Mapping[str, helpers.KtRange],
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
     grooming_styles = plot_style.define_paper_grooming_styles()
+    model_styles = plot_style.define_paper_model_styles()
 
     #_method_to_color = dict(zip(
     #    [
@@ -588,7 +596,7 @@ def _plot_data_model_comparison_for_single_system(
                 label=grooming_styles[grooming_method].label_short,
                 color=grooming_styles[grooming_method].color,
                 # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
-                zorder=3 + _plot_counter,
+                zorder=3 + _plot_counter + grooming_styles[grooming_method].zorder,
             )
 
             # Systematic uncertainty
@@ -639,7 +647,7 @@ def _plot_data_model_comparison_for_single_system(
                 alpha=0.3,
             )
 
-            for model_name, model_with_all_grooming_methods in models.items():
+            for model_name, (model_calculation, model_with_all_grooming_methods) in models.items():
                 model = model_with_all_grooming_methods.get(grooming_method, None)
                 if not model:
                     logger.debug(
@@ -666,22 +674,14 @@ def _plot_data_model_comparison_for_single_system(
 
                 # And plot
                 # Make sure we copy the settings so we can modify them
-                temp_kwargs = dict(plot_style.models_styles[model_name])
-                temp_kwargs["label"] = temp_kwargs["label"] if plotting_last_method else None
-                temp_kwargs.pop("color")
+                temp_kwargs = dict(model_styles[f"{collision_system}_{model_name}"])
+                temp_kwargs["label"] = model_calculation.label(collision_system=collision_system) if plotting_last_method else None
                 temp_kwargs.pop("marker")
                 ax.errorbar(
                     model.axes[0].bin_centers,
                     model.values,
                     # yerr=model.errors,
                     # xerr=model.axes[0].bin_widths / 2,
-                    # TODO: This isn't right if there are multiple models, but let's me get through the previews
-                    color=p[0].get_color(),
-                    #color=grooming_styling[grooming_method].color,
-                    # marker=style.marker,
-                    # fillstyle=grooming_styling[grooming_method].fillstyle,
-                    # linestyle="",
-                    # label=_models_styles[model_name]["label"] if plotting_last_method else None,
                     zorder=5,
                     alpha=0.7,
                     **temp_kwargs,
@@ -697,13 +697,6 @@ def _plot_data_model_comparison_for_single_system(
                     ratio.values,
                     # yerr=model.errors,
                     # xerr=model.axes[0].bin_widths / 2,
-                    # TODO: This isn't right if there are multiple models, but let's me get through the previews
-                    color=p[0].get_color(),
-                    #color=grooming_styling[grooming_method].color,
-                    # marker=style.marker,
-                    # fillstyle=grooming_styling[grooming_method].fillstyle,
-                    # linestyle="",
-                    # label=_models_styles[model_name]["label"] if plotting_last_method else None,
                     zorder=5,
                     alpha=0.7,
                     **temp_kwargs,
@@ -764,7 +757,7 @@ def _plot_data_model_comparison_for_single_system(
 
 def plot_grooming_model_comparisons_for_single_system(
     hists: Mapping[str, unfolding_analysis.SingleResult],
-    models: Mapping[str, Mapping[str, binned_data.BinnedData]],
+    models: Mapping[str, tuple[model_calculations.ModelCalculation, Mapping[str, binned_data.BinnedData]]],
     grooming_methods: Sequence[str],
     collision_system: str,
     collision_system_key: str,
@@ -795,6 +788,7 @@ def plot_grooming_model_comparisons_for_single_system(
         hists=hists,
         models=models,
         grooming_methods=grooming_methods,
+        collision_system=collision_system,
         set_zero_to_nan=False,
         kt_range=kt_range,
         plot_config=pb.PlotConfig(
