@@ -220,7 +220,7 @@ class HybridModel:
         _soft_drop_prediction_indices = {
             "soft_drop_z_cut_00": 0,
             "soft_drop_z_cut_02": 1,
-            "soft_drop_z_cut_04": 1,
+            "soft_drop_z_cut_04": 2,
         }
         _dyg_prediction_indices = {
             "dynamical_core": 0,
