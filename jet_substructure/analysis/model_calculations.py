@@ -618,7 +618,7 @@ def load_jetscape_data_jetscape_analysis(filename: Path) -> dict[str, dict[str, 
     return output
 
 
-def calculate_jetscape_ratio(
+def calculate_jetscape_ratio_2022(
     pp: dict[str, dict[str, binned_data.BinnedData]], PbPb: dict[str, dict[str, binned_data.BinnedData]]
 ) -> dict[str, dict[str, binned_data.BinnedData]]:
     """ Calculate jetscape predictions from the pp and PbPb kt spectra. """
