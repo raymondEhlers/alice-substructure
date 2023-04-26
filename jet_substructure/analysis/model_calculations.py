@@ -315,19 +315,28 @@ class HybridModel:
                         values=input_data[:, 1],
                         variances=input_data[:, 2] ** 2,
                     )
+                    if self.needs_normalization:
+                        pp_prediction /= np.sum(pp_prediction.values)
+                        # NOTE: Doesn't need additional normalization by bin width
+                    predictions["pp"][grooming_method] = pp_prediction
 
                 # Now, onto the AA
                 # NOTE: The above note about intermediate variable definitions applies equally here.
                 PbPb_upper_band = input_data[:, 3]
                 PbPb_lower_band = input_data[:, 4]
-                predictions[centrality_bin][grooming_method] = _convert_hybrid_inputs_to_binned_data(
+                PbPb_prediction = _convert_hybrid_inputs_to_binned_data(
                     bin_edges=bin_edges,
                     lower_band=PbPb_lower_band,
                     upper_band=PbPb_upper_band,
                 )
+                if self.needs_normalization:
+                    PbPb_prediction /= np.sum(PbPb_prediction.values)
+                    # NOTE: Doesn't need additional normalization by bin width
+                predictions[centrality_bin][grooming_method] = PbPb_prediction
                 # And ratio
                 ratio_upper_band = input_data[:, 5]
                 ratio_lower_band = input_data[:, 6]
+                # NOTE: Wouldn't need a bin width normalization on the ratios
                 ratios[centrality_bin][grooming_method] = _convert_hybrid_inputs_to_binned_data(
                     bin_edges=bin_edges,
                     lower_band=ratio_lower_band,
