@@ -308,15 +308,12 @@ class HybridModel:
                 # NOTE: The pp is stored in both the semi-central and the central. In both cases, it's identical (ie. they contain
                 #       redundant information). Thus, we only have to fill it up once. After it's loaded, we can skip it the next time.
                 if not predictions["pp"].get(grooming_method):
-                    # NOTE: In principle, we could pass these values without the intermediate. But I find the order that the values
-                    #       were written to be a bit counterintuitive, so I would rather label them explicitly via the variable names.
-                    #       Nothing here is computationally expensive, so it's fine.
-                    pp_upper_band = input_data[:, 1]
-                    pp_lower_band = input_data[:, 2]
-                    predictions["pp"][grooming_method] = _convert_hybrid_inputs_to_binned_data(
-                        bin_edges=bin_edges,
-                        lower_band=pp_lower_band,
-                        upper_band=pp_upper_band,
+                    # NOTE: pp is handled differently than PbPb! Here, the values are:
+                    #       vacuum  vacuum_error
+                    pp_prediction = binned_data.BinnedData(
+                        axes=[bin_edges],
+                        values=input_data[:, 1],
+                        variances=input_data[:, 2] ** 2,
                     )
 
                 # Now, onto the AA
