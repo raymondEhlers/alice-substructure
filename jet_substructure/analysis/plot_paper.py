@@ -676,68 +676,43 @@ def _plot_data_model_comparison_for_single_system(
                 # Make sure we copy the settings so we can modify them
                 temp_kwargs = dict(model_styles[f"{collision_system}_{model_name}"])
                 temp_kwargs["label"] = model_calculation.label(collision_system=collision_system) if plotting_last_method else None
+                # Need to pop for fill_between since these aren't valid args
                 temp_kwargs.pop("marker")
-                ax.errorbar(
+                temp_kwargs.pop("markerfacecolor", None)
+                temp_kwargs.pop("markeredgewidth", None)
+                # And switch to the proper color
+                temp_kwargs["facecolor"] = temp_kwargs.pop("color")
+                ax.fill_between(
                     model.axes[0].bin_centers,
-                    model.values,
-                    # yerr=model.errors,
-                    # xerr=model.axes[0].bin_widths / 2,
+                    model.values - model.errors,
+                    model.values + model.errors,
                     zorder=5,
-                    alpha=0.7,
+                    alpha=0.8,
                     **temp_kwargs,
                 )
 
                 # Ratio
                 # Could move down the range selection down here if you want to see the entire range above,
                 # although careful about binning differences!
-                ratio = model / h
+                # NOTE: If we naively construct the ratio here by just dividing the model by the data,
+                #       then the errors stored in the ratio aren't what we want since they convolve the
+                #       model uncertainties with the data uncertainties. So want to calculate the ratio
+                #       using a hist without the data uncertainties.
+                h_without_uncertainties = binned_data.BinnedData(
+                    axes=[h.axes[0].bin_edges],
+                    values=h.values,
+                    variances=np.zeros_like(h.values),
+                )
+                ratio = model / h_without_uncertainties
 
-                ax_ratio.errorbar(
+                ax_ratio.fill_between(
                     ratio.axes[0].bin_centers,
-                    ratio.values,
-                    # yerr=model.errors,
-                    # xerr=model.axes[0].bin_widths / 2,
+                    ratio.values - ratio.errors,
+                    ratio.values + ratio.errors,
                     zorder=5,
-                    alpha=0.7,
+                    alpha=0.8,
                     **temp_kwargs,
                 )
-
-                ## Ratio + statistical error bars at one
-                #ax_ratio.errorbar(
-                #    ratio.axes[0].bin_centers,
-                #    ratio.values,
-                #    yerr=ratio.errors,
-                #    xerr=ratio.axes[0].bin_widths / 2,
-                #    color=p[0].get_color(),
-                #    marker=_markers_by_grooming_method[grooming_method],
-                #    markersize=11,
-                #    linestyle="",
-                #    linewidth=3,
-                #)
-                ## Systematic errors.
-                #y_relative_error_low = full_results_helpers.relative_error(
-                #    full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
-                #)
-                #y_relative_error_high = full_results_helpers.relative_error(
-                #    full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
-                #)
-                ## From error prop, pythia has no systematic error, so we just convert the relative errors.
-                #ratio.metadata["y_systematic"] = {}
-                #ratio.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
-                #    low=y_relative_error_low * ratio.values,
-                #    high=y_relative_error_high * ratio.values,
-                #)
-                #y_systematic = ratio.metadata["y_systematic"]["quadrature"]
-                #pachyderm.plot.error_boxes(
-                #    ax=ax_ratio,
-                #    x_data=ratio.axes[0].bin_centers,
-                #    y_data=ratio.values,
-                #    x_errors=ratio.axes[0].bin_widths / 2,
-                #    y_errors=np.array([y_systematic.low, y_systematic.high]),
-                #    color=p[0].get_color(),
-                #    linewidth=0,
-                #    alpha=0.3,
-                #)
 
     # reference value for ratio
     ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
