@@ -1061,25 +1061,208 @@ for _temp_grooming_methods, _reference_method, _label in [
 # ### R = 0.2
 
 # %%
-from importlib import reload
+# %matplotlib widget
 
-reload(plot_unfolding)
+# %%
+import seaborn as sns
+sns.color_palette(
+  [
+    # Dark Green
+    '#003d31', '#0b5345', '#1d7373',
+    # Olive
+    '#4d2600', '#6e2c00', '#8f3f00',
+    # Rust
+    '#44110d', '#b03a2e', '#f27573',
+    # Peach
+    '#b2a464', '#f7dc6f', '#fff9d9',
+    # Navy Blue
+    '#050b41', '#0a1172', '#1d2c9b',
+    # Sky Blue
+    '#5390d9', '#6fb1fc', '#9cc9ff',
+    # Salmon
+    '#b83621', '#ff5733', '#ff8752',
+    # Mustard
+    '#b89400', '#f0c72f', '#fbe7a4'
+])
+#sns.color_palette("rocket")
+
+# %%
+
+_colors = {
+    "magenta": {
+        # 35% darker, --, 45% darker
+        "dark": "#793051",
+        "mid": "#b84c7d",
+        #"light": "#d89db7",
+        "light": "#ff6361",
+    },
+    "violet": {
+        # Previously generated
+        "dark": "#7e459e",
+        "mid": "#cda9e0",
+        "light": "",
+    },
+    "blue": {
+        # Previously generated
+        #"dark": "#7385d9",
+        # 40% darker than mid
+        "dark": "#2b3f9d",
+        "mid": "#4bafd0",
+        "light": "#abb6e8",
+    },
+    "blue2": {
+        # Previously generated
+        #"dark": "#7385d9",
+        # 40% darker than mid
+        "dark": "#2980b9",
+        "mid": "#4bafd0",
+        "light": "#8bc1e5",
+    },
+    "green": {
+        # Previously generated
+        "dark": "#147736",
+        #"mid": "#2ecc71",
+        "mid": "#85aa55",
+        "light": "#2ecc71",
+    },
+    "orange": {
+        "dark": "#d35400",
+        "mid": "#FF8301",
+        # 40% lighter
+        "light": "#ffb567",
+    }
+}
+
+method_to_color = dict(zip(
+    [
+        "dynamical_core",
+        "dynamical_core_z_cut_02",
+        "dynamical_kt",
+        "dynamical_kt_z_cut_02",
+        "dynamical_time",
+        "dynamical_time_z_cut_02",
+        "soft_drop_z_cut_02",
+        "soft_drop_z_cut_04",
+    ],
+    [
+        # https://colorkit.co/palette/7e459e-c09cd3-7385d9-4bafd0-517225-85aa55-b84c7d-FF8301/
+        #"#7e459e","#c09cd3","#7385d9","#4bafd0","#517225","#85aa55","#b84c7d","#FF8301"
+        # 5 looks good
+        #"#7e459e","#cda9e0","#7385d9","#4bafd0","#367325","#7fad93","#b84c7d","#FF8301"
+        # 5 looks even better here...
+        #"#7e459e","#cda9e0","#7385d9","#4bafd0","#147736","#7fad93","#b84c7d","#FF8301"
+        #_colors["magenta"]["mid"], _colors["violet"]["mid"],
+        _colors["magenta"]["mid"], _colors["magenta"]["light"],
+        #*list(_colors["magenta"].values())[:2],
+        _colors["blue2"]["dark"], _colors["blue2"]["light"],
+        #_colors["blue2"]["dark"], _colors["blue"]["mid"],
+        #*list(_colors["blue"].values())[:2],
+        _colors["green"]["dark"], _colors["green"]["light"], 
+        #*list(_colors["green"].values())[:2],
+        *list(_colors["orange"].values())[1:],
+        #_colors["magenta"]["mid"],
+        #_colors["orange"]["mid"],
+        #"#7e459e","#cda9e0","#7385d9","#4bafd0","#147736","#27ae60","#b84c7d","#FF8301"
+    ]
+    # Nice teal: 008585
+))
+
+method_to_color = dict(zip(
+    [
+        "dynamical_core",
+        "dynamical_core_z_cut_02",
+        "dynamical_kt",
+        "dynamical_kt_z_cut_02",
+        "dynamical_time",
+        "dynamical_time_z_cut_02",
+        "soft_drop_z_cut_02",
+        "soft_drop_z_cut_04",
+    ],
+    [
+        # Dark and light
+        # Magenta
+        "#b84c7d", "#ff6361",
+        # Blue
+        "#2980b9", "#8bc1e5",
+        # Greens
+        "#147736", "#2ecc71",
+        # Orange
+        "#FF8301", "#ffb567",
+    ]
+    # Nice teal: 008585
+))
+
 
 # %%
 jet_R = 0.2
 jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / input_dir_tag / jet_R_str
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
-plot_unfolding.plot_grooming_model_comparisons_for_single_system(
+for _grooming_method in grooming_methods:
+    plot_paper.plot_grooming_model_comparisons_for_single_system(
+        hists=pp_R02_unfolded_with_systematics,
+        models={
+            "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.pp),
+            "pythia": (pythia_predictions_R02, pp_R02_true_reference),
+            # All of the hybrid loaded predictions have the same pp, so picking any one is fine!
+            "hybrid": (hybrid_model_with_wake_with_moliere_predictions_R02, hybrid_model_with_wake_with_moliere_predictions_R02.pp),
+        },
+        grooming_methods=[_grooming_method],
+        collision_system="pp",
+        collision_system_key="pp_5TeV",
+        output_dir=_output_dir,
+        kt_range=helpers.KtRange(0.25, 6),
+        figure_kt_range=helpers.KtRange(0, 6.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+    )
+
+for _method_groups in [
+    ["dynamical_core", "dynamical_core_z_cut_02"],
+    ["dynamical_kt", "dynamical_kt_z_cut_02"],
+    ["dynamical_time", "dynamical_time_z_cut_02"],
+    ["soft_drop_z_cut_02", "soft_drop_z_cut_04"],
+    ["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"],
+    list(reversed(["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"])),
+    ["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02", "soft_drop_z_cut_04"],
+    list(reversed(["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02", "soft_drop_z_cut_04"])),
+    ["dynamical_core_z_cut_02", "soft_drop_z_cut_02", "soft_drop_z_cut_04"],
+]:
+    # I don't think I will use these in the paper. However, I might, so may as well keep them around
+    continue
+    plot_paper.plot_grooming_model_comparisons_for_single_system(
+        hists=pp_R02_unfolded_with_systematics,
+        models={
+            "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.pp),
+            "pythia": (pythia_predictions_R02, pythia_predictions_R02.pp),
+            # All of the hybrid loaded predictions have the same pp, so any are fine!
+            "hybrid": (hybrid_model_with_wake_with_moliere_predictions_R02, hybrid_model_with_wake_with_moliere_predictions_R02.pp),
+        },
+        #grooming_methods=grooming_methods,
+        #grooming_methods=list(reversed(_grooming_methods_using_new_conventions)),
+        grooming_methods=_method_groups,
+        collision_system="pp",
+        collision_system_key="pp_5TeV",
+        output_dir=_output_dir,
+        kt_range=helpers.KtRange(0.25, 6),
+        figure_kt_range=helpers.KtRange(0, 6.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+    )
+# This isn't really super useful as it's too much information, but I think it's a bit nice as a summary
+# of all of the available data and models
+plot_paper.plot_grooming_model_comparisons_for_single_system(
     hists=pp_R02_unfolded_with_systematics,
     models={
-        # TODO: Need to update the jetscape binning. Whoops...
-        #"jetscape": jetscape_pp["R02"],
-        "pythia": pp_R02_true_reference,
+        "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.pp),
+        "pythia": (pythia_predictions_R02, pp_R02_true_reference),
+        # All of the hybrid loaded predictions have the same pp, so any are fine!
+        "hybrid": (hybrid_model_with_wake_with_moliere_predictions_R02, hybrid_model_with_wake_with_moliere_predictions_R02.pp),
     },
-    #grooming_methods=grooming_methods,
-    grooming_methods=list(reversed(_grooming_methods_using_new_conventions)),
+    #grooming_methods=list(reversed(_grooming_methods_using_new_conventions)),
+    #grooming_methods=list(reversed(grooming_methods)),
+    grooming_methods=grooming_methods,
     collision_system="pp",
     collision_system_key="pp_5TeV",
     output_dir=_output_dir,
