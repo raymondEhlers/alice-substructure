@@ -1272,6 +1272,14 @@ plot_paper.plot_grooming_model_comparisons_for_single_system(
     alice_status=alice_status,
 )
 
+# %%
+from jet_substructure.analysis import plot_style
+import seaborn as sns
+sns.color_palette(plot_style._paper_model_palette)
+
+# %%
+# !echo $PATH
+
 # %% [markdown]
 # ## PbPb grooming methods comparison
 #
@@ -1416,9 +1424,9 @@ for event_activity in ["central"]:
             models={
                 #"hybrid_without_moliere": semi_central_hybrid_model_ratio["hybrid_without_moliere"][jet_R_str],
                 #"hybrid_moliere": semi_central_hybrid_model_ratio["hybrid_moliere"][jet_R_str],
-                "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions.ratio(event_activity),
-                "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions.ratio(event_activity),
-                "jetscape": jetscape_predictions.ratio(event_activity),
+                "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02.ratio(event_activity),
+                "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02.ratio(event_activity),
+                "jetscape": jetscape_predictions_R02.ratio(event_activity),
             },
             grooming_method=grooming_method,
             output_dir=_output_dir,
