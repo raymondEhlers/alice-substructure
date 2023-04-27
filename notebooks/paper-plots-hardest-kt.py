@@ -1007,8 +1007,12 @@ hybrid_model_with_wake_without_moliere_predictions_R02.semi_central_ratio["soft_
 # %% [markdown]
 # # Plots
 
+# %% [markdown]
+# ### Setup
+
 # %%
 alice_status = "final"
+plot_output_dir_tag = "2023-paper-plots"
 
 # %% [markdown]
 # ## pp grooming methods comparison
@@ -1024,7 +1028,7 @@ reload(plot_unfolding)
 # %%
 jet_R = 0.2
 jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / input_dir_tag / jet_R_str
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
 for _temp_grooming_methods, _reference_method, _label in [
@@ -1098,7 +1102,7 @@ reload(plot_unfolding)
 # %%
 jet_R = 0.2
 jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / input_dir_tag / jet_R_str
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
 for _collision_system, _hists in [
@@ -1149,7 +1153,7 @@ reload(plot_unfolding)
 # %%
 jet_R = 0.2
 jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / input_dir_tag / jet_R_str
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
 _collision_systems_with_stats_tests_results = ["semi_central", "central"]
@@ -1209,7 +1213,7 @@ reload(plot_unfolding)
 # %%
 jet_R = 0.2
 jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / input_dir_tag / jet_R_str
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
 #for event_activity in ["semi_central", "central"]:
