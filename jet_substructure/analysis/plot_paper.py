@@ -755,7 +755,12 @@ def plot_grooming_model_comparisons_for_single_system(
     jet_pt_bin = next(iter(hists.values())).ranges[0]
 
     text = plot_style.label_to_display_string["ALICE"][alice_status]
-    text += "\n" + plot_style.label_to_display_string["collision_system"][collision_system_key]
+    # Since the final text is short, we can merge onto one line
+    if alice_status != "final":
+        text += "\n"
+    else:
+        text += " "
+    text += plot_style.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + plot_style.label_to_display_string["jets"]["general"]
     text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
