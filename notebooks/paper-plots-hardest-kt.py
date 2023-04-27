@@ -8,9 +8,9 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.14.5
 #   kernelspec:
-#     display_name: Substructure w/ ROOT 6.24.06, conda
+#     display_name: substructure_c_24_06
 #     language: python
-#     name: substructure_c_24_06
+#     name: python3
 # ---
 
 # %% [markdown]
