@@ -31,6 +31,7 @@ from mammoth import helpers as mammoth_helpers
 
 from jet_substructure.analysis import (
     model_calculations,
+    plot_paper,
     plot_unfolding,
     unfolding_analysis,
 )
@@ -871,7 +872,35 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
 # %% [markdown]
 # ### Pythia
 #
-# Already loaded in the "true_reference" variables
+# Already loaded in the "true_reference" variables. We just need to create the model objects to wrap them up
+
+# %% [markdown]
+# #### R = 0.2
+
+# %%
+pythia_predictions_R02 = model_calculations.ModelCalculation(
+    name="pythia8",
+    label_pp="PYTHIA8 Monash 2013",
+    label_AA="",
+    normalized=True,
+    grooming_methods=grooming_methods,
+    metadata={"jet_R": 0.2},
+    pp=pp_R02_true_reference,
+)
+
+# %% [markdown]
+# #### R = 0.4
+
+# %%
+pythia_predictions_R02 = model_calculations.ModelCalculation(
+    name="pythia8",
+    label_pp="PYTHIA8 Monash 2013",
+    label_AA="",
+    normalized=True,
+    grooming_methods=grooming_methods,
+    metadata={"jet_R": 0.4},
+    pp=pp_R04_true_reference,
+)
 
 # %% [markdown]
 # ### Jetscape
@@ -883,12 +912,12 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
 # Predictions from Yasuki provided for HP 2023 for R = 0.2
 
 # %%
-jetscape = model_calculations.Jetscape(
+jetscape_R02 = model_calculations.Jetscape(
     base_dir=Path("output/comparison/models/jetscape/2023-03-23-yasuki"),
     needs_normalization=False,
     metadata={"jet_R": 0.2},
 )
-jetscape_predictions = jetscape.load_predictions()
+jetscape_predictions_R02 = jetscape_R02.load_predictions()
 
 # %% [markdown]
 # #### R = 0.4, TBD
@@ -953,7 +982,7 @@ caucal_analytical_pp_R04_predictions
 #       And since we don't the data by the ratio, we can just use whatever binning,
 #       including the same for central and semi-central!
 bin_edges = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2.0, 3.0, 4., 5., 6., 7., 8.]
-hybrid_model_with_wake_with_moliere = model_calculations.HybridModel(
+hybrid_model_with_wake_with_moliere_R02 = model_calculations.HybridModel(
     base_dir=Path("/Users/REhlers/software/dev/substructure/output/comparison/models/hybrid/HP2023/ForRaymond/results_kt_raymond"),
     metadata={
         "include_elastic": True,
@@ -961,8 +990,8 @@ hybrid_model_with_wake_with_moliere = model_calculations.HybridModel(
         "bin_edges": bin_edges,
     },
 )
-hybrid_model_with_wake_with_moliere_predictions = hybrid_model_with_wake_with_moliere.load_predictions()
-hybrid_model_with_wake_without_moliere = model_calculations.HybridModel(
+hybrid_model_with_wake_with_moliere_predictions_R02 = hybrid_model_with_wake_with_moliere_R02.load_predictions()
+hybrid_model_with_wake_without_moliere_R02 = model_calculations.HybridModel(
     base_dir=Path("/Users/REhlers/software/dev/substructure/output/comparison/models/hybrid/HP2023/ForRaymond/results_kt_raymond"),
     metadata={
         "include_elastic": False,
@@ -970,10 +999,10 @@ hybrid_model_with_wake_without_moliere = model_calculations.HybridModel(
         "bin_edges": bin_edges,
     },
 )
-hybrid_model_with_wake_without_moliere_predictions = hybrid_model_with_wake_without_moliere.load_predictions()
+hybrid_model_with_wake_without_moliere_predictions_R02 = hybrid_model_with_wake_without_moliere_R02.load_predictions()
 
 # %%
-hybrid_model_with_wake_without_moliere_predictions.semi_central_ratio["soft_drop_z_cut_04"]
+hybrid_model_with_wake_without_moliere_predictions_R02.semi_central_ratio["soft_drop_z_cut_04"]
 
 # %% [markdown]
 # # Plots
