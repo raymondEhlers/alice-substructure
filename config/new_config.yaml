@@ -3255,11 +3255,17 @@ analysis_configurations:
     pp_R04:
         datasets:
             nominal:
-                pp: *LHC17pq_pp_R04
-                pythia: *LHC18b8_pythia_R04
+                pp: *LHC17pq_pp_R04_mammoth
+                pythia: *LHC18b8_pythia_R04_mammoth
             tracking_efficiency:
-                pp: *LHC17pq_pp_R04
-                pythia: *LHC18b8_pythia_R04_tracking_efficiency
+                pp: *LHC17pq_pp_R04_mammoth
+                pythia: *LHC18b8_pythia_R04_mammoth_tracking_efficiency_pt_dep
+            herwig_fastsim:
+                pp: *LHC17pq_pp_R04_mammoth
+                pythia: *LHC18b8_herwig_R04_mammoth_fastsim
+            pythia_fastsim:
+                pp: *LHC17pq_pp_R04_mammoth
+                pythia: *LHC18b8_pythia_R04_mammoth_fastsim
         unfolding:
             suffix: "pp_R04"
             nominal_binning:
@@ -3271,18 +3277,38 @@ analysis_configurations:
                         # Modified on 30 May 2021 to try to match the min kt in R = 0.2
                         #"true": [-0.05, 0., 0.5, 1, 2, 4, 6, 8, 15]
                         #"smeared": [0, 0.25, 0.5, 1., 1.5, 2.5, 4, 6, 8]
-                        "true": [0., 0.25, 0.5, 1, 2, 4, 6, 8, 15]
-                        "smeared": [0.25, 0.25, 0.5, 1., 1.5, 2.5, 4, 6, 8]
+                        # Tweaked from this in April 2023 to fully match R = 0.2 in overlapping range
+                        #"true": [0., 0.25, 0.5, 1, 2, 4, 6, 8, 15]
+                        #"smeared": [0.25, 0.25, 0.5, 1., 1.5, 2.5, 4, 6, 8]
+                        "true": [0., 0.25, 0.5, 1., 1.5, 2., 3., 4., 6., 8., 15.]
+                        "smeared": [0.25, 0.25, 0.5, 1., 1.5, 2., 3., 4., 6., 8.]
                 soft_drop_z_cut_02:
+                    kt: &_pp_R04_kt_binning_with_untagged_bin
+                        # Same as above, but we include the untagged bin because it's meaningful for SD z > 0.2
+                        # Tweaked from this in April 2023 to fully match R = 0.2 in overlapping range
+                        #"true": [-0.05, 0., 0.25, 0.5, 1, 2, 4, 6, 8, 15]
+                        #"smeared": [0, 0.25, 0.5, 1., 1.5, 2.5, 4, 6, 8]
+                        "true": [-0.05, 0., 0.25, 0.5, 1., 1.5, 2., 3., 4., 6., 8., 15.]
+                        "smeared": [0, 0.25, 0.5, 1., 1.5, 2., 3., 4., 6., 8.]
+                soft_drop_z_cut_04:
                     kt:
-                        "true": [-0.05, 0., 0.25, 0.5, 1, 2, 4, 6, 8, 15]
-                        "smeared": [0, 0.25, 0.5, 1., 1.5, 2.5, 4, 6, 8]
+                        <<: *_pp_R04_kt_binning_with_untagged_bin
+                dynamical_core_z_cut_02:
+                    kt:
+                        <<: *_pp_R04_kt_binning_with_untagged_bin
+                dynamical_kt_z_cut_02:
+                    kt:
+                        <<: *_pp_R04_kt_binning_with_untagged_bin
+                dynamical_time_z_cut_02:
+                    kt:
+                        <<: *_pp_R04_kt_binning_with_untagged_bin
             settings:
                 default:
                     label: ""
-                    # NOTE: Untagged bin above is included in the closures!
                     closures: true
                     closure_settings:
+                        # If using the data precision, the split MC fraction is applied, but then
+                        # the uncertainties on the smeared are matched to those seen in data.
                         use_data_stat_precision_for_smeared: true
                         split_MC_fraction_for_response: 0.75
                         max_untagged_bin: 10
@@ -3327,16 +3353,40 @@ analysis_configurations:
                     binning:
                         default:
                             kt:
-                                # In [2]: r = np.random.random_sample(6) / 10 + 0.95
+                                # TODO: Update!
+                                # In [1]: arr = np.array([0.5, 1., 1.5, 2., 3., 4., 6.], dtype=np.float64)
+                                # In [2]: r = np.random.random_sample(len(arr)) / 10 + 0.95
                                 # In [3]: r
-                                # Out[3]: array([0.99004269, 1.01579345, 1.00831217, 1.00027165, 1.00207932, 1.02404388])
-                                # In [4]: np.round(r * [0.5, 1., 1.5, 2.5, 4, 6,], 2)
-                                # Out[4]: array([0.5 , 1.02, 1.51, 2.5 , 4.01, 6.14])
-                                "smeared": [0.25, 0.25, 0.5, 1.02, 1.51, 2.5, 4.01, 6.14, 8]
+                                # Out[3]: array([0.9617071 , 1.0123858 , 0.98693627, 1.02692154, 1.03804192, 0.97035549, 1.01433081])
+                                # In [4]: np.round(r * arr, 2)
+                                # Out[4]: array([0.48, 1.01, 1.48, 2.05, 3.11, 3.88, 6.09])
+                                "smeared": [0.25, 0.25, 0.48, 1.01, 1.48, 2.05, 3.11, 3.88, 6.09, 8]
                         soft_drop_z_cut_02:
-                            kt:
+                            kt: &_pp_R04_kt_random_binning_with_untagged_bin
                                 # Same as above, but including the untagged bin.
-                                "smeared": [0, 0.25, 0.5, 1.02, 1.51, 2.5, 4.01, 6.14, 8]
+                                "smeared": [0, 0.25, 0.48, 1.01, 1.48, 2.05, 3.11, 3.88, 6.09, 8]
+                        soft_drop_z_cut_04:
+                            kt:
+                                <<: *_pp_R04_kt_random_binning_with_untagged_bin
+                        dynamical_core_z_cut_02:
+                            kt:
+                                <<: *_pp_R04_kt_random_binning_with_untagged_bin
+                        dynamical_kt_z_cut_02:
+                            kt:
+                                <<: *_pp_R04_kt_random_binning_with_untagged_bin
+                        dynamical_time_z_cut_02:
+                            kt:
+                                <<: *_pp_R04_kt_random_binning_with_untagged_bin
+                model_dependence_herwig:
+                    label: "model_dependence_herwig_fastsim"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "herwig_fastsim"
+                model_dependence_pythia:
+                    label: "model_dependence_pythia_fastsim"
+                    closures: false
+                    reweight_prior: false
+                    datasets: "pythia_fastsim"
 
     pp_R02:
         datasets:
