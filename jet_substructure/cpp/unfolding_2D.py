@@ -20,13 +20,11 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 import numpy as np
 import numpy.typing as npt
 import uproot
-from pachyderm import binned_data
-
 from mammoth.framework.analysis import jet_substructure as analysis_jet_substructure
+from pachyderm import binned_data
 
 from jet_substructure.base import helpers, skim_analysis_objects
 from jet_substructure.base import unfolding as unfolding_base
-
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +92,7 @@ def correlation_hist_substructure_var(cov: TMatrixD, name: str, title: str, na: 
     return h
 
 
-def correlation_hist_pt(cov: TMatrixD, name: str, title: str, na: int, nb: int, kbin: int) -> TH2D:
+def correlation_hist_pt(cov: TMatrixD, name: str, title: str, na: int, nb: int, kbin: int) -> TH2D:  # noqa: ARG001
     """Correlation histogram for the jet pt.
 
     Varies from the substructure variable by the indexing of the covariance matrix.
@@ -156,7 +154,7 @@ def unfolding_2D(
     logger.info("=======================================================")
     logger.info(f'Unfolding for tag "{tag}"')
     # Determine the tag. If we have a non-empty tag, we append it to all of the histograms.
-    if tag != "":
+    if tag:
         tag += "_"
     output_hists = {}
 
@@ -344,7 +342,7 @@ def _default_hists(settings: unfolding_base.Settings2D) -> Dict[str, TH2D]:
     )
 
     # Sumw2 for all hists, store for passing them...
-    for k, h in hists.items():
+    for _, h in hists.items():
         h.Sumw2()
 
     return hists
@@ -493,7 +491,8 @@ def _get_reweighted_ratio(
     except (TypeError, ReferenceError) as e:
         import pprint
 
-        raise RuntimeError(f"Ref error {e}. Variables: {pprint.pformat(local_vars)}") from e
+        _msg = f"Ref error {e}. Variables: {pprint.pformat(local_vars)}"
+        raise RuntimeError(_msg) from e
 
     # Cleanup
     f_response.Close()
@@ -509,9 +508,8 @@ def _get_reweighting_ratio(
 ) -> TH2D:
     # Validation
     if not reweight_data_dataset_name or not reweight_response_dataset_name:
-        raise ValueError(
-            f"Must pass data and response dataset names. Passed data: {reweight_data_dataset_name}, response: {reweight_response_dataset_name}"
-        )
+        _msg = f"Must pass data and response dataset names. Passed data: {reweight_data_dataset_name}, response: {reweight_response_dataset_name}"
+        raise ValueError(_msg)
 
     h_reweighting_ratio = _get_reweighted_ratio(
         data_dataset_name=reweight_data_dataset_name,
@@ -606,7 +604,7 @@ def _create_branch_rename_shim(
         input_branches=input_branches,
     )
 
-    return branch_renames
+    return branch_renames  # noqa: RET504
 
 
 def _setup_root_logging(debug_cpp_code: bool = False) -> Tuple[Any, Any]:
@@ -622,7 +620,7 @@ def _setup_root_logging(debug_cpp_code: bool = False) -> Tuple[Any, Any]:
 
     if debug_cpp_code:
         return ROOT.std.cout, ROOT.std.cerr
-    else:
+    else:  # noqa: RET505
         return ROOT.std.ostringstream(), ROOT.std.ostringstream()
 
 
@@ -803,7 +801,7 @@ def run_unfolding(
     return True
 
 
-def run_unfolding_closure_reweighting(
+def run_unfolding_closure_reweighting(  # noqa: C901
     settings: unfolding_base.Settings2D,
     response_filenames: Sequence[Path],
     response_tree_name: str,
@@ -1013,8 +1011,8 @@ def run_unfolding_tree(
     substructure_variable_name: str,
     smeared_substructure_variable_bins: npt.NDArray[np.float64],
     smeared_jet_pt_bins: npt.NDArray[np.float64],
-    true_substructure_variable_bins: npt.NDArray[np.float64],
-    true_jet_pt_bins: npt.NDArray[np.float64],
+    true_substructure_variable_bins: npt.NDArray[np.float64],  # noqa: ARG001
+    true_jet_pt_bins: npt.NDArray[np.float64],  # noqa: ARG001
     # data_filenames: Sequence[Path],
     # embedded_filenames: Sequence[Path],
     # output_filename: Path,
@@ -1131,8 +1129,8 @@ def run_unfolding_rdf(
     substructure_variable_name: str,
     smeared_substructure_variable_bins: npt.NDArray[np.float64],
     smeared_jet_pt_bins: npt.NDArray[np.float64],
-    true_substructure_variable_bins: npt.NDArray[np.float64],
-    true_jet_pt_bins: npt.NDArray[np.float64],
+    true_substructure_variable_bins: npt.NDArray[np.float64],  # noqa: ARG001
+    true_jet_pt_bins: npt.NDArray[np.float64],  # noqa: ARG001
     # data_filenames: Sequence[Path],
     # embedded_filenames: Sequence[Path],
     # output_filename: Path,
@@ -1269,7 +1267,7 @@ def run_unfolding_rdf(
     }}
     std::vector<std::string> colName = {{ "{jet_pt_column_format.format(prefix='hybrid')}" }};
     """
-    print(r)
+    logger.info(r)
     ROOT.gInterpreter.Declare(r)
 
     logger.info(ROOT.RooUnfold.kCovariance)
@@ -1286,7 +1284,7 @@ def run_unfolding_rdf(
     )
     substructure_variable_value_filter = f"({data_substructure_variable_name} >= {min_smeared_substructure_variable} && {data_substructure_variable_name} <= {max_smeared_substructure_variable}) || ({data_substructure_variable_name} < 0)"
     df_data = df_data.Filter(f"({smeared_jet_pt_filter}) && ({substructure_variable_value_filter})")
-    print(data_substructure_variable_name)
+    logger.info(data_substructure_variable_name)
     df_data = df_data.Define(
         "data_substructure_variable",
         f"getSubstructureVariable({data_substructure_variable_name})",
@@ -1440,7 +1438,7 @@ if __name__ == "__main__":
         # NOTE: TChain can only handle one "*" in the filename.
         data_filenames=[Path(f"trains/pp/{train_number}/skim/*.root") for train_number in range(1998, 2000)],
         response_filenames=[
-            Path(f"trains/pythia/{train_number}/skim/*.root") for train_number in list(range(2461, 2462)) + []
+            Path(f"trains/pythia/{train_number}/skim/*.root") for train_number in [*list(range(2461, 2462))]
         ],
         data_tree_name="tree",
         response_tree_name="tree",

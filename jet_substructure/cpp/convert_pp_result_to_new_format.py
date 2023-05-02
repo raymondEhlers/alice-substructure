@@ -8,7 +8,7 @@ so it's worth the effort.
 
 from pathlib import Path
 
-from jet_substructure.analysis import plot_unfolding
+from jet_substructure.analysis import unfolding_analysis
 from jet_substructure.base import helpers
 
 
@@ -16,7 +16,7 @@ def get_n_iter(hist_name: str) -> int:
     return int("".join(filter(str.isdigit, hist_name)))
 
 
-def convert_file(input_path: Path, tag: str, unfolding_output: plot_unfolding.UnfoldingOutput) -> bool:
+def convert_file(input_path: Path, tag: str, unfolding_output: unfolding_analysis.UnfoldingOutput) -> bool:
     # Delay import to avoid explicit dependence.
     import ROOT
 
@@ -61,7 +61,7 @@ def convert_file(input_path: Path, tag: str, unfolding_output: plot_unfolding.Un
     # unfolded_example_hist = binned_data.BinnedData.from_existing_data(f.Get("Bayesian_Unfoldediter2.root"))
 
     # f_out = ROOT.TFile.Open(str(unfolding_output./ f"{unfolding_output.identifier}.root"), "RECREATE")
-    print(f"Writing to {unfolding_output.input_filename}")
+    print(f"Writing to {unfolding_output.input_filename}")  # noqa: T201
     unfolding_output.input_filename.parent.mkdir(parents=True, exist_ok=True)
     f_out = ROOT.TFile.Open(str(unfolding_output.input_filename), "RECREATE")
 
@@ -97,7 +97,7 @@ def convert(grooming_method: str) -> None:
     #       projections which were stored.
 
     # Standard
-    unfolding_output = plot_unfolding.UnfoldingOutput(
+    unfolding_output = unfolding_analysis.UnfoldingOutput(
         grooming_method=grooming_method,
         substructure_variable="kt",
         smeared_var_range=helpers.KtRange(0.25, 8),
@@ -107,12 +107,12 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},  # type: ignore
+        hists={"ignore": "this"},  # type: ignore[dict-item]
     )
     convert_file(input_path=input_path, tag="", unfolding_output=unfolding_output)
 
     # Tracking efficiency
-    unfolding_output = plot_unfolding.UnfoldingOutput(
+    unfolding_output = unfolding_analysis.UnfoldingOutput(
         grooming_method=grooming_method,
         substructure_variable="kt",
         smeared_var_range=helpers.KtRange(0.25, 8),
@@ -122,12 +122,12 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04_tracking_efficiency",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},  # type: ignore
+        hists={"ignore": "this"},  # type: ignore[dict-item]
     )
     convert_file(input_path=input_path, tag="Eff", unfolding_output=unfolding_output)
 
     # Truncation
-    unfolding_output = plot_unfolding.UnfoldingOutput(
+    unfolding_output = unfolding_analysis.UnfoldingOutput(
         grooming_method=grooming_method,
         substructure_variable="kt",
         smeared_var_range=helpers.KtRange(0.25, 8),
@@ -137,10 +137,10 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04_truncation",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},  # type: ignore
+        hists={"ignore": "this"},  # type: ignore[dict-item]
     )
     convert_file(input_path=input_path, tag="TruncLow", unfolding_output=unfolding_output)
-    unfolding_output = plot_unfolding.UnfoldingOutput(
+    unfolding_output = unfolding_analysis.UnfoldingOutput(
         grooming_method=grooming_method,
         substructure_variable="kt",
         smeared_var_range=helpers.KtRange(0.25, 8),
@@ -150,12 +150,12 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04_truncation",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},  # type: ignore
+        hists={"ignore": "this"},  # type: ignore[dict-item]
     )
     convert_file(input_path=input_path, tag="TruncHigh", unfolding_output=unfolding_output)
 
     # Random binning
-    unfolding_output = plot_unfolding.UnfoldingOutput(
+    unfolding_output = unfolding_analysis.UnfoldingOutput(
         grooming_method=grooming_method,
         substructure_variable="kt",
         smeared_var_range=helpers.KtRange(0.25, 8),
@@ -165,12 +165,12 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04_random_binning",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},  # type: ignore
+        hists={"ignore": "this"},  # type: ignore[dict-item]
     )
     convert_file(input_path=input_path, tag="Bin", unfolding_output=unfolding_output)
 
     # Untagged bin
-    unfolding_output = plot_unfolding.UnfoldingOutput(
+    unfolding_output = unfolding_analysis.UnfoldingOutput(
         grooming_method=grooming_method,
         substructure_variable="kt",
         smeared_var_range=helpers.KtRange(0.25, 8),
@@ -180,12 +180,12 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},  # type: ignore
+        hists={"ignore": "this"},  # type: ignore[dict-item]
     )
     convert_file(input_path=input_path, tag="Displaced", unfolding_output=unfolding_output)
 
     # Reweight prior
-    unfolding_output = plot_unfolding.UnfoldingOutput(
+    unfolding_output = unfolding_analysis.UnfoldingOutput(
         grooming_method=grooming_method,
         substructure_variable="kt",
         smeared_var_range=helpers.KtRange(0.25, 8),
@@ -195,7 +195,7 @@ def convert(grooming_method: str) -> None:
         base_dir=output_dir,
         suffix="pp_R04_reweight_prior",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},  # type: ignore
+        hists={"ignore": "this"},  # type: ignore[dict-item]
     )
     convert_file(input_path=input_path, tag="Prior", unfolding_output=unfolding_output)
 

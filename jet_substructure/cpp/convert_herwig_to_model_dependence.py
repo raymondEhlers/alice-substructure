@@ -5,19 +5,19 @@ so it's worth the effort.
 
 Note:
     In this case, we only have the unfolded outputs. This means that we're
-    be creating an imcomplete unfolding output object. But it's the best we can do.
+    be creating an incomplete unfolding output object. But it's the best we can do.
 
 .. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
 from pathlib import Path
 
-from jet_substructure.analysis import plot_unfolding
+from jet_substructure.analysis import unfolding_analysis
 from jet_substructure.base import helpers
 
 
 def convert_file(
-    input_path: Path, jet_R: str, grooming_method: str, n_iter: int, unfolding_output: plot_unfolding.UnfoldingOutput
+    input_path: Path, jet_R: str, grooming_method: str, n_iter: int, unfolding_output: unfolding_analysis.UnfoldingOutput
 ) -> bool:
     # Delay import to avoid explicit dependence.
     import ROOT
@@ -36,14 +36,14 @@ def convert_file(
         str(input_path / input_filename),
         "READ",
     )
-    input_hist_names = [k.GetName() for k in f.GetListOfKeys()]
+    # input_hist_names = [k.GetName() for k in f.GetListOfKeys()]
 
     # Create an output object for convenience to retrieve the identifier.
     # smeared_example_hist = binned_data.BinnedData.from_existing_data(f.Get("Bayesian_Foldediter2.root"))
     # unfolded_example_hist = binned_data.BinnedData.from_existing_data(f.Get("Bayesian_Unfoldediter2.root"))
 
     # f_out = ROOT.TFile.Open(str(unfolding_output./ f"{unfolding_output.identifier}.root"), "RECREATE")
-    print(f"Writing to {unfolding_output.input_filename}")
+    print(f"Writing to {unfolding_output.input_filename}")  # noqa: T201
     unfolding_output.input_filename.parent.mkdir(parents=True, exist_ok=True)
     f_out = ROOT.TFile.Open(str(unfolding_output.input_filename), "RECREATE")
 
@@ -86,7 +86,7 @@ def convert(grooming_method: str) -> None:
     # Model dependence
     # R = 0.2
     smeared_untagged_var = helpers.KtRange(0, 0.25) if "soft_drop" in grooming_method else helpers.KtRange(0.25, 0.25)
-    unfolding_output = plot_unfolding.UnfoldingOutput(
+    unfolding_output = unfolding_analysis.UnfoldingOutput(
         grooming_method=grooming_method,
         substructure_variable="kt",
         smeared_var_range=helpers.KtRange(0.25, 6),
@@ -97,7 +97,7 @@ def convert(grooming_method: str) -> None:
         suffix="pp_R02",
         label="model_dependence",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},  # type: ignore
+        hists={"ignore": "this"},  # type: ignore[dict-item]
     )
     convert_file(
         input_path=input_path, jet_R="R02", grooming_method=grooming_method, n_iter=3, unfolding_output=unfolding_output
@@ -106,7 +106,7 @@ def convert(grooming_method: str) -> None:
     # R = 0.4
     # Previously, 8-9
     smeared_untagged_var = helpers.KtRange(0, 0.25) if "soft_drop" in grooming_method else helpers.KtRange(0.25, 0.25)
-    unfolding_output = plot_unfolding.UnfoldingOutput(
+    unfolding_output = unfolding_analysis.UnfoldingOutput(
         grooming_method=grooming_method,
         substructure_variable="kt",
         smeared_var_range=helpers.KtRange(0.25, 8),
@@ -117,7 +117,7 @@ def convert(grooming_method: str) -> None:
         suffix="pp_R04",
         label="model_dependence",
         # Pass empty hists so that it doesn't try to load the hists that don't yet exist...
-        hists={"ignore": "this"},  # type: ignore
+        hists={"ignore": "this"},  # type: ignore[dict-item]
     )
     convert_file(
         input_path=input_path, jet_R="R04", grooming_method=grooming_method, n_iter=5, unfolding_output=unfolding_output
