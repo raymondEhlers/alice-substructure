@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Mapping, Optional, Sequence
+from typing import Mapping, Sequence
 
 import boost_histogram as bh
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
@@ -20,17 +20,16 @@ import jet_substructure.analysis.plot_style as pb
 from jet_substructure.analysis import plot_from_skim
 from jet_substructure.base import helpers
 
-
 logger = logging.getLogger(__name__)
 
 pachyderm.plot.configure()
 # Enable ticks on all sides
 # Unfortunately, some of this is overriding the pachyderm plotting style.
 # That will have to be updated eventually...
-matplotlib.rcParams["xtick.top"] = True
-matplotlib.rcParams["xtick.minor.top"] = True
-matplotlib.rcParams["ytick.right"] = True
-matplotlib.rcParams["ytick.minor.right"] = True
+mpl.rcParams["xtick.top"] = True
+mpl.rcParams["xtick.minor.top"] = True
+mpl.rcParams["ytick.right"] = True
+mpl.rcParams["ytick.minor.right"] = True
 
 
 def plot_compare_grooming_methods_for_attribute(
@@ -43,9 +42,9 @@ def plot_compare_grooming_methods_for_attribute(
     set_zero_to_nan: bool,
     plot_config: pb.PlotConfig,
     output_dir: Path,
-    fig: Optional[matplotlib.figure.Figure] = None,
-    ax: Optional[matplotlib.axes.Axes] = None,
-    plot_png: Optional[bool] = False,
+    fig: mpl.figure.Figure | None = None,
+    ax: mpl.axes.Axes | None = None,
+    plot_png: bool | None = False,
 ) -> str:
     """Plot comparison between grooming methods for a given substructure variable (attribute) and given prefix.
 
@@ -70,7 +69,7 @@ def plot_compare_grooming_methods_for_attribute(
         bh_hist = hists[f"{grooming_method}_{prefix}_{attr_name}_{tag}"]
         # Need to project to just the attr of interest.
         h = binned_data.BinnedData.from_existing_data(
-            bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :]  # noqa: E203
+            bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :]
         )
 
         # Normalize

@@ -14,7 +14,6 @@ from pachyderm import binned_data
 from jet_substructure.analysis import data_frame
 from jet_substructure.base import helpers, skim_analysis_objects
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -27,12 +26,12 @@ def hists_from_file(
     # for grooming_method in grooming_methods:
     f = uproot3.open(filename)
     temp_hists = {
-        k.decode("utf-8"): binned_data.BinnedData.from_existing_data(f[k]).to_boost_histogram() for k in f.keys()
+        k.decode("utf-8"): binned_data.BinnedData.from_existing_data(f[k]).to_boost_histogram() for k in f.keys()  # noqa: SIM118
     }
     hists = {}
     # Remove the cycle, which we don't care about.
-    for k, v in temp_hists.items():
-        k = k[: k.find(";")]
+    for _k, v in temp_hists.items():
+        k = _k[: _k.find(";")]
         hists[k] = v
 
     return hists
@@ -76,7 +75,7 @@ def plot_PbPb_embedded_comparison() -> None:
 
     user_ns = locals()
     user_ns.update({"output_dir_f": data_frame.output_dir_f, "Path": Path})
-    IPython.start_ipython(user_ns=user_ns)
+    IPython.start_ipython(user_ns=user_ns)  # type: ignore[no-untyped-call]
 
 
 if __name__ == "__main__":

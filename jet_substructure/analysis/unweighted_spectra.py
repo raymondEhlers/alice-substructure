@@ -15,13 +15,12 @@ from pachyderm import binned_data
 from jet_substructure.analysis import analyze_tree
 from jet_substructure.base import analysis_objects, helpers
 
-
 pachyderm.plot.configure()
 
 
 def rebin(h: binned_data.BinnedData, rebin_factor: int) -> binned_data.BinnedData:
     bh_hist = h.to_boost_histogram()
-    bh_hist = bh_hist[:: bh.rebin(rebin_factor)]
+    bh_hist = bh_hist[:: bh.rebin(rebin_factor)]  # type: ignore[misc]
     h_return = binned_data.BinnedData.from_existing_data(bh_hist)
     h_return /= rebin_factor
     return h_return
@@ -37,9 +36,9 @@ def get_hists_for_train_number(
 
         # If the output file already exist, skip processing the tree and just return the hists instead (which is way faster!)
         if pkl_filename.exists():
-            print(f"Loading pkl file {pkl_filename}")
+            print(f"Loading pkl file {pkl_filename}")  # noqa: T201
             with gzip.GzipFile(pkl_filename, "r") as pkl_file:
-                result = analysis_objects.SingleTreeEmbeddingResult(**pickle.load(pkl_file))  # type: ignore
+                result = analysis_objects.SingleTreeEmbeddingResult(**pickle.load(pkl_file))
 
         yield result
 
@@ -54,7 +53,7 @@ def get_hists(
     ]
 ]:
     for train_number in range(5517, 5537):
-        print(f"Processing train number {train_number}")
+        print(f"Processing train number {train_number}")  # noqa: T201
         # Merge all hists from a given train together.
         result = functools.reduce(analyze_tree.merge_results, get_hists_for_train_number(dataset, train_number))
 
@@ -86,7 +85,7 @@ def scaling_per_pt_hard_bin() -> None:
         # Need to be inside of the with statement to have the color settings applied
         fig_true, ax_true = plt.subplots(figsize=(8, 6))
         fig_hybrid, ax_hybrid = plt.subplots(figsize=(8, 6))
-        for pt_hard_bin, (train_number, true_hists, hybrid_hists) in enumerate(get_hists(dataset, identifier), start=1):
+        for pt_hard_bin, (train_number, true_hists, hybrid_hists) in enumerate(get_hists(dataset, identifier), start=1):  # noqa: B007
             # results_true.append(true_hists)
             # results_hybrid.append(hybrid_hists)
             # pt_hard_bin = dataset.settings.train_number_to_pt_hard_bin[int(train_number)]
@@ -125,7 +124,7 @@ def scaling_per_pt_hard_bin() -> None:
 
     # Plot merged true
     with gzip.GzipFile(Path("output/embedPythia/LHC19f4_embedded_into_LHC18qr/embedding_hists.pgz"), "r") as pkl_file:
-        merged_result = pickle.load(pkl_file)  # type: ignore
+        merged_result = pickle.load(pkl_file)
     merged_true_hists = merged_result.true_hists[identifier]
     merged_true_jet_pt = merged_true_hists.leading_kt.jet_pt
     # Rebin
