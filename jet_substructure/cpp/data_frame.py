@@ -8,20 +8,19 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Mapping, Sequence
 
 import attr
 import numpy as np
 import numpy.typing as npt
 import uproot
-from pachyderm import binned_data
 from mammoth import helpers as mammoth_helpers
 from mammoth.framework import utils
 from mammoth.framework.analysis import jet_substructure as jet_substructure_analysis
+from pachyderm import binned_data
 
 from jet_substructure.base import helpers, skim_analysis_objects
 from jet_substructure.base import unfolding as unfolding_base
-
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +49,9 @@ def new_matching_hists(
     kt_axis: npt.NDArray[np.float64],
     jet_pt_axis: npt.NDArray[np.float64],
     kt_selection_axis: npt.NDArray[np.float64],
-    matching_jet_pt_prefix: Optional[str] = None,
+    matching_jet_pt_prefix: str | None = None,
     create_generator_subjet_in_measured_jet_hists: bool = False,
-) -> List[RootHist]:
+) -> list[RootHist]:
     if matching_jet_pt_prefix is None:
         matching_jet_pt_prefix = matching_index.generator_like_prefix
 
@@ -134,10 +133,10 @@ def matching_hists(  # noqa: C901
     measured_like_prefix: str,
     generator_like_prefix: str,
     jet_pt_column_format: str,
-    matching_jet_pt_prefix: Optional[str] = None,
-    matching_jet_pt_axis: Optional[Tuple[int, float, float]] = None,
+    matching_jet_pt_prefix: str | None = None,
+    matching_jet_pt_axis: tuple[int, float, float] | None = None,
     create_generator_subjet_in_measured_jet_hists: bool = False,
-) -> List[RootHist]:
+) -> list[RootHist]:
     # Validation
     if matching_jet_pt_axis is None:
         matching_jet_pt_axis = (150, 0, 150)
@@ -147,7 +146,7 @@ def matching_hists(  # noqa: C901
     # Setup
     hists = []
     matching_level = f"{measured_like_prefix}_{generator_like_prefix}"
-    matching_map: Dict[str, str] = {
+    matching_map: dict[str, str] = {
         "all": "",
         "pure": f"{grooming_method}_{matching_level}_matching_leading == 1"
         f" && {grooming_method}_{matching_level}_matching_subleading == 1",
@@ -175,10 +174,7 @@ def matching_hists(  # noqa: C901
 
     for matching_type, selection in matching_map.items():
         # Empty string will break the filter, so we need to only apply it if there is a valid selection.
-        if selection:
-            df_selection = df.Filter(selection)
-        else:
-            df_selection = df
+        df_selection = df.Filter(selection) if selection else df
 
         # Matching
         name = f"{grooming_method}_{matching_level}_matching_{matching_type}"
@@ -282,14 +278,14 @@ def matching_hists(  # noqa: C901
 def _substructure_hists(
     df: RDF,
     jet_pt_column_format: str,
-    jet_pt_axis: Tuple[int, float, float],
+    jet_pt_axis: tuple[int, float, float],
     jet_R: float,
     prefix: str,
     grooming_method: str,
     tag: str,
-    jet_pt_prefix: Optional[str] = None,
-    include_stats_hist: Optional[bool] = False,
-) -> List[RootHist]:
+    jet_pt_prefix: str | None = None,
+    include_stats_hist: bool | None = False,
+) -> list[RootHist]:
     # Validation
     if jet_pt_prefix is None:
         jet_pt_prefix = prefix
@@ -468,7 +464,7 @@ def _apply_double_counting_cut_to_data_frame(
     dc_cuts = []
     if dcc_settings.det_level_leading_track_pt_cut:
         dc_cuts.append(
-            f"det_level_leading_track_pt >= hybrid_leading_track_pt"
+            "det_level_leading_track_pt >= hybrid_leading_track_pt"
         )
     if dcc_settings.min_true_pt:
         dc_cuts.append(
@@ -490,20 +486,20 @@ def _apply_double_counting_cut_to_data_frame(
     return df.Filter(double_counting_cut)
 
 
-def run_embedded_pt_hard_scaling(  # noqa: C901
+def run_embedded_pt_hard_scaling(
     collision_system: str,
     input_filenames: Sequence[Path],
     tree_name: str,
     prefixes: Sequence[str],
     grooming_method: str,
-    jet_R: float,
+    jet_R: float,  # noqa: ARG001
     main_jet_pt_range: helpers.JetPtRange,
     output_filename: Path,
     jet_pt_prefix_first: bool = False,
     n_cores: int = 8,
     cross_check_task: bool = False,
     double_counting_cut_name: str | None = None,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
 
     # Setup
@@ -630,8 +626,8 @@ def run_create_closure_ratio(  # noqa: C901
     tree_name: str,
     prefixes: Sequence[str],
     grooming_method: str,
-    jet_R: float,  # Intentionally ignored, but kept for uniform interface.
-    main_jet_pt_range: helpers.JetPtRange,  # Intentionally ignored, but kept for uniform interface.
+    jet_R: float,  # Intentionally ignored, but kept for uniform interface.  # noqa: ARG001
+    main_jet_pt_range: helpers.JetPtRange,  # Intentionally ignored, but kept for uniform interface.  # noqa: ARG001
     output_filename: Path,
     # NOTE: This unfolding config and settings arguments are the only arguments which varies from
     #       the other run functions.
@@ -643,7 +639,7 @@ def run_create_closure_ratio(  # noqa: C901
     cross_check_task: bool = False,
     double_counting_cut_name: str | None = None,
     additional_substructure_variable_cut: unfolding_base.AdditionalVariableCut | None = None,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """Create the histogram necessary to create the closure ratio.
 
     This histogram is binned in the (smeared substructure variable, smeared jet pt) and by creating the ratio, we
@@ -830,7 +826,7 @@ def run_response(  # noqa: C901
     n_cores: int = 8,
     cross_check_task: bool = False,
     double_counting_cut_name: str | None = None,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
 
     # Delay ROOT import so we don't explicitly rely on it.
@@ -982,7 +978,7 @@ def run_response(  # noqa: C901
         require_splittings_filter = f"({grooming_method}_{measured_like_prefix}_n_passed_grooming > 0) && ({grooming_method}_{generator_like_prefix}_n_passed_grooming > 0)"
         df_require_splittings = df_original.Filter(require_splittings_filter)
 
-        matching_map: Dict[str, str] = {
+        matching_map: dict[str, str] = {
             "all": "",
             "pure": f"({grooming_method}_{measured_like_prefix}_{generator_like_prefix}_matching_leading == 1)"
             f" && ({grooming_method}_{measured_like_prefix}_{generator_like_prefix}_matching_subleading == 1)",
@@ -1188,7 +1184,7 @@ def run(  # noqa: C901
     n_cores: int = 8,
     cross_check_task: bool = False,
     double_counting_cut_name: str | None = None,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     # Delay ROOT import so we don't explicitly rely on it.
     import ROOT
 
@@ -1259,7 +1255,7 @@ def run(  # noqa: C901
 
     hists = []
     jet_pt_axis = (28, 0, 140)
-    _measured_min_kt_values: List[float] = [-1, 2, 3, 5]
+    _measured_min_kt_values: list[float] = [-1, 2, 3, 5]
     if jet_R == 0.2:
         _measured_min_kt_values = [-1, 0.5, 1, 1.5, 2]
 
@@ -1349,7 +1345,7 @@ def run_standalone(
     n_cores: int = 8,
     cross_check_task: bool = False,
     double_counting_cut_name: str | None = None,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     # Determine the filenames based on the train numbers and predefined path here.
     #base_path = Path("trains/") / collision_system / "{train_number}/skim/AnalysisResults.*.root"
     base_path = Path("trains/") / collision_system / "00{train_number}/skim/*.root"
