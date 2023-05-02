@@ -12,7 +12,6 @@ from typing import Any, Dict, Optional, Sequence
 import uproot
 from pachyderm import binned_data
 
-
 logger = logging.getLogger(__name__)
 
 # These are very useful
@@ -90,7 +89,8 @@ def _image_to_base64(filename: Path) -> str:
     Returns:
         Base64 encoded string (decoded as utf-8, so we can treat it as a normal str).
     """
-    return base64.b64encode(open(filename, "rb").read()).decode("utf-8")
+    with filename.open("rb") as f:
+        return base64.b64encode(f.read()).decode("utf-8")
 
 
 def display_images(
@@ -140,7 +140,7 @@ def display_images(
     for row in rows:
         # For convenience, handle single strings. We convert it to a length one list.
         if isinstance(row, str):
-            row = [row]
+            row = [row]  # noqa: PLW2901
 
         # Display images with equal width.
         # Need to express width as percentage for CSS.
@@ -198,7 +198,7 @@ def display_images(
     if render_display:
         from IPython.display import HTML, display
 
-        display(HTML(full_html))
+        display(HTML(full_html))  # type: ignore[no-untyped-call]
     else:
         return full_html
 
@@ -227,15 +227,20 @@ def display_images_ipywidgets(rows: Sequence[Sequence[str]], fig_output_dir: Pat
     for row in rows:
         # For convenience, handle single strings
         if isinstance(row, str):
-            row = [row]
+            row = [row]  # noqa: PLW2901
 
-        _images = [Image(value=open(fig_output_dir / f"{filename}.png", "rb").read(), format="png") for filename in row]
+        _images = []
+        for filename in row:
+            with (fig_output_dir / f"{filename}.png").open("rb") as f:
+                _images.append(
+                    Image(value=f.read(), format="png")
+                )
         layout.append(HBox(_images))
 
     ret_value = VBox(layout)
     if render_display:
         from IPython.display import display
 
-        display(ret_value)
+        display(ret_value)  # type: ignore[no-untyped-call]
 
     return ret_value

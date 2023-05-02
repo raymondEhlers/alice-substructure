@@ -17,7 +17,6 @@ from pachyderm import yaml
 
 from jet_substructure.base import helpers
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -43,7 +42,8 @@ def year_from_dataset(dataset: str) -> int:
         Year of the given dataset.
     """
     if not dataset.startswith("LHC"):
-        raise ValueError(f"Invalid dataset name: {dataset}")
+        _msg = f"Invalid dataset name: {dataset}"
+        raise ValueError(_msg)
     return int(dataset[3:5]) + 2000
 
 
@@ -55,8 +55,7 @@ def add_files_from_xml_file(
     logger.info(f"Downloading {alien_xml_file.name} file: {alien_xml_file} to file://{local_xml_file}")
     subprocess.run(
         ["alien_cp", str(alien_xml_file), f"file://{str(local_xml_file)}"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
     )
 
     # Open local XML file
@@ -69,10 +68,7 @@ def add_files_from_xml_file(
             lfn = node[0].attrib["lfn"]
             alien_file = lfn.replace("root_archive.zip", "AnalysisResults.root")
             i = int(node.attrib["name"])
-            if additional_label:
-                label = f"{additional_label}.{i:03}"
-            else:
-                label = f"{i:03}"
+            label = f"{additional_label}.{i:03}" if additional_label else f"{i:03}"
             local_file = local_train_dir / f"AnalysisResults.{child_label}.{label}.root"
             # print(f"Adding alien://{alien_file} : {local_file}")
             output[str(alien_file)] = str(local_file)
@@ -96,7 +92,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
         logger.info(f"Processing train {train_number}")
         local_train_dir = Path(str(train_number))
         config_filename = local_train_dir / "config.yaml"
-        with open(config_filename, "r") as f:
+        with config_filename.open() as f:
             config = y.load(f)
 
         # Sanity check
@@ -117,9 +113,9 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
             continue
 
         alien_output_info = config["alien_output_info"]
-        for child_name, child_info in alien_output_info.items():
+        for _child_name, child_info in alien_output_info.items():
             # Validation
-            child_name = child_name.lower()
+            child_name = _child_name.lower()
 
             # _ is equivalent to "pass"
             if child_name != "_":
@@ -149,9 +145,8 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
             stage_to_download = child_info["stage_to_download"]
             # Validation
             if stage_to_download not in _possible_merging_stages:
-                raise ValueError(
-                    f"Invalid last successful merging stage. Provided: {stage_to_download}. Possible values: {_possible_merging_stages}"
-                )
+                _msg = f"Invalid last successful merging stage. Provided: {stage_to_download}. Possible values: {_possible_merging_stages}"
+                raise ValueError(_msg)
             # Child label (such as LHC18q)
             child_label = child_info.get("name", child_name)
             # Validation
@@ -168,9 +163,8 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                 for run_number, manual_stage_to_download in manual_config.items():
                     # Validation
                     if manual_stage_to_download not in _possible_merging_stages:
-                        raise ValueError(
-                            f"Invalid last successful merging stage. Provided: {manual_stage_to_download}. Possible values: {_possible_merging_stages}"
-                        )
+                        _msg = f"Invalid last successful merging stage. Provided: {manual_stage_to_download}. Possible values: {_possible_merging_stages}"
+                        raise ValueError(_msg)
                     # NOTE: This is LHC18{q,r} specific
                     # Example: /alice/data/2018/LHC18r/000296934/pass1/PWGJE/Jets_EMC_PbPb/5902_20200515-1910_child_1
                     # We default to pass1 because we didn't specify this in the past.
@@ -229,17 +223,13 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                             alien_file = d / "AnalysisResults.root"
                             # Local filename
                             i = int(d.name)
-                            if _additional_label:
-                                label = f"{_additional_label}.{i:03}"
-                            else:
-                                label = f"{i:03}"
+                            label = f"{_additional_label}.{i:03}" if _additional_label else f"{i:03}"
                             local_file = local_train_dir / f"AnalysisResults.{child_label}.{label}.root"
                             logger.debug(f"Adding alien://{alien_file} : {local_file}")
                             output[str(alien_file)] = str(local_file)
                     else:
-                        raise ValueError(
-                            f"Invalid manual stage to download {manual_stage_to_download} for run number {run_number}"
-                        )
+                        _msg = f"Invalid manual stage to download {manual_stage_to_download} for run number {run_number}"
+                        raise ValueError(_msg)
 
             elif stage_to_download == "run_by_run":
                 # Setup
@@ -253,7 +243,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                 if _pass_value is None:
                     _pass_value = str(config.get("pass", ""))
                     # Add "pass" to the front of the name. Only if it's a general dataset pass
-                    if _pass_value != "":
+                    if _pass_value != "":  # noqa: PLC1901
                         _pass_value = f"pass{str(_pass_value)}"
                 if _pass_value is None:
                     _pass_value = ""
@@ -275,10 +265,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                 base_dataset_path = Path(f"/alice/{data_or_sim_str}/{year_from_dataset(dataset_name)}/") / dataset_name
                 # Add pt hard bins if requested
                 n_pt_hard_bins = config.get("n_pt_hard_bins", None)
-                if n_pt_hard_bins:
-                    pt_hard_bin_generator = range(1, n_pt_hard_bins + 1)
-                else:
-                    pt_hard_bin_generator = range(0, 1)
+                pt_hard_bin_generator = range(1, n_pt_hard_bins + 1) if n_pt_hard_bins else range(0, 1)
 
                 for possible_pt_hard_bin in pt_hard_bin_generator:
                     dataset_path = base_dataset_path
@@ -320,7 +307,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                                 # Skip this check for the sake of efficiency. It seems quite rare for the directory to be created,
                                 # but not to contain AnalysisResults.root . Perhaps it practically never happens.
                                 if False:
-                                    _dir_contents = alice_utils.list_alien_dir(_directory_with_data_full_path)
+                                    _dir_contents = alice_utils.list_alien_dir(_directory_with_data_full_path)  # type: ignore[unreachable]
                                     if "AnalysisResults.root" not in _dir_contents:
                                         logger.debug(
                                             f"Run number: {run_number}, directory {_directory_with_data} doesn't contain an AnalysisResults.root. Skipping..."
@@ -389,7 +376,7 @@ def download(trains: Sequence[int]) -> None:  # noqa: C901
                 #        pass
 
     # Write out the files
-    with open("files_to_download.yaml", "w") as f:
+    with Path("files_to_download.yaml").open("w") as f:
         y.dump(output, f)
 
 
@@ -412,7 +399,7 @@ def entry_point() -> None:
 
     # Determine what to download
     trains = []
-    if not args.maxTrain:
+    if not args.maxTrain:  # noqa: SIM108
         trains = [args.train]
     else:
         # NOTE: We add +1 so that we're inclusive on this upper limit. I think this will be more intuitive.

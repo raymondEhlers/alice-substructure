@@ -7,13 +7,13 @@
 
 import logging
 import queue
+from pathlib import Path
 from typing import List
 
 from pachyderm import yaml
 from pachyderm.alice import download
 
 from jet_substructure.base import helpers
-
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ def create_file_pairs() -> List[download.FilePair]:
     alien_file: local_file
     """
     y = yaml.yaml()
-    with open("files_to_download.yaml", "r") as f:
+    with Path("files_to_download.yaml").open() as f:
         file_list_input = y.load(f)
 
     file_pairs = []

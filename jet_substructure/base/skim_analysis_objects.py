@@ -5,13 +5,13 @@
 
 from __future__ import annotations
 
-from typing import Dict, Sequence
+from typing import Sequence
 
-import attr
+import attrs
 from mammoth.framework.analysis.objects import ScaleFactor  # noqa: F401
 
 
-def cross_check_task_branch_name_shim(grooming_method: str, input_branches: Sequence[str]) -> Dict[str, str]:
+def cross_check_task_branch_name_shim(grooming_method: str, input_branches: Sequence[str]) -> dict[str, str]:
     """Map existing cross check task branch names to standardized names.
 
     Args:
@@ -44,10 +44,10 @@ def cross_check_task_branch_name_shim(grooming_method: str, input_branches: Sequ
     return renames
 
 
-@attr.s
+@attrs.define
 class ResponseType:
-    measured_like: str = attr.ib()
-    generator_like: str = attr.ib()
+    measured_like: str = attrs.field()
+    generator_like: str = attrs.field()
 
     def __str__(self) -> str:
         return f"{self.measured_like}_{self.generator_like}"
