@@ -525,6 +525,21 @@ def _plot_data_model_comparison_for_single_system(
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
+    """Plot data/model comparison for a single collision system.
+
+    Args:
+        hists: Mapping from grooming method to unfolding result.
+        models: Mapping from model name to model calculation and binned data.
+        grooming_methods: List of grooming methods.
+        collision_system: Collision system.
+        set_zero_to_nan: Whether to set zero bins to NaN.
+        kt_range: Mapping from grooming method to kt range.
+        plot_config: Plot configuration.
+        output_dir: Output directory.
+    Returns:
+        None.
+    """
+
     grooming_styles = plot_style.define_paper_grooming_styles()
     model_styles = plot_style.define_paper_model_styles()
 
@@ -820,6 +835,17 @@ def _plot_single_system_comparison(
     plot_config: pb.PlotConfig,
     output_dir: Path,
 ) -> None:
+    """Plot comparison of grooming methods for a single system.
+
+    Args:
+        hists: Mapping of grooming method to SingleResult.
+        grooming_methods: List of grooming methods to plot.
+        reference_grooming_method: Grooming method to use as reference.
+        set_zero_to_nan: Whether to set zero bins to NaN.
+        kt_range: Mapping of grooming method to kt range.
+        plot_config: Plot configuration.
+        output_dir: Output directory.
+    """
     grooming_styling = plot_style.define_grooming_styles()
 
     # Blue, Purple, Green, Red
