@@ -394,8 +394,8 @@ def _load_caucal_analytical_calculations(filename: Path, bin_edges: npt.NDArray[
 
 
 @attrs.define
-class CaucalAnalyticalCalculations:
-    """Load analytical calculations for a collection of jet R, as determined by the bin edges dict."""
+class Caucal2020AnalyticalCalculations:
+    """Load analytical calculations from Paul, Alba et al in pp"""
     base_dir: Path
     needs_normalization: bool = attrs.field(default=False)
     metadata: dict[str, Any] = attrs.field(factory=dict)
