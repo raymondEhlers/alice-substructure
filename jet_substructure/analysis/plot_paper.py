@@ -648,6 +648,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
             markersize=11,
             linestyle="",
             linewidth=3,
+            zorder=6,
         )
         pachyderm.plot.error_boxes(
             ax=ax_ratio,
@@ -663,6 +664,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
             color="black",
             linewidth=0,
             alpha=0.3,
+            zorder=5.5,
         )
 
         for model_name, (model_calculation, model_with_all_grooming_methods) in models.items():
@@ -734,7 +736,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
                 model.values - lower_error,
                 model.values + upper_error,
                 zorder=5,
-                alpha=0.8,
+                alpha=0.75,
                 **temp_kwargs,
             )
 
@@ -763,7 +765,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
                 ratio.values - lower_error,
                 ratio.values + upper_error,
                 zorder=5,
-                alpha=0.8,
+                alpha=0.75,
                 **temp_kwargs,
             )
 
