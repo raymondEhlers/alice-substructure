@@ -134,8 +134,9 @@ exclude = [
     'bak',
     'build',
     'dist',
-    "exploration_scripts",
     "comparison",
+    "exploration_scripts",
+    "external",
 ]
 line-length = 120
 select = [
