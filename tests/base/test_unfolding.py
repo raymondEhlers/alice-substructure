@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pytest
@@ -84,8 +84,8 @@ settings:
                         max: null
 """
 
-@pytest.fixture
-def binning_in_unfolding_config() -> Dict[str, Any]:
+@pytest.fixture()
+def binning_in_unfolding_config() -> dict[str, Any]:
     y = yaml.yaml()
     return y.load(_test_config)  # type: ignore[no-any-return]
 
@@ -106,7 +106,7 @@ def binning_in_unfolding_config() -> Dict[str, Any]:
     "nested_variable_name", [None, "jet_pt"],
 )
 def test_loading_binning_from_unfolding_config(
-    caplog: Any,
+    caplog: Any,  # noqa: ARG001
     binning_in_unfolding_config: Any,
     specialized_settings: str,
     binning_type: unfolding_base.BinningType,
@@ -201,7 +201,7 @@ def test_loading_binning_from_unfolding_config(
     "nested_variable_name", [None],
 )
 def test_loading_property_stored_in_binning(
-    caplog: Any,
+    caplog: Any,  # noqa: ARG001
     binning_in_unfolding_config: Any,
     specialized_settings: str,
     grooming_method: str,

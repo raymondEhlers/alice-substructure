@@ -20,7 +20,6 @@ from pachyderm import binned_data
 
 from jet_substructure.analysis import plot_style as pb
 
-
 pachyderm.plot.configure()
 
 
@@ -175,7 +174,7 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
                         ],
                     ),
                 ],
-                figure=pb.Figure(edge_padding=dict(left=0.13, bottom=0.115)),
+                figure=pb.Figure(edge_padding={"left": 0.13, "bottom": 0.115}),
             ),
             output_dir=output_dir,
             axis=bh.axis.Regular(50, 0, 100),
@@ -240,7 +239,7 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
                             ],
                         ),
                     ],
-                    figure=pb.Figure(edge_padding=dict(left=0.13, bottom=0.115)),
+                    figure=pb.Figure(edge_padding={"left": 0.13, "bottom": 0.115}),
                 ),
                 normalize=True,
                 axis=bh.axis.Regular(50, 0, 10),
@@ -302,7 +301,7 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
                             ],
                         ),
                     ],
-                    figure=pb.Figure(edge_padding=dict(left=0.13, bottom=0.115)),
+                    figure=pb.Figure(edge_padding={"left": 0.13, "bottom": 0.115}),
                 ),
                 output_dir=output_dir,
                 axis=bh.axis.Regular(50, 0, 0.6),
@@ -368,7 +367,7 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
                             ],
                         ),
                     ],
-                    figure=pb.Figure(edge_padding=dict(left=0.13, bottom=0.115)),
+                    figure=pb.Figure(edge_padding={"left": 0.13, "bottom": 0.115}),
                 ),
                 normalize=True,
                 axis=bh.axis.Regular(50, 0, 0.5),

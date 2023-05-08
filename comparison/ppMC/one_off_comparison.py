@@ -14,7 +14,6 @@ import pandas as pd
 import uproot3
 from pachyderm import binned_data
 
-
 pachyderm.plot.configure()
 
 
@@ -105,7 +104,7 @@ print(mine_df.keys())
 leticia_iter = uproot3.pandas.iterate(
     "leticia/Ev_13_*.root", "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_scheme_TCRawTree_PythiaDef_NoSub_Incl"
 )
-leticia_df = pd.concat([df for df in leticia_iter])
+leticia_df = pd.concat(list(leticia_iter))
 print(leticia_df)
 
 # Plot true pt

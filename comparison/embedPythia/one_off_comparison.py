@@ -6,6 +6,7 @@
 """
 
 import pickle
+from pathlib import Path
 from typing import Optional
 
 import attr
@@ -18,7 +19,6 @@ import pachyderm.plot
 import pandas as pd
 import uproot3
 from pachyderm import binned_data
-
 
 pachyderm.plot.configure()
 
@@ -160,17 +160,17 @@ def plot_centrality_hist(hist: binned_data.BinnedData, output_name: str) -> None
 laura_hists = uproot3.open("laura/AnalysisResults_PbPbMC_pThard13.root")[
     "JetSubstructure_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_TCRaw_EventSub_Incl"
 ]
-print(laura_hists)
-# This is wayyyyyy to hard to select...
+print(laura_hists)  # noqa: T201
+# This is wayyyyyy too hard to select...
 laura_centrality = binned_data.BinnedData.from_existing_data(
     [h for h in laura_hists if hasattr(h, "name") and h.name == b"MultCentCorrelation_selected"][0]
 )
 mine_hists = uproot3.open("mine/hists/hists.root")
-print(mine_hists.keys())
+print(mine_hists.keys())  # noqa: T201
 # Mine is easier, for some reason.
 mine_centrality = binned_data.BinnedData.from_existing_data(mine_hists[b"MultCentCorrelation_selected"])
 # Jet pt hists from before the skim
-with open("hists.pkl", "rb") as f:
+with Path("hists.pkl").open("rb") as f:
     mine_pre_skim_input = pickle.load(f)
     # Convert to BinnedData
     mine_pre_skim = {}
@@ -193,10 +193,10 @@ laura_dc_mask = (laura_df["LeadingTrackPtMatch"] >= laura_df["LeadingTrackPt"]) 
 print(f"Laura: double counting cut is cutting {1 - (np.count_nonzero(laura_dc_mask) / len(laura_df))}")
 laura_df = laura_df[laura_dc_mask]
 
-IPython.embed()
+IPython.embed()  # type: ignore[no-untyped-call]
 print("Loading mine...")
 mine_iter = uproot3.pandas.iterate("mine/AnalysisResults.18q.01.chunk*_iterative_splittings.root", "tree")
-mine_df = pd.concat([df for df in mine_iter])
+mine_df = pd.concat(list(mine_iter))
 print(mine_df.keys())
 # leticia_iter = uproot3.pandas.iterate("leticia/Ev_13_*.root", "JetSubstructure_Jet_AKTChargedR040_tracks_pT0150_E_scheme_TCRawTree_PythiaDef_NoSub_Incl")
 # leticia_df = pd.concat([df for df in leticia_iter])

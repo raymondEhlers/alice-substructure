@@ -14,7 +14,6 @@ import pandas as pd
 import uproot3
 from pachyderm import binned_data
 
-
 pachyderm.plot.configure()
 
 
@@ -104,7 +103,7 @@ laura_df = uproot3.open("laura/AnalysisResults.5403.18q.root")[
 print(laura_df.columns)
 print("Loading mine...")
 mine_iter = uproot3.pandas.iterate("mine/AnalysisResults.18*.root", "tree")
-dfs = [df for df in mine_iter]
+dfs = list(mine_iter)
 mine_df = pd.concat(dfs)
 print(f"Number of files: {len(dfs)}")
 print(mine_df.keys())

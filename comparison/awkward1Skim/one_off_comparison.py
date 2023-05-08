@@ -7,14 +7,12 @@
 
 import attr
 import boost_histogram as bh
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pachyderm.plot
 import pandas as pd
 import uproot3
 from pachyderm import binned_data
-
 
 pachyderm.plot.configure()
 
@@ -26,8 +24,10 @@ class Input:
     attribute: str = attr.ib()
 
 
+_default_axis = bh.axis.Regular(30, 0, 150)
+
 def df_to_hist(
-    df: pd.DataFrame, attribute: str, axis: bh.axis.Regular = bh.axis.Regular(30, 0, 150)
+    df: pd.DataFrame, attribute: str, axis: bh.axis.Regular = _default_axis
 ) -> binned_data.BinnedData:
     bh_hist = bh.Histogram(axis, storage=bh.storage.Weight())
     bh_hist.fill(df[attribute].to_numpy())
@@ -39,7 +39,7 @@ def plot_attribute_compare(
     other: Input,
     mine: Input,
     output_name: str,
-    axis: bh.axis.Regular = bh.axis.Regular(30, 0, 150),
+    axis: bh.axis.Regular = _default_axis,
     log_y: bool = False,
     normalize: bool = False,
 ) -> None:
@@ -75,9 +75,9 @@ def plot_attribute_compare(
     ax_ratio.errorbar(
         ratio.axes[0].bin_centers, ratio.values, xerr=ratio.axes[0].bin_widths / 2, yerr=ratio.errors, linestyle=""
     )
-    print(f"ratio sum: {np.sum(ratio.values)}")
-    print(f"other: {np.sum(other_hist.values)}")
-    print(f"mine: {np.sum(mine_hist.values)}")
+    print(f"ratio sum: {np.sum(ratio.values)}")  # noqa: T201
+    print(f"other: {np.sum(other_hist.values)}")  # noqa: T201
+    print(f"mine: {np.sum(mine_hist.values)}")  # noqa: T201
 
     ax.set_ylabel("Prob.")
     if log_y:
@@ -136,27 +136,27 @@ mine_df = mine_df[mine_dc_mask]
 
 # They're run side-by-side, so we expect exact matching, and we can just check the arrays.
 # Cross check. Make sure that we have matching columns so we don't miss anything.
-assert list(sorted(original_df.columns)) == list(sorted(mine_df.columns))
+assert sorted(original_df.columns) == sorted(mine_df.columns)
 
 # Now let's check the arrays.
 for col in original_df.columns:
     # Deal with this below. Some conventions changed, so it's not as trivial.
     if "matching" in col:
         continue
-    print(f"Checking column {col}")
+    print(f"Checking column {col}")  # noqa: T201
     try:
         # Types vary a bit, so we need to reduce the absolute tolerance just a little bit.
         np.testing.assert_allclose(
             original_df[col].to_numpy(), mine_df[col].to_numpy(), atol=1e-5,
         )
-        print("Success")
+        print("Success")  # noqa: T201
     except AssertionError as e:
-        print(f"cross_check: {original_df[col]}")
-        print(f"mine: {mine_df[col]}")
-        print(e)
+        print(f"cross_check: {original_df[col]}")  # noqa: T201
+        print(f"mine: {mine_df[col]}")  # noqa: T201
+        print(e)  # noqa: T201
         import IPython
 
-        IPython.embed()
+        IPython.embed()  # type: ignore[no-untyped-call]
         raise (e)
         # Continue from here so we can check the rest...
 

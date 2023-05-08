@@ -14,7 +14,6 @@ import pandas as pd
 import uproot3
 from pachyderm import binned_data
 
-
 pachyderm.plot.configure()
 
 
