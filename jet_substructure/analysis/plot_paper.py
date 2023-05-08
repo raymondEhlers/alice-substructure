@@ -695,7 +695,6 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
                 values=np.array(h.values),
                 variances=np.zeros_like(h.values),
             )
-            logger.info(f"Pre ({model_name}): {h_without_uncertainties=}")
 
             # Check that binning matches up. If it doesn't attempt to rebin
             if h_without_uncertainties.axes[0].bin_edges.shape != model.axes[0].bin_edges.shape or \
@@ -717,7 +716,6 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
                         # This is okay since the model doesn't usually have a systematic uncertainty.
                         okay_for_systematic_not_to_exist=True,
                     )
-            logger.info(f"Post ({model_name}): {h_without_uncertainties=}")
 
             # And plot
             # Make sure we copy the settings so we can modify them
@@ -757,9 +755,6 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
                     high=y_relative_error_high * ratio.values,
                 )
                 ratio.metadata["y_systematic"]["quadrature"] = ratio_systematic
-            logger.info(f"{ratio=}")
-            logger.info(f"{model=}")
-            logger.info(f"{h_without_uncertainties=}")
 
             # Finally, plot the band in the ratio
             lower_error, upper_error = _determine_uncertainty_limits_for_model(model=ratio)
