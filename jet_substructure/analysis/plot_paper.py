@@ -1265,6 +1265,9 @@ def plot_comparisons_of_grooming_methods_for_single_system(
     }
     if collision_system != "pp":
         event_activity = f"{_event_activity_label_map[collision_system]} "
+    collision_system_filename_label = collision_system
+    if collision_system != "pp":
+        collision_system_filename_label = f"PbPb_{collision_system_filename_label}"
 
     grooming_styling = plot_style.define_grooming_styles()
     jet_pt_bin = next(iter(hists.values())).ranges[0]
@@ -1279,10 +1282,9 @@ def plot_comparisons_of_grooming_methods_for_single_system(
         grooming_methods=grooming_methods,
         reference_grooming_method=reference_grooming_method,
         set_zero_to_nan=False,
-        all_methods_on_one_figure=False,
         kt_range=kt_range,
         plot_config=pb.PlotConfig(
-            name=f"unfolded_kt_{collision_system}_comparison_{jet_R_str}{label}",
+            name=f"unfolded_kt_{collision_system_filename_label}_grooming_method_comparison_{jet_R_str}{label}",
             panels=[
                 # Main panel
                 pb.Panel(
