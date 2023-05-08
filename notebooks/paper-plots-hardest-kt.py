@@ -928,18 +928,54 @@ jetscape_predictions_R02 = jetscape_R02.load_predictions()
 # %% [markdown]
 # #### R = 0.2, TBD
 
+# %%
+sherpa_ahadic_R02 = model_calculations.SherpaFromLeticia(
+    base_dir=Path(output_dir / "comparison" / "models" / "sherpa"),
+    needs_normalization=False,
+    metadata={
+        "jet_R": 0.2,
+        "hadronization_method": "ahadic"
+    },
+)
+sherpa_ahadic_predictions_R02 = sherpa_ahadic_R02.load_predictions()
+sherpa_lund_R02 = model_calculations.SherpaFromLeticia(
+    base_dir=Path(output_dir / "comparison" / "models" / "sherpa"),
+    needs_normalization=False,
+    metadata={
+        "jet_R": 0.2,
+        "hadronization_method": "lund"
+    },
+)
+sherpa_lund_predictions_R02 = sherpa_lund_R02.load_predictions()
+
 # %% [markdown]
 # #### R = 0.4
 #
-# R = 0.4 predctions performed by Leticia
+# R = 0.4 predictions performed by Leticia
 
 # %%
-sherpa_ahadic = plot_unfolding.load_sherpa_predictions(
-    filename = output_dir / "comparison" / "models" / "sherpa" / "SherpaHistograms_Ahadic_R04_merged12.root", jet_R_values=[0.2, 0.4]
+sherpa_ahadic_R04 = model_calculations.SherpaFromLeticia(
+    base_dir=Path(output_dir / "comparison" / "models" / "sherpa"),
+    needs_normalization=True,
+    metadata={
+        "jet_R": 0.4,
+        "hadronization_method": "ahadic",
+        "pre_bin_width_normalization": False,
+        "bin_width_normalization": False,
+    },
 )
-sherpa_lund = plot_unfolding.load_sherpa_predictions(
-    filename = output_dir / "comparison" / "models" / "sherpa" / "SherpaHistograms_Lund_R04_merged12.root", jet_R_values=[0.2, 0.4]
+sherpa_ahadic_predictions_R04 = sherpa_ahadic_R04.load_predictions()
+sherpa_lund_R04 = model_calculations.SherpaFromLeticia(
+    base_dir=Path(output_dir / "comparison" / "models" / "sherpa"),
+    needs_normalization=True,
+    metadata={
+        "jet_R": 0.4,
+        "hadronization_method": "lund",
+        "pre_bin_width_normalization": False,
+        "bin_width_normalization": False,
+    },
 )
+sherpa_lund_predictions_R04 = sherpa_lund_R04.load_predictions()
 
 # %% [markdown]
 # ### Caucal et al. Analytical Calculations
@@ -954,7 +990,7 @@ sherpa_lund = plot_unfolding.load_sherpa_predictions(
 
 # %%
 # NOTE: We only have R=0.4 for DyG kt and DyG time as of April 2023
-caucal_analytical_pp_R04 = model_calculations.CaucalAnalyticalCalculations(
+caucal_analytical_pp_R04 = model_calculations.Caucal2020AnalyticalCalculations(
     base_dir=output_dir / "comparison" / "models" / "caucal_analytical",
     needs_normalization=False,
     metadata={
@@ -963,10 +999,10 @@ caucal_analytical_pp_R04 = model_calculations.CaucalAnalyticalCalculations(
         "bin_edges": [0.5, 1, 2, 4, 6, 8]
     },
 )
-caucal_analytical_pp_R04_predictions = caucal_analytical_pp_R04.load_predictions()
+caucal_analytical_pp_predictions_R04 = caucal_analytical_pp_R04.load_predictions()
 
 # %%
-caucal_analytical_pp_R04_predictions
+caucal_analytical_pp_predictions_R04.pp["dynamical_kt"]
 
 # %% [markdown] toc-hr-collapsed=true
 # ### Hybrid model
@@ -1349,9 +1385,12 @@ for _grooming_method in grooming_methods:
         hists=pp_R04_unfolded_with_systematics,
         models={
             #"jetscape": (jetscape_predictions_R04, jetscape_predictions_R04.pp),
-            "pythia": (pythia_predictions_R04, pp_R04_true_reference),
+            "pythia": (pythia_predictions_R04, pythia_predictions_R04.pp),
             # All of the hybrid loaded predictions have the same pp, so picking any one is fine!
             #"hybrid": (hybrid_model_with_wake_with_moliere_predictions_R04, hybrid_model_with_wake_with_moliere_predictions_R04.pp),
+            "sherpa_ahadic": (sherpa_ahadic_predictions_R04, sherpa_ahadic_predictions_R04.pp),
+            "sherpa_lund": (sherpa_lund_predictions_R04, sherpa_lund_predictions_R04.pp),
+            "caucal_analytical": (caucal_analytical_pp_predictions_R04, caucal_analytical_pp_predictions_R04.pp),
         },
         grooming_methods=[_grooming_method],
         collision_system="pp",
@@ -1383,6 +1422,9 @@ for _method_groups in [
             "pythia": (pythia_predictions_R04, pythia_predictions_R04.pp),
             # All of the hybrid loaded predictions have the same pp, so any are fine!
             #"hybrid": (hybrid_model_with_wake_with_moliere_predictions_R04, hybrid_model_with_wake_with_moliere_predictions_R04.pp),
+            "sherpa_ahadic": (sherpa_ahadic_predictions_R04, sherpa_ahadic_predictions_R04.pp),
+            "sherpa_lund": (sherpa_lund_predictions_R04, sherpa_lund_predictions_R04.pp),
+            "caucal_analytical": (caucal_analytical_pp_predictions_R04, caucal_analytical_pp_predictions_R04.pp),
         },
         #grooming_methods=grooming_methods,
         #grooming_methods=list(reversed(_grooming_methods_using_new_conventions)),
@@ -1404,6 +1446,9 @@ plot_paper.plot_grooming_model_comparisons_for_single_system(
         "pythia": (pythia_predictions_R04, pp_R04_true_reference),
         # All of the hybrid loaded predictions have the same pp, so any are fine!
         #"hybrid": (hybrid_model_with_wake_with_moliere_predictions_R04, hybrid_model_with_wake_with_moliere_predictions_R04.pp),
+        "sherpa_ahadic": (sherpa_ahadic_predictions_R04, sherpa_ahadic_predictions_R04.pp),
+        "sherpa_lund": (sherpa_lund_predictions_R04, sherpa_lund_predictions_R04.pp),
+        "caucal_analytical": (caucal_analytical_pp_predictions_R04, caucal_analytical_pp_predictions_R04.pp),
     },
     #grooming_methods=list(reversed(_grooming_methods_using_new_conventions)),
     #grooming_methods=list(reversed(grooming_methods)),
@@ -1425,6 +1470,9 @@ plot_paper.plot_grooming_model_comparisons_for_single_system_one_figure(
         "pythia": (pythia_predictions_R04, pp_R04_true_reference),
         # All of the hybrid loaded predictions have the same pp, so any are fine!
         #"hybrid": (hybrid_model_with_wake_with_moliere_predictions_R04, hybrid_model_with_wake_with_moliere_predictions_R04.pp),
+        "sherpa_ahadic": (sherpa_ahadic_predictions_R04, sherpa_ahadic_predictions_R04.pp),
+        "sherpa_lund": (sherpa_lund_predictions_R04, sherpa_lund_predictions_R04.pp),
+        "caucal_analytical": (caucal_analytical_pp_predictions_R04, caucal_analytical_pp_predictions_R04.pp),
     },
     #grooming_methods=list(reversed(_grooming_methods_using_new_conventions)),
     #grooming_methods=list(reversed(grooming_methods)),
@@ -1439,6 +1487,13 @@ plot_paper.plot_grooming_model_comparisons_for_single_system_one_figure(
     jet_R_str=jet_R_str,
     alice_status=alice_status,
 )
+
+# %%
+from jet_substructure.analysis import full_results_helpers
+full_results_helpers.select_hist_range(caucal_analytical_pp_predictions_R04.pp["dynamical_kt"], x_range=helpers.KtRange(0.25, 8), allow_range_broader_than_bin_edges=True)
+
+# %%
+caucal_analytical_pp_predictions_R04.pp["dynamical_kt"]
 
 # %% [markdown]
 # ## PbPb grooming methods comparison
