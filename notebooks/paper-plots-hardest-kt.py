@@ -667,12 +667,12 @@ _new_grooming_methods = [
     "dynamical_time_z_cut_02",
     "soft_drop_z_cut_04",
 ]
-input_dir_tag = "2023-02-HP"
+input_dir_tag = "2023-paper"
 ###################
 # Setup I/O options
 ###################
 # NOTE: Technically, these are HP2020 results rather than QM2022, but good enough
-_use_qm22_inputs = True
+_use_qm22_inputs = False
 _grooming_methods_using_qm_result_conventions = _OG_grooming_methods if _use_qm22_inputs else []
 _grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inputs else grooming_methods
 
@@ -736,10 +736,10 @@ _n_iter_compare = {
     "dynamical_kt": 5,
     "dynamical_time": 5,
     "soft_drop_z_cut_02": 5,
-    "dynamical_core": 5,
-    "dynamical_kt": 5,
-    "dynamical_time": 5,
-    "soft_drop_z_cut_02": 5,
+    "dynamical_core_z_cut_02": 5,
+    "dynamical_kt_z_cut_02": 5,
+    "dynamical_time_z_cut_02": 5,
+    "soft_drop_z_cut_04": 5,
 }
 if _use_qm22_inputs:
     _n_iter_compare.update({
@@ -751,8 +751,8 @@ if _use_qm22_inputs:
 _max_n_iter: dict[str, int | None] = {
     # Need +1 for convenience with range iteration
     # TODO: Update this once we've rerun it.
-    #"soft_drop_z_cut_04": 30,
-    "soft_drop_z_cut_04": 20,
+    "soft_drop_z_cut_04": 30,
+    #"soft_drop_z_cut_04": 20,
 }
 _max_n_iter.update({
     grooming_method: 20 for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
@@ -834,8 +834,7 @@ print(pp_R04_unfolded_with_systematics["dynamical_core"].data.metadata["y_system
 
 # %%
 plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
-    #grooming_methods=grooming_methods,
-    grooming_methods=_grooming_methods_using_qm_result_conventions,
+    grooming_methods=grooming_methods,
     unfolded_with_systematics=pp_R04_unfolded_with_systematics,
     unfolding_systematics_outputs=pp_R04_unfolding_systematics_outputs,
     unfolding_closure_outputs=pp_R04_unfolding_closure_outputs,
@@ -892,7 +891,7 @@ pythia_predictions_R02 = model_calculations.ModelCalculation(
 # #### R = 0.4
 
 # %%
-pythia_predictions_R02 = model_calculations.ModelCalculation(
+pythia_predictions_R04 = model_calculations.ModelCalculation(
     name="pythia8",
     label_pp="PYTHIA8 Monash 2013",
     label_AA="",
@@ -1021,11 +1020,6 @@ plot_output_dir_tag = "2023-paper-plots"
 # ### R = 0.2
 
 # %%
-from importlib import reload
-
-reload(plot_unfolding)
-
-# %%
 jet_R = 0.2
 jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
@@ -1048,6 +1042,44 @@ for _temp_grooming_methods, _reference_method, _label in [
         output_dir=_output_dir,
         kt_range=helpers.KtRange(0.25, 6),
         figure_kt_range=helpers.KtRange(0, 6.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+        label=_label,
+    )
+
+# %%
+
+# %%
+from importlib import reload
+
+reload(plot_unfolding)
+
+# %% [markdown]
+# ### R = 0.4
+
+# %%
+jet_R = 0.4
+jet_R_str = f"R{int(jet_R*10):02}"
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
+_output_dir.mkdir(parents=True, exist_ok=True)
+
+for _temp_grooming_methods, _reference_method, _label in [
+    (["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"], "dynamical_core", "0"),
+    (["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"], "soft_drop_z_cut_02", "1"),
+    (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "2"),
+    (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "3"),
+    (["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "4"),
+    (["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "dynamical_kt_z_cut_02", "5"),
+]:
+    plot_unfolding.plot_grooming_comparisons_for_single_system(
+        hists=pp_R04_unfolded_with_systematics,
+        grooming_methods=_temp_grooming_methods,
+        reference_grooming_method=_reference_method,
+        collision_system="pp",
+        collision_system_key="pp_5TeV",
+        output_dir=_output_dir,
+        kt_range=helpers.KtRange(0.25, 8),
+        figure_kt_range=helpers.KtRange(0, 8.25),
         jet_R_str=jet_R_str,
         alice_status=alice_status,
         label=_label,
@@ -1272,6 +1304,29 @@ plot_paper.plot_grooming_model_comparisons_for_single_system(
     alice_status=alice_status,
 )
 
+# Figure for the paper, saving the space on all of the axes
+plot_paper.plot_grooming_model_comparisons_for_single_system_one_figure(
+    hists=pp_R02_unfolded_with_systematics,
+    models={
+        "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.pp),
+        "pythia": (pythia_predictions_R02, pp_R02_true_reference),
+        # All of the hybrid loaded predictions have the same pp, so any are fine!
+        "hybrid": (hybrid_model_with_wake_with_moliere_predictions_R02, hybrid_model_with_wake_with_moliere_predictions_R02.pp),
+    },
+    #grooming_methods=list(reversed(_grooming_methods_using_new_conventions)),
+    #grooming_methods=list(reversed(grooming_methods)),
+    grooming_methods=grooming_methods,
+    collision_system="pp",
+    collision_system_key="pp_5TeV",
+    output_dir=_output_dir,
+    kt_range=helpers.KtRange(0.25, 6),
+    figure_kt_range=helpers.KtRange(0, 6.25),
+    main_panel_y_axis_range=(8e-3, 0.8),
+    ratio_y_axis_range=(0.3, 1.7),
+    jet_R_str=jet_R_str,
+    alice_status=alice_status,
+)
+
 # %%
 from jet_substructure.analysis import plot_style
 import seaborn as sns
@@ -1279,6 +1334,111 @@ sns.color_palette(plot_style._paper_model_palette)
 
 # %%
 # !echo $PATH
+
+# %% [markdown]
+# ### R = 0.4
+
+# %%
+jet_R = 0.4
+jet_R_str = f"R{int(jet_R*10):02}"
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
+_output_dir.mkdir(parents=True, exist_ok=True)
+
+for _grooming_method in grooming_methods:
+    plot_paper.plot_grooming_model_comparisons_for_single_system(
+        hists=pp_R04_unfolded_with_systematics,
+        models={
+            #"jetscape": (jetscape_predictions_R04, jetscape_predictions_R04.pp),
+            "pythia": (pythia_predictions_R04, pp_R04_true_reference),
+            # All of the hybrid loaded predictions have the same pp, so picking any one is fine!
+            #"hybrid": (hybrid_model_with_wake_with_moliere_predictions_R04, hybrid_model_with_wake_with_moliere_predictions_R04.pp),
+        },
+        grooming_methods=[_grooming_method],
+        collision_system="pp",
+        collision_system_key="pp_5TeV",
+        output_dir=_output_dir,
+        kt_range=helpers.KtRange(0.25, 8),
+        figure_kt_range=helpers.KtRange(0, 8.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+    )
+
+for _method_groups in [
+    ["dynamical_core", "dynamical_core_z_cut_02"],
+    ["dynamical_kt", "dynamical_kt_z_cut_02"],
+    ["dynamical_time", "dynamical_time_z_cut_02"],
+    ["soft_drop_z_cut_02", "soft_drop_z_cut_04"],
+    ["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"],
+    list(reversed(["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"])),
+    ["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02", "soft_drop_z_cut_04"],
+    list(reversed(["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02", "soft_drop_z_cut_04"])),
+    ["dynamical_core_z_cut_02", "soft_drop_z_cut_02", "soft_drop_z_cut_04"],
+]:
+    # I don't think I will use these in the paper. However, I might, so may as well keep them around
+    continue
+    plot_paper.plot_grooming_model_comparisons_for_single_system(
+        hists=pp_R04_unfolded_with_systematics,
+        models={
+            #"jetscape": (jetscape_predictions_R04, jetscape_predictions_R04.pp),
+            "pythia": (pythia_predictions_R04, pythia_predictions_R04.pp),
+            # All of the hybrid loaded predictions have the same pp, so any are fine!
+            #"hybrid": (hybrid_model_with_wake_with_moliere_predictions_R04, hybrid_model_with_wake_with_moliere_predictions_R04.pp),
+        },
+        #grooming_methods=grooming_methods,
+        #grooming_methods=list(reversed(_grooming_methods_using_new_conventions)),
+        grooming_methods=_method_groups,
+        collision_system="pp",
+        collision_system_key="pp_5TeV",
+        output_dir=_output_dir,
+        kt_range=helpers.KtRange(0.25, 8),
+        figure_kt_range=helpers.KtRange(0, 8.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+    )
+# This isn't really super useful as it's too much information, but I think it's a bit nice as a summary
+# of all of the available data and models
+plot_paper.plot_grooming_model_comparisons_for_single_system(
+    hists=pp_R04_unfolded_with_systematics,
+    models={
+        #"jetscape": (jetscape_predictions_R04, jetscape_predictions_R04.pp),
+        "pythia": (pythia_predictions_R04, pp_R04_true_reference),
+        # All of the hybrid loaded predictions have the same pp, so any are fine!
+        #"hybrid": (hybrid_model_with_wake_with_moliere_predictions_R04, hybrid_model_with_wake_with_moliere_predictions_R04.pp),
+    },
+    #grooming_methods=list(reversed(_grooming_methods_using_new_conventions)),
+    #grooming_methods=list(reversed(grooming_methods)),
+    grooming_methods=grooming_methods,
+    collision_system="pp",
+    collision_system_key="pp_5TeV",
+    output_dir=_output_dir,
+    kt_range=helpers.KtRange(0.25, 8),
+    figure_kt_range=helpers.KtRange(0, 8.25),
+    jet_R_str=jet_R_str,
+    alice_status=alice_status,
+)
+
+# Figure for the paper, saving the space on all of the axes
+plot_paper.plot_grooming_model_comparisons_for_single_system_one_figure(
+    hists=pp_R04_unfolded_with_systematics,
+    models={
+        #"jetscape": (jetscape_predictions_R04, jetscape_predictions_R04.pp),
+        "pythia": (pythia_predictions_R04, pp_R04_true_reference),
+        # All of the hybrid loaded predictions have the same pp, so any are fine!
+        #"hybrid": (hybrid_model_with_wake_with_moliere_predictions_R04, hybrid_model_with_wake_with_moliere_predictions_R04.pp),
+    },
+    #grooming_methods=list(reversed(_grooming_methods_using_new_conventions)),
+    #grooming_methods=list(reversed(grooming_methods)),
+    grooming_methods=grooming_methods,
+    collision_system="pp",
+    collision_system_key="pp_5TeV",
+    output_dir=_output_dir,
+    kt_range=helpers.KtRange(0.25, 8),
+    figure_kt_range=helpers.KtRange(0, 8.25),
+    main_panel_y_axis_range=(4e-3, 0.8),
+    ratio_y_axis_range=(0.3, 1.7),
+    jet_R_str=jet_R_str,
+    alice_status=alice_status,
+)
 
 # %% [markdown]
 # ## PbPb grooming methods comparison
