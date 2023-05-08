@@ -517,7 +517,8 @@ def plot_pp_grooming_comparison_with_models_2022(
     )
 
 
-def _determine_uncertainty_limits_for_model(model: binned_data.BinnedData) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+def _determine_uncertainty_lower_upper_for_model(model: binned_data.BinnedData) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    """Based on whether the model contains a systematic uncertainty or not."""
     if "y_systematic" in model.metadata:
         if not np.allclose(model.errors, np.zeros(len(model.errors))):
             msg = "Model has both statistical and systematic uncertainties. This is not yet supported."
@@ -729,7 +730,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
             temp_kwargs.pop("markeredgewidth", None)
             # And switch to the proper color
             temp_kwargs["facecolor"] = temp_kwargs.pop("color")
-            lower_error, upper_error = _determine_uncertainty_limits_for_model(model=model)
+            lower_error, upper_error = _determine_uncertainty_lower_upper_for_model(model=model)
 
             ax.fill_between(
                 model.axes[0].bin_centers,
@@ -759,7 +760,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
                 ratio.metadata["y_systematic"]["quadrature"] = ratio_systematic
 
             # Finally, plot the band in the ratio
-            lower_error, upper_error = _determine_uncertainty_limits_for_model(model=ratio)
+            lower_error, upper_error = _determine_uncertainty_lower_upper_for_model(model=ratio)
             ax_ratio.fill_between(
                 ratio.axes[0].bin_centers,
                 ratio.values - lower_error,
@@ -844,7 +845,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
     plt.close(fig)
 
 
-def plot_grooming_model_comparisons_for_single_system(
+def plot_grooming_methods_comparison_with_model_for_single_system(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     models: Mapping[str, tuple[model_calculations.ModelCalculation, Mapping[str, binned_data.BinnedData]]],
     grooming_methods: Sequence[str],
@@ -858,7 +859,6 @@ def plot_grooming_model_comparisons_for_single_system(
     text_font_size: int = 31,
 ) -> None:
     """Plot comparison of grooming methods for a single system."""
-
     # Validation
     if figure_kt_range is None:
         figure_kt_range = helpers.KtRange(1.5, 15)
@@ -926,7 +926,7 @@ def plot_grooming_model_comparisons_for_single_system(
     )
 
 
-def plot_grooming_model_comparisons_for_single_system_one_figure(
+def plot_grooming_methods_comparison_with_model_for_single_system_one_figure(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     models: Mapping[str, tuple[model_calculations.ModelCalculation, Mapping[str, binned_data.BinnedData]]],
     grooming_methods: Sequence[str],
@@ -941,8 +941,7 @@ def plot_grooming_model_comparisons_for_single_system_one_figure(
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
 ) -> None:
-    """Plot comparison of grooming methods for a single system."""
-
+    """Plot comparison of grooming methods for a single system in one composite figure."""
     # Validation
     if figure_kt_range is None:
         figure_kt_range = helpers.KtRange(1.5, 15)
@@ -1345,7 +1344,7 @@ def _plot_single_system_comparison(
     plt.close(fig)
 
 
-def plot_grooming_comparisons_for_single_system(
+def plot_comparisons_of_grooming_methods_for_single_system(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
     reference_grooming_method: str,
@@ -1431,7 +1430,7 @@ def plot_grooming_comparisons_for_single_system(
     )
 
 
-def plot_grooming_comparisons_for_single_system_one_figure(
+def plot_comparisons_of_grooming_methods_for_single_system_one_figure(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
     reference_grooming_method: str,

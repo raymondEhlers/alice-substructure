@@ -1268,7 +1268,7 @@ _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / su
 _output_dir.mkdir(parents=True, exist_ok=True)
 
 for _grooming_method in grooming_methods:
-    plot_paper.plot_grooming_model_comparisons_for_single_system(
+    plot_paper.plot_grooming_methods_comparison_with_model_for_single_system(
         hists=pp_R02_unfolded_with_systematics,
         models={
             "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.pp),
@@ -1299,7 +1299,7 @@ for _method_groups in [
 ]:
     # I don't think I will use these in the paper. However, I might, so may as well keep them around
     continue
-    plot_paper.plot_grooming_model_comparisons_for_single_system(
+    plot_paper.plot_grooming_methods_comparison_with_model_for_single_system(
         hists=pp_R02_unfolded_with_systematics,
         models={
             "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.pp),
@@ -1320,7 +1320,7 @@ for _method_groups in [
     )
 # This isn't really super useful as it's too much information, but I think it's a bit nice as a summary
 # of all of the available data and models
-plot_paper.plot_grooming_model_comparisons_for_single_system(
+plot_paper.plot_grooming_methods_comparison_with_model_for_single_system(
     hists=pp_R02_unfolded_with_systematics,
     models={
         "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.pp),
@@ -1341,7 +1341,7 @@ plot_paper.plot_grooming_model_comparisons_for_single_system(
 )
 
 # Figure for the paper, saving the space on all of the axes
-plot_paper.plot_grooming_model_comparisons_for_single_system_one_figure(
+plot_paper.plot_grooming_methods_comparison_with_model_for_single_system_one_figure(
     hists=pp_R02_unfolded_with_systematics,
     models={
         "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.pp),
@@ -1381,7 +1381,7 @@ _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / su
 _output_dir.mkdir(parents=True, exist_ok=True)
 
 for _grooming_method in grooming_methods:
-    plot_paper.plot_grooming_model_comparisons_for_single_system(
+    plot_paper.plot_grooming_methods_comparison_with_model_for_single_system(
         hists=pp_R04_unfolded_with_systematics,
         models={
             #"jetscape": (jetscape_predictions_R04, jetscape_predictions_R04.pp),
@@ -1415,7 +1415,7 @@ for _method_groups in [
 ]:
     # I don't think I will use these in the paper. However, I might, so may as well keep them around
     continue
-    plot_paper.plot_grooming_model_comparisons_for_single_system(
+    plot_paper.plot_grooming_methods_comparison_with_model_for_single_system(
         hists=pp_R04_unfolded_with_systematics,
         models={
             #"jetscape": (jetscape_predictions_R04, jetscape_predictions_R04.pp),
@@ -1439,7 +1439,7 @@ for _method_groups in [
     )
 # This isn't really super useful as it's too much information, but I think it's a bit nice as a summary
 # of all of the available data and models
-plot_paper.plot_grooming_model_comparisons_for_single_system(
+plot_paper.plot_grooming_methods_comparison_with_model_for_single_system(
     hists=pp_R04_unfolded_with_systematics,
     models={
         #"jetscape": (jetscape_predictions_R04, jetscape_predictions_R04.pp),
@@ -1464,7 +1464,7 @@ plot_paper.plot_grooming_model_comparisons_for_single_system(
 
 # %%
 # Figure for the paper, saving the space on all of the axes
-plot_paper.plot_grooming_model_comparisons_for_single_system_one_figure(
+plot_paper.plot_grooming_methods_comparison_with_model_for_single_system_one_figure(
     hists=pp_R04_unfolded_with_systematics,
     models={
         #"jetscape": (jetscape_predictions_R04, jetscape_predictions_R04.pp),
