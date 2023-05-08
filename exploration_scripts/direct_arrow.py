@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-import awkward1 as ak
+import awkward as ak
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq

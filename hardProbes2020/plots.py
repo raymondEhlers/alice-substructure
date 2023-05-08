@@ -278,7 +278,7 @@ def plot(grooming_method: str, output_dir: Path) -> None:
         hists[k] = v
     print(hists)
 
-    # Just for conveneice to get the grooming label right...
+    # Just for convenience to get the grooming label right...
     grooming_styles = pb.define_grooming_styles()
     grooming_method_label = grooming_styles[grooming_method].label
 
@@ -448,7 +448,7 @@ def plot_lund_plane(
     plot_config.apply(fig=fig, ax=ax)
 
     # Add the grooming method separately (one possibility, but not used currently).
-    # Just for conveneice to get the grooming label right...
+    # Just for convenience to get the grooming label right...
     # grooming_styles = pb.define_grooming_styles()
     # grooming_method_label = grooming_styles[grooming_method].label
     # grooming_method_text = pb.TextConfig(x=0.03, y=0.03, text=f"{grooming_method_label} iterative splittings", font_size=20)
@@ -597,7 +597,7 @@ def plot_n_to_split(
 def plot_pythia(grooming_methods: Sequence[str], output_dir: Path) -> None:
     hists = load_pythia_hists(grooming_methods=grooming_methods)
 
-    # Just for conveneice to get the grooming label right...
+    # Just for convenience to get the grooming label right...
     grooming_styles = pb.define_grooming_styles()
 
     # Setup

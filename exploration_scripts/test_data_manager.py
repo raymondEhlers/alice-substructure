@@ -2,7 +2,7 @@
 
 """ Test the capabilities of the data manager.
 
-.. codeuathor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
+.. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
 import logging

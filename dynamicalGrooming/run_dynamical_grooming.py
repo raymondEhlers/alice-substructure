@@ -360,7 +360,7 @@ def run_dynamical_grooming(  # noqa: C901
             skim_task.Initialize()
 
     if enable_HF_tree:
-        # PID eesponse is a dependency
+        # PID response is a dependency
         pid_response = _run_add_task_macro(
             "$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C",
             "AliAnalysisTaskPIDResponse",
@@ -1220,7 +1220,7 @@ def run_dynamical_grooming_embedding(
     truth_tracks = akt_particle_level_jet_finder.GetMCParticleContainer(0)
     truth_tracks.SetIsEmbedding(True)
 
-    # Detecor level jet finder: JetFinderAKTCharged_R04_EschemeDetLevelNew
+    # Detector level jet finder: JetFinderAKTCharged_R04_EschemeDetLevelNew
     akt_detector_level_jet_finder = ROOT.AliEmcalJetTask.AddTaskEmcalJet(
         "usedefault",
         "",

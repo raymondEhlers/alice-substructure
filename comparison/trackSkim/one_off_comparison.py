@@ -183,7 +183,7 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
         standard_jet_pt = standard[f"{prefix}_jet_pt"]
         track_skim_jet_pt = track_skim[f"{prefix}_jet_pt"]
 
-        # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessasry
+        # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessary
         #logger.info(f"standard_jet_pt: {standard_jet_pt.to_list()}")
         #logger.info(f"track_skim_jet_pt: {track_skim_jet_pt.to_list()}")
 
@@ -197,7 +197,7 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
                 _arr = ak.zip({"s": standard_jet_pt, "t": track_skim_jet_pt})
                 logger.info(pprint.pformat(_arr.to_list()))
                 is_not_close_jet_pt = np.where(~np.isclose(ak.to_numpy(standard_jet_pt), ak.to_numpy(track_skim_jet_pt)))
-                logger.info(f"Indicies where not close: {is_not_close_jet_pt}")
+                logger.info(f"Indices where not close: {is_not_close_jet_pt}")
         except ValueError as e:
             logger.exception(e)
 
@@ -249,7 +249,7 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
             standard_kt = standard[f"{grooming_method}_{prefix}_kt"]
             track_skim_kt = track_skim[f"{grooming_method}_{prefix}_kt"]
 
-            # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessasry
+            # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessary
             #logger.info(f"standard_kt: {standard_kt.to_list()}")
             #logger.info(f"track_skim_kt: {track_skim_kt.to_list()}")
 
@@ -261,7 +261,7 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
                     _arr = ak.zip({"s": standard_kt, "t": track_skim_kt})
                     logger.info(pprint.pformat(_arr.to_list()))
                     is_not_close_kt = np.where(~np.isclose(ak.to_numpy(standard_kt), ak.to_numpy(track_skim_kt)))
-                    logger.info(f"Indicies where not close: {is_not_close_kt}")
+                    logger.info(f"Indices where not close: {is_not_close_kt}")
             except ValueError as e:
                 logger.exception(e)
 
@@ -310,7 +310,7 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
             standard_rg = standard[f"{grooming_method}_{prefix}_delta_R"]
             track_skim_rg = track_skim[f"{grooming_method}_{prefix}_delta_R"]
 
-            # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessasry
+            # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessary
             #logger.info(f"standard_zg: {standard_zg.to_list()}")
             #logger.info(f"track_skim_zg: {track_skim_zg.to_list()}")
 
@@ -322,7 +322,7 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
                     _arr = ak.zip({"s": standard_rg, "t": track_skim_rg})
                     logger.info(pprint.pformat(_arr.to_list()))
                     is_not_close_rg = np.where(~np.isclose(ak.to_numpy(standard_rg), ak.to_numpy(track_skim_rg)))
-                    logger.info(f"Indicies where not close: {is_not_close_rg}")
+                    logger.info(f"Indices where not close: {is_not_close_rg}")
             except ValueError as e:
                 logger.exception(e)
 
@@ -377,7 +377,7 @@ def compare(collision_system: str, prefixes: Sequence[str], standard_filename: P
             standard_zg = standard[f"{grooming_method}_{prefix}_z"]
             track_skim_zg = track_skim[f"{grooming_method}_{prefix}_z"]
 
-            # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessasry
+            # Sometimes it's useful to start at this, but sometimes it's just overwhelming, so uncomment as necessary
             #logger.info(f"standard_zg: {standard_zg.to_list()}")
             #logger.info(f"track_skim_zg: {track_skim_zg.to_list()}")
 
