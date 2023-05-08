@@ -672,3 +672,59 @@ def load_sherpa_predictions(
                 output[jet_R_str][grooming_method] = binned_data.BinnedData.from_existing_data(f[f"histo{tag}"])
 
     return output
+
+
+@attrs.define
+class SherpaFromLeticia:
+    """Load SHERPA calculations from Leticia as determined by the bin edges dict."""
+    base_dir: Path
+    needs_normalization: bool = attrs.field(default=False)
+    metadata: dict[str, Any] = attrs.field(factory=dict)
+
+    def load_predictions(self, grooming_methods: list[str] | None = None) -> ModelCalculation:
+        # Validation
+        if grooming_methods is None:
+            grooming_methods = list(_full_grooming_methods_list)
+
+        # Settings
+        hadronization_method = self.metadata["hadronization_method"]
+        jet_R = self.metadata["jet_R"]
+
+        # Setup
+        _name_map = {
+            "dynamical_core": "k0",
+            "dynamical_kt": "k1",
+            "dynamical_time": "k2",
+            "soft_drop_z_cut_02": "ksd",
+        }
+        jet_R_str = f"R{round(jet_R * 10):02}"
+        _hadronization_label_map = {
+            "ahadic": "AHADIC",
+            "lund": "Lund",
+        }
+
+        predictions: dict[str, dict[str, binned_data.BinnedData]] = {}
+        filename = self.base_dir / f"SherpaHistograms_{hadronization_method.capitalize()}_{jet_R_str}_merged12.root"
+        # NOTE: As of April 2023, we only have the pp calculations for a subset of grooming methods,
+        #       so it's important that we catch for missing files.
+        with uproot.open(filename) as f:
+            for collision_system in ["pp"]:
+                predictions[collision_system] = {}
+                for grooming_method in grooming_methods:
+                    tag = _name_map.get(grooming_method, None)
+                    if tag is not None:
+                        predictions[collision_system][grooming_method] = binned_data.BinnedData.from_existing_data(f[f"histo{tag}"])
+
+        # NOTE: We don't just blindly take grooming_methods here since we don't have predictions for all methods
+        loaded_grooming_methods = list(predictions['pp'])
+        logger.info(f"Successfully loaded: {loaded_grooming_methods}")
+
+        return ModelCalculation(
+            name=f"sherpa_{hadronization_method}",
+            label_pp=f"SHERPA ({_hadronization_label_map[hadronization_method]})",
+            label_AA="",
+            normalized=self.needs_normalization,
+            grooming_methods=loaded_grooming_methods,
+            metadata=dict(self.metadata),
+            pp=predictions["pp"],
+        )
