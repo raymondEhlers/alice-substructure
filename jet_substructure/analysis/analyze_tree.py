@@ -2,7 +2,7 @@
 
 """ Analyze the dynamical grooming tree.
 
-.. codeauthor:: Raymnod Ehlers <raymond.ehlers@cern.ch>, ORNL
+.. codeauthor:: Raymond Ehlers <raymond.ehlers@cern.ch>, ORNL
 """
 
 from __future__ import annotations

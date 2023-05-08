@@ -240,7 +240,7 @@ class JetConstituentArray(JetConstituentArrayMethods, ak.ObjectArray):  # type:i
         """Creates a view of constituents with jagged structure.
 
         On it's own, this object can operate on arrays. However, by constructing with this method, it goes a step
-        further in, constructing virtual objects in the jagged structure. Basically, it unwarps the first layer of
+        further in, constructing virtual objects in the jagged structure. Basically, it unwraps the first layer of
         jaggedness using a wrapper.
 
         Args:
@@ -523,8 +523,8 @@ class SubjetArray(SubjetArrayMethods, ak.ObjectArray):  # type: ignore
             # And convert back to JetConstituentArray. Without this, it will just appear as a JaggedArray.
             # Can't wait until I can use awkward1!
             # NOTE: May not be the most performant, but fine for now.
-            # NOTE: All of the type ignores are because I don't wnat to deal with passing through the
-            #       attributes through the UprrotArray type.
+            # NOTE: All of the type ignores are because I don't want to deal with passing through the
+            #       attributes through the UprootArray type.
             subjet_constituents = JetConstituentArray.from_jagged(
                 subjet_constituents.pt,  # type: ignore
                 subjet_constituents.eta,  # type: ignore
@@ -693,7 +693,7 @@ class JetSplittingArrayMethods(ArrayMethods):
         return cast(UprootArray[float], self["z"])
 
     def iterative_splittings(self, subjets: SubjetArray) -> SubjetArray:
-        """Retriieve the iterative splittings.
+        """Retrieve the iterative splittings.
 
         Args:
             subjets: Subjets of the jets which containing the iterative splitting information.
@@ -788,7 +788,7 @@ class JetSplittingArrayMethods(ArrayMethods):
 
         Note:
             z_g is filled with the `UNFILLED_VALUE` if a splitting wasn't selected. In that case, there is
-            no index (ie. an emptry JaggedArray entry), and n_sd = 0.
+            no index (ie. an empty JaggedArray entry), and n_sd = 0.
 
         Note:
             n_sd can be calculated by using `count_nonzero()` on the indices which pass the cutoff.
@@ -1099,7 +1099,7 @@ class SubstructureJetArray(SubstructureJetArrayMethods, ak.ObjectArray):  # type
         subjets: SubjetArray,
         jet_splittings: JetSplittingArray,
     ) -> T:
-        """Serialization doesn't seem to receate these jagged members properly.
+        """Serialization doesn't seem to recreate these jagged members properly.
 
         Namely, it creates the object in the jagged array, but it doesn't wrap them up in the
         external objects properly. So we manually recreate the objects here. It may be that I'm
