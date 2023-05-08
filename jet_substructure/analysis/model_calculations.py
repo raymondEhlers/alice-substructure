@@ -425,6 +425,9 @@ class Caucal2020AnalyticalCalculations:
                     predictions[collision_system][grooming_method] = _load_caucal_analytical_calculations(
                         filename=self.base_dir / jet_R_str / f"ktg_a{_grooming_label}.dat", bin_edges=bin_edges
                     )
+                    if self.needs_normalization:
+                        predictions[collision_system][grooming_method] /= np.sum(predictions[collision_system][grooming_method].values)
+
                 except FileNotFoundError:
                     #logger.debug(f"Skipping {grooming_method} due to missing file (probably expected).")
                     pass

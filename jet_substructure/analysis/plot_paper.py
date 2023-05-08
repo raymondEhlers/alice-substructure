@@ -14,6 +14,7 @@ import cycler
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import pachyderm.plot
 import pachyderm.plot as pb
 import seaborn as sns
@@ -516,7 +517,20 @@ def plot_pp_grooming_comparison_with_models_2022(
     )
 
 
-def _plot_data_model_comparison_for_single_system(
+def _determine_uncertainty_limits_for_model(model: binned_data.BinnedData) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    if "y_systematic" in model.metadata:
+        if not np.allclose(model.errors, np.zeros(len(model.errors))):
+            msg = "Model has both statistical and systematic uncertainties. This is not yet supported."
+            raise ValueError(msg)
+        lower_error = model.metadata["y_systematic"]["quadrature"].low
+        upper_error = model.metadata["y_systematic"]["quadrature"].high
+    else:
+        lower_error = model.errors
+        upper_error = model.errors
+    return lower_error, upper_error
+
+
+def _plot_data_model_comparison_for_single_system(  # noqa: C901
     hists: Mapping[str, unfolding_analysis.SingleResult],
     models: Mapping[str, tuple[model_calculations.ModelCalculation, Mapping[str, binned_data.BinnedData]]],
     grooming_methods: Sequence[str],
@@ -663,18 +677,42 @@ def _plot_data_model_comparison_for_single_system(
             # Get the model for the reference.
             model = binned_data.BinnedData.from_existing_data(model)
             # And select the same range.
-            model = full_results_helpers.select_hist_range(model, kt_range[grooming_method])
+            # NOTE: Because some models may not cover the entire kt range, we need to explicitly allow that here
+            model = full_results_helpers.select_hist_range(model, kt_range[grooming_method], allow_range_broader_than_bin_edges=True)
+
+            # Further setup
+            # NOTE: If we naively construct the ratio here by just dividing the model by the data,
+            #       then the errors stored in the ratio aren't what we want since they convolve the
+            #       model uncertainties with the data uncertainties. So want to calculate the ratio
+            #       using a hist without the data uncertainties.
+            # NOTE: We define this here (ie. early) so we can decide what to rebin (which) we need to
+            #       know before we plot the model
+            h_without_uncertainties = binned_data.BinnedData(
+                axes=[h.axes[0].bin_edges],
+                values=h.values,
+                variances=np.zeros_like(h.values),
+            )
 
             # Check that binning matches up. If it doesn't attempt to rebin
-            if h.axes[0].bin_edges.shape != model.axes[0].bin_edges.shape or \
-                not np.allclose(h.axes[0].bin_edges, model.axes[0].bin_edges):
+            if h_without_uncertainties.axes[0].bin_edges.shape != model.axes[0].bin_edges.shape or \
+                not np.allclose(h_without_uncertainties.axes[0].bin_edges, model.axes[0].bin_edges):
                 # Rebin according to the data which we are supposed to be plotting
-                model = full_results_helpers.rebin_bin_width_scaled_hist(
-                    h_to_rebin=model,
-                    h_target=h,
-                    # This is okay since the model doesn't usually have a systematic uncertainty.
-                    okay_for_systematic_not_to_exist=True,
-                )
+                # NOTE: We take as a proxy that whichever hist has more bins is the one that needs to be rebinned.
+                #       We can't just assume that the model is more finely binned because some (eg. Caucal) is not.
+                if h_without_uncertainties.axes[0].bin_edges.shape[0] > model.axes[0].bin_edges.shape[0]:
+                    h_without_uncertainties = full_results_helpers.rebin_bin_width_scaled_hist(
+                        h_to_rebin=h_without_uncertainties,
+                        h_target_axis=model.axes[0],
+                        # This is okay since the data is explicitly constructed without systematic systematic uncertainties.
+                        okay_for_systematic_not_to_exist=True,
+                    )
+                else:
+                    model = full_results_helpers.rebin_bin_width_scaled_hist(
+                        h_to_rebin=model,
+                        h_target_axis=h_without_uncertainties.axes[0],
+                        # This is okay since the model doesn't usually have a systematic uncertainty.
+                        okay_for_systematic_not_to_exist=True,
+                    )
 
             # And plot
             # Make sure we copy the settings so we can modify them
@@ -686,33 +724,41 @@ def _plot_data_model_comparison_for_single_system(
             temp_kwargs.pop("markeredgewidth", None)
             # And switch to the proper color
             temp_kwargs["facecolor"] = temp_kwargs.pop("color")
+            lower_error, upper_error = _determine_uncertainty_limits_for_model(model=model)
+
             ax.fill_between(
                 model.axes[0].bin_centers,
-                model.values - model.errors,
-                model.values + model.errors,
+                model.values - lower_error,
+                model.values + upper_error,
                 zorder=5,
                 alpha=0.8,
                 **temp_kwargs,
             )
 
             # Ratio
-            # Could move down the range selection down here if you want to see the entire range above,
-            # although careful about binning differences!
-            # NOTE: If we naively construct the ratio here by just dividing the model by the data,
-            #       then the errors stored in the ratio aren't what we want since they convolve the
-            #       model uncertainties with the data uncertainties. So want to calculate the ratio
-            #       using a hist without the data uncertainties.
-            h_without_uncertainties = binned_data.BinnedData(
-                axes=[h.axes[0].bin_edges],
-                values=h.values,
-                variances=np.zeros_like(h.values),
-            )
             ratio = model / h_without_uncertainties
 
+            # We need to propagate this manually since the data is constructed not to have uncertainties that we would usually propagate with
+            if "y_systematic" in model.metadata:
+                y_relative_error_low = full_results_helpers.relative_error(
+                    full_results_helpers.ErrorInput(value=model.values, error=model.metadata["y_systematic"]["quadrature"].low),
+                )
+                y_relative_error_high = full_results_helpers.relative_error(
+                    full_results_helpers.ErrorInput(value=model.values, error=model.metadata["y_systematic"]["quadrature"].high),
+                )
+                model_systematic = full_results_helpers.AsymmetricErrors(
+                    low=y_relative_error_low * ratio.values,
+                    high=y_relative_error_high * ratio.values,
+                )
+                ratio.metadata["y_systematic"]["quadrature"] = model_systematic
+            if "caucal" in model_name:
+                logger.info(f"{ratio=}")
+
+            lower_error, upper_error = _determine_uncertainty_limits_for_model(model=ratio)
             ax_ratio.fill_between(
                 ratio.axes[0].bin_centers,
-                ratio.values - ratio.errors,
-                ratio.values + ratio.errors,
+                ratio.values - lower_error,
+                ratio.values + upper_error,
                 zorder=5,
                 alpha=0.8,
                 **temp_kwargs,
@@ -1212,7 +1258,7 @@ def _plot_single_system_comparison(
                 # Rebin according to the data which we are supposed to be plotting
                 ratio_reference_hist = full_results_helpers.rebin_bin_width_scaled_hist(
                     h_to_rebin=ratio_reference_hist.copy(),
-                    h_target=h,
+                    h_target_axis=h.axes[0],
                 )
 
             ratio = h / ratio_reference_hist

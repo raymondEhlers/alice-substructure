@@ -142,7 +142,7 @@ def determine_overlapping_range(current_range: _T_RangeSelector, reference: _T_R
     return type(current_range)(range_min, range_max)
 
 
-def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelector) -> binned_data.BinnedData:
+def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelector, allow_range_broader_than_bin_edges: bool = False) -> binned_data.BinnedData:
     """Select a histogram with a new range, including the systematics.
 
     NOTE:
@@ -153,12 +153,31 @@ def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelect
     if len(hist.axes) > 1:
         _msg = "Can only handle 1D histogram"
         raise ValueError(_msg)
+
+    # Validation
+    low, high = tuple(x_range)
+    if x_range.min < hist.axes[0].bin_edges[0]:
+        msg = "Range is smaller than the lower bin edge!"
+        if allow_range_broader_than_bin_edges:
+            low = hist.axes[0].bin_edges[0]
+            logger.debug(msg)
+        else:
+            msg += " You need to allow this explicitly if it's okay"
+            raise ValueError(msg)
+    if x_range.max > hist.axes[0].bin_edges[-1]:
+        msg = "Range is larger than the upper bin edge!"
+        if allow_range_broader_than_bin_edges:
+            high = hist.axes[0].bin_edges[-1]
+        else:
+            msg += " You need to allow this explicitly if it's okay"
+            raise ValueError(msg)
+
     # Setup
     # We'll use a consistent slice throughout. This does mean that we have to create additional binned_data objects
     # just to do the selection, but I think that tradeoff is worth it to use a consistent code path for all selections.
     # NOTE: We could refactor the selection, but we would need the binning and the values, and so we're already most of
     #       the way there. By using the existing code, we don't have to worry about any subtle issues.
-    selected_range = slice(x_range.min * 1j, x_range.max * 1j)
+    selected_range = slice(low * 1j, high * 1j)
 
     # First, we handle the main hist
     h = hist[selected_range]
@@ -205,7 +224,7 @@ def select_hist_range(hist: binned_data.BinnedData, x_range: helpers.RangeSelect
     return h
 
 
-def rebin_bin_width_scaled_hist(h_to_rebin: binned_data.BinnedData, h_target: binned_data.BinnedData, okay_for_systematic_not_to_exist: bool = False) -> binned_data.BinnedData:
+def rebin_bin_width_scaled_hist(h_to_rebin: binned_data.BinnedData, h_target_axis: binned_data.Axis, okay_for_systematic_not_to_exist: bool = False) -> binned_data.BinnedData:
     # Validation and setup
     has_systematic = "y_systematic" in h_to_rebin.metadata and "quadrature" in h_to_rebin.metadata["y_systematic"]
     if not has_systematic and not okay_for_systematic_not_to_exist:
@@ -232,20 +251,20 @@ def rebin_bin_width_scaled_hist(h_to_rebin: binned_data.BinnedData, h_target: bi
             axes=binned_data.Axis(h_to_rebin.axes[0].bin_edges),
             values=_ratio_y_systematic.low,
             variances=np.ones(len(h_to_rebin.values)),
-        )[::h_target.axes[0].bin_edges].values
+        )[::h_target_axis.bin_edges].values
         _ratio_systematic_high = binned_data.BinnedData(
             axes=binned_data.Axis(h_to_rebin.axes[0].bin_edges),
             values=_ratio_y_systematic.high,
             variances=np.ones(len(h_to_rebin.values)),
-        )[::h_target.axes[0].bin_edges].values
+        )[::h_target_axis.bin_edges].values
         # Store the update systematics and scale back down by the bin widths
         _ratio_y_systematic = AsymmetricErrors(
-            _ratio_systematic_low / h_target.axes[0].bin_widths,
-            _ratio_systematic_high / h_target.axes[0].bin_widths,
+            _ratio_systematic_low / h_target_axis.bin_widths,
+            _ratio_systematic_high / h_target_axis.bin_widths,
         )
 
     # And finally rebin the main data
-    h_to_rebin = h_to_rebin[::h_target.axes[0].bin_edges]
+    h_to_rebin = h_to_rebin[::h_target_axis.bin_edges]
     # And scale back by the bin width
     h_to_rebin /= h_to_rebin.axes[0].bin_widths
     # And store the updated systematic

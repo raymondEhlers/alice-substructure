@@ -790,7 +790,7 @@ def _plot_single_system_comparison(
                 # Rebin according to the data which we are supposed to be plotting
                 ratio_reference_hist = full_results_helpers.rebin_bin_width_scaled_hist(
                     h_to_rebin=ratio_reference_hist.copy(),
-                    h_target=h,
+                    h_target_axis=h.axes[0],
                 )
 
             ratio = h / ratio_reference_hist

@@ -1902,7 +1902,7 @@ def _plot_compare_kt(
         #    variances = fit.fit_result.errors ** 2,
         # )
 
-        ## Complete lael with fit info:
+        ## Complete label with fit info:
         # label = label + fr": $kt^{{({fit.fit_result.values_at_minimum['p']:.02} \pm {fit.fit_result.errors_on_parameters['p']:.02})}}$"
 
         # plot = ax.plot(fit_hist.axes[0].bin_centers, fit_hist.values, label = label)
