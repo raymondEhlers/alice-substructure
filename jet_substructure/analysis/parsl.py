@@ -2287,7 +2287,7 @@ def follow_progress_of_futures(futures: List[Future[Any]]) -> None:
     # asking for the result. By embedded here, we can inspect results, etc in the meantime.
     # NOTE: This may be commented out sometimes when I have long running processes and wil
     #       probably forget to close it.
-    IPython.start_ipython(user_ns={**locals(), **globals()})
+    IPython.start_ipython(user_ns={**locals(), **globals()})  # type: ignore[no-untyped-call]
 
     # In case we close IPython early, wait on results
     # print each job status, initially all are running

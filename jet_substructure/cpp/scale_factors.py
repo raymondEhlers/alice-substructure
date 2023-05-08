@@ -125,7 +125,7 @@ def scale_factor_uproot(filenames: Sequence[Path], run_despite_issues: bool = Fa
     if False:
         # To make this code appear valid, this line is just a hack and should be ignored when looking
         # at the code as a reference.
-        filename = filenames[0]
+        filename = filenames[0]  # type: ignore[unreachable]
 
         # Setup
         input_file = uproot3.open(filename)
@@ -326,7 +326,7 @@ def test() -> None:
     # print(f"scale_factors_uproot: {scale_factors_uproot}")
     import IPython
 
-    IPython.start_ipython(user_ns=locals())
+    IPython.start_ipython(user_ns=locals())  # type: ignore[no-untyped-call]
 
 
 if __name__ == "__main__":

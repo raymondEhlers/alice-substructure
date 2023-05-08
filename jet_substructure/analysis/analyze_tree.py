@@ -123,7 +123,7 @@ def _construct_jets_from_tree(
         if name not in tree:
             tree[name] = jets.subjets.constituents
 
-        # Store the full treee in h5.
+        # Store the full tree in h5.
         # This provides a huge speed up in terms of processing speed!
         if constructed_name not in tree:
             tree[constructed_name] = jets
