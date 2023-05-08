@@ -410,16 +410,29 @@ def define_paper_model_styles() -> dict[str, dict[str, Any]]:
             "linewidth": 3,
             "linestyle": "--",
             "marker": "*",
-            "color": "#f39c12",
+            # Yellow-orange
+            #"color": "#f39c12",
+            # Violet
+            "color": "#2c4875",
         },
         "pp_sherpa_ahadic": {
             "label": "SHERPA (AHADIC)",
             "linewidth": 3,
             "linestyle": ":",
             "marker": "X",
-            "color": "#d35400",
+            # Orange
+            #"color": "#d35400",
+            # Violet-ish
+            "color": "#8a508f",
         },
         "pp_jetscape": {
+            "linewidth": 3,
+            "linestyle": "--",
+            "marker": "D",
+            #"color": "#008585",
+            "color": "#4cab98",
+        },
+        "AA_jetscape": {
             "linewidth": 3,
             "linestyle": "--",
             "marker": "D",
