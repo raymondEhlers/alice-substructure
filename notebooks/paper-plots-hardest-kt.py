@@ -1385,12 +1385,12 @@ for _grooming_method in grooming_methods:
         hists=pp_R04_unfolded_with_systematics,
         models={
             #"jetscape": (jetscape_predictions_R04, jetscape_predictions_R04.pp),
-            "pythia": (pythia_predictions_R04, pythia_predictions_R04.pp),
+            "caucal_analytical": (caucal_analytical_pp_predictions_R04, caucal_analytical_pp_predictions_R04.pp),
             # All of the hybrid loaded predictions have the same pp, so picking any one is fine!
             #"hybrid": (hybrid_model_with_wake_with_moliere_predictions_R04, hybrid_model_with_wake_with_moliere_predictions_R04.pp),
-            "sherpa_ahadic": (sherpa_ahadic_predictions_R04, sherpa_ahadic_predictions_R04.pp),
             "sherpa_lund": (sherpa_lund_predictions_R04, sherpa_lund_predictions_R04.pp),
-            "caucal_analytical": (caucal_analytical_pp_predictions_R04, caucal_analytical_pp_predictions_R04.pp),
+            "sherpa_ahadic": (sherpa_ahadic_predictions_R04, sherpa_ahadic_predictions_R04.pp),
+            "pythia": (pythia_predictions_R04, pythia_predictions_R04.pp),
         },
         grooming_methods=[_grooming_method],
         collision_system="pp",
@@ -1419,12 +1419,12 @@ for _method_groups in [
         hists=pp_R04_unfolded_with_systematics,
         models={
             #"jetscape": (jetscape_predictions_R04, jetscape_predictions_R04.pp),
-            "pythia": (pythia_predictions_R04, pythia_predictions_R04.pp),
+            "caucal_analytical": (caucal_analytical_pp_predictions_R04, caucal_analytical_pp_predictions_R04.pp),
             # All of the hybrid loaded predictions have the same pp, so any are fine!
             #"hybrid": (hybrid_model_with_wake_with_moliere_predictions_R04, hybrid_model_with_wake_with_moliere_predictions_R04.pp),
             "sherpa_ahadic": (sherpa_ahadic_predictions_R04, sherpa_ahadic_predictions_R04.pp),
             "sherpa_lund": (sherpa_lund_predictions_R04, sherpa_lund_predictions_R04.pp),
-            "caucal_analytical": (caucal_analytical_pp_predictions_R04, caucal_analytical_pp_predictions_R04.pp),
+            "pythia": (pythia_predictions_R04, pythia_predictions_R04.pp),
         },
         #grooming_methods=grooming_methods,
         #grooming_methods=list(reversed(_grooming_methods_using_new_conventions)),
@@ -1443,12 +1443,12 @@ plot_paper.plot_grooming_model_comparisons_for_single_system(
     hists=pp_R04_unfolded_with_systematics,
     models={
         #"jetscape": (jetscape_predictions_R04, jetscape_predictions_R04.pp),
-        "pythia": (pythia_predictions_R04, pp_R04_true_reference),
+        "caucal_analytical": (caucal_analytical_pp_predictions_R04, caucal_analytical_pp_predictions_R04.pp),
         # All of the hybrid loaded predictions have the same pp, so any are fine!
         #"hybrid": (hybrid_model_with_wake_with_moliere_predictions_R04, hybrid_model_with_wake_with_moliere_predictions_R04.pp),
-        "sherpa_ahadic": (sherpa_ahadic_predictions_R04, sherpa_ahadic_predictions_R04.pp),
         "sherpa_lund": (sherpa_lund_predictions_R04, sherpa_lund_predictions_R04.pp),
-        "caucal_analytical": (caucal_analytical_pp_predictions_R04, caucal_analytical_pp_predictions_R04.pp),
+        "sherpa_ahadic": (sherpa_ahadic_predictions_R04, sherpa_ahadic_predictions_R04.pp),
+        "pythia": (pythia_predictions_R04, pp_R04_true_reference),
     },
     #grooming_methods=list(reversed(_grooming_methods_using_new_conventions)),
     #grooming_methods=list(reversed(grooming_methods)),
@@ -1462,6 +1462,7 @@ plot_paper.plot_grooming_model_comparisons_for_single_system(
     alice_status=alice_status,
 )
 
+# %%
 # Figure for the paper, saving the space on all of the axes
 plot_paper.plot_grooming_model_comparisons_for_single_system_one_figure(
     hists=pp_R04_unfolded_with_systematics,
