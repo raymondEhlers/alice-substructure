@@ -717,10 +717,14 @@ class SherpaFromLeticia:
                     tag = _name_map.get(grooming_method, None)
                     if tag is not None:
                         predictions[collision_system][grooming_method] = binned_data.BinnedData.from_existing_data(f[f"histo{tag}"])
+                        if self.metadata["pre_bin_width_normalization"]:
+                            # Bin width normalization
+                            predictions[collision_system][grooming_method] /= predictions[collision_system][grooming_method].axes[0].bin_widths
                         if self.needs_normalization:
                             predictions[collision_system][grooming_method] /= np.sum(predictions[collision_system][grooming_method].values)
-                        # Bin width normalization
-                        #predictions[collision_system][grooming_method] /= predictions[collision_system][grooming_method].axes[0].bin_widths
+                        if self.metadata["bin_width_normalization"]:
+                            # Bin width normalization
+                            predictions[collision_system][grooming_method] /= predictions[collision_system][grooming_method].axes[0].bin_widths
 
         # NOTE: We don't just blindly take grooming_methods here since we don't have predictions for all methods
         loaded_grooming_methods = list(predictions['pp'])
