@@ -720,7 +720,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
             # And plot
             # Make sure we copy the settings so we can modify them
             temp_kwargs = dict(model_styles[f"{collision_system}_{model_name}"])
-            temp_kwargs["label"] = model_calculation.label(collision_system=collision_system) if plotting_last_method else None
+            temp_kwargs["label"] = model_calculation.label(collision_system=collision_system) if plotting_last_method and not all_methods_on_one_figure else None
             # Need to pop for fill_between since these aren't valid args
             temp_kwargs.pop("marker")
             temp_kwargs.pop("markerfacecolor", None)
@@ -786,7 +786,21 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
         legend_models.location = "upper right"
         legend_models.anchor= (0.98, 0.98)
 
+        # Create handles and labels by hand, using all models
+        legend_elements = []
+        for model_name, (model_calculation, _) in models.items():
+            model_kwargs = dict(model_styles[f"{collision_system}_{model_name}"])
+            legend_elements.append(
+                mpl.patches.Patch(
+                    facecolor=model_kwargs["color"],
+                    label=model_calculation.label(collision_system=collision_system)
+                )
+            )
+
         # Next, to create the new legend, we need the existing handles
+        # NOTE: We won't have handles from every model because I don't have all of their predictions right now.
+        #       However, this should only be a temporary issue. Once fixed, the plots will fix themselves. So for now (May 2023),
+        #       I just should look for a quick hack as a temporary fix.
         ax_legend = all_axes[::2].flatten()[-1]
         handles, labels = ax_legend.get_legend_handles_labels()
 
@@ -795,13 +809,12 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
         # NOTE: As a convention, we decide to use legend_config for the data, and we create the new legend for the models.
         legend_data_obj = legend_config.apply(
             ax=ax_legend,
-            legend_handles=handles[-1:],
-            legend_labels=labels[-1:],
+            legend_handles=handles,
+            legend_labels=labels,
         )
         legend_models_obj = legend_models.apply(
             ax=ax_legend,
-            legend_handles=handles[:-1],
-            legend_labels=labels[:-1],
+            legend_handles=legend_elements,
         )
         # Now that we've gotten the legends all figured out, we need to make sure that the standard formatting doesn't interfere.
         # We do this by removing the legend config
