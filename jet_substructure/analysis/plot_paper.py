@@ -689,9 +689,13 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
             #       know before we plot the model
             h_without_uncertainties = binned_data.BinnedData(
                 axes=[h.axes[0].bin_edges],
-                values=h.values,
+                # NOTE: The `np.array` is really important here because we need to make a copy!
+                #       Otherwise, we modify the underlying values, and everything gets fucked up in
+                #       future loop iterations.
+                values=np.array(h.values),
                 variances=np.zeros_like(h.values),
             )
+            logger.info(f"Pre ({model_name}): {h_without_uncertainties=}")
 
             # Check that binning matches up. If it doesn't attempt to rebin
             if h_without_uncertainties.axes[0].bin_edges.shape != model.axes[0].bin_edges.shape or \
@@ -713,6 +717,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
                         # This is okay since the model doesn't usually have a systematic uncertainty.
                         okay_for_systematic_not_to_exist=True,
                     )
+            logger.info(f"Post ({model_name}): {h_without_uncertainties=}")
 
             # And plot
             # Make sure we copy the settings so we can modify them
@@ -738,7 +743,8 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
             # Ratio
             ratio = model / h_without_uncertainties
 
-            # We need to propagate this manually since the data is constructed not to have uncertainties that we would usually propagate with
+            # We need to propagate the systematic uncertainty manually since the data is constructed not to have
+            # uncertainties that we would usually propagate with
             if "y_systematic" in model.metadata:
                 y_relative_error_low = full_results_helpers.relative_error(
                     full_results_helpers.ErrorInput(value=model.values, error=model.metadata["y_systematic"]["quadrature"].low),
@@ -746,14 +752,16 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
                 y_relative_error_high = full_results_helpers.relative_error(
                     full_results_helpers.ErrorInput(value=model.values, error=model.metadata["y_systematic"]["quadrature"].high),
                 )
-                model_systematic = full_results_helpers.AsymmetricErrors(
+                ratio_systematic = full_results_helpers.AsymmetricErrors(
                     low=y_relative_error_low * ratio.values,
                     high=y_relative_error_high * ratio.values,
                 )
-                ratio.metadata["y_systematic"]["quadrature"] = model_systematic
-            if "caucal" in model_name:
-                logger.info(f"{ratio=}")
+                ratio.metadata["y_systematic"]["quadrature"] = ratio_systematic
+            logger.info(f"{ratio=}")
+            logger.info(f"{model=}")
+            logger.info(f"{h_without_uncertainties=}")
 
+            # Finally, plot the band in the ratio
             lower_error, upper_error = _determine_uncertainty_limits_for_model(model=ratio)
             ax_ratio.fill_between(
                 ratio.axes[0].bin_centers,
