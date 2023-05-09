@@ -1683,42 +1683,56 @@ for grooming_method in grooming_methods:
 # ### R = 0.2
 
 # %%
-from importlib import reload
-
-reload(plot_unfolding)
-
-# %%
 jet_R = 0.2
 jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
 for event_activity in ["semi_central", "central"]:
+    _additional_hists = {
+        "semi_central": semi_central_R02_unfolded_with_systematics,
+        "central": central_R02_unfolded_with_systematics,
+    }
+    plot_paper.plot_pp_PbPb_comparison_single_figure(
+        hists={
+            "pp": pp_R02_unfolded_with_systematics,
+            event_activity: _additional_hists[event_activity],
+        },
+        models_ratio={
+            "hybrid_without_moliere": (hybrid_model_with_wake_without_moliere_predictions_R02, hybrid_model_with_wake_without_moliere_predictions_R02.ratio(event_activity)),
+            "hybrid_moliere": (hybrid_model_with_wake_with_moliere_predictions_R02, hybrid_model_with_wake_with_moliere_predictions_R02.ratio(event_activity)),
+            "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.ratio(event_activity)),
+        },
+        grooming_methods=grooming_methods,
+        output_dir=_output_dir,
+        event_activity_to_kt_range={
+            "pp": helpers.KtRange(0.25, 6),
+            "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+            "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+        },
+        kt_display_range=(0.0, 6.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+        additional_label=event_activity,
+    )
+
     for grooming_method in grooming_methods:
-        _additional_hists = {
-            "semi_central": semi_central_R02_unfolded_with_systematics[grooming_method],
-            "central": central_R02_unfolded_with_systematics[grooming_method],
-        }
-        plot_unfolding.plot_pp_PbPb_comparison(
+        plot_paper.plot_pp_PbPb_comparison(
             hists={
-                "pp": pp_R02_unfolded_with_systematics[grooming_method],
+                "pp": pp_R02_unfolded_with_systematics,
                 event_activity: _additional_hists[event_activity],
-                #"semi_central": semi_central_R02_unfolded_with_systematics[grooming_method],
-                #"central": central_R02_unfolded_with_systematics[grooming_method],
             },
-            models={
-                #"hybrid_without_moliere": semi_central_hybrid_model_ratio["hybrid_without_moliere"][jet_R_str],
-                #"hybrid_moliere": semi_central_hybrid_model_ratio["hybrid_moliere"][jet_R_str],
-                "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02.ratio(event_activity),
-                "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02.ratio(event_activity),
-                "jetscape": jetscape_predictions_R02.ratio(event_activity),
+            models_ratio={
+                "hybrid_without_moliere": (hybrid_model_with_wake_without_moliere_predictions_R02, hybrid_model_with_wake_without_moliere_predictions_R02.ratio(event_activity)),
+                "hybrid_moliere": (hybrid_model_with_wake_with_moliere_predictions_R02, hybrid_model_with_wake_with_moliere_predictions_R02.ratio(event_activity)),
+                "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.ratio(event_activity)),
             },
-            grooming_method=grooming_method,
+            grooming_methods=[grooming_method],
             output_dir=_output_dir,
             event_activity_to_kt_range={
                 "pp": helpers.KtRange(0.25, 6),
-                "semi_central": helpers.KtRange(0.25, 6) if "z_cut" in grooming_method else helpers.KtRange(2, 6),
-                "central": helpers.KtRange(0.25, 6) if "z_cut" in grooming_method else helpers.KtRange(3, 6),
+                "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+                "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
             },
             kt_display_range=(0.0, 6.25),
             jet_R_str=jet_R_str,
