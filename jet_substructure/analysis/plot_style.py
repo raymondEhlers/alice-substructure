@@ -432,7 +432,7 @@ def define_paper_model_styles() -> dict[str, dict[str, Any]]:
             #"color": "#008585",
             "color": "#4cab98",
         },
-        "AA_jetscape": {
+        "PbPb_jetscape": {
             "linewidth": 3,
             "linestyle": "--",
             "marker": "D",
@@ -445,14 +445,14 @@ def define_paper_model_styles() -> dict[str, dict[str, Any]]:
             "marker": "D",
             "color": "#DF5257",
         },
-        "AA_hybrid_moliere": {
+        "PbPb_hybrid_moliere": {
             "linewidth": 3,
             "linestyle": "--",
             "marker": "D",
             #"color": "#4cab98",
             "color": "#DF5257",
         },
-        "AA_hybrid_without_moliere": {
+        "PbPb_hybrid_without_moliere": {
             "linewidth": 3,
             "linestyle": "--",
             "marker": "D",

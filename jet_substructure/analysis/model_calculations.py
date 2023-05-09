@@ -51,6 +51,15 @@ class ModelCalculation:
             return self.label_pp
         return self.label_AA
 
+    def PbPb(self, event_activity: str) -> dict[str, binned_data.BinnedData]:
+        """Helper so we can select with strings. """
+        if event_activity == "central":
+            return self.central
+        if event_activity == "semi_central":
+            return self.semi_central
+        _msg = f"Unrecognized event activity {event_activity}"
+        raise ValueError(_msg)
+
     def ratio(self, event_activity: str) -> dict[str, binned_data.BinnedData]:
         """Helper so we can select with strings. """
         if event_activity == "central":
