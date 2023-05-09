@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import copy
+import functools
 import logging
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -38,6 +39,21 @@ _event_activity_label_map = {
     "central": r"0-10\%",
     "semi_central": r"30-50\%",
 }
+
+
+@functools.cache
+def retrieve_model_styles(event_activity: str, model_name: str) -> dict[str, Any]:
+    # Setup
+    # NOTE: The danger of sometimes calling it `collision_system` when it's really event activity / collision system
+    #       is that labeling can get confusing. But this is a good enough work around.
+    _event_activity_to_model_styles_key_map = {
+        "pp": "pp",
+        "semi_central": "PbPb",
+        "central": "PbPb",
+    }
+
+    model_styles = plot_style.define_models_styles()
+    return dict(model_styles[f"{_event_activity_to_model_styles_key_map[event_activity]}_{model_name}"])
 
 
 def _plot_pp_grooming_comparison_with_models_2022(
@@ -566,14 +582,6 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
     grooming_styles = plot_style.define_paper_grooming_styles()
     model_styles = plot_style.define_paper_model_styles()
 
-    # This is the danger of calling it `collision_system` when it's really event activity / collision system.
-    # But this is a good enough work around.
-    _collision_system_to_model_styles_key_map = {
-        "pp": "pp",
-        "semi_central": "PbPb",
-        "central": "PbPb",
-    }
-
     if all_methods_on_one_figure:
         n_panels = int(np.ceil(len(grooming_methods) / 2))
         fig, all_axes = plt.subplots(
@@ -736,7 +744,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
 
             # And plot
             # Make sure we copy the settings so we can modify them
-            temp_kwargs = dict(model_styles[f"{_collision_system_to_model_styles_key_map[collision_system]}_{model_name}"])
+            temp_kwargs = retrieve_model_styles(event_activity=collision_system, model_name=model_name)
             temp_kwargs["label"] = model_calculation.label(collision_system=collision_system) if plotting_last_method and not all_methods_on_one_figure else None
             # Need to pop for fill_between since these aren't valid args
             temp_kwargs.pop("marker")
@@ -806,7 +814,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
         # Create handles and labels by hand, using all models
         legend_elements = []
         for model_name, (model_calculation, _) in models.items():
-            model_kwargs = dict(model_styles[f"{_collision_system_to_model_styles_key_map[collision_system]}_{model_name}"])
+            model_kwargs = retrieve_model_styles(event_activity=collision_system, model_name=model_name)
             legend_elements.append(
                 mpl.patches.Patch(
                     facecolor=model_kwargs["color"],
@@ -1093,7 +1101,6 @@ def _plot_single_system_comparison(
         output_dir: Output directory.
     """
     grooming_styles = plot_style.define_paper_grooming_styles()
-    model_styles = plot_style.define_paper_model_styles()
 
     # fig, ax = plt.subplots(figsize=(9, 10))
     # Size is specified to make it convenient to compare against Hard Probes plots.
@@ -1341,8 +1348,172 @@ def plot_comparisons_of_grooming_methods_for_single_system(
     )
 
 
+def _plot_pp_PbPb_comparison_single_panel(
+    ax: mpl.axes.Axis,
+    ax_ratio: mpl.axes.Axis,
+    hists: Mapping[str, unfolding_analysis.SingleResult],
+    grooming_method: str,
+    set_zero_to_nan: bool,
+    event_activity_to_kt_range: Mapping[str, helpers.KtRange],
+    models_ratio: Mapping[str, Mapping[str, Mapping[str, binned_data.BinnedData]]] | None = None,
+) -> None:
+    # Setup
+    _event_activity_label_map = {
+        "pp": "pp",
+        "central": r"0-10\% $\text{Pb--Pb}$",
+        "semi_central": r"30-50\% $\text{Pb--Pb}$",
+    }
+    _event_activity_to_color = {
+        "pp": "#845cba",
+        "semi_central": "#FF8301",
+        "central": "#4bafd0",
+    }
+
+    # Use pp as reference, but only in the range where the others are measured.
+    ratio_reference_hist_unselected = hists["pp"].data
+    # Determine whether we should plot the ratio in black points and grey uncertainties
+    # We only want to do that if we have models for comparison and have just pp and one
+    # other collision system available
+    plot_ratio_black_and_white = (models_ratio and len(hists) == 2)
+
+    for _plot_counter, (collision_system, hist) in enumerate(hists.items()):
+        # Axes: jet_pt, attr_name
+        h = hist.data
+
+        # Select range to display.
+        h = full_results_helpers.select_hist_range(h, event_activity_to_kt_range[collision_system])
+
+        # Set 0s to NaN
+        if set_zero_to_nan:
+            h.errors[h.values == 0] = np.nan
+            h.values[h.values == 0] = np.nan
+
+        # Main data points
+        p = ax.errorbar(
+            h.axes[0].bin_centers,
+            h.values,
+            yerr=h.errors,
+            xerr=h.axes[0].bin_widths / 2,
+            marker="s" if "soft_drop" in grooming_method else "o",
+            markersize=11,
+            linestyle="",
+            linewidth=3,
+            label=_event_activity_label_map[collision_system],
+            # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+            zorder=3 + _plot_counter,
+            color=_event_activity_to_color[collision_system],
+        )
+
+        # Systematic uncertainty
+        pachyderm.plot.error_boxes(
+            ax=ax,
+            x_data=h.axes[0].bin_centers,
+            y_data=h.values,
+            x_errors=h.axes[0].bin_widths / 2,
+            y_errors=np.array(
+                [
+                    h.metadata["y_systematic"]["quadrature"].low,
+                    h.metadata["y_systematic"]["quadrature"].high,
+                ]
+            ),
+            color=p[0].get_color(),
+            linewidth=0,
+            alpha=0.3,
+            zorder=2,
+        )
+
+        # Ratio
+        # Skip pp because it's not meaningful.
+        if collision_system == "pp":
+            continue
+
+        # Ensure the ratio is defined over the same range.
+        ratio_reference_hist = full_results_helpers.select_hist_range(
+            ratio_reference_hist_unselected, event_activity_to_kt_range[collision_system]
+        )
+        ratio = h / ratio_reference_hist
+        # Ratio + statistical error bars
+        ax_ratio.errorbar(
+            ratio.axes[0].bin_centers,
+            ratio.values,
+            yerr=ratio.errors,
+            xerr=ratio.axes[0].bin_widths / 2,
+            color="black" if plot_ratio_black_and_white else p[0].get_color(),
+            marker="s" if "soft_drop" in grooming_method else "o",
+            markersize=11,
+            linestyle="",
+            linewidth=3,
+            # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+            zorder=3 + _plot_counter,
+        )
+        # Systematic errors.
+        y_relative_error_low = full_results_helpers.relative_error(
+            full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
+            full_results_helpers.ErrorInput(
+                value=ratio_reference_hist.values,
+                error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].low,
+            ),
+        )
+        y_relative_error_high = full_results_helpers.relative_error(
+            full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
+            full_results_helpers.ErrorInput(
+                value=ratio_reference_hist.values,
+                error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].high,
+            ),
+        )
+        # Store the systematic.
+        ratio.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
+            low=y_relative_error_low * ratio.values,
+            high=y_relative_error_high * ratio.values,
+        )
+        y_systematic = ratio.metadata["y_systematic"]["quadrature"]
+        pachyderm.plot.error_boxes(
+            ax=ax_ratio,
+            x_data=ratio.axes[0].bin_centers,
+            y_data=ratio.values,
+            x_errors=ratio.axes[0].bin_widths / 2,
+            y_errors=np.array([y_systematic.low, y_systematic.high]),
+            color="grey" if plot_ratio_black_and_white else p[0].get_color(),
+            linewidth=0,
+            alpha=0.3,
+            zorder=2,
+        )
+
+    # Plot model comparison if available
+    for i_model, (model_name, model_with_all_grooming_methods) in enumerate(models_ratio.items()):
+        model = model_with_all_grooming_methods.get(grooming_method, None)
+        if not model:
+            logger.debug(
+                f"Skipping model {model_name}, grooming method: {grooming_method} because predictions aren't available"
+            )
+            continue
+
+        # Select the relevant kt range
+        model = full_results_helpers.select_hist_range(
+            model, event_activity_to_kt_range[collision_system]
+        )
+
+        # Fill between
+        # NOTE: This relies on collision_system being defined above and that it's not "pp" as the last entry
+        #       Otherwise, will give the wrong label.
+        temp_kwargs = retrieve_model_styles(event_activity=collision_system, model_name=model_name)
+        temp_kwargs["label"] = temp_kwargs["label"]
+        temp_kwargs["facecolor"] = temp_kwargs.pop("color")
+        temp_kwargs.pop("marker")
+        ax_ratio.fill_between(
+            model.axes[0].bin_centers,
+            model.values - model.errors,
+            model.values + model.errors,
+            alpha=0.7,
+            **temp_kwargs,
+        )
+
+    # Reference value for ratio
+    ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
+
+
 def _plot_pp_PbPb_comparison(  # noqa: C901
-    hists: Mapping[str, unfolding_analysis.SingleResult] | Mapping[str, Mapping[str, unfolding_analysis.SingleResult]],
+    hists: Mapping[str, Mapping[str, unfolding_analysis.SingleResult]],
     grooming_methods: list[str],
     set_zero_to_nan: bool,
     all_methods_on_one_figure: bool,
@@ -1360,20 +1531,6 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
     logger.info("Plotting grooming method comparison for kt with systematics")
 
     # Setup
-    _event_activity_label_map = {
-        "pp": "pp",
-        "central": r"0-10\% $\text{Pb--Pb}$",
-        "semi_central": r"30-50\% $\text{Pb--Pb}$",
-    }
-    _event_activity_to_color = {
-        "pp": "#845cba",
-        "semi_central": "#FF8301",
-        "central": "#4bafd0",
-    }
-
-    # fig, ax = plt.subplots(figsize=(9, 10))
-    # Size is specified to make it convenient to compare against Hard Probes plots.
-    # TODO: Need to support passing multiple grooming methods...
     if all_methods_on_one_figure:
         n_panels = int(np.ceil(len(grooming_methods) / 2))
         fig, all_axes = plt.subplots(
@@ -1399,194 +1556,28 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
             sharex=True,
         )
         ax, ax_ratio = all_axes
+        # Repeat the pairs
         ax_pairs = [
             (ax, ax_ratio)
             for _ in range(len(grooming_methods))
         ]
 
-    # Use pp as reference, but only in the range where the others are measured.
-    ratio_reference_hist_unselected = hists["pp"].data
-
-    # Determine whether we should plot the ratio in black points and grey uncertainties
-    # We only want to do that if we have models for comparison and have just pp and one
-    # other collision system available
-    plot_ratio_black_and_white = (models and len(hists) == 2)
-
-    # Collision system is a bit misleading because it's really event activity + pp, but good enough.
-    for _plot_counter, (grooming_method, (ax, ax_ratio)) in enumerate(zip(grooming_methods, ax_pairs)):
-        for _plot_counter, (collision_system, hist) in enumerate(hists.items()):
-            # Axes: jet_pt, attr_name
-            h = hist.data
-
-            # Select range to display.
-            h = full_results_helpers.select_hist_range(h, event_activity_to_kt_range[collision_system])
-
-            # Set 0s to NaN
-            if set_zero_to_nan:
-                h.errors[h.values == 0] = np.nan
-                h.values[h.values == 0] = np.nan
-
-            # Main data points
-            p = ax.errorbar(
-                h.axes[0].bin_centers,
-                h.values,
-                yerr=h.errors,
-                xerr=h.axes[0].bin_widths / 2,
-                marker="s" if "soft_drop" in grooming_method else "o",
-                markersize=11,
-                linestyle="",
-                linewidth=3,
-                label=_event_activity_label_map[collision_system],
-                # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
-                zorder=3 + _plot_counter,
-                color=_event_activity_to_color[collision_system],
-            )
-
-            # Systematic uncertainty
-            pachyderm.plot.error_boxes(
-                ax=ax,
-                x_data=h.axes[0].bin_centers,
-                y_data=h.values,
-                x_errors=h.axes[0].bin_widths / 2,
-                y_errors=np.array(
-                    [
-                        h.metadata["y_systematic"]["quadrature"].low,
-                        h.metadata["y_systematic"]["quadrature"].high,
-                    ]
-                ),
-                color=p[0].get_color(),
-                linewidth=0,
-                alpha=0.3,
-                zorder=2,
-            )
-
-            # Ratio
-            # Skip pp because it's not meaningful.
-            if collision_system == "pp":
-                continue
-
-            # Ensure the ratio is defined over the same range.
-            ratio_reference_hist = full_results_helpers.select_hist_range(
-                ratio_reference_hist_unselected, event_activity_to_kt_range[collision_system]
-            )
-            logger.debug(f"h: {h.axes[0].bin_edges}")
-            logger.debug(f"ratio_reference_hist: {ratio_reference_hist.axes[0].bin_edges}")
-            ratio = h / ratio_reference_hist
-            # Ratio + statistical error bars
-            ax_ratio.errorbar(
-                ratio.axes[0].bin_centers,
-                ratio.values,
-                yerr=ratio.errors,
-                xerr=ratio.axes[0].bin_widths / 2,
-                color="black" if plot_ratio_black_and_white else p[0].get_color(),
-                marker="s" if "soft_drop" in grooming_method else "o",
-                markersize=11,
-                linestyle="",
-                linewidth=3,
-                # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
-                zorder=3 + _plot_counter,
-            )
-            # Systematic errors.
-            y_relative_error_low = full_results_helpers.relative_error(
-                full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].low),
-                full_results_helpers.ErrorInput(
-                    value=ratio_reference_hist.values,
-                    error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].low,
-                ),
-            )
-            y_relative_error_high = full_results_helpers.relative_error(
-                full_results_helpers.ErrorInput(value=h.values, error=h.metadata["y_systematic"]["quadrature"].high),
-                full_results_helpers.ErrorInput(
-                    value=ratio_reference_hist.values,
-                    error=ratio_reference_hist.metadata["y_systematic"]["quadrature"].high,
-                ),
-            )
-            # Sanity check
-            # TODO: If this passes once, delete it. I've checked this a lot now...
-            test_relative_y_error_low = np.sqrt(
-                (h.metadata["y_systematic"]["quadrature"].low / h.values) ** 2
-                + (ratio_reference_hist.metadata["y_systematic"]["quadrature"].low / ratio_reference_hist.values) ** 2
-            )
-            test_relative_y_error_high = np.sqrt(
-                (h.metadata["y_systematic"]["quadrature"].high / h.values) ** 2
-                + (ratio_reference_hist.metadata["y_systematic"]["quadrature"].high / ratio_reference_hist.values) ** 2
-            )
-            np.testing.assert_allclose(y_relative_error_low, test_relative_y_error_low)
-            np.testing.assert_allclose(y_relative_error_high, test_relative_y_error_high)
-            # Store the systematic.
-            ratio.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
-                low=y_relative_error_low * ratio.values,
-                high=y_relative_error_high * ratio.values,
-            )
-            y_systematic = ratio.metadata["y_systematic"]["quadrature"]
-            pachyderm.plot.error_boxes(
-                ax=ax_ratio,
-                x_data=ratio.axes[0].bin_centers,
-                y_data=ratio.values,
-                x_errors=ratio.axes[0].bin_widths / 2,
-                y_errors=np.array([y_systematic.low, y_systematic.high]),
-                color="grey" if plot_ratio_black_and_white else p[0].get_color(),
-                linewidth=0,
-                alpha=0.3,
-                zorder=2,
-            )
-
-        # Plot model comparison if available
-        for i_model, (model_name, model_with_all_grooming_methods) in enumerate(models.items()):
-            model = model_with_all_grooming_methods.get(grooming_method, None)
-            if not model:
-                logger.debug(
-                    f"Skipping model {model_name}, grooming method: {grooming_method} because predictions aren't available"
-                )
-                continue
-
-            # Select the relevant kt range
-            model = full_results_helpers.select_hist_range(
-                model, event_activity_to_kt_range[collision_system]
-            )
-
-            # TODO: Cleanup - this is a mess! Just needed to move quickly for HP2023
-            # Colors (copied from elsewhere)
-            _palette_6_mod = {
-                #"purple": "#7e459e",
-                "green": "#85aa55",
-                #"blue": "#7385d9",
-                "magenta": "#b84c7d",
-                "teal": "#4cab98",
-                #"orange": "#FF8301",
-            }
-            _extended_colors = {
-                "purple": "#7e459e",
-                #"alt_purple": "#c09cd3",
-                # Generated
-                #"alt_green": "#3f591d",
-                #"alt_green": "#517225",
-                # Already existing green
-                #"alt_green": "#55a270",
-                #"alt_blue": "#4bafd0",
-                # random additions...
-                "teal": "#4cab98",
-                #"blue": "#7385d9",
-                #"alt_green_2": "#55a270",
-                #"alt_red": _model_palette[1],
-                "alt_red": _model_palette[1],
-            }
-            # Fill between
-            temp_kwargs = dict(_models_styles[model_name])
-            temp_kwargs["label"] = temp_kwargs["label"]
-            temp_kwargs["facecolor"] = temp_kwargs.pop("color")
-            temp_kwargs["facecolor"] = list(reversed(_extended_colors.values()))[i_model]
-            temp_kwargs.pop("marker")
-            ax_ratio.fill_between(
-                model.axes[0].bin_centers,
-                model.values - model.errors,
-                model.values + model.errors,
-                alpha=0.7,
-                **temp_kwargs,
-            )
-
-        # Reference value for ratio
-        ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
+    # Loop over grooming methods to plot
+    for grooming_method, (ax, ax_ratio) in zip(grooming_methods, ax_pairs):
+        _plot_pp_PbPb_comparison_single_panel(
+            ax=ax, ax_ratio=ax_ratio,
+            hists={
+                k: v[grooming_method]
+                for k, v in hists.items()
+            },
+            grooming_method=grooming_method,
+            set_zero_to_nan=set_zero_to_nan,
+            event_activity_to_kt_range=event_activity_to_kt_range,
+            models_ratio={
+                k: v[grooming_method]
+                for k, v in models_ratio.items()
+            } if models_ratio else {},
+        )
 
     # Labeling and presentation
     ax_ratio_legend_config = None
@@ -1604,6 +1595,7 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
         ax_ratio_labels.insert(insert_position, "")
         #ax_ratio_handles.insert(insert_position, ax_ratio_handles[0])
         #ax_ratio_labels.insert(insert_position, ax_ratio_labels[0])
+
     plot_config.apply(fig=fig, axes=[ax, ax_ratio])
     # A few additional tweaks.
     ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
@@ -1623,86 +1615,91 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
 
 
 def plot_pp_PbPb_comparison(
-    hists: Mapping[str, unfolding_analysis.SingleResult],
-    grooming_method: str,
+    hists: Mapping[str, Mapping[str, unfolding_analysis.SingleResult]],
+    grooming_methods: list[str],
     output_dir: Path,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
     kt_display_range: tuple[float, float] = (1.5, 15),
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
-    models: Mapping[str, Mapping[str, binned_data.BinnedData]] | None = None,
+    models_ratio: Mapping[str, Mapping[str, binned_data.BinnedData]] | None = None,
     additional_label: str = "",
-) -> tuple[dict[str, float], dict[str, float]]:
-    """Plot PbPb unfolded results with systematics."""
-    jet_pt_bin = next(iter(hists.values())).ranges[0]
-    grooming_styling = pb.define_grooming_styles()
-    style = grooming_styling[grooming_method]
+) -> None:
+    """Compare pp and PbPb results with ratio."""
+    # Setup
+    jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
+    grooming_styles = plot_style.define_paper_grooming_styles()
 
-    text = pb.label_to_display_string["ALICE"][alice_status]
-    text += "\n" + pb.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
-    text += "\n" + pb.label_to_display_string["jets"]["general"]
-    text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    for grooming_method in grooming_methods:
+        style = grooming_styles[grooming_method]
 
-    name = "unfolded_kt_pp_PbPb"
-    if additional_label:
-        name += f"_{additional_label}"
-    if models:
-        name += "_models"
-    name += f"_comparison_{jet_R_str}"
+        text = plot_style.label_to_display_string["ALICE"][alice_status]
+        text += "\n" + plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
+        text += "\n" + plot_style.label_to_display_string["jets"]["general"]
+        text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
+        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
 
-    _ratio_range = (0.3, 1.7)
-    if "central" in hists and models:
-        _ratio_range = (0.1, 1.9)
-    if "z_cut_04" in grooming_method:
-        _ratio_range = (-0.2, 2.2) if models else (0.1, 1.9)
+        name = "unfolded_kt_pp_PbPb"
+        if additional_label:
+            name += f"_{additional_label}"
+        if models_ratio:
+            name += "_models"
+        name += f"_comparison_{jet_R_str}"
 
+        _ratio_range = (0.3, 1.7)
+        if "central" in hists and models_ratio:
+            _ratio_range = (0.1, 1.9)
+        if any("z_cut_04" in m for m in grooming_methods):
+            _ratio_range = (-0.2, 2.2) if models_ratio else (0.1, 1.9)
 
-    _results = _plot_pp_PbPb_comparison(
-        hists=hists,
-        models=models,
-        grooming_method=grooming_method,
-        set_zero_to_nan=False,
-        event_activity_to_kt_range=event_activity_to_kt_range,
-        plot_config=pb.PlotConfig(
-            name=name,
-            panels=[
-                # Main panel
-                pb.Panel(
-                    axes=[
-                        pb.AxisConfig(
-                            "y",
-                            label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
-                            log=True,
-                            #range=(7e-3, 1),
-                            range=(4e-3, 1),
-                            font_size=text_font_size,
-                        ),
-                    ],
-                    text=[
-                        pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
-                        # Add the grooming label in a separate location in the bottom left
-                        # Otherwise, it will overlap with the data
-                        pb.TextConfig(x=0.02, y=0.02, text=style.label, font_size=text_font_size),
-                    ],
-                    legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.0, 0.10), marker_label_spacing=-0.2),
-                ),
-                pb.Panel(
-                    axes=[
-                        pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
-                        pb.AxisConfig("y", label=r"$\frac{\text{Pb--Pb}}{\text{pp}}$",
-                                      range=_ratio_range,
-                                      # Make the label a bit bigger since it's stack on top
-                                      font_size=text_font_size * 1.05
-                                      ),
-                    ],
-                    legend=pb.LegendConfig(location="lower left", font_size=22, anchor=(0.01, 0.02), ncol=2, marker_label_spacing=0.05, label_spacing=0.1, handle_height=1.3, column_spacing=0.30),
-                ),
-            ],
-            figure=pb.Figure(edge_padding={"left": 0.15, "bottom": 0.095, "top": 0.975}),
-        ),
-        output_dir=output_dir,
-    )
+        model_legend_config = None
+        if models_ratio:
+            model_legend_config = pb.LegendConfig(location="lower left", font_size=22, anchor=(0.01, 0.02), ncol=2, marker_label_spacing=0.05, label_spacing=0.1, handle_height=1.3, column_spacing=0.30)
 
-    return _results  # noqa: RET504
+        _plot_pp_PbPb_comparison(
+            hists=hists,
+            models_ratio=models_ratio,
+            grooming_methods=grooming_methods,
+            set_zero_to_nan=False,
+            all_methods_on_one_figure=False,
+            event_activity_to_kt_range=event_activity_to_kt_range,
+            plot_config=pb.PlotConfig(
+                name=name,
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
+                                log=True,
+                                #range=(7e-3, 1),
+                                range=(4e-3, 1),
+                                font_size=text_font_size,
+                            ),
+                        ],
+                        text=[
+                            pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
+                            # Add the grooming label in a separate location in the bottom left
+                            # Otherwise, it will overlap with the data
+                            pb.TextConfig(x=0.02, y=0.02, text=style.label, font_size=text_font_size),
+                        ],
+                        legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.0, 0.10), marker_label_spacing=-0.2),
+                    ),
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
+                            pb.AxisConfig("y", label=r"$\frac{\text{Pb--Pb}}{\text{pp}}$",
+                                        range=_ratio_range,
+                                        # Make the label a bit bigger since it's stack on top
+                                        font_size=text_font_size * 1.05
+                                        ),
+                        ],
+                        legend=model_legend_config,
+                    ),
+                ],
+                figure=pb.Figure(edge_padding={"left": 0.15, "bottom": 0.095, "top": 0.975}),
+            ),
+            output_dir=output_dir,
+        )
