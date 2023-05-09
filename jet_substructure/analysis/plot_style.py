@@ -390,7 +390,6 @@ def define_paper_model_styles() -> dict[str, dict[str, Any]]:
 
     paper_model_styles = {
         "pp_pythia": {
-            "label": "PYTHIA8 Monash 2013",
             "linewidth": 3,
             "linestyle": "-",
             "marker": "s",
@@ -399,14 +398,12 @@ def define_paper_model_styles() -> dict[str, dict[str, Any]]:
             "markeredgewidth": 3,
         },
         "pp_caucal_analytical": {
-            "label": "Caucal et al.",
             "linewidth": 3,
             "linestyle": "-.",
             "marker": "P",
             "color": "#1abc9c",
         },
         "pp_sherpa_lund": {
-            "label": "SHERPA (Lund)",
             "linewidth": 3,
             "linestyle": "--",
             "marker": "*",
@@ -416,7 +413,6 @@ def define_paper_model_styles() -> dict[str, dict[str, Any]]:
             "color": "#2c4875",
         },
         "pp_sherpa_ahadic": {
-            "label": "SHERPA (AHADIC)",
             "linewidth": 3,
             "linestyle": ":",
             "marker": "X",
