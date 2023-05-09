@@ -1589,8 +1589,10 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
             legend_models = copy.deepcopy(legend_config)
             legend_models.location = "upper right"
             legend_models.anchor= (0.98, 0.98)
-            legend_models.font_size = round(legend_models.font_size * 0.9)
+            # Make smaller to try to fit...
+            legend_models.font_size = round(legend_models.font_size * 0.8)
             legend_models.marker_label_spacing = 0.
+            legend_models.label_spacing = 0.1
 
             # Create handles and labels by hand, using all models
             legend_elements = []
@@ -1605,11 +1607,8 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
                     )
                 )
 
-            # Next, to create the new legend, we need the existing handles
-            # NOTE: We won't have handles from every model because I don't have all of their predictions right now.
-            #       However, this should only be a temporary issue. Once fixed, the plots will fix themselves. So for now (May 2023),
-            #       I just should look for a quick hack as a temporary fix.
-            ax_legend = all_axes[::2].flatten()[-1]
+            # Put on the second panel, next to the data labels
+            ax_legend = all_axes[::2].flatten()[1]
 
             # Now that we have the handles, we can apply
             legend_models.apply(
