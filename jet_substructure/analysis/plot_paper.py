@@ -1694,7 +1694,12 @@ def plot_pp_PbPb_comparison(
         style = grooming_styles[grooming_method]
 
         text = plot_style.label_to_display_string["ALICE"][alice_status]
-        text += "\n" + plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
+        # Since the final text is short, we can merge onto one line
+        if alice_status != "final":
+            text += "\n"
+        else:
+            text += " "
+        text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
         text += "\n" + plot_style.label_to_display_string["jets"]["general"]
         text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
         text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
