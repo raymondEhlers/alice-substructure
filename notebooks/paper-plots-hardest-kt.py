@@ -1613,10 +1613,25 @@ for _collision_system, _hists in [
         alice_status=alice_status,
     )
 
+
 # %% [markdown]
 # ## PbPb-pp comparison by each grooming methods
 #
-# ### R = 0.2
+# ### R = 0.2, semi-central + central
+
+# %%
+def PbPb_kt_measured_range_by_grooming_method(event_activity: str) -> None:
+    return {
+        "dynamical_core": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
+        "dynamical_kt": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
+        "dynamical_time": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
+        "soft_drop_z_cut_02": helpers.KtRange(0.25, 6),
+        "dynamical_core_z_cut_02": helpers.KtRange(0.25, 6),
+        "dynamical_kt_z_cut_02": helpers.KtRange(0.25, 6),
+        "dynamical_time_z_cut_02": helpers.KtRange(0.25, 6),
+        "soft_drop_z_cut_04": helpers.KtRange(0.25, 6),
+    }
+
 
 # %%
 jet_R = 0.2
@@ -1624,22 +1639,38 @@ jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
+plot_paper.plot_pp_PbPb_comparison_single_figure(
+    hists={
+        "pp": pp_R02_unfolded_with_systematics,
+        "semi_central": semi_central_R02_unfolded_with_systematics,
+        "central": central_R02_unfolded_with_systematics,
+    },
+    grooming_methods=grooming_methods,
+    output_dir=_output_dir,
+    event_activity_to_kt_range={
+        "pp": helpers.KtRange(0.25, 6),
+        "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+        "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+    },
+    kt_display_range=(0.0, 6.25),
+    jet_R_str=jet_R_str,
+    alice_status=alice_status,
+)
+
 for grooming_method in grooming_methods:
     logger.info(f"Processing {grooming_method}")
     plot_paper.plot_pp_PbPb_comparison(
         hists={
-            "pp": pp_R02_unfolded_with_systematics[grooming_method],
-            "semi_central": semi_central_R02_unfolded_with_systematics[grooming_method],
-            "central": central_R02_unfolded_with_systematics[grooming_method],
+            "pp": pp_R02_unfolded_with_systematics,
+            "semi_central": semi_central_R02_unfolded_with_systematics,
+            "central": central_R02_unfolded_with_systematics,
         },
-        grooming_method=grooming_method,
+        grooming_methods=[grooming_method],
         output_dir=_output_dir,
         event_activity_to_kt_range={
             "pp": helpers.KtRange(0.25, 6),
             "semi_central": helpers.KtRange(0.25, 6) if "z_cut" in grooming_method else helpers.KtRange(2, 6),
             "central": helpers.KtRange(0.25, 6) if "z_cut" in grooming_method else helpers.KtRange(3, 6),
-            # Peter's binning
-            #"semi_central": helpers.KtRange(2.25, 6) if "z_cut" not in grooming_method else helpers.KtRange(0.25, 6),
         },
         kt_display_range=(0.0, 6.25),
         jet_R_str=jet_R_str,
