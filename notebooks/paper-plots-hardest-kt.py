@@ -1261,7 +1261,7 @@ for _grooming_method in grooming_methods:
         hists=pp_R02_unfolded_with_systematics,
         models={
             "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.pp),
-            "pythia": (pythia_predictions_R02, pp_R02_true_reference),
+            "pythia": (pythia_predictions_R02, pythia_predictions_R02.pp),
             # All of the hybrid loaded predictions have the same pp, so picking any one is fine!
             "hybrid": (hybrid_model_with_wake_with_moliere_predictions_R02, hybrid_model_with_wake_with_moliere_predictions_R02.pp),
         },
@@ -1466,8 +1466,9 @@ plot_paper.plot_grooming_methods_comparison_with_model_for_single_system(
 # %%
 
 # %% [markdown]
-# ## PbPb grooming methods comparison
-#
+# ## PbPb data: compare between grooming methods
+
+# %% [markdown]
 # ### R = 0.2
 
 # %%
@@ -1480,13 +1481,11 @@ for _collision_system, _hists in [
     ("semi_central", semi_central_R02_unfolded_with_systematics),
     ("central", central_R02_unfolded_with_systematics),
 ]:
+    logger.info(f"Plotting {_collision_system}")
     for _temp_grooming_methods, _reference_method, _label in [
-        (["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"], "dynamical_core", "0"),
-        (["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"], "soft_drop_z_cut_02", "1"),
-        (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "2"),
-        (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "3"),
-        (["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "4"),
-        (["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "dynamical_kt_z_cut_02", "5"),
+        (["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"], "soft_drop_z_cut_02", "primary"),
+        (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "secondary"),
+        (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "summary"),
     ]:
         plot_paper.plot_comparisons_of_grooming_methods_for_single_system(
             hists=_hists,
@@ -1510,6 +1509,109 @@ for _collision_system, _hists in [
             alice_status=alice_status,
             label=_label,
         )
+
+# %% [markdown]
+# ## PbPb data comparison to models
+
+# %% [markdown]
+# ### R = 0.2, semi-central + central
+
+# %%
+jet_R = 0.2
+jet_R_str = f"R{int(jet_R*10):02}"
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
+_output_dir.mkdir(parents=True, exist_ok=True)
+
+for _collision_system, _hists in [
+    ("semi_central", semi_central_R02_unfolded_with_systematics),
+    ("central", central_R02_unfolded_with_systematics),
+]:
+    _PbPb_kt_range = {
+        "dynamical_core": helpers.KtRange(2, 6) if _collision_system == "semi_central" else helpers.KtRange(3, 6),
+        "dynamical_kt": helpers.KtRange(2, 6) if _collision_system == "semi_central" else helpers.KtRange(3, 6),
+        "dynamical_time": helpers.KtRange(2, 6) if _collision_system == "semi_central" else helpers.KtRange(3, 6),
+        "soft_drop_z_cut_02": helpers.KtRange(0.25, 6),
+        "dynamical_core_z_cut_02": helpers.KtRange(0.25, 6),
+        "dynamical_kt_z_cut_02": helpers.KtRange(0.25, 6),
+        "dynamical_time_z_cut_02": helpers.KtRange(0.25, 6),
+        "soft_drop_z_cut_04": helpers.KtRange(0.25, 6),
+    }
+    models = {
+        "hybrid_without_moliere": (hybrid_model_with_wake_without_moliere_predictions_R02, hybrid_model_with_wake_without_moliere_predictions_R02.PbPb(event_activity)),
+        "hybrid_moliere": (hybrid_model_with_wake_with_moliere_predictions_R02, hybrid_model_with_wake_with_moliere_predictions_R02.PbPb(event_activity)),
+        "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.PbPb(event_activity)),
+    }
+
+    for _grooming_method in grooming_methods:
+        plot_paper.plot_grooming_methods_comparison_with_model_for_single_system(
+            hists=_hists,
+            models=models,
+            grooming_methods=[_grooming_method],
+            collision_system=_collision_system,
+            collision_system_key="PbPb_5TeV",
+            output_dir=_output_dir,
+            kt_range=_PbPb_kt_range,
+            figure_kt_range=helpers.KtRange(0, 6.25),
+            jet_R_str=jet_R_str,
+            alice_status=alice_status,
+        )
+
+    # Figure for the paper, saving the space by using one figure and fully shared axes
+    plot_paper.plot_grooming_methods_comparison_with_model_for_single_system_one_figure(
+        hists=_hists,
+        models=models,
+        grooming_methods=grooming_methods,
+        collision_system=_collision_system,
+        collision_system_key="PbPb_5TeV",
+        output_dir=_output_dir,
+        kt_range=_PbPb_kt_range,
+        figure_kt_range=helpers.KtRange(0, 6.25),
+        main_panel_y_axis_range=(8e-3, 0.8),
+        ratio_y_axis_range=(0.3, 1.7),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+    )
+
+    # Some other plots that we keep around, but are unlikely to go into the paper
+    for _method_groups in [
+        ["dynamical_core", "dynamical_core_z_cut_02"],
+        ["dynamical_kt", "dynamical_kt_z_cut_02"],
+        ["dynamical_time", "dynamical_time_z_cut_02"],
+        ["soft_drop_z_cut_02", "soft_drop_z_cut_04"],
+        ["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"],
+        list(reversed(["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"])),
+        ["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02", "soft_drop_z_cut_04"],
+        list(reversed(["dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02", "soft_drop_z_cut_04"])),
+        ["dynamical_core_z_cut_02", "soft_drop_z_cut_02", "soft_drop_z_cut_04"],
+    ]:
+        # I don't think I will use these in the paper. However, I might, so may as well keep them around
+        continue
+        plot_paper.plot_grooming_methods_comparison_with_model_for_single_system(
+            hists=_hists,
+            models=models,
+            grooming_methods=_method_groups,
+            collision_system=_collision_system,
+            collision_system_key="PbPb_5TeV",
+            output_dir=_output_dir,
+            kt_range=_PbPb_kt_range,
+            figure_kt_range=helpers.KtRange(0, 6.25),
+            jet_R_str=jet_R_str,
+            alice_status=alice_status,
+        )
+    # This plot with all methods isn't really super useful as it's too much information on one panel, but I think
+    # it's a bit nice as a summary of all of the available data and models
+    plot_paper.plot_grooming_methods_comparison_with_model_for_single_system(
+        hists=_hists,
+        models=models,
+        grooming_methods=grooming_methods,
+        collision_system=_collision_system,
+        collision_system_key="PbPb_5TeV",
+        output_dir=_output_dir,
+        kt_range=_PbPb_kt_range,
+        figure_kt_range=helpers.KtRange(0, 6.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+    )
 
 # %% [markdown]
 # ## PbPb-pp comparison by each grooming methods
