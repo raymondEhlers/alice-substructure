@@ -821,10 +821,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
                 )
             )
 
-        # Next, to create the new legend, we need the existing handles
-        # NOTE: We won't have handles from every model because I don't have all of their predictions right now.
-        #       However, this should only be a temporary issue. Once fixed, the plots will fix themselves. So for now (May 2023),
-        #       I just should look for a quick hack as a temporary fix.
+        # Next, before we create the new legend, we need the existing data point handles
         ax_legend = all_axes[::2].flatten()[-1]
         handles, labels = ax_legend.get_legend_handles_labels()
 
@@ -1626,10 +1623,6 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
         # A few additional tweaks.
         for _ax in all_axes[::2].flatten():
             _ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
-        # Need a manual hack here since the range has gotten so big with the models
-        #if models_ratio:
-        #    for _ax_ratio in all_axes[1::2].flatten():
-        #        _ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
     else:
         # Labeling and presentation
         ax_ratio_legend_config = None
