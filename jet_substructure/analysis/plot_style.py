@@ -401,7 +401,7 @@ def define_paper_model_styles() -> dict[str, dict[str, Any]]:
             "linewidth": 3,
             "linestyle": "-.",
             "marker": "P",
-            "color": "#1abc9c",
+            "color": "#008585",
         },
         "pp_sherpa_lund": {
             "linewidth": 3,
