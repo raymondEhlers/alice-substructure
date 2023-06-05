@@ -36,4 +36,11 @@ As just references, results from Pythia Monash2013 with options:
 
 HardQCD:all=on, PartonLevel:ISR = on, PartonLevel:MPI = on, PartonLevel:FSR = on, ParticleDecays:limitTau0=on, ParticleDecays:tau0Max = 10
 
-are provided (RJE: I haven't copied those in since I already have the PYTHIA results from ALICE)
+are provided
+
+### Notes
+
+- I haven't copied in the PYTHIA since I already have the PYTHIA results from ALICE)
+- I had to rename to add a `pp_` prefix to the files to match the R=0.2. I did this in the `combined/pp`
+  directory
+

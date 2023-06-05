@@ -113,6 +113,15 @@ class Jetscape:
             "40-50": "pbpb40-50",
             "pp": "pp",
         }
+        _jet_rapidity_ranges = {
+            0.2: "0.7",
+            0.4: "0.5"
+        }
+
+        # Settings
+        _jet_R = self.metadata["jet_R"]
+        _jet_rapidity_range =_jet_rapidity_ranges[_jet_R]
+
         # After setup, grab the predictions
         values: dict[str, dict[str, binned_data.BinnedData]] = {}
         for grooming_method in grooming_methods:
@@ -123,28 +132,37 @@ class Jetscape:
             _grooming_parameter_label = "aDyn" if "dynamical" in grooming_method else "beta"
             input_dir = self.base_dir / "combined"
             for _cent_bin, _cent_bin_label in _centrality_bins.items():
-                filename = f"{_cent_bin_label}_{_grooming_label}_ktG_jetr0.2_ptj60-80_rapj0.0-0.7_pt0.0-2510.0_rap0.0-1.1_{_grooming_parameter_label}{_grooming_param:.02f}_zCut{_z_cut:.02f}.txt"
+                filename = f"{_cent_bin_label}_{_grooming_label}_ktG_jetr{_jet_R}_ptj60-80_rapj0.0-{_jet_rapidity_range}_pt0.0-2510.0_rap0.0-1.1_{_grooming_parameter_label}{_grooming_param:.02f}_zCut{_z_cut:.02f}.txt"
                 #logger.debug(f"Loading {grooming_method}, {_cent_bin} from {filename}")
-                loaded_data = np.loadtxt(input_dir / _cent_bin_label / filename)
-                # Construct binned_data from input
-                # For the bin edges, we take all of the lower edges, and then cap it off with the last value
-                # from the upper edges.
-                bin_edges = np.concatenate([loaded_data[:, 1], loaded_data[-1:, 2]])
-                #logger.debug(f"{bin_edges=}")
-                data = binned_data.BinnedData(
-                    axes=bin_edges,
-                    values=loaded_data[:, 3],
-                    variances=(loaded_data[:, 4] ** 2),
-                )
-                values[grooming_method][_cent_bin] = data
+                try:
+                    loaded_data = np.loadtxt(input_dir / _cent_bin_label / filename)
+                    # Construct binned_data from input
+                    # For the bin edges, we take all of the lower edges, and then cap it off with the last value
+                    # from the upper edges.
+                    bin_edges = np.concatenate([loaded_data[:, 1], loaded_data[-1:, 2]])
+                    #logger.debug(f"{bin_edges=}")
+                    data = binned_data.BinnedData(
+                        axes=bin_edges,
+                        values=loaded_data[:, 3],
+                        variances=(loaded_data[:, 4] ** 2),
+                    )
+                    values[grooming_method][_cent_bin] = data
+                except FileNotFoundError:
+                    logger.debug(f"Skipping {grooming_method}, {_cent_bin} due to missing file (probably expected). {filename=}")
+                    pass
 
         # Merge relevant hists to extract the predictions
         predictions: dict[str, dict[str, binned_data.BinnedData]] = {}
+        selected_collision_systems = self.metadata.get("selected_collision_systems", {})
         for collision_system, contributors in {
             "pp": ["pp"],
             "semi_central": ["30-40", "40-50"],
             "central": ["0-5", "5-10"],
         }.items():
+            # Skip out if we can't load it (eg. R = 0.4, where we can't measure in PbPb).
+            if selected_collision_systems and collision_system not in selected_collision_systems:
+                continue
+
             # NOTE: len(contributors) assumes that there's the same number of events in each cent bin.
             #       This should be approximately true, although it would be nicer if we could do this precisely.
             #       Unfortunately, it doesn't appear that we have this information available in the output,
@@ -172,7 +190,7 @@ class Jetscape:
                 _method: predictions[_system][_method] / predictions["pp"][_method]
                 for _method in grooming_methods
             }
-            for _system in ["central", "semi_central"]
+            for _system in ["central", "semi_central"] if selected_collision_systems and _system in selected_collision_systems
         }
 
         return ModelCalculation(
@@ -181,11 +199,11 @@ class Jetscape:
             label_AA="JETSCAPEv3.5 AA22",
             normalized=self.needs_normalization,
             grooming_methods=grooming_methods,
-            pp=predictions["pp"],
-            semi_central=predictions["semi_central"],
-            semi_central_ratio=ratios["semi_central"],
-            central=predictions["central"],
-            central_ratio=ratios["central"],
+            pp=predictions.get("pp", {}),
+            semi_central=predictions.get("semi_central", {}),
+            semi_central_ratio=ratios.get("semi_central", {}),
+            central=predictions.get("central", {}),
+            central_ratio=ratios.get("central", {}),
         )
 
 
