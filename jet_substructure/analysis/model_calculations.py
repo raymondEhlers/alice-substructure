@@ -163,6 +163,7 @@ class Jetscape:
         }.items():
             # Skip out if we can't load it (eg. R = 0.4, where we can't measure in PbPb).
             if selected_collision_systems and collision_system not in selected_collision_systems:
+                logger.info(f"Skip calculation predictions for {collision_system} due to selected collision systems.")
                 continue
 
             # NOTE: len(contributors) assumes that there's the same number of events in each cent bin.
@@ -187,12 +188,14 @@ class Jetscape:
                 predictions[collision_system][_method] = _data
 
         # Now, calculate the ratios based on the predictions
+        # NOTE: We can only calculate the ratio if the have the necessary collision systems
+        #       selected and available.
         ratios = {
             _system: {
                 _method: predictions[_system][_method] / predictions["pp"][_method]
                 for _method in grooming_methods
             }
-            for _system in ["central", "semi_central"] if selected_collision_systems and _system in selected_collision_systems
+            for _system in predictions if _system != "pp"
         }
 
         return ModelCalculation(
