@@ -2020,7 +2020,6 @@ def plot_pp_PbPb_comparison_with_multiple_model_ratios(
                                         font_size=text_font_size * 1.05
                                         ),
                         ],
-                        legend=model_legend_config,
                     ),
                 ],
                 figure=pb.Figure(edge_padding={"left": 0.1525, "bottom": 0.095, "top": 0.975}),
