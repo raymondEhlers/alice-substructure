@@ -1636,10 +1636,15 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
         for _ax in all_axes[::2].flatten():
             _ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
     else:
-        # TODO: Need to decide on which axis to put this one...
+        # Grab the axes which has the legend config.
+        ratio_axes_with_legend_config = [ax for ax, panel_config in zip(axes_ratio, plot_config.panels[1:]) if panel_config.legend is not None]
+        if len(ratio_axes_with_legend_config) != 1:
+            raise ValueError(f"Expected exactly one ratio axis to have a legend, got {len(ratio_axes_with_legend_config)}")
+        ax_ratio_legend = ratio_axes_with_legend_config[0]
+
         # Labeling and presentation
         ax_ratio_legend_config = None
-        ax_ratio_handles, ax_ratio_labels = axes_ratio[0].get_legend_handles_labels()
+        ax_ratio_handles, ax_ratio_labels = ax_ratio_legend.get_legend_handles_labels()
         #logger.info(f"{len(ax_ratio_handles)=}")
         #logger.info(f"{len(ax_ratio_labels)=}, {ax_ratio_labels=}")
         if models_ratio and len(ax_ratio_handles) % 2 == 1:
@@ -1649,7 +1654,7 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
             ax_ratio_legend_config = plot_config.panels[1].legend
             plot_config.panels[1].legend = None
             insert_position = round((len(ax_ratio_handles) + 1)/2)
-            ax_ratio_handles.insert(insert_position, axes_ratio[0].plot([], [], color=(0, 0, 0, 0), label=" ")[0])
+            ax_ratio_handles.insert(insert_position, ax_ratio_legend.plot([], [], color=(0, 0, 0, 0), label=" ")[0])
             ax_ratio_labels.insert(insert_position, "")
             #ax_ratio_handles.insert(insert_position, ax_ratio_handles[0])
             #ax_ratio_labels.insert(insert_position, ax_ratio_labels[0])
@@ -1659,10 +1664,10 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
         ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
         # Need a manual hack here since the range has gotten so big with the models
         if models_ratio and grooming_method == "soft_drop_z_cut_04":
-            axes_ratio[0].yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+            ax_ratio_legend.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
         if ax_ratio_legend_config:
             ax_ratio_legend_config.apply(
-                ax=axes_ratio[0],
+                ax=ax_ratio_legend,
                 legend_handles=ax_ratio_handles,
                 legend_labels=ax_ratio_labels,
             )
