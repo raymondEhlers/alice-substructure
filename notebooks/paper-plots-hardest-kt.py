@@ -1473,8 +1473,6 @@ plot_paper.plot_grooming_methods_comparison_with_model_for_single_system(
     alice_status=alice_status,
 )
 
-# %%
-
 # %% [markdown]
 # ## PbPb data: compare between grooming methods
 
@@ -1532,6 +1530,11 @@ jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
+models = {
+    "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
+    "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
+    "jetscape": jetscape_predictions_R02,
+}
 for _collision_system, _hists in [
     ("semi_central", semi_central_R02_unfolded_with_systematics),
     ("central", central_R02_unfolded_with_systematics),
@@ -1545,11 +1548,6 @@ for _collision_system, _hists in [
         "dynamical_kt_z_cut_02": helpers.KtRange(0.25, 6),
         "dynamical_time_z_cut_02": helpers.KtRange(0.25, 6),
         "soft_drop_z_cut_04": helpers.KtRange(0.25, 6),
-    }
-    models = {
-        "hybrid_without_moliere": (hybrid_model_with_wake_without_moliere_predictions_R02, hybrid_model_with_wake_without_moliere_predictions_R02.PbPb(event_activity)),
-        "hybrid_moliere": (hybrid_model_with_wake_with_moliere_predictions_R02, hybrid_model_with_wake_with_moliere_predictions_R02.PbPb(event_activity)),
-        "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.PbPb(event_activity)),
     }
 
     for _grooming_method in grooming_methods:
@@ -1625,7 +1623,7 @@ for _collision_system, _hists in [
 
 
 # %% [markdown]
-# ## PbPb-pp comparison by each grooming methods
+# ## PbPb-pp comparison by each grooming method
 #
 # ### R = 0.2, semi-central + central
 
@@ -1698,6 +1696,12 @@ jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
+models_ratio = {
+    "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
+    "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
+    "jetscape": jetscape_predictions_R02,
+}
+
 for event_activity in ["semi_central", "central"]:
     _additional_hists = {
         "semi_central": semi_central_R02_unfolded_with_systematics,
@@ -1708,11 +1712,7 @@ for event_activity in ["semi_central", "central"]:
             "pp": pp_R02_unfolded_with_systematics,
             event_activity: _additional_hists[event_activity],
         },
-        models_ratio={
-            "hybrid_without_moliere": (hybrid_model_with_wake_without_moliere_predictions_R02, hybrid_model_with_wake_without_moliere_predictions_R02.ratio(event_activity)),
-            "hybrid_moliere": (hybrid_model_with_wake_with_moliere_predictions_R02, hybrid_model_with_wake_with_moliere_predictions_R02.ratio(event_activity)),
-            "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.ratio(event_activity)),
-        },
+        models_ratio=models_ratio,
         grooming_methods=grooming_methods,
         output_dir=_output_dir,
         event_activity_to_kt_range={
@@ -1732,11 +1732,7 @@ for event_activity in ["semi_central", "central"]:
                 "pp": pp_R02_unfolded_with_systematics,
                 event_activity: _additional_hists[event_activity],
             },
-            models_ratio={
-                "hybrid_without_moliere": (hybrid_model_with_wake_without_moliere_predictions_R02, hybrid_model_with_wake_without_moliere_predictions_R02.ratio(event_activity)),
-                "hybrid_moliere": (hybrid_model_with_wake_with_moliere_predictions_R02, hybrid_model_with_wake_with_moliere_predictions_R02.ratio(event_activity)),
-                "jetscape": (jetscape_predictions_R02, jetscape_predictions_R02.ratio(event_activity)),
-            },
+            models_ratio=models_ratio,
             grooming_methods=[grooming_method],
             output_dir=_output_dir,
             event_activity_to_kt_range={

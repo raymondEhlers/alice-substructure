@@ -555,7 +555,7 @@ def _determine_uncertainty_lower_upper_for_model(model: binned_data.BinnedData) 
 
 def _plot_data_model_comparison_for_single_system(  # noqa: C901
     hists: Mapping[str, unfolding_analysis.SingleResult],
-    models: Mapping[str, tuple[model_calculations.ModelCalculation, Mapping[str, binned_data.BinnedData]]],
+    models: Mapping[str, model_calculations.ModelCalculation],
     grooming_methods: Sequence[str],
     collision_system: str,
     set_zero_to_nan: bool,
@@ -568,7 +568,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
 
     Args:
         hists: Mapping from grooming method to unfolding result.
-        models: Mapping from model name to model calculation and binned data.
+        models: Mapping from model name to model calculation.
         grooming_methods: List of grooming methods.
         collision_system: Collision system.
         set_zero_to_nan: Whether to set zero bins to NaN.
@@ -689,8 +689,8 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
             zorder=5.5,
         )
 
-        for model_name, (model_calculation, model_with_all_grooming_methods) in models.items():
-            model = model_with_all_grooming_methods.get(grooming_method, None)
+        for model_name, model_calculation in models.items():
+            model = model_calculation.spectra(event_activity=collision_system).get(grooming_method, None)
             if not model:
                 logger.debug(
                     f"Skipping model {model_name}, grooming method: {grooming_method} because predictions aren't available"
@@ -812,7 +812,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
 
         # Create handles and labels by hand, using all models
         legend_elements = []
-        for model_name, (model_calculation, _) in models.items():
+        for model_name, model_calculation in models.items():
             model_kwargs = retrieve_model_styles(event_activity=collision_system, model_name=model_name)
             legend_elements.append(
                 mpl.patches.Patch(
@@ -864,7 +864,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
 
 def plot_grooming_methods_comparison_with_model_for_single_system(
     hists: Mapping[str, unfolding_analysis.SingleResult],
-    models: Mapping[str, tuple[model_calculations.ModelCalculation, Mapping[str, binned_data.BinnedData]]],
+    models: Mapping[str, model_calculations.ModelCalculation],
     grooming_methods: Sequence[str],
     collision_system: str,
     collision_system_key: str,

@@ -51,8 +51,10 @@ class ModelCalculation:
             return self.label_pp
         return self.label_AA
 
-    def PbPb(self, event_activity: str) -> dict[str, binned_data.BinnedData]:
+    def spectra(self, event_activity: str) -> dict[str, binned_data.BinnedData]:
         """Helper so we can select with strings. """
+        if event_activity == "pp":
+            return self.pp
         if event_activity == "central":
             return self.central
         if event_activity == "semi_central":
