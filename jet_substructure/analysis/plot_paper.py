@@ -812,7 +812,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
         # First, we define the config for the legend. This way, we'll always have the same settings except for the location
         legend_models = copy.deepcopy(legend_config)
         legend_models.location = "upper right"
-        legend_models.anchor= (0.98, 0.98)
+        legend_models.anchor = (0.98, 0.98)
 
         # Create handles and labels by hand, using all models
         legend_elements = []
@@ -2043,9 +2043,6 @@ def _plot_pp_PbPb_only_ratios(
     # Setup
     grooming_styles = plot_style.define_paper_grooming_styles()
 
-    # Use pp as reference for the PbPb, but only in the range where the others are measured.
-    ratio_reference_hist_unselected = hists["pp"][grooming_method].data
-
     fig, axes = plt.subplots(
         len(hists),
         1,
@@ -2068,7 +2065,7 @@ def _plot_pp_PbPb_only_ratios(
 
         # Next, draw the data and uncertainties at one as black and grey boxes
         # Ratio + statistical error bars at one
-        ax.errorbar(
+        p_errorbar_data = ax.errorbar(
             h.axes[0].bin_centers,
             np.ones_like(h.axes[0].bin_centers),
             yerr=h.errors / h.values,
@@ -2079,8 +2076,9 @@ def _plot_pp_PbPb_only_ratios(
             linestyle="",
             linewidth=3,
             zorder=6,
+            #label=_event_activity_short_label_map[collision_system],
         )
-        pachyderm.plot.error_boxes(
+        p_boxes_data = pachyderm.plot.error_boxes(
             ax=ax,
             x_data=h.axes[0].bin_centers,
             y_data=np.ones_like(h.values),
@@ -2171,6 +2169,7 @@ def _plot_pp_PbPb_only_ratios(
             # NOTE: This is assuming we'll only plot PbPb model colors here, but I think that's a reasonable assumption,
             #       since that's the only models that could compare to the PbPb/pp ratio
             temp_kwargs = retrieve_model_styles(event_activity="PbPb", model_name=model_name)
+            # Will fill label in legend manually, so no need to do it here...
             temp_kwargs["label"] = model_calculation.label(collision_system=collision_system) if not all_methods_on_one_figure else None
             # Need to pop for fill_between since these aren't valid args
             temp_kwargs.pop("marker")
@@ -2189,14 +2188,78 @@ def _plot_pp_PbPb_only_ratios(
             )
 
     # Reference value for ratio
-    for ax_ratio in axes:
+    for _plot_counter, (ax_ratio, panel_config) in enumerate(zip(axes, plot_config.panels)):
         ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
+
+        # Update the data legends to show both the marker and box
+        # NOTE: As of 2023 Jun 8, it wasn't worth the effort. The box was too small for the marker, etc.
+        #       In general, these things are often quite tough with mpl... :-(
+        if _plot_counter != 1:
+            continue
+
+        # Setup
+        legend_config = panel_config.legend
+        assert legend_config is not None
+
+        # Begin with the data legend...
+        #handles, labels = ax_ratio.get_legend_handles_labels()
+
+        #import matplotlib.lines as mlines
+        #handles = [
+        #    (
+        #        copy.deepcopy(handle),
+        #        mpl.patches.Patch(
+        #            facecolor=p_boxes_data.get_facecolor()[0],
+        #            alpha=p_boxes_data.get_alpha(),
+        #        ),
+        #    )
+        #    for handle in handles
+        #]
+        #logger.info(f"{handles=}")
+        #legend_object = legend_config.apply(
+        #    ax=ax_ratio,
+        #    legend_handles=handles,
+        #    legend_labels=labels
+        #)
+
+        # Add an additional legend for the models.
+        if _plot_counter == 1:
+            # Create handles and labels by hand, using all models
+            # Put in the lower left of the middle panel
+            legend_config = copy.deepcopy(legend_config)
+            # NOTE: We only have to change these settings **if** we're passing a data legend.
+            #       As of 2023 June 8, we're not doing that, so we have these lines commented out.
+            #legend_config.location = "lower left"
+            #legend_config.ncol = 2
+            #legend_config.anchor = (0.02, 0.02)
+
+            model_legend_elements = []
+            for model_name, model_calculation in models_ratio.items():
+                # NOTE: This is assuming we'll only plot PbPb model colors here, but I think that's a reasonable assumption,
+                #       since that's the only models that could compare to the PbPb/pp ratio
+                model_kwargs = retrieve_model_styles(event_activity="PbPb", model_name=model_name)
+                model_legend_elements.append(
+                    mpl.patches.Patch(
+                        facecolor=model_kwargs["color"],
+                        label=model_calculation.label(collision_system=collision_system)
+                    )
+                )
+            model_legend_object = legend_config.apply(
+                ax=ax_ratio,
+                legend_handles=model_legend_elements,
+            )
+            ax_ratio.add_artist(model_legend_object)
+
+        # Commented - see above.
+        ## Add the legend
+        #ax_ratio.add_artist(legend_object)
+        ## And since it's there and we don't want plot_config to interfere, we set it to None.
+        #panel_config.legend = None
 
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=axes)
     # A few additional tweaks.
     ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
-    # ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.2))
 
     filename = f"{plot_config.name}"
     fig.savefig(output_dir / f"{filename}_{grooming_method}.pdf")
@@ -2253,6 +2316,17 @@ def plot_pp_PbPb_only_model_data_ratios(
             # Make the label a bit bigger since it's stack on top
             font_size=text_font_size * 1.05
         )
+        #standard_data_legend = pb.LegendConfig(location="lower right", font_size=text_font_size, anchor=(0.98, 0.02), marker_label_spacing=-0.2)
+        standard_model_legend = pb.LegendConfig(
+            location="lower left",
+            font_size=text_font_size,
+            anchor=(0.02, 0.02),
+            ncol=2,
+            marker_label_spacing=0.05,
+            label_spacing=0.1,
+            handle_height=1.3,
+            column_spacing=0.30,
+        )
         # pp - top panel
         # ALICE pp, PbPb 5.02 TeV
         text = plot_style.label_to_display_string["ALICE"][alice_status]
@@ -2270,17 +2344,18 @@ def plot_pp_PbPb_only_model_data_ratios(
                 text=[
                     pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
                     # Add the grooming label in a separate location in the bottom right
-                    pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
+                    #pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
                     # And the collision system
-                    pb.TextConfig(x=0.02, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
+                    pb.TextConfig(x=0.98, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
                 ],
-                #legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.02, 0.02), marker_label_spacing=-0.2),
+                #legend=copy.deepcopy(standard_data_legend),
             )
         )
         # Middle panel
         text = plot_style.label_to_display_string["jets"]["general"]
         text += " " + plot_style.label_to_display_string["jets"][jet_R_str]
         #text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
+        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
         panels.append(
             pb.Panel(
                 axes=[
@@ -2289,15 +2364,15 @@ def plot_pp_PbPb_only_model_data_ratios(
                 text=[
                     pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
                     # Add the grooming label in a separate location in the bottom right
-                    pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
+                    #pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
                     # And the collision system
-                    pb.TextConfig(x=0.02, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
+                    pb.TextConfig(x=0.98, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
                 ],
-                #legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.02, 0.02), marker_label_spacing=-0.2),
+                #legend=copy.deepcopy(standard_data_legend),
+                legend=copy.deepcopy(standard_model_legend),
             )
         )
         # Bottom panel
-        text = fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
         panels.append(
             pb.Panel(
                 axes=[
@@ -2305,19 +2380,14 @@ def plot_pp_PbPb_only_model_data_ratios(
                     pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
                 ],
                 text=[
-                    pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
-                    # Add the grooming label in a separate location in the bottom right
-                    pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
+                    # Add the grooming label in a separate location in the upper right
+                    pb.TextConfig(x=0.95, y=0.97, text=style.label, font_size=text_font_size),
                     # And the collision system
-                    pb.TextConfig(x=0.02, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
+                    pb.TextConfig(x=0.98, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
                 ],
-                #legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.02, 0.02), marker_label_spacing=-0.2),
+                #legend=copy.deepcopy(standard_data_legend),
             )
         )
-
-        #model_legend_config = None
-        #if models_ratio:
-        #    model_legend_config = pb.LegendConfig(location="lower left", font_size=22, anchor=(0.01, 0.02), ncol=2, marker_label_spacing=0.05, label_spacing=0.1, handle_height=1.3, column_spacing=0.30)
 
         _plot_pp_PbPb_only_ratios(
             hists=hists,
