@@ -1804,3 +1804,62 @@ for grooming_method in grooming_methods:
     )
 
 # %%
+
+# %% [markdown]
+# ## PbPb+pp model/data ratios only
+
+# %% [markdown]
+# ### R = 0.2
+
+# %%
+jet_R = 0.2
+jet_R_str = f"R{int(jet_R*10):02}"
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
+_output_dir.mkdir(parents=True, exist_ok=True)
+
+models_ratio = {
+    "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
+    "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
+    "jetscape": jetscape_predictions_R02,
+}
+
+#plot_paper.plot_pp_PbPb_comparison_single_figure(
+#    hists={
+#        "pp": pp_R02_unfolded_with_systematics,
+#        "semi_central": semi_central_R02_unfolded_with_systematics,
+#        "central": central_R02_unfolded_with_systematics,
+#    },
+#    models_ratio=models_ratio,
+#    grooming_methods=grooming_methods,
+#    output_dir=_output_dir,
+#    event_activity_to_kt_range={
+#        "pp": helpers.KtRange(0.25, 6),
+#        "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+#        "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+#    },
+#    kt_display_range=(0.0, 6.25),
+#    jet_R_str=jet_R_str,
+#    alice_status=alice_status,
+#)
+
+for grooming_method in grooming_methods:
+    plot_paper.plot_pp_PbPb_only_model_data_ratios(
+        hists={
+            "pp": pp_R02_unfolded_with_systematics,
+            "semi_central": semi_central_R02_unfolded_with_systematics,
+            "central": central_R02_unfolded_with_systematics,
+        },
+        models_ratio=models_ratio,
+        grooming_methods=[grooming_method],
+        output_dir=_output_dir,
+        event_activity_to_kt_range={
+            "pp": helpers.KtRange(0.25, 6),
+            "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+            "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+        },
+        kt_display_range=(0.0, 6.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+    )
+
+# %%
