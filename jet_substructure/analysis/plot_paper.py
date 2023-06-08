@@ -2027,3 +2027,275 @@ def plot_pp_PbPb_comparison_with_multiple_model_ratios(
             ),
             output_dir=output_dir,
         )
+
+
+def _plot_pp_PbPb_only_ratios(
+    hists: Mapping[str, unfolding_analysis.SingleResult],
+    grooming_method: str,
+    set_zero_to_nan: bool,
+    all_methods_on_one_figure: bool,
+    event_activity_to_kt_range: Mapping[str, helpers.KtRange],
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+    models_ratio: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
+) -> None:
+    """Plot model/data ratios for all provided collision systems."""
+    # Setup
+    grooming_styles = plot_style.define_paper_grooming_styles()
+    # TODO: Implement these...
+    _event_activity_label_map = {
+        "pp": "pp",
+        "central": r"0-10\% $\text{Pb--Pb}$",
+        "semi_central": r"30-50\% $\text{Pb--Pb}$",
+    }
+
+    # Use pp as reference for the PbPb, but only in the range where the others are measured.
+    ratio_reference_hist_unselected = hists["pp"][grooming_method].data
+
+    fig, axes = plt.subplots(
+        len(hists),
+        1,
+        figsize=(10, 10),
+        gridspec_kw={"height_ratios": [1] * len(hists)},
+        sharex=True,
+    )
+
+    for _plot_counter, ((collision_system, hist), ax) in enumerate(zip(hists.items(), axes)):
+        # Axes: jet_pt, attr_name
+        h = hist[grooming_method].data
+
+        # Select range to display.
+        h = full_results_helpers.select_hist_range(h, event_activity_to_kt_range[collision_system][grooming_method])
+
+        # Set 0s to NaN
+        if set_zero_to_nan:
+            h.errors[h.values == 0] = np.nan
+            h.values[h.values == 0] = np.nan
+
+        # Next, draw the data and uncertainties at one as black and grey boxes
+        # Ratio + statistical error bars at one
+        ax.errorbar(
+            h.axes[0].bin_centers,
+            np.ones_like(h.axes[0].bin_centers),
+            yerr=h.errors / h.values,
+            xerr=h.axes[0].bin_widths / 2,
+            color="black",
+            marker=grooming_styles[grooming_method].marker,
+            markersize=11,
+            linestyle="",
+            linewidth=3,
+            zorder=6,
+        )
+        pachyderm.plot.error_boxes(
+            ax=ax,
+            x_data=h.axes[0].bin_centers,
+            y_data=np.ones_like(h.values),
+            x_errors=h.axes[0].bin_widths / 2,
+            y_errors=np.array(
+                [
+                    h.metadata["y_systematic"]["quadrature"].low / h.values,
+                    h.metadata["y_systematic"]["quadrature"].high / h.values,
+                ]
+            ),
+            color="black",
+            linewidth=0,
+            alpha=0.3,
+            zorder=5.5,
+        )
+
+        # Plot model comparisons
+        for model_name, model_calculation in models_ratio.items():
+            model = model_calculation.spectra(event_activity=collision_system).get(grooming_method, None)
+            if not model:
+                logger.debug(f"{model_calculation.ratio(event_activity=collision_system)}")
+                logger.debug(
+                    f"Skipping model {model_name}, grooming method: {grooming_method}, {collision_system} because predictions aren't available"
+                )
+                continue
+
+            # Select the relevant kt range
+            model = full_results_helpers.select_hist_range(
+                model, event_activity_to_kt_range[collision_system][grooming_method]
+            )
+
+            # Further setup
+            # NOTE: If we naively construct the ratio here by just dividing the model by the data,
+            #       then the errors stored in the ratio aren't what we want since they convolve the
+            #       model uncertainties with the data uncertainties. So want to calculate the ratio
+            #       using a hist without the data uncertainties.
+            # NOTE: We define this here (ie. early) so we can decide what to rebin (which) we need to
+            #       know before we plot the model
+            h_without_uncertainties = binned_data.BinnedData(
+                axes=[h.axes[0].bin_edges],
+                # NOTE: The `np.array` is really important here because we need to make a copy!
+                #       Otherwise, we modify the underlying values, and everything gets fucked up in
+                #       future loop iterations.
+                values=np.array(h.values),
+                variances=np.zeros_like(h.values),
+            )
+
+            # Check that binning matches up. If it doesn't attempt to rebin
+            if h_without_uncertainties.axes[0].bin_edges.shape != model.axes[0].bin_edges.shape or \
+                not np.allclose(h_without_uncertainties.axes[0].bin_edges, model.axes[0].bin_edges):
+                # Rebin according to the data which we are supposed to be plotting
+                # NOTE: We take as a proxy that whichever hist has more bins is the one that needs to be rebinned.
+                #       We can't just assume that the model is more finely binned because some (eg. Caucal) is not.
+                if h_without_uncertainties.axes[0].bin_edges.shape[0] > model.axes[0].bin_edges.shape[0]:
+                    h_without_uncertainties = full_results_helpers.rebin_bin_width_scaled_hist(
+                        h_to_rebin=h_without_uncertainties,
+                        h_target_axis=model.axes[0],
+                        # This is okay since the data is explicitly constructed without systematic systematic uncertainties.
+                        okay_for_systematic_not_to_exist=True,
+                    )
+                else:
+                    model = full_results_helpers.rebin_bin_width_scaled_hist(
+                        h_to_rebin=model,
+                        h_target_axis=h_without_uncertainties.axes[0],
+                        # This is okay since the model doesn't usually have a systematic uncertainty.
+                        okay_for_systematic_not_to_exist=True,
+                    )
+
+            # Ratio
+            ratio = model / h_without_uncertainties
+
+            # We need to propagate the systematic uncertainty manually since the data is constructed not to have
+            # uncertainties that we would usually propagate with
+            if "y_systematic" in model.metadata:
+                y_relative_error_low = full_results_helpers.relative_error(
+                    full_results_helpers.ErrorInput(value=model.values, error=model.metadata["y_systematic"]["quadrature"].low),
+                )
+                y_relative_error_high = full_results_helpers.relative_error(
+                    full_results_helpers.ErrorInput(value=model.values, error=model.metadata["y_systematic"]["quadrature"].high),
+                )
+                ratio_systematic = full_results_helpers.AsymmetricErrors(
+                    low=y_relative_error_low * ratio.values,
+                    high=y_relative_error_high * ratio.values,
+                )
+                ratio.metadata["y_systematic"]["quadrature"] = ratio_systematic
+
+            # Finally, plot the band in the ratio
+            # NOTE: This is assuming we'll only plot PbPb model colors here, but I think that's a reasonable assumption,
+            #       since that's the only models that could compare to the PbPb/pp ratio
+            temp_kwargs = retrieve_model_styles(event_activity="PbPb", model_name=model_name)
+            temp_kwargs["label"] = model_calculation.label(collision_system=collision_system) if not all_methods_on_one_figure else None
+            # Need to pop for fill_between since these aren't valid args
+            temp_kwargs.pop("marker")
+            temp_kwargs.pop("markerfacecolor", None)
+            temp_kwargs.pop("markeredgewidth", None)
+            # And switch to the proper color
+            temp_kwargs["facecolor"] = temp_kwargs.pop("color")
+            lower_error, upper_error = _determine_uncertainty_lower_upper_for_model(model=ratio)
+            ax.fill_between(
+                ratio.axes[0].bin_centers,
+                ratio.values - lower_error,
+                ratio.values + upper_error,
+                zorder=5,
+                alpha=0.75,
+                **temp_kwargs,
+            )
+
+    # Reference value for ratio
+    for ax_ratio in axes:
+        ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
+
+    # Labeling and presentation
+    plot_config.apply(fig=fig, axes=axes)
+    # A few additional tweaks.
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    # ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.2))
+
+    filename = f"{plot_config.name}"
+    fig.savefig(output_dir / f"{filename}_{grooming_method}.pdf")
+    plt.close(fig)
+
+
+def plot_pp_PbPb_only_model_data_ratios(
+    hists: Mapping[str, Mapping[str, unfolding_analysis.SingleResult]],
+    grooming_methods: list[str],
+    output_dir: Path,
+    event_activity_to_kt_range: Mapping[str, helpers.KtRange | Mapping[str, helpers.KtRange]],
+    models_ratio: Mapping[str, Mapping[str, binned_data.BinnedData]],
+    kt_display_range: tuple[float, float] = (1.5, 15),
+    jet_R_str: str = "R04",
+    alice_status: str = "work_in_progress",
+    text_font_size: int = 31,
+    additional_label: str = "",
+) -> None:
+    """Compare pp and PbPb results with ratio."""
+    # Validation
+    for ev, kt_range in event_activity_to_kt_range.items():
+        if isinstance(kt_range, helpers.KtRange):
+            event_activity_to_kt_range[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
+
+    # Setup
+    jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
+    grooming_styles = plot_style.define_paper_grooming_styles()
+
+    for grooming_method in grooming_methods:
+        logger.info(f"Plotting all ratios for {grooming_method}")
+        style = grooming_styles[grooming_method]
+
+        text = plot_style.label_to_display_string["ALICE"][alice_status]
+        # Since the final text is short, we can merge onto one line
+        if alice_status != "final":
+            text += "\n"
+        else:
+            text += " "
+        text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
+        text += "\n" + plot_style.label_to_display_string["jets"]["general"]
+        text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
+        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+
+        name = "unfolded_kt_pp_PbPb"
+        if additional_label:
+            name += f"_{additional_label}"
+        name += f"_model_data_ratios_{jet_R_str}"
+
+        _ratio_range = (0.3, 1.7)
+        if "central" in hists and models_ratio:
+            _ratio_range = (0.1, 1.9)
+        if any("z_cut_04" in m for m in grooming_methods):
+            _ratio_range = (-0.2, 2.2) if models_ratio else (0.1, 1.9)
+
+        # Define panels
+        standard_panel = pb.Panel(
+            axes=[
+                pb.AxisConfig(
+                    "y",
+                    label=r"$\frac{\text{model}}{\text{data}}$",
+                    range=_ratio_range,
+                    # Make the label a bit bigger since it's stack on top
+                    font_size=text_font_size * 1.05
+                )
+            ],
+            text=[
+                pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
+                # Add the grooming label in a separate location in the bottom left
+                # Otherwise, it will overlap with the data
+                pb.TextConfig(x=0.02, y=0.02, text=style.label, font_size=text_font_size),
+            ],
+            legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.0, 0.10), marker_label_spacing=-0.2),
+        )
+        panels = [copy.deepcopy(standard_panel) for _ in range(len(hists))]
+        panels[-1].axes.append(
+            pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
+        )
+
+        #model_legend_config = None
+        #if models_ratio:
+        #    model_legend_config = pb.LegendConfig(location="lower left", font_size=22, anchor=(0.01, 0.02), ncol=2, marker_label_spacing=0.05, label_spacing=0.1, handle_height=1.3, column_spacing=0.30)
+
+        _plot_pp_PbPb_only_ratios(
+            hists=hists,
+            models_ratio=models_ratio,
+            grooming_method=grooming_method,
+            set_zero_to_nan=False,
+            all_methods_on_one_figure=False,
+            event_activity_to_kt_range=event_activity_to_kt_range,
+            plot_config=pb.PlotConfig(
+                name=name,
+                panels=panels,
+                figure=pb.Figure(edge_padding={"left": 0.1525, "bottom": 0.095, "top": 0.975}),
+            ),
+            output_dir=output_dir,
+        )
