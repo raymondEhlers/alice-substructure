@@ -2220,25 +2220,18 @@ def plot_pp_PbPb_only_model_data_ratios(
     for ev, kt_range in event_activity_to_kt_range.items():
         if isinstance(kt_range, helpers.KtRange):
             event_activity_to_kt_range[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
+    # NOTE: This ordering is important to get the panels right!
+    #       We want pp first, and then the order for the rest is determined by the order in which the hists are passed
+    assert next(iter(list(hists.keys()))) == "pp"
 
     # Setup
     jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
     grooming_styles = plot_style.define_paper_grooming_styles()
+    event_activity_order = iter(list(hists))
 
     for grooming_method in grooming_methods:
         logger.info(f"Plotting all ratios for {grooming_method}")
         style = grooming_styles[grooming_method]
-
-        text = plot_style.label_to_display_string["ALICE"][alice_status]
-        # Since the final text is short, we can merge onto one line
-        if alice_status != "final":
-            text += "\n"
-        else:
-            text += " "
-        text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
-        text += "\n" + plot_style.label_to_display_string["jets"]["general"]
-        text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
-        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
 
         name = "unfolded_kt_pp_PbPb"
         if additional_label:
@@ -2252,27 +2245,74 @@ def plot_pp_PbPb_only_model_data_ratios(
             _ratio_range = (-0.2, 2.2) if models_ratio else (0.1, 1.9)
 
         # Define panels
-        standard_panel = pb.Panel(
-            axes=[
-                pb.AxisConfig(
-                    "y",
-                    label=r"$\frac{\text{Model}}{\text{Data}}$",
-                    range=_ratio_range,
-                    # Make the label a bit bigger since it's stack on top
-                    font_size=text_font_size * 1.05
-                )
-            ],
-            text=[
-                pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
-                # Add the grooming label in a separate location in the bottom left
-                # Otherwise, it will overlap with the data
-                pb.TextConfig(x=0.02, y=0.02, text=style.label, font_size=text_font_size),
-            ],
-            legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.0, 0.10), marker_label_spacing=-0.2),
+        panels = []
+        standard_y_axis = pb.AxisConfig(
+            "y",
+            label=r"$\frac{\text{Model}}{\text{Data}}$",
+            range=_ratio_range,
+            # Make the label a bit bigger since it's stack on top
+            font_size=text_font_size * 1.05
         )
-        panels = [copy.deepcopy(standard_panel) for _ in range(len(hists))]
-        panels[-1].axes.append(
-            pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
+        # pp - top panel
+        # ALICE pp, PbPb 5.02 TeV
+        text = plot_style.label_to_display_string["ALICE"][alice_status]
+        # Since the final text is short, we can merge onto one line
+        if alice_status != "final":
+            text += "\n"
+        else:
+            text += " "
+        text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
+        panels.append(
+            pb.Panel(
+                axes=[
+                    copy.deepcopy(standard_y_axis)
+                ],
+                text=[
+                    pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
+                    # Add the grooming label in a separate location in the bottom right
+                    pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
+                    # And the collision system
+                    pb.TextConfig(x=0.02, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
+                ],
+                #legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.02, 0.02), marker_label_spacing=-0.2),
+            )
+        )
+        # Middle panel
+        text = plot_style.label_to_display_string["jets"]["general"]
+        text += " " + plot_style.label_to_display_string["jets"][jet_R_str]
+        #text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
+        panels.append(
+            pb.Panel(
+                axes=[
+                    copy.deepcopy(standard_y_axis)
+                ],
+                text=[
+                    pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
+                    # Add the grooming label in a separate location in the bottom right
+                    pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
+                    # And the collision system
+                    pb.TextConfig(x=0.02, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
+                ],
+                #legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.02, 0.02), marker_label_spacing=-0.2),
+            )
+        )
+        # Bottom panel
+        text = fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+        panels.append(
+            pb.Panel(
+                axes=[
+                    copy.deepcopy(standard_y_axis),
+                    pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
+                ],
+                text=[
+                    pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
+                    # Add the grooming label in a separate location in the bottom right
+                    pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
+                    # And the collision system
+                    pb.TextConfig(x=0.02, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
+                ],
+                #legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.02, 0.02), marker_label_spacing=-0.2),
+            )
         )
 
         #model_legend_config = None
