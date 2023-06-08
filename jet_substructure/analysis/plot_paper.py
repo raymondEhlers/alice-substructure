@@ -2281,6 +2281,7 @@ def plot_pp_PbPb_only_model_data_ratios(
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
     additional_label: str = "",
+    logy: bool = False,
 ) -> None:
     """Compare pp and PbPb results with ratio."""
     # Validation
@@ -2311,6 +2312,8 @@ def plot_pp_PbPb_only_model_data_ratios(
             _ratio_range = (0.35, 1.6)
         if any("z_cut_04" in m for m in grooming_methods):
             _ratio_range = (-0.2, 2.2) if models_ratio else (0.1, 1.9)
+        if logy:
+            _ratio_range = (0.45, 1.8)
 
         # Define panels
         panels = []
@@ -2319,7 +2322,8 @@ def plot_pp_PbPb_only_model_data_ratios(
             label=r"$\frac{\text{Model}}{\text{Data}}$",
             range=_ratio_range,
             # Make the label a bit bigger since it's stack on top
-            font_size=text_font_size * 1.05
+            font_size=text_font_size * 1.05,
+            log=logy,
         )
         #standard_data_legend = pb.LegendConfig(location="lower right", font_size=text_font_size, anchor=(0.98, 0.02), marker_label_spacing=-0.2)
         standard_model_legend = pb.LegendConfig(
