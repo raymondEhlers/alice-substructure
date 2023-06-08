@@ -2038,6 +2038,7 @@ def _plot_pp_PbPb_only_ratios(
     plot_config: pb.PlotConfig,
     output_dir: Path,
     models_ratio: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
+    model_labels_on_axes: list[str],
 ) -> None:
     """Plot model/data ratios for all provided collision systems."""
     # Setup
@@ -2194,7 +2195,8 @@ def _plot_pp_PbPb_only_ratios(
         # Update the data legends to show both the marker and box
         # NOTE: As of 2023 Jun 8, it wasn't worth the effort. The box was too small for the marker, etc.
         #       In general, these things are often quite tough with mpl... :-(
-        if _plot_counter != 1:
+
+        if not model_labels_on_axes[_plot_counter]:
             continue
 
         # Setup
@@ -2222,39 +2224,40 @@ def _plot_pp_PbPb_only_ratios(
         #    legend_labels=labels
         #)
 
-        # Add an additional legend for the models.
-        if _plot_counter == 1:
-            # Create handles and labels by hand, using all models
-            # Put in the lower left of the middle panel
-            legend_config = copy.deepcopy(legend_config)
-            # NOTE: We only have to change these settings **if** we're passing a data legend.
-            #       As of 2023 June 8, we're not doing that, so we have these lines commented out.
-            #legend_config.location = "lower left"
-            #legend_config.ncol = 2
-            #legend_config.anchor = (0.02, 0.02)
+        ######
+        # Create handles and labels by hand, using all models
+        ######
+        legend_config = copy.deepcopy(legend_config)
+        # NOTE: We only have to change these settings **if** we're passing a data legend.
+        #       As of 2023 June 8, we're not doing that, so we have these lines commented out.
+        #legend_config.location = "lower left"
+        #legend_config.ncol = 2
+        #legend_config.anchor = (0.02, 0.02)
 
-            model_legend_elements = []
-            for model_name, model_calculation in models_ratio.items():
-                # NOTE: This is assuming we'll only plot PbPb model colors here, but I think that's a reasonable assumption,
-                #       since that's the only models that could compare to the PbPb/pp ratio
-                model_kwargs = retrieve_model_styles(event_activity="PbPb", model_name=model_name)
-                model_legend_elements.append(
-                    mpl.patches.Patch(
-                        facecolor=model_kwargs["color"],
-                        label=model_calculation.label(collision_system=collision_system)
-                    )
+        model_legend_elements = []
+        for model_name in model_labels_on_axes[_plot_counter]:
+            model_calculation = models_ratio[model_name]
+
+            # NOTE: This is assuming we'll only plot PbPb model colors here, but I think that's a reasonable assumption,
+            #       since that's the only models that could compare to the PbPb/pp ratio
+            model_kwargs = retrieve_model_styles(event_activity="PbPb", model_name=model_name)
+            model_legend_elements.append(
+                mpl.patches.Patch(
+                    facecolor=model_kwargs["color"],
+                    label=model_calculation.label(collision_system=collision_system)
                 )
-            model_legend_object = legend_config.apply(
-                ax=ax_ratio,
-                legend_handles=model_legend_elements,
             )
-            ax_ratio.add_artist(model_legend_object)
+        model_legend_object = legend_config.apply(
+            ax=ax_ratio,
+            legend_handles=model_legend_elements,
+        )
+        ax_ratio.add_artist(model_legend_object)
 
         # Commented - see above.
         ## Add the legend
         #ax_ratio.add_artist(legend_object)
-        ## And since it's there and we don't want plot_config to interfere, we set it to None.
-        #panel_config.legend = None
+        # And since we've manually added the legend and we don't want plot_config to interfere, we set it to None.
+        panel_config.legend = None
 
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=axes)
@@ -2272,6 +2275,7 @@ def plot_pp_PbPb_only_model_data_ratios(
     output_dir: Path,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange | Mapping[str, helpers.KtRange]],
     models_ratio: Mapping[str, Mapping[str, binned_data.BinnedData]],
+    model_labels_on_axes: list[list[str]],
     kt_display_range: tuple[float, float] = (1.5, 15),
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
@@ -2291,6 +2295,7 @@ def plot_pp_PbPb_only_model_data_ratios(
     jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
     grooming_styles = plot_style.define_paper_grooming_styles()
     event_activity_order = iter(list(hists))
+    model_label_order = iter(model_labels_on_axes)
 
     for grooming_method in grooming_methods:
         logger.info(f"Plotting all ratios for {grooming_method}")
@@ -2303,7 +2308,7 @@ def plot_pp_PbPb_only_model_data_ratios(
 
         _ratio_range = (0.3, 1.7)
         if "central" in hists and models_ratio:
-            _ratio_range = (0.1, 1.9)
+            _ratio_range = (0.35, 1.6)
         if any("z_cut_04" in m for m in grooming_methods):
             _ratio_range = (-0.2, 2.2) if models_ratio else (0.1, 1.9)
 
@@ -2319,9 +2324,9 @@ def plot_pp_PbPb_only_model_data_ratios(
         #standard_data_legend = pb.LegendConfig(location="lower right", font_size=text_font_size, anchor=(0.98, 0.02), marker_label_spacing=-0.2)
         standard_model_legend = pb.LegendConfig(
             location="lower left",
-            font_size=text_font_size,
+            font_size=round(text_font_size * 0.8),
             anchor=(0.02, 0.02),
-            ncol=2,
+            #ncol=2,
             marker_label_spacing=0.05,
             label_spacing=0.1,
             handle_height=1.3,
@@ -2346,9 +2351,11 @@ def plot_pp_PbPb_only_model_data_ratios(
                     # Add the grooming label in a separate location in the bottom right
                     #pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
                     # And the collision system
-                    pb.TextConfig(x=0.98, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
+                    pb.TextConfig(x=0.97, y=0.04, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
                 ],
                 #legend=copy.deepcopy(standard_data_legend),
+                # Only provide if there are model entries for this panel.
+                legend=copy.deepcopy(standard_model_legend) if next(model_label_order) else None,
             )
         )
         # Middle panel
@@ -2369,7 +2376,8 @@ def plot_pp_PbPb_only_model_data_ratios(
                     pb.TextConfig(x=0.98, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
                 ],
                 #legend=copy.deepcopy(standard_data_legend),
-                legend=copy.deepcopy(standard_model_legend),
+                # Only provide if there are model entries for this panel.
+                legend=copy.deepcopy(standard_model_legend) if next(model_label_order) else None,
             )
         )
         # Bottom panel
@@ -2386,12 +2394,15 @@ def plot_pp_PbPb_only_model_data_ratios(
                     pb.TextConfig(x=0.98, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
                 ],
                 #legend=copy.deepcopy(standard_data_legend),
+                # Only provide if there are model entries for this panel.
+                legend=copy.deepcopy(standard_model_legend) if next(model_label_order) else None,
             )
         )
 
         _plot_pp_PbPb_only_ratios(
             hists=hists,
             models_ratio=models_ratio,
+            model_labels_on_axes=model_labels_on_axes,
             grooming_method=grooming_method,
             set_zero_to_nan=False,
             all_methods_on_one_figure=False,
@@ -2399,7 +2410,7 @@ def plot_pp_PbPb_only_model_data_ratios(
             plot_config=pb.PlotConfig(
                 name=name,
                 panels=panels,
-                figure=pb.Figure(edge_padding={"left": 0.1525, "bottom": 0.095, "top": 0.975}),
+                figure=pb.Figure(edge_padding={"left": 0.14, "bottom": 0.095, "top": 0.975}),
             ),
             output_dir=output_dir,
         )
