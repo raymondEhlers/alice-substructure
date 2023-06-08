@@ -2262,7 +2262,7 @@ def plot_pp_PbPb_only_model_data_ratios(
             axes=[
                 pb.AxisConfig(
                     "y",
-                    label=r"$\frac{\text{model}}{\text{data}}$",
+                    label=r"$\frac{\text{Model}}{\text{Data}}$",
                     range=_ratio_range,
                     # Make the label a bit bigger since it's stack on top
                     font_size=text_font_size * 1.05
