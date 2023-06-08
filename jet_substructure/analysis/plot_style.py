@@ -457,3 +457,12 @@ def define_paper_model_styles() -> dict[str, dict[str, Any]]:
     }
 
     return paper_model_styles
+
+
+def define_paper_event_activity_comparison_styles() -> dict[str, str]:
+    event_activity_to_color = {
+        "pp": "#845cba",
+        "semi_central": "#FF8301",
+        "central": "#4bafd0",
+    }
+    return event_activity_to_color

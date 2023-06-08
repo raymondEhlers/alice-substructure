@@ -1362,11 +1362,7 @@ def _plot_pp_PbPb_comparison_single_panel(
         "central": r"0-10\% $\text{Pb--Pb}$",
         "semi_central": r"30-50\% $\text{Pb--Pb}$",
     }
-    _event_activity_to_color = {
-        "pp": "#845cba",
-        "semi_central": "#FF8301",
-        "central": "#4bafd0",
-    }
+    _event_activity_to_color = plot_style.define_paper_event_activity_comparison_styles()
 
     # Use pp as reference, but only in the range where the others are measured.
     ratio_reference_hist_unselected = hists["pp"].data
