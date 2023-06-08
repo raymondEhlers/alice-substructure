@@ -33,10 +33,15 @@ logger = logging.getLogger(__name__)
 
 pb.configure()
 
-_event_activity_label_map = {
+_event_activity_short_label_map = {
     "pp": "pp",
     "central": r"0-10\%",
     "semi_central": r"30-50\%",
+}
+_event_activity_full_label_map = {
+    "pp": "pp",
+    "central": r"0-10\% $\text{Pb--Pb}$",
+    "semi_central": r"30-50\% $\text{Pb--Pb}$",
 }
 
 
@@ -884,7 +889,7 @@ def plot_grooming_methods_comparison_with_model_for_single_system(
     # Setup
     event_activity = ""
     if collision_system != "pp":
-        event_activity = f"{_event_activity_label_map[collision_system]} "
+        event_activity = f"{_event_activity_short_label_map[collision_system]} "
     collision_system_filename_label = collision_system
     if collision_system != "pp":
         collision_system_filename_label = f"PbPb_{collision_system_filename_label}"
@@ -973,7 +978,7 @@ def plot_grooming_methods_comparison_with_model_for_single_system_one_figure(
     # Setup
     event_activity = ""
     if collision_system != "pp":
-        event_activity = f"{_event_activity_label_map[collision_system]} "
+        event_activity = f"{_event_activity_short_label_map[collision_system]} "
     collision_system_filename_label = collision_system
     if collision_system != "pp":
         collision_system_filename_label = f"PbPb_{collision_system_filename_label}"
@@ -1286,7 +1291,7 @@ def plot_comparisons_of_grooming_methods_for_single_system(
     # Add event activity to label if needed
     event_activity = ""
     if collision_system != "pp":
-        event_activity = f"{_event_activity_label_map[collision_system]} "
+        event_activity = f"{_event_activity_short_label_map[collision_system]} "
     collision_system_filename_label = collision_system
     if collision_system != "pp":
         collision_system_filename_label = f"PbPb_{collision_system_filename_label}"
@@ -1357,11 +1362,6 @@ def _plot_pp_PbPb_comparison_single_panel(
         axes_ratio = [axes_ratio]
 
     # Setup
-    _event_activity_label_map = {
-        "pp": "pp",
-        "central": r"0-10\% $\text{Pb--Pb}$",
-        "semi_central": r"30-50\% $\text{Pb--Pb}$",
-    }
     _event_activity_to_color = plot_style.define_paper_event_activity_comparison_styles()
 
     # Use pp as reference, but only in the range where the others are measured.
@@ -1396,7 +1396,7 @@ def _plot_pp_PbPb_comparison_single_panel(
             markersize=11,
             linestyle="",
             linewidth=3,
-            label=_event_activity_label_map[collision_system],
+            label=_event_activity_full_label_map[collision_system],
             # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
             zorder=3 + _plot_counter,
             color=_event_activity_to_color[collision_system],
@@ -2004,7 +2004,7 @@ def plot_pp_PbPb_comparison_with_multiple_model_ratios(
                     ),
                     pb.Panel(
                         axes=[
-                            pb.AxisConfig("y", label=fr"$\frac{{\text{{{_event_activity_label_map[non_pp_collision_system[0]]}}}}}{{\text{{pp}}}}$",
+                            pb.AxisConfig("y", label=fr"$\frac{{\text{{{_event_activity_short_label_map[non_pp_collision_system[0]]}}}}}{{\text{{pp}}}}$",
                                         range=_ratio_range,
                                         # Make the label a bit bigger since it's stack on top
                                         font_size=text_font_size * 1.05
@@ -2015,7 +2015,7 @@ def plot_pp_PbPb_comparison_with_multiple_model_ratios(
                     pb.Panel(
                         axes=[
                             pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
-                            pb.AxisConfig("y", label=fr"$\frac{{\text{{{_event_activity_label_map[non_pp_collision_system[1]]}}}}}{{\text{{pp}}}}$",
+                            pb.AxisConfig("y", label=fr"$\frac{{\text{{{_event_activity_short_label_map[non_pp_collision_system[1]]}}}}}{{\text{{pp}}}}$",
                                         range=_ratio_range,
                                         # Make the label a bit bigger since it's stack on top
                                         font_size=text_font_size * 1.05
@@ -2042,12 +2042,6 @@ def _plot_pp_PbPb_only_ratios(
     """Plot model/data ratios for all provided collision systems."""
     # Setup
     grooming_styles = plot_style.define_paper_grooming_styles()
-    # TODO: Implement these...
-    _event_activity_label_map = {
-        "pp": "pp",
-        "central": r"0-10\% $\text{Pb--Pb}$",
-        "semi_central": r"30-50\% $\text{Pb--Pb}$",
-    }
 
     # Use pp as reference for the PbPb, but only in the range where the others are measured.
     ratio_reference_hist_unselected = hists["pp"][grooming_method].data
