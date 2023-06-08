@@ -2314,6 +2314,8 @@ def plot_pp_PbPb_only_model_data_ratios(
             _ratio_range = (-0.2, 2.2) if models_ratio else (0.1, 1.9)
         if logy:
             _ratio_range = (0.45, 1.8)
+            # If I move the collision system, I could try to make something like the below work
+            #_ratio_range = (0.55, 1.65)
 
         # Define panels
         panels = []
