@@ -2416,7 +2416,7 @@ def plot_pp_PbPb_only_model_data_ratios(
             plot_config=pb.PlotConfig(
                 name=name,
                 panels=panels,
-                figure=pb.Figure(edge_padding={"left": 0.14, "bottom": 0.095, "top": 0.975}),
+                figure=pb.Figure(edge_padding={"left": 0.125, "bottom": 0.095, "top": 0.975}),
             ),
             output_dir=output_dir,
         )
