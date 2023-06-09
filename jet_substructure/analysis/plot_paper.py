@@ -1635,7 +1635,8 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
         # Grab the axes which has the legend config.
         ratio_axes_with_legend_config = [ax for ax, panel_config in zip(axes_ratio, plot_config.panels[1:]) if panel_config.legend is not None]
         if len(ratio_axes_with_legend_config) != 1:
-            raise ValueError(f"Expected exactly one ratio axis to have a legend, got {len(ratio_axes_with_legend_config)}")
+            msg = f"Expected exactly one ratio axis to have a legend, got {len(ratio_axes_with_legend_config)}"
+            raise ValueError(msg)
         ax_ratio_legend = ratio_axes_with_legend_config[0]
 
         # Labeling and presentation
@@ -2066,7 +2067,7 @@ def _plot_pp_PbPb_only_ratios(
 
         # Next, draw the data and uncertainties at one as black and grey boxes
         # Ratio + statistical error bars at one
-        p_errorbar_data = ax.errorbar(
+        ax.errorbar(
             h.axes[0].bin_centers,
             np.ones_like(h.axes[0].bin_centers),
             yerr=h.errors / h.values,
@@ -2079,7 +2080,7 @@ def _plot_pp_PbPb_only_ratios(
             zorder=6,
             #label=_event_activity_short_label_map[collision_system],
         )
-        p_boxes_data = pachyderm.plot.error_boxes(
+        pachyderm.plot.error_boxes(
             ax=ax,
             x_data=h.axes[0].bin_centers,
             y_data=np.ones_like(h.values),
