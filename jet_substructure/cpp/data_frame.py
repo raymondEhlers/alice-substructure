@@ -365,6 +365,7 @@ def _substructure_hists(
         )
         hists.append(kt_over_pt_stats)
 
+    # delta_R
     # Use 0.02 for the bin width.
     n_bins_delta_R = round((jet_R + 0.02) / 0.02)
     delta_R = df.Histo2D(
@@ -381,12 +382,41 @@ def _substructure_hists(
         "scale_factor",
     )
     hists.append(delta_R)
+    if include_stats_hist:
+        # Determine the statistics that are available by not scaling according to the scale factor.
+        # In data, this will be trivially the same, but for the response, this is quite helpful.
+        delta_R_stats = df.Histo2D(
+            (
+                f"{grooming_method}_{prefix}_delta_R_stats{tag}",
+                f"{grooming_method}_{prefix}_delta_R_stats{tag}",
+                *jet_pt_axis,
+                n_bins_delta_R,
+                -0.02,
+                jet_R,
+            ),
+            jet_pt_column,
+            f"{grooming_method}_{prefix}_delta_R",
+        )
+        hists.append(delta_R_stats)
+    # z
     z = df.Histo2D(
         (f"{grooming_method}_{prefix}_z{tag}", f"{grooming_method}_{prefix}_z{tag}", *jet_pt_axis, 21, -0.025, 0.5),
         jet_pt_column,
         f"{grooming_method}_{prefix}_z",
         "scale_factor",
     )
+    hists.append(z)
+    if include_stats_hist:
+        z = df.Histo2D(
+            (
+                f"{grooming_method}_{prefix}_z_stats{tag}",
+                f"{grooming_method}_{prefix}_z_stats{tag}",
+                *jet_pt_axis,
+                21, -0.025, 0.5
+            ),
+            jet_pt_column,
+            f"{grooming_method}_{prefix}_z",
+        )
     hists.append(z)
     n_to_split = df.Histo2D(
         (
@@ -1245,7 +1275,7 @@ def run(  # noqa: C901
             f"{grooming_method}_{prefix}_kt_over_pt",
             (
                 f"{grooming_method}_{prefix}_kt / "
-                f"{jet_pt_column_format.format(prefix=prefix)}",
+                f"{jet_pt_column_format.format(prefix=prefix)}"
             )
         )
 
