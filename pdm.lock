@@ -6,7 +6,7 @@ groups = ["default", "dev"]
 cross_platform = true
 static_urls = false
 lock_version = "4.3"
-content_hash = "sha256:4e1246af76cc9ce97c98803c75cd1fd79d5f5a3a1ea5377f72b6c981cbeffdd2"
+content_hash = "sha256:f354f4c4fa583635d4058b7aeba1d550ffabcc5d08bd229889e66511a1cef3bf"
 
 [[package]]
 name = "aiofiles"
@@ -348,6 +348,27 @@ dependencies = [
 files = [
     {file = "blessed-1.19.1-py2.py3-none-any.whl", hash = "sha256:63b8554ae2e0e7f43749b6715c734cc8f3883010a809bf16790102563e6cf25b"},
     {file = "blessed-1.19.1.tar.gz", hash = "sha256:9a0d099695bf621d4680dd6c73f6ad547f6a3442fbdbe80c4b1daa1edbc492fc"},
+]
+
+[[package]]
+name = "bokeh"
+version = "3.1.1"
+requires_python = ">=3.8"
+summary = "Interactive plots and applications in the browser from Python"
+dependencies = [
+    "Jinja2>=2.9",
+    "PyYAML>=3.10",
+    "contourpy>=1",
+    "numpy>=1.16",
+    "packaging>=16.8",
+    "pandas>=1.2",
+    "pillow>=7.1.0",
+    "tornado>=5.1",
+    "xyzservices>=2021.09.1",
+]
+files = [
+    {file = "bokeh-3.1.1-py3-none-any.whl", hash = "sha256:a542a076ce326f81bf6d226355458572d39fe8fc9b547eab9728a2f1d71e4bdb"},
+    {file = "bokeh-3.1.1.tar.gz", hash = "sha256:ba0fc6bae4352d307541293256dee930a42d0acf92e760c72dc0e7397c3a28e9"},
 ]
 
 [[package]]
@@ -731,22 +752,22 @@ files = [
 
 [[package]]
 name = "dask"
-version = "2023.3.2"
+version = "2023.5.0"
 requires_python = ">=3.8"
 summary = "Parallel PyData with Task Scheduling"
 dependencies = [
-    "click>=7.0",
-    "cloudpickle>=1.1.1",
-    "fsspec>=0.6.0",
+    "click>=8.0",
+    "cloudpickle>=1.5.0",
+    "fsspec>=2021.09.0",
     "importlib-metadata>=4.13.0",
     "packaging>=20.0",
     "partd>=1.2.0",
     "pyyaml>=5.3.1",
-    "toolz>=0.8.2",
+    "toolz>=0.10.0",
 ]
 files = [
-    {file = "dask-2023.3.2-py3-none-any.whl", hash = "sha256:5e64763d62feb18afd3ad66f364e0b4f456f7ac92e894fcc87950af75029ecdf"},
-    {file = "dask-2023.3.2.tar.gz", hash = "sha256:51009e92ba9a280bd417633d1ae84f3ed23a8940f0a19594a4b7797ef226fff4"},
+    {file = "dask-2023.5.0-py3-none-any.whl", hash = "sha256:32b34986519b7ddc0947c8ca63c2fc81b964e4c208dfb5cbf9f4f8aec92d152b"},
+    {file = "dask-2023.5.0.tar.gz", hash = "sha256:4f4c28ac406e81b8f21b5be4b31b21308808f3e0e7c7e2f4a914f16476d9941b"},
 ]
 
 [[package]]
@@ -765,34 +786,38 @@ files = [
 
 [[package]]
 name = "dask"
-version = "2023.3.2"
-extras = ["dataframe", "distributed"]
+version = "2023.5.0"
+extras = ["dataframe", "diagnostics", "distributed"]
 requires_python = ">=3.8"
 summary = "Parallel PyData with Task Scheduling"
 dependencies = [
-    "dask==2023.3.2",
-    "distributed==2023.3.2",
+    "bokeh>=2.4.2",
+    "dask==2023.5.0",
+    "distributed==2023.5.0",
+    "jinja2>=2.10.3",
     "numpy>=1.21",
     "pandas>=1.3",
 ]
 files = [
-    {file = "dask-2023.3.2-py3-none-any.whl", hash = "sha256:5e64763d62feb18afd3ad66f364e0b4f456f7ac92e894fcc87950af75029ecdf"},
-    {file = "dask-2023.3.2.tar.gz", hash = "sha256:51009e92ba9a280bd417633d1ae84f3ed23a8940f0a19594a4b7797ef226fff4"},
+    {file = "dask-2023.5.0-py3-none-any.whl", hash = "sha256:32b34986519b7ddc0947c8ca63c2fc81b964e4c208dfb5cbf9f4f8aec92d152b"},
+    {file = "dask-2023.5.0.tar.gz", hash = "sha256:4f4c28ac406e81b8f21b5be4b31b21308808f3e0e7c7e2f4a914f16476d9941b"},
 ]
 
 [[package]]
 name = "dask"
-version = "2023.3.2"
-extras = ["distributed"]
+version = "2023.5.0"
+extras = ["diagnostics", "distributed"]
 requires_python = ">=3.8"
 summary = "Parallel PyData with Task Scheduling"
 dependencies = [
-    "dask==2023.3.2",
-    "distributed==2023.3.2",
+    "bokeh>=2.4.2",
+    "dask==2023.5.0",
+    "distributed==2023.5.0",
+    "jinja2>=2.10.3",
 ]
 files = [
-    {file = "dask-2023.3.2-py3-none-any.whl", hash = "sha256:5e64763d62feb18afd3ad66f364e0b4f456f7ac92e894fcc87950af75029ecdf"},
-    {file = "dask-2023.3.2.tar.gz", hash = "sha256:51009e92ba9a280bd417633d1ae84f3ed23a8940f0a19594a4b7797ef226fff4"},
+    {file = "dask-2023.5.0-py3-none-any.whl", hash = "sha256:32b34986519b7ddc0947c8ca63c2fc81b964e4c208dfb5cbf9f4f8aec92d152b"},
+    {file = "dask-2023.5.0.tar.gz", hash = "sha256:4f4c28ac406e81b8f21b5be4b31b21308808f3e0e7c7e2f4a914f16476d9941b"},
 ]
 
 [[package]]
@@ -875,13 +900,13 @@ files = [
 
 [[package]]
 name = "distributed"
-version = "2023.3.2"
+version = "2023.5.0"
 requires_python = ">=3.8"
 summary = "Distributed scheduler for Dask"
 dependencies = [
     "click>=8.0",
     "cloudpickle>=1.5.0",
-    "dask==2023.3.2",
+    "dask==2023.5.0",
     "jinja2>=2.10.3",
     "locket>=1.0.0",
     "msgpack>=1.0.0",
@@ -893,11 +918,11 @@ dependencies = [
     "toolz>=0.10.0",
     "tornado>=6.0.3",
     "urllib3>=1.24.3",
-    "zict>=2.1.0",
+    "zict>=2.2.0",
 ]
 files = [
-    {file = "distributed-2023.3.2-py3-none-any.whl", hash = "sha256:43b74f08ea4ea0696ae8d2f1ea53adcda998a2a159bd34dffd42e4e678ff5f8a"},
-    {file = "distributed-2023.3.2.tar.gz", hash = "sha256:3f0b4ce73289583a27376672f67895e041c71d9a6e901b4f4cc4a95dd81ec349"},
+    {file = "distributed-2023.5.0-py3-none-any.whl", hash = "sha256:73ce33bd2460bd45ffc793ffdf9066bd2a3b6bbc65079f74f5147eafcda9b1cb"},
+    {file = "distributed-2023.5.0.tar.gz", hash = "sha256:74e3f7f68d4dc435a3591ae1ad8ce7d5a11211fd22692e39c7e50aa11bf7e385"},
 ]
 
 [[package]]
@@ -1876,7 +1901,7 @@ dependencies = [
     "attrs>=21.2.0",
     "awkward>=2.0.8",
     "dask-jobqueue>=0.8.1",
-    "dask[distributed]>=2022.12.0",
+    "dask[diagnostics,distributed]>=2022.12.0",
     "hist[plot]>=2.5.0",
     "mammoth-cpp @ file:///Users/REhlers/software/dev/mammoth/mammoth-cpp",
     "numba>=0.56.0",
@@ -4162,6 +4187,16 @@ files = [
     {file = "wrapt-1.15.0-cp39-cp39-win_amd64.whl", hash = "sha256:eef4d64c650f33347c1f9266fa5ae001440b232ad9b98f1f43dfe7a79435c0a6"},
     {file = "wrapt-1.15.0-py3-none-any.whl", hash = "sha256:64b1df0f83706b4ef4cfb4fb0e4c2669100fd7ecacfb59e091fad300d4e04640"},
     {file = "wrapt-1.15.0.tar.gz", hash = "sha256:d06730c6aed78cee4126234cf2d071e01b44b915e725a6cb439a879ec9754a3a"},
+]
+
+[[package]]
+name = "xyzservices"
+version = "2023.7.0"
+requires_python = ">=3.8"
+summary = "Source of XYZ tiles providers"
+files = [
+    {file = "xyzservices-2023.7.0-py3-none-any.whl", hash = "sha256:88e9cbf22b31a2f9c1b242e2b18690f5c705f0e539c9bfd37a10399e1037731b"},
+    {file = "xyzservices-2023.7.0.tar.gz", hash = "sha256:0ec928742227d6f5d4367ea7b457fcfed943429f4de2949b5b02a82cdf5569d6"},
 ]
 
 [[package]]
