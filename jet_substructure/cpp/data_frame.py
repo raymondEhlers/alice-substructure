@@ -535,6 +535,7 @@ def run_embedded_pt_hard_scaling(
     # Setup
     smeared_cut_prefix = "hybrid" if "embed" in collision_system else "data"
     # Parameters
+    # NOTE: This intentionally isn't formatted yet. We'll format it later
     jet_pt_column_format = "{prefix}_jet_pt" if jet_pt_prefix_first else "jet_pt_{prefix}"
 
     # Delay ROOT import so we don't explicitly rely on it.
@@ -688,6 +689,7 @@ def run_create_closure_ratio(  # noqa: C901
     # Setup
     prefix_for_ratio = "hybrid" if "embed" in collision_system else "data"
     # Parameters
+    # NOTE: This intentionally isn't formatted yet. We'll format it later
     jet_pt_column_format = "{prefix}_jet_pt" if jet_pt_prefix_first else "jet_pt_{prefix}"
     # Retrieve the binning
     # We always want the binning that is relevant for this particular unfolding case so we don't have any mismatches.
@@ -869,6 +871,7 @@ def run_response(  # noqa: C901
     ROOT.TH1.SetDefaultSumw2(True)
 
     # Parameters
+    # NOTE: This intentionally isn't formatted yet. We'll format it later
     jet_pt_column_format = "jet_pt_{prefix}"
     if jet_pt_prefix_first:
         jet_pt_column_format = "{prefix}_jet_pt"
@@ -1225,6 +1228,7 @@ def run(  # noqa: C901
     ROOT.TH1.SetDefaultSumw2(True)
 
     # Parameters
+    # NOTE: This intentionally isn't formatted yet. We'll format it later
     jet_pt_column_format = "jet_pt_{prefix}"
     if jet_pt_prefix_first:
         jet_pt_column_format = "{prefix}_jet_pt"
