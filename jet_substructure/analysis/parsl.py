@@ -1988,6 +1988,39 @@ def setup_all_unfolding(  # noqa: C901
     return results
 
 
+@python_app
+def _trivial_ROOT_test_app(job_framework: job_utils.JobFramework) -> bool:
+    """Trivial ROOT import test app.
+
+    For when there are issues with ROOT (especially new ROOT versions).
+    """
+    # NOTE: We're using print here to avoid any possible issues with logs not being passed on correctly, etc.
+    #       We have a pretty good handle of that now, but it's just not worth the risk.
+    from jet_substructure.cpp import utils
+    print("Pre ROOT")
+    # If there's a ROOT issue (deadlock or otherwise), we will see it here. The next message won't be printed.
+    ROOT = utils.import_ROOT()
+    print("Post ROOT / Pre MT")
+    h = ROOT.TH1D("test", "test", 10, 0, 1)
+    h.GetEntries()
+    print("Post MT")
+    print("About to do second import")
+    # Perform it a second time so we can confirm that
+    ROOT2 = utils.import_ROOT()
+    print("Done with second import")
+    return True
+
+
+def setup_trivial_ROOT_test(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
+    """Setup for trivial ROOT import test app.
+
+    For when there are issues with ROOT (especially new ROOT versions).
+    """
+    return [
+        _trivial_ROOT_test_app(job_framework=job_framework),
+    ]
+
+
 def _hours_in_walltime(walltime: str) -> int:
     return int(walltime.split(":")[0])
 
@@ -2184,6 +2217,9 @@ def setup_and_submit_tasks(  # noqa: C901
         )
         all_results.extend(results)
     if "root_data_frame" in jobs_to_execute:
+        # Uncomment if you want to run this test. Should only be done for debugging, so
+        # we don't make it a proper job.
+        #all_results.extend(setup_trivial_ROOT_test(job_framework=job_framework))
         rdf_results = setup_root_data_frame(
             processing_mode="standard",
             collision_system=collision_system,
@@ -2304,7 +2340,7 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
     # Settings
     # Base settings
     facility: job_utils.FACILITIES = "rehlers_mbp_m1pro"
-    conda_environment_name = "substructure_c_24_06"
+    conda_environment_name = "substructure_c_28_00"
     # base_dataset_name = "PbPb_central_R02_pass1"
     # base_dataset_name = "PbPb_central_R02_pass3"
     #base_dataset_name = "PbPb_semi_central_R02_pass3"
