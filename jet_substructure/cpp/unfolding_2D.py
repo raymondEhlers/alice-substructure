@@ -21,6 +21,7 @@ import numpy as np
 import numpy.typing as npt
 import uproot
 from mammoth.framework.analysis import jet_substructure as analysis_jet_substructure
+from mammoth.framework import root_utils
 from pachyderm import binned_data
 
 from jet_substructure.base import helpers, skim_analysis_objects
@@ -55,7 +56,7 @@ def _array_to_ROOT(arr: Union[List[str], Union[npt.NDArray[np.float32], npt.NDAr
     Returns:
         std::vector containing the numpy array values.
     """
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     vector = ROOT.std.vector(type_name)()
     for a in arr:
@@ -78,7 +79,7 @@ def correlation_hist_substructure_var(cov: TMatrixD, name: str, title: str, na: 
     Returns:
         The correlation histogram.
     """
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     h = ROOT.TH2D(name, title, nb, 0, nb, nb, 0, nb)
 
@@ -107,7 +108,7 @@ def correlation_hist_pt(cov: TMatrixD, name: str, title: str, na: int, nb: int, 
     Returns:
         The correlation histogram.
     """
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     h = ROOT.TH2D(name, title, na, 0, na, na, 0, na)
 
@@ -144,7 +145,7 @@ def unfolding_2D(
         Unfolded and folded hists per iter, as well as the covariance matrices. See the hist names in the code.
     """
     # Delayed import for convenience.
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     # Validation
     if error_treatment is None:
@@ -234,11 +235,8 @@ def unfolding_2D(
 def _setup_unfolding() -> None:
     """ Setup RooUnfold and the additional unfolding code. """
     # Delayed import to avoid direct dependence.
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
-    # Nominally setup for MT. It's not really going to do us any good here, but it doesn't hurt anything.
-    # NOTE: We do need to specify 1 to ensure that we don't use extra cores.
-    ROOT.ROOT.EnableImplicitMT(1)
     # Load RooUnfold
     ROOT.gSystem.Load("libRooUnfold")
     # Load the unfolding utilities. We're careful to be (relatively) position independent.
@@ -254,7 +252,7 @@ def _setup_unfolding() -> None:
 
 def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path, additional_tag: str = "") -> None:
     # Delayed import to avoid direct dependence.
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     # Setup
     output_filename.parent.mkdir(parents=True, exist_ok=True)
@@ -265,13 +263,13 @@ def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path, additi
         output_filename = Path(f"{output_filename.parent / output_filename.stem}_{additional_tag}.root")
 
     logger.info(f"Writing hists to {output_filename}")
-    # Uproot3 also works, but it's far less space efficient. Since we already have to import ROOT,
-    # we may as well just use it...
-    # with uproot3.recreate(settings.output_filename.with_suffix(".uproot.root")) as f:
+    # uproot also works, but it's uproot3 was far less space efficient (to be confirmed for never versions).
+    # Since we already have to import ROOT, we may as well just use it...
+    # with uproot.recreate(settings.output_filename.with_suffix(".uproot.root")) as f:
     #    for k, v in hists.items():
-    #        f[k] = binned_data.BinnedData.from_existing_data(v).to_numpy()
+    #        f[k] = binned_data.BinnedData.from_existing_data(v).to_hist()
     #    for k, v in output_hists.items():
-    #        f[k] = binned_data.BinnedData.from_existing_data(v).to_numpy()
+    #        f[k] = binned_data.BinnedData.from_existing_data(v).to_hist()
     f_out = ROOT.TFile(str(output_filename), "RECREATE")
     f_out.cd()
     for hists_dict in hists:
@@ -282,7 +280,7 @@ def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path, additi
 
 
 def _default_hists(settings: unfolding_base.Settings2D) -> Dict[str, TH2D]:
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     hists = {}
     # the raw correlation (ie. data)
@@ -350,7 +348,7 @@ def _default_hists(settings: unfolding_base.Settings2D) -> Dict[str, TH2D]:
 
 def _hists_to_map_for_ROOT(hists: Dict[str, TH2D]) -> Any:
     # Delayed import to avoid direct dependence.
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     hists_map_for_root = ROOT.std.map("std::string", "TH2D *")()
     for k, h in hists.items():
@@ -365,7 +363,7 @@ def _hists_to_map_for_ROOT(hists: Dict[str, TH2D]) -> Any:
 
 def _branch_name_shim_to_map_for_ROOT(branch_renames: Mapping[str, str]) -> Any:
     # Delayed import to avoid direct dependence.
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     map = ROOT.std.map("std::string", "std::string")()
     for k, h in branch_renames.items():
@@ -395,7 +393,7 @@ def _get_raw_data_hist(
     base_directory: Path,
 ) -> TH2D:
     # Delayed import to avoid direct dependence.
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     data_filename = (
         base_directory
@@ -438,7 +436,7 @@ def _get_reweighted_ratio(
     base_directory: Path = Path("output"),
 ) -> TH2D:
     # Delayed import to avoid direct dependence.
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     data_collision_system, response_collision_system = _collision_system_names(unfolding_for_pp=unfolding_for_pp)
 
@@ -616,7 +614,7 @@ def _setup_root_logging(debug_cpp_code: bool = False) -> Tuple[Any, Any]:
     and https://bitbucket.org/wlav/cppyy/issues/256/issue-capturing-stdout-stderr
     """
     # Delayed import to avoid direct dependence.
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     if debug_cpp_code:
         return ROOT.std.cout, ROOT.std.cerr
@@ -645,7 +643,7 @@ def run_unfolding(
     debug_cpp_code: bool = False,
 ) -> bool:
     # Delayed import to avoid direct dependence.
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     # Setup
     _setup_unfolding()
@@ -828,7 +826,7 @@ def run_unfolding_closure_reweighting(  # noqa: C901
         True if successful.
     """
     # Delayed import to avoid direct dependence.
-    import ROOT
+    ROOT = root_utils.import_ROOT()
 
     # Setup
     _setup_unfolding()
@@ -1020,10 +1018,7 @@ def run_unfolding_tree(
     ...
 
     # Delayed import to avoid direct dependence.
-    import ROOT
-
-    # Configuration (not totally clear if this actually does anything for this script...)
-    ROOT.ROOT.EnableImplicitMT(1)
+    ROOT = root_utils.import_ROOT(n_cores=1)
 
     data_chain = ROOT.TChain("tree")
     data_chain.Add("trains/PbPb/5863/skim/*.root")
@@ -1143,10 +1138,7 @@ def run_unfolding_rdf(
         jet_pt_column_format = "{prefix}_jet_pt"
 
     # Delayed import to avoid direct dependence.
-    import ROOT
-
-    # Configuration (not totally clear if this actually does anything for this script...)
-    ROOT.ROOT.EnableImplicitMT(1)
+    ROOT = root_utils.import_ROOT(n_cores=1)
 
     data_chain_data = ROOT.TChain("tree")
     data_chain_data.Add("trains/PbPb/5863/skim/*.root")

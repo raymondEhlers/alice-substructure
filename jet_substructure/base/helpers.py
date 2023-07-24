@@ -350,7 +350,8 @@ def _AliEmcalList_to_TList(
         TList containing the same contents.
     """
     # Delayed import because we want to depend on ROOT as little as possible.
-    import ROOT
+    from mammoth.framework import root_utils
+    ROOT = root_utils.import_ROOT()
 
     temp_list = ROOT.TList()
     temp_list.SetName(existing_list.GetName())
@@ -410,7 +411,8 @@ def split_tree(  # noqa: C901
     import enlighten
 
     # Delayed import because we want to depend on ROOT as little as possible.
-    import ROOT
+    from mammoth.framework import root_utils
+    ROOT = root_utils.import_ROOT()
 
     # Just in case we enable multithreading later.
     ROOT.ROOT.EnableImplicitMT(n_cores)
@@ -562,7 +564,8 @@ def merge_ROOT_files(dir: Path, n_merged_files: int = 5) -> dict[Path, list[Path
     import enlighten
 
     # Delayed import because we want to depend on ROOT as little as possible.
-    import ROOT
+    from mammoth.framework import root_utils
+    ROOT = root_utils.import_ROOT()
 
     # Just in case we enable multithreading later.
     ROOT.ROOT.EnableImplicitMT()

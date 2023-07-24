@@ -22,7 +22,8 @@ def convert_measured_data_to_TGraphs(
     hist = full_results_helpers.select_hist_range(hist=hist, x_range=kt_range)
 
     # Delay import to avoid direct dependence.
-    import ROOT
+    from mammoth.framework import root_utils
+    ROOT = root_utils.import_ROOT()
 
     stat_errors = ROOT.TGraphAsymmErrors(len(hist.axes[0].bin_centers))
     stat_errors.SetName("stat_errors")
