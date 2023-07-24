@@ -2021,10 +2021,6 @@ def setup_trivial_ROOT_test(job_framework: job_utils.JobFramework) -> List[Futur
     ]
 
 
-def _hours_in_walltime(walltime: str) -> int:
-    return int(walltime.split(":")[0])
-
-
 def setup_job_framework(
     job_framework: job_utils.JobFramework,
     jobs_to_execute: Sequence[str],
@@ -2440,7 +2436,7 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
         n_cores_to_allocate = 2
         walltime = "1:59:00"
 
-    #facility="ORNL_b587_long" if _hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
+    #facility="ORNL_b587_long" if job_utils.hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
 
     # Keep the job executor just to keep it alive
     job_executor, _job_framework_config = setup_job_framework(
