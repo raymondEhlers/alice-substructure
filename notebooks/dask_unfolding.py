@@ -8,9 +8,9 @@
 #       format_version: '1.5'
 #       jupytext_version: 1.14.5
 #   kernelspec:
-#     display_name: Substructure w/ ROOT 6.24.06, conda
+#     display_name: Substructure w/ ROOT 6.28.04, conda
 #     language: python
-#     name: substructure_c_24_06
+#     name: substructure_c_28_04
 # ---
 
 # %load_ext rich
@@ -57,23 +57,25 @@ job_executor, job_cluster = None, None
 # Settings
 # Base settings
 job_framework = job_utils.JobFramework.dask_delayed
+#job_framework = job_utils.JobFramework.immediate_execution_debug
 facility: job_utils.FACILITIES = "rehlers_mbp_m1pro"
-conda_environment_name = "substructure_c_24_06"
+conda_environment_name = "substructure_c_28_04"
 
 # Base analysis settings
 #base_dataset_name = "pp_R02"
 #collision_system = "pp"
+#collision_system = "pythia"
 #base_dataset_name = "PbPb_semi_central_R02_pass3"
 #collision_system = "PbPb"
 #collision_system = "embed_pythia"
 base_dataset_name = "PbPb_central_R02_pass3"
-collision_system = "PbPb"
-#collision_system = "embed_pythia"
+#collision_system = "PbPb"
+collision_system = "embed_pythia"
 dataset_type = "nominal"
 # Detailed analysis settings
 jobs_to_execute = [
     "root_data_frame",
-    #"root_data_frame_response",
+    "root_data_frame_response",
 ]
 grooming_methods = [
     # "leading_kt",
@@ -123,6 +125,8 @@ if job_executor is None or job_cluster is None:
     )
 # -
 
+
+
 # ### Unfolding
 
 # +
@@ -131,18 +135,20 @@ if job_executor is None or job_cluster is None:
 job_framework = job_utils.JobFramework.dask_delayed
 #job_framework = job_utils.JobFramework.immediate_execution_debug
 facility: job_utils.FACILITIES = "rehlers_mbp_m1pro"
-conda_environment_name = "substructure_c_24_06"
+conda_environment_name = "substructure_c_28_04"
 
 # Base analysis settings
 # pp
 #base_dataset_name = "pp_R02"
 #collision_system = "pp"
+base_dataset_name = "pp_R04"
+collision_system = "pp"
 # Semi-central
 #base_dataset_name = "PbPb_semi_central_R02_pass3"
 #collision_system = "PbPb"
 # Central
-base_dataset_name = "PbPb_central_R02_pass3"
-collision_system = "PbPb"
+#base_dataset_name = "PbPb_central_R02_pass3"
+#collision_system = "PbPb"
 dataset_type = "nominal"
 # Detailed analysis settings
 jobs_to_execute = [
@@ -153,11 +159,11 @@ grooming_methods = [
     # "leading_kt_z_cut_02",
     # "leading_kt_z_cut_04",
     # "dynamical_z",
-    #"dynamical_core",
-    #"dynamical_kt",
-    #"dynamical_time",
+    "dynamical_core",
+    "dynamical_kt",
+    "dynamical_time",
     #"soft_drop_z_cut_02",
-    "soft_drop_z_cut_04",
+    #"soft_drop_z_cut_04",
     #"dynamical_core_z_cut_02",
     #"dynamical_kt_z_cut_02",
     #"dynamical_time_z_cut_02",
@@ -171,7 +177,7 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
         #########
         # Nominal
         #########
-        #"default",
+        "default",
         #"default_delta_R",
         #"default_z",
         ## Systematics
@@ -195,27 +201,27 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
         ####################
         # Binning variations
         ####################
-        # ------------------------------
-        # Merge 3-6 bin for SD zcut 0.4
-        # ------------------------------
-        "merge_3_6",
-        # Systematics (copied from above and adapted as needed)
-        # Unfolding
-        "merge_3_6_truncation_low",
-        "merge_3_6_truncation_high",
-        "merge_3_6_random_binning",
-        # Tracking efficiency
-        "merge_3_6_tracking_efficiency",
-        ## Model dependence in pp
-        #"merge_3_6_model_dependence_herwig",
-        #"merge_3_6_model_dependence_pythia",
-        # PbPb background
-        "merge_3_6_background_low",
-        "merge_3_6_background_high",
-        # PbPb Unfolding
-        "merge_3_6_reweight_prior",
-        # PbPb thermal model
-        "merge_3_6_thermal_model",
+        ## ------------------------------
+        ## Merge 3-6 bin for SD zcut 0.4
+        ## ------------------------------
+        #"merge_3_6",
+        ## Systematics (copied from above and adapted as needed)
+        ## Unfolding
+        #"merge_3_6_truncation_low",
+        #"merge_3_6_truncation_high",
+        #"merge_3_6_random_binning",
+        ## Tracking efficiency
+        #"merge_3_6_tracking_efficiency",
+        ### Model dependence in pp
+        ##"merge_3_6_model_dependence_herwig",
+        ##"merge_3_6_model_dependence_pythia",
+        ## PbPb background
+        #"merge_3_6_background_low",
+        #"merge_3_6_background_high",
+        ## PbPb Unfolding
+        #"merge_3_6_reweight_prior",
+        ## PbPb thermal model
+        #"merge_3_6_thermal_model",
 
         # ------------------------------
         # Peter's binning
@@ -234,7 +240,8 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
         #"peter_binning_background_low",
         #"peter_binning_background_high",
     ],
-    output_dir_tag="2023-02-HP",
+    output_dir_tag="2023-paper",
+    #output_dir_tag="2023-conda-test",
 )
 
 # Job execution configuration
