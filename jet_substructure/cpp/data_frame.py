@@ -21,6 +21,7 @@ from pachyderm import binned_data
 
 from jet_substructure.base import helpers, skim_analysis_objects
 from jet_substructure.base import unfolding as unfolding_base
+from jet_substructure.cpp import utils as root_utils
 
 logger = logging.getLogger(__name__)
 
@@ -539,11 +540,9 @@ def run_embedded_pt_hard_scaling(
     jet_pt_column_format = "{prefix}_jet_pt" if jet_pt_prefix_first else "jet_pt_{prefix}"
 
     # Delay ROOT import so we don't explicitly rely on it.
-    import ROOT
+    ROOT = root_utils.import_ROOT(n_cores=n_cores)
 
     # Setup for ROOT
-    # Enable multithreading
-    ROOT.ROOT.EnableImplicitMT(n_cores)
     # Sumw2
     ROOT.TH1.SetDefaultSumw2(True)
 
@@ -759,11 +758,9 @@ def run_create_closure_ratio(  # noqa: C901
                 logger.info(f"Could not find hist {hist_name}. Creating...")
 
     # Delay ROOT import so we don't explicitly rely on it.
-    import ROOT
+    ROOT = root_utils.import_ROOT(n_cores=n_cores)
 
     # Setup for ROOT
-    # Enable multithreading
-    ROOT.ROOT.EnableImplicitMT(n_cores)
     # Sumw2
     ROOT.TH1.SetDefaultSumw2(True)
 
@@ -862,11 +859,9 @@ def run_response(  # noqa: C901
     # TODO: For now (Sept 2020), I just copy to move quickly. But it would be better to refactor the setup.
 
     # Delay ROOT import so we don't explicitly rely on it.
-    import ROOT
+    ROOT = root_utils.import_ROOT(n_cores=n_cores)
 
     # Setup for ROOT
-    # Enable multithreading
-    ROOT.ROOT.EnableImplicitMT(n_cores)
     # Sumw2
     ROOT.TH1.SetDefaultSumw2(True)
 
@@ -1219,11 +1214,9 @@ def run(  # noqa: C901
     double_counting_cut_name: str | None = None,
 ) -> tuple[bool, str]:
     # Delay ROOT import so we don't explicitly rely on it.
-    import ROOT
+    ROOT = root_utils.import_ROOT(n_cores=n_cores)
 
     # Setup for ROOT
-    # Enable multithreading
-    ROOT.ROOT.EnableImplicitMT(n_cores)
     # Sumw2
     ROOT.TH1.SetDefaultSumw2(True)
 
@@ -1244,8 +1237,13 @@ def run(  # noqa: C901
         # Add friends with scale factors
         main_tree.AddFriend(friend_tree)
 
+    # If we want to connect directly to the dask scheduler, we could take this approach.
+    # See notes for further details, as we would have to figure out a way to conditionally pass the client location to the function
+    # (eg. don't pass if running with parsl).
+    #from dask.distributed import Client
+    #client = Client("localhost:57550")
+    #df_original = ROOT.RDF.Experimental.Distributed.Dask.RDataFrame(main_tree)
     df_original = ROOT.RDataFrame(main_tree)
-    # df = ROOT.RDataFrame("AliAnalysisTaskJetHardestKt_hybridLevelJets_AKTChargedR040_tracks_pT0150_E_schemeConstSub_RawTree_EventSub_Incl", "")
 
     if cross_check_task:
         # Add the aliases. This has to be done after the df is defined because apparently they don't carry over.
