@@ -15,6 +15,7 @@ pc059/
 # Virtualenv
 env/
 .venv/
+.venv*/
 
 # Misc
 temp/
