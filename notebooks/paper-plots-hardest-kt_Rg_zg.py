@@ -13,25 +13,28 @@
 #     name: substructure_c_24_06
 # ---
 
-# # Comparison for $R=0.2$ pp, semi-central, central
+# # Paper plots for Rg + zg for pp, semi-central, central
 #
-# To start, focus on DyG core. May or may not contain systematic uncertainties. Depends on what is available
 
 # +
+from __future__ import annotations
+
 # Setup
 import logging
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Sequence
 
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
-from pachyderm import binned_data
-import seaborn as sns
-import uproot
+import pachyderm.plot as pb
+from mammoth import helpers as mammoth_helpers
 
-import jet_substructure.analysis.plot_base as pb
-from jet_substructure.base import helpers, notebook_utils as nb_utils
-from jet_substructure.analysis import new_plot_comparison, plot_from_skim, plot_paper, plot_unfolding, plot_unfolding_1D, unfolding_base
+from jet_substructure.analysis import (
+    model_calculations,
+    plot_paper,
+    plot_unfolding,
+    unfolding_analysis,
+)
+from jet_substructure.base import helpers
 
 # %load_ext autoreload
 # %autoreload 2
@@ -41,14 +44,15 @@ from jet_substructure.analysis import new_plot_comparison, plot_from_skim, plot_
 # Don't show mpl images inline. We'll handle displaying them separately.
 plt.ioff()
 # Ensure the axes are legible on a dark background
-matplotlib.rcParams['figure.facecolor'] = 'w'
+mpl.rcParams['figure.facecolor'] = 'w'
 
-helpers.setup_logging()
+mammoth_helpers.setup_logging(level=logging.DEBUG)
 # Quiet down the matplotlib logging
 logging.getLogger("matplotlib").setLevel(logging.INFO)
 logging.getLogger("PIL").setLevel(logging.INFO)
 logging.getLogger("pachyderm.histogram").setLevel(logging.INFO)
 logging.getLogger("boost_histogram").setLevel(logging.INFO)
+logging.getLogger("numba").setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
 
