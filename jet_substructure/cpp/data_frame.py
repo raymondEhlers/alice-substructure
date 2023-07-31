@@ -41,6 +41,27 @@ class MatchingIndex:
         return f"{self.measured_like_prefix}_{self.generator_like_prefix}"
 
 
+def _standard_substructure_axis(substructure_var: str, jet_R: float) -> npt.NDArray[np.float64]:
+    if substructure_var == "kt":
+        # kt binning should vary with jet R because the kt kinematic limits vary with jet_R
+        kt_axis = np.linspace(-1, 25, 26 + 1, dtype=np.float64)
+        if jet_R == 0.2:
+            # NOTE: Lower edge varies to ensure that we only have below 0.
+            kt_axis = np.linspace(-0.5, 12, 25 + 1, dtype=np.float64)
+        return kt_axis
+    elif substructure_var == "delta_R":
+        n_bins_delta_R = round((jet_R + 0.02) / 0.02)
+        delta_R_axis = np.linspace(-0.02, jet_R, n_bins_delta_R + 1, dtype=np.float64)
+        return delta_R_axis
+    elif substructure_var == "z":
+        n_bins_z = 21
+        z_axis = np.linspace(-0.025, 0.5, n_bins_z + 1, dtype=np.float64)
+        return z_axis
+    else:
+        msg = f"Invalid substructure variable {substructure_var}"
+        raise ValueError(msg)
+
+
 def new_matching_hists(
     df: RDF,
     grooming_method: str,
@@ -918,83 +939,102 @@ def run_response(  # noqa: C901
 
     # For the substructure variables, we also apply a jet pt cut at the measured level (ie. data or hybrid).
     jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= {main_jet_pt_range.min} && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < {main_jet_pt_range.max}"
-    df_measured_selections = df_original.Filter(jet_pt_cut)
+    df_measured_selections_to_use = df_original.Filter(jet_pt_cut)
 
-    # kt binning should vary with jet R because the kt kinematic limits vary with jet_R
-    kt_axis = np.linspace(-1, 25, 26 + 1, dtype=np.float64)
-    if jet_R == 0.2:
-        # NOTE: Lower edge varies to ensure that we only have below 0.
-        kt_axis = np.linspace(-0.5, 12, 25 + 1, dtype=np.float64)
-
+    # Final setup
     hists = []
-    # Responses
-    # General responses.
-    # Hybrid-det level
-    kt_hybrid_det_level_response = df_measured_selections.Histo2D(
-        (
-            f"{grooming_method}_hybrid_det_level_kt_response_jet_pt_{smeared_cut_prefix}_40_120",
-            f"{grooming_method}_hybrid_det_level_kt_response_jet_pt_{smeared_cut_prefix}_40_120",
-            len(kt_axis) - 1,
-            kt_axis,
-            len(kt_axis) - 1,
-            kt_axis,
-        ),
-        f"{grooming_method}_hybrid_kt",
-        f"{grooming_method}_det_level_kt",
-        "scale_factor",
-    )
-    hists.append(kt_hybrid_det_level_response)
-    # Hybrid-true
-    kt_hybrid_true_response = df_measured_selections.Histo2D(
-        (
-            f"{grooming_method}_hybrid_true_kt_response_jet_pt_{smeared_cut_prefix}_40_120",
-            f"{grooming_method}_hybrid_true_kt_response_jet_pt_{smeared_cut_prefix}_40_120",
-            len(kt_axis) - 1,
-            kt_axis,
-            len(kt_axis) - 1,
-            kt_axis,
-        ),
-        f"{grooming_method}_hybrid_kt",
-        f"{grooming_method}_true_kt",
-        "scale_factor",
-    )
-    hists.append(kt_hybrid_true_response)
-    # Det-level true
-    kt_det_level_true_response = df_measured_selections.Histo2D(
-        (
-            f"{grooming_method}_det_level_true_kt_response_jet_pt_{smeared_cut_prefix}_40_120",
-            f"{grooming_method}_det_level_true_kt_response_jet_pt_{smeared_cut_prefix}_40_120",
-            len(kt_axis) - 1,
-            kt_axis,
-            len(kt_axis) - 1,
-            kt_axis,
-        ),
-        f"{grooming_method}_det_level_kt",
-        f"{grooming_method}_true_kt",
-        "scale_factor",
-    )
-    hists.append(kt_det_level_true_response)
 
-    # Debug code for the RDF Filtering.
-    # We explicitly require splittings at both the det level and hybrid level.
-    # From here, we require a splitting at det level.
-    # df = df.Filter(f"{grooming_method}_det_level_n_passed_grooming > 0 && {grooming_method}_hybrid_n_passed_grooming > 0")
-    # extra = df.Filter(f"{grooming_method}_hybrid_det_level_matching_leading == 1 && {grooming_method}_hybrid_det_level_matching_subleading == 2").Count()
-    # logger.debug(f"Extra: {extra.GetValue()}")
+    # Now, determine the variable and the appropriate cuts
+    for substructure_var in ["kt", "delta_R", "z"]:
+        min_kt_requirement = []
+        if substructure_var == "kt":
+            min_kt_requirement = [None]
+        else:
+            min_kt_requirement = [None, 1.0, 1.5, 2.0]
 
-    # Matrix of possible counts values.
-    # counts = {}
-    # for leading_value in range(-1, 4):
-    #    for subleading_value in range(-1, 4):
-    #        counts[
-    #            f"{grooming_method}_hybrid_det_level_matching_leading == {leading_value}"
-    #            f" && {grooming_method}_hybrid_det_level_matching_subleading == {subleading_value}"
-    #        ] = 0
-    # for selection in counts:
-    #    counts[selection] = df.Filter(selection).Count()
-    ## Get the values:
-    # for selection, values in counts.items():
-    #    logger.info(f"Selection: {selection}: {values.GetValue()}")
+        for min_kt in min_kt_requirement:
+            tag = ""
+            if min_kt is not None:
+                tag = f"_min_smeared_kt_{str(min_kt).replace('.', 'p')}"
+                kt_selection = f"{grooming_method}_{smeared_cut_prefix}_kt >= {min_kt}"
+                logger.info(f"{substructure_var=}, {kt_selection=}")
+                df_measured_selections = df_measured_selections_to_use.Filter(
+                    f"{grooming_method}_{smeared_cut_prefix}_kt >= {min_kt}"
+                )
+            else:
+                df_measured_selections = df_measured_selections_to_use
+
+            # kt binning should vary with jet R because the kt kinematic limits vary with jet_R
+            substructure_axis = _standard_substructure_axis(substructure_var=substructure_var, jet_R=jet_R)
+
+            # Responses
+            # General responses.
+            # Hybrid-det level
+            hybrid_det_level_response = df_measured_selections.Histo2D(
+                (
+                    f"{grooming_method}_hybrid_det_level_{substructure_var}_response_jet_pt_{smeared_cut_prefix}_40_120{tag}",
+                    f"{grooming_method}_hybrid_det_level_{substructure_var}_response_jet_pt_{smeared_cut_prefix}_40_120{tag}",
+                    len(substructure_axis) - 1,
+                    substructure_axis,
+                    len(substructure_axis) - 1,
+                    substructure_axis,
+                ),
+                f"{grooming_method}_hybrid_{substructure_var}",
+                f"{grooming_method}_det_level_{substructure_var}",
+                "scale_factor",
+            )
+            hists.append(hybrid_det_level_response)
+            # Hybrid-true
+            hybrid_true_response = df_measured_selections.Histo2D(
+                (
+                    f"{grooming_method}_hybrid_true_{substructure_var}_response_jet_pt_{smeared_cut_prefix}_40_120{tag}",
+                    f"{grooming_method}_hybrid_true_{substructure_var}_response_jet_pt_{smeared_cut_prefix}_40_120{tag}",
+                    len(substructure_axis) - 1,
+                    substructure_axis,
+                    len(substructure_axis) - 1,
+                    substructure_axis,
+                ),
+                f"{grooming_method}_hybrid_{substructure_var}",
+                f"{grooming_method}_true_{substructure_var}",
+                "scale_factor",
+            )
+            hists.append(hybrid_true_response)
+            # Det-level true
+            det_level_true_response = df_measured_selections.Histo2D(
+                (
+                    f"{grooming_method}_det_level_true_{substructure_var}_response_jet_pt_{smeared_cut_prefix}_40_120{tag}",
+                    f"{grooming_method}_det_level_true_{substructure_var}_response_jet_pt_{smeared_cut_prefix}_40_120{tag}",
+                    len(substructure_axis) - 1,
+                    substructure_axis,
+                    len(substructure_axis) - 1,
+                    substructure_axis,
+                ),
+                f"{grooming_method}_det_level_{substructure_var}",
+                f"{grooming_method}_true_{substructure_var}",
+                "scale_factor",
+            )
+            hists.append(det_level_true_response)
+
+            # Debug code for the RDF Filtering.
+            # We explicitly require splittings at both the det level and hybrid level.
+            # From here, we require a splitting at det level.
+            # df = df.Filter(f"{grooming_method}_det_level_n_passed_grooming > 0 && {grooming_method}_hybrid_n_passed_grooming > 0")
+            # extra = df.Filter(f"{grooming_method}_hybrid_det_level_matching_leading == 1 && {grooming_method}_hybrid_det_level_matching_subleading == 2").Count()
+            # logger.debug(f"Extra: {extra.GetValue()}")
+
+            # Matrix of possible counts values.
+            # counts = {}
+            # for leading_value in range(-1, 4):
+            #    for subleading_value in range(-1, 4):
+            #        counts[
+            #            f"{grooming_method}_hybrid_det_level_matching_leading == {leading_value}"
+            #            f" && {grooming_method}_hybrid_det_level_matching_subleading == {subleading_value}"
+            #        ] = 0
+            # for selection in counts:
+            #    counts[selection] = df.Filter(selection).Count()
+            ## Get the values:
+            # for selection, values in counts.items():
+            #    logger.info(f"Selection: {selection}: {values.GetValue()}")
 
     # Matching and matching dependent responses.
     # First, setup the dataframes. We only want to apply this complex filtering once since
@@ -1070,6 +1110,8 @@ def run_response(  # noqa: C901
         jet_pt_cut = f"{jet_pt_column_format.format(prefix=smeared_cut_prefix)} >= {main_jet_pt_range.min} && {jet_pt_column_format.format(prefix=smeared_cut_prefix)} < {main_jet_pt_range.max}"
         df_selection = df_base.Filter(jet_pt_cut)
 
+        # We have to hard code for kt here, since that's how the code was designed.
+        kt_axis = _standard_substructure_axis(substructure_var="kt", jet_R=jet_R)
         hists.extend(
             new_matching_hists(
                 df=df_selection,
