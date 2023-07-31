@@ -1533,9 +1533,10 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     rdf_plots: bool,
     plot_config: PlotConfig,
     output_dir: Path,
+    substructure_variable: str,
     plot_png: bool = False,
 ) -> Path:
-    logger.debug(f"Plotting kt vs jet pt for {grooming_method}.")
+    logger.debug(f"Plotting {substructure_variable} vs jet pt for {grooming_method}.")
 
     fig, ax = plt.subplots(figsize=(12, 9))
 
@@ -1543,7 +1544,7 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     # However, first we need to rebin
     tag = f"_{jet_pt_bin.histogram_str(label=prefix)}" if rdf_plots else ""
     try:
-        bh_hist = hists[f"{grooming_method}_{prefix}_kt_stats{tag}"]
+        bh_hist = hists[f"{grooming_method}_{prefix}_{substructure_variable}_stats{tag}"]
         # h = binned_data.BinnedData.from_existing_data(
         #    bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1 :: bh.rebin(2)]  # noqa: E203
         # )
@@ -1643,12 +1644,136 @@ def plot_kt_vs_jet_pt_stats(
                     prefix=prefix,
                     jet_pt_bin=jet_pt_bin,
                     rdf_plots=rdf_plots,
+                    substructure_variable="kt",
                     plot_config=PlotConfig(
                         name="kt_vs_jet_pt_raw",
                         panels=Panel(
                             axes=[
                                 AxisConfig(
                                     "x", label=r"$k_{\text{T}}\:(\text{GeV}/c)$",
+                                    range=(substructure_var_range.min, substructure_var_range.max),
+                                ),
+                                AxisConfig(
+                                    "y", label=r"$p_{\text{T}}\:(\text{GeV}/c)$",
+                                    range=(jet_pt_bin.min, jet_pt_max)
+                                ),
+                            ],
+                            text=TextConfig(x=0.98, y=0.02, text=text),
+                        ),
+                    ),
+                    output_dir=output_dir,
+                    plot_png=plot_png,
+                )
+            )
+        except KeyError as e:
+            logger.info(f"Skipping due to missing output: {e}")
+
+    return filenames
+
+
+def plot_Rg_vs_jet_pt_stats(
+    hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    prefix: str,
+    jet_pt_bin: helpers.JetPtRange,
+    rdf_plots: bool,
+    output_dir: Path,
+    plot_png: bool,
+    system_label: str,
+    jet_R: float = 0.2,
+    substructure_var_range: helpers.RangeSelector | None = None,
+) -> List[Path]:
+    # Validation
+    if substructure_var_range is None:
+        if jet_R == 0.4:
+            substructure_var_range = helpers.KtRange(-0.1, 0.5)
+        else:
+            substructure_var_range = helpers.KtRange(-0.1, 0.3)
+    # Setup
+    # We want to round the jet pt up to ensure that we don't cut it off when rebinning
+    # (ie. if 85 is the max, round up to 90. But if 120 is max, leave at 120)
+    jet_pt_max = _round_value_to_next_ten(jet_pt_bin.max)
+
+    filenames = []
+    for grooming_method in grooming_methods:
+        text = "Iterative splittings"
+        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
+        text += "\n" + system_label
+        try:
+            filenames.append(
+                _plot_kt_vs_jet_pt_raw_with_labels(
+                    hists=hists,
+                    grooming_method=grooming_method,
+                    prefix=prefix,
+                    jet_pt_bin=jet_pt_bin,
+                    rdf_plots=rdf_plots,
+                    substructure_variable="delta_R",
+                    plot_config=PlotConfig(
+                        name="rg_vs_jet_pt_raw",
+                        panels=Panel(
+                            axes=[
+                                AxisConfig(
+                                    "x", label=r"$R_{\text{g}}$",
+                                    range=(substructure_var_range.min, substructure_var_range.max),
+                                ),
+                                AxisConfig(
+                                    "y", label=r"$p_{\text{T}}\:(\text{GeV}/c)$",
+                                    range=(jet_pt_bin.min, jet_pt_max)
+                                ),
+                            ],
+                            text=TextConfig(x=0.98, y=0.02, text=text),
+                        ),
+                    ),
+                    output_dir=output_dir,
+                    plot_png=plot_png,
+                )
+            )
+        except KeyError as e:
+            logger.info(f"Skipping due to missing output: {e}")
+
+    return filenames
+
+
+def plot_zg_vs_jet_pt_stats(
+    hists: Mapping[str, bh.Histogram],
+    grooming_methods: Sequence[str],
+    prefix: str,
+    jet_pt_bin: helpers.JetPtRange,
+    rdf_plots: bool,
+    output_dir: Path,
+    plot_png: bool,
+    system_label: str,
+    jet_R: float = 0.2,
+    substructure_var_range: helpers.RangeSelector | None = None,
+) -> List[Path]:
+    # Validation
+    if substructure_var_range is None:
+        substructure_var_range = helpers.KtRange(-0.1, 0.55)
+    # Setup
+    # We want to round the jet pt up to ensure that we don't cut it off when rebinning
+    # (ie. if 85 is the max, round up to 90. But if 120 is max, leave at 120)
+    jet_pt_max = _round_value_to_next_ten(jet_pt_bin.max)
+
+    filenames = []
+    for grooming_method in grooming_methods:
+        text = "Iterative splittings"
+        text += "\n" + " ".join(grooming_method.split("_")).capitalize()
+        text += "\n" + system_label
+        try:
+            filenames.append(
+                _plot_kt_vs_jet_pt_raw_with_labels(
+                    hists=hists,
+                    grooming_method=grooming_method,
+                    prefix=prefix,
+                    jet_pt_bin=jet_pt_bin,
+                    rdf_plots=rdf_plots,
+                    substructure_variable="z",
+                    plot_config=PlotConfig(
+                        name="zg_vs_jet_pt_raw",
+                        panels=Panel(
+                            axes=[
+                                AxisConfig(
+                                    "x", label=r"$z_{\text{g}}$",
                                     range=(substructure_var_range.min, substructure_var_range.max),
                                 ),
                                 AxisConfig(
