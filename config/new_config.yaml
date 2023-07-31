@@ -1957,6 +1957,9 @@ analysis_configurations:
                             "smeared": [40, 50, 60, 70, 80, 90, 120]
                 dynamical_core:
                     delta_R: &_R02_delta_R_additional_kt_cut
+                        # 0.02 is okay for 1 GeV cut, but 0.04 seems to be required for the 1.5 GeV cut
+                        "true": [-0.05, 0, 0.044, 0.06, 0.08, 0.1, 0.14 , 0.2]
+                        "smeared": [-0.05, 0, 0.044, 0.06, 0.08, 0.1, 0.14 , 0.2]
                         additional_substructure_variable_cut:
                             variable_name: "kt"
                             # NOTE: Need to match the min cut in both central and semi-central, so take the max of all options (ie. 1.5)
@@ -1965,9 +1968,8 @@ analysis_configurations:
                             apply_to_smeared: true
                             apply_to_true: true
                     z: &_R02_z_additional_kt_cut_no_z_cut
-                        # TODO: This is really speculative - need to look at the stats
-                        "true": [-0.05, 0, 0.1, 0.15, 0.2, 0.275, 0.35, 0.5, 0.8]
-                        "smeared": [-0.05, 0, 0.1, 0.15, 0.2, 0.275, 0.35, 0.5]
+                        "true": [-0.05, 0, 0.15, 0.2, 0.275, 0.35, 0.5, 0.8]
+                        "smeared": [-0.05, 0, 0.15, 0.2, 0.275, 0.35, 0.5]
                         additional_substructure_variable_cut:
                             variable_name: "kt"
                             # NOTE: Need to match the min cut in both central and semi-central, so take the max of all options (ie. 1.5)
