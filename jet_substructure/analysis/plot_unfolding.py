@@ -5023,6 +5023,104 @@ def run_delta_R(collision_system: str) -> None:
         plot_delta_R_unfolding(unfolding_output=unfolding_output)
 
 
+def steer_plotting_of_substructure_var_unfolding_outputs(
+    substructure_variable: str,
+    grooming_methods: list[str],
+    unfolded_with_systematics: dict[str, unfolding_analysis.SingleResult],
+    unfolding_systematics_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
+    unfolding_closure_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
+    plot: bool,
+    plot_png: bool,
+    plot_systematic_breakdown: bool,
+    plot_systematics: bool,
+    plot_closures: bool,
+    unfolding_display_range: dict[str, tuple[float, float]] | tuple[float, float],
+    prior_variation_output_name: dict[str, str | None] | str | None = None,
+    relative_individual_systematic_ratio_range: dict[str, tuple[float, float]] | tuple[float, float] | None = None,
+) -> None:
+    # Validation
+    if isinstance(unfolding_display_range, tuple):
+        unfolding_display_range = {grooming_method: unfolding_display_range for grooming_method in grooming_methods}
+    if isinstance(prior_variation_output_name, str) or prior_variation_output_name is None:
+        prior_variation_output_name = {grooming_method: prior_variation_output_name for grooming_method in grooming_methods}
+    if isinstance(relative_individual_systematic_ratio_range, tuple) or relative_individual_systematic_ratio_range is None:
+        relative_individual_systematic_ratio_range = {
+            grooming_method: relative_individual_systematic_ratio_range if relative_individual_systematic_ratio_range is not None else (0.5, 1.5)
+            for grooming_method in grooming_methods
+        }
+
+    # Skip out immediately if we can
+    if not plot:
+        return
+
+    # Setup
+    if substructure_variable == "kt":
+        axis_label = r"k_{\text{T}}"
+    elif substructure_variable == "delta_R":
+        axis_label = r"R_{\text{g}}"
+    elif substructure_variable == "z":
+        axis_label = r"z_{\text{g}}"
+    else:
+        msg = f"Unknown substructure variable: {substructure_variable}"
+        raise ValueError(msg)
+
+    for grooming_method in grooming_methods:
+        logger.info(f"Plotting '{grooming_method}'")
+        if plot_systematic_breakdown:
+            # Plot the individual relative systematics
+            plot_relative_individual_systematics(
+                unfolded=unfolded_with_systematics[grooming_method],
+                plot_config=pb.PlotConfig(
+                    name="unfolded_systematic_relative",
+                    panels=[
+                        pb.Panel(
+                            axes=[
+                                pb.AxisConfig(
+                                    "x",
+                                    label=r"$" + axis_label + r"\:(\text{GeV}/c)$",
+                                    range=unfolding_display_range[grooming_method],
+                                ),
+                                pb.AxisConfig(
+                                    "y",
+                                    label="Relative error",
+                                    range=relative_individual_systematic_ratio_range[grooming_method],
+                                ),
+                            ],
+                            legend=pb.LegendConfig(location="upper right", ncol=2),
+                            #text=pb.TextConfig(text, 0.97, 0.97),
+                        ),
+                    ],
+                ),
+                output_dir=unfolding_systematics_outputs[grooming_method]["default"].output_dir,
+                plot_png=plot_png,
+            )
+
+        _prior_variation_name = prior_variation_output_name[grooming_method]
+        if _prior_variation_name is not None:
+            _prior_variation_output = unfolding_systematics_outputs[grooming_method][_prior_variation_name]
+        else:
+            _prior_variation_output = None
+        plot_delta_R_unfolding(
+            unfolding_output=unfolding_systematics_outputs[grooming_method]["default"],
+            plot_png=plot_png,
+            prior_variation_output=_prior_variation_output,
+            unfolding_Rg_display_range=unfolding_display_range[grooming_method],
+        )
+        for _outputs in [
+            unfolding_closure_outputs if plot_closures else {grooming_method: {}},
+            unfolding_systematics_outputs if plot_systematics else {grooming_method: {}},
+        ]:
+            for name, _unfolding_output in _outputs[grooming_method].items():
+                # Skip, since we already plotted above.
+                if name == "default":
+                    continue
+                plot_kt_unfolding(
+                    unfolding_output=_unfolding_output,
+                    plot_png=plot_png,
+                    unfolding_kt_display_range=unfolding_display_range[grooming_method],
+                )
+
+
 def steer_plotting_of_kt_unfolding_outputs(
     grooming_methods: list[str],
     unfolded_with_systematics: dict[str, unfolding_analysis.SingleResult],
