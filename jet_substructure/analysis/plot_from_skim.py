@@ -972,6 +972,167 @@ def plot_residuals(
         )
 
 
+def _plot_response_without_matching_type(
+    hists: Mapping[str, bh.Histogram],
+    substructure_variable: str,
+    grooming_method: str,
+    response_type: skim_analysis_objects.ResponseType,
+    hist_suffix: str,
+    hybrid_jet_pt_bin: helpers.RangeSelector,
+    plot_config: PlotConfig,
+    output_dir: Path,
+    rdf_plots: bool = False,
+    plot_png: bool = False,
+    smeared_kt_min: float | None = None,
+) -> None:
+    logger.debug(
+        f"Plotting {substructure_variable} {response_type} response for {grooming_method}, hybrid: {hybrid_jet_pt_bin}, hist_suffix: {hist_suffix}"
+    )
+
+    # dynamical_core_det_level_true_z_response_jet_pt_hybrid_40_120_min_smeared_kt_2p0;1
+    tag = ""
+    if smeared_kt_min is not None:
+        tag = f"_min_smeared_kt_{str(smeared_kt_min).replace('.', 'p')}"
+    hist_name = f"{grooming_method}_{response_type}_{substructure_variable}_response_{hybrid_jet_pt_bin.histogram_str(label='hybrid')}{tag}"
+
+    # leading_kt_hybrid_true_kt_response_matching_hybrid_det_level_type_all_jet_pt_hybrid_40_120
+    #hist_name = f"{grooming_method}_{response_type}_{label}_response_matching_{matching_level}_type_{matching_type}_{hybrid_jet_pt_bin.histogram_str(label='hybrid')}"
+    # hist_name = f"{grooming_method}_{response_type}_{label}_response_{matching_level}_matching_type_{matching_type}"
+    # hist_name = f"{grooming_method}_{response_type}_{label}_response_{matching_level}_matching_type_{matching_type}_{subjet_name}_pt_fraction_in_hybrid"
+    if hist_suffix:
+        hist_name += f"_{hist_suffix}"
+    logger.debug(f"hist_name: {hist_name}")
+    bh_input_hist = hists[hist_name]
+    h_input = binned_data.BinnedData.from_existing_data(bh_input_hist)
+
+    # Select the variables (for the example of kt)
+    # Axes: hybrid_pt, hybrid_kt, det_level_pt, det_level_kt
+    # NOTE: We already applied the 40 < hybrid jet pt < 120 cut, so it doesn't need an additional selection.
+    if rdf_plots:
+        ## For RDF skim
+        #subjet_range = slice(bh.loc(subjet_pt_fraction_range[0]), bh.loc(subjet_pt_fraction_range[1]), bh.sum)
+        #h = binned_data.BinnedData.from_existing_data(bh_input_hist[::, ::, subjet_range])
+        h = binned_data.BinnedData.from_existing_data(bh_input_hist)
+    else:
+        h = binned_data.BinnedData(
+            axes=[h_input.axes[1], h_input.axes[3]],
+            values=np.sum(h_input.values, axis=(0, 2)),
+            variances=np.sum(h_input.variances, axis=(0, 2)),
+        )
+
+    # Normalize the response.
+    normalization_values = h.values.sum(axis=0, keepdims=True)
+    h.values = np.divide(
+        h.values, normalization_values, out=np.zeros_like(h.values), where=normalization_values != 0
+    )
+
+    # Finish setup
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Determine the normalization range
+    z_axis_range = {
+        # "vmin": h_proj.values[h_proj.values > 0].min(),
+        "vmin": 1e-4,
+        # Account for the possibility of having no values.
+        "vmax": h.values.max() if (h.values).any() else 1.0,
+    }
+    logger.debug(f"z_axis_range: {z_axis_range}")
+
+    # Plot
+    mesh = ax.pcolormesh(
+        h.axes[0].bin_edges.T,
+        h.axes[1].bin_edges.T,
+        h.values.T,
+        norm=matplotlib.colors.LogNorm(**z_axis_range),
+    )
+    fig.colorbar(mesh, pad=0.02)
+
+    # Labeling and presentation
+    plot_config.apply(fig=fig, ax=ax)
+
+    # Store and cleanup
+    filename = (
+        f"{plot_config.name}_iterative_splittings_{grooming_method}{tag}"
+    )
+    if hist_suffix:
+        filename += f"_{hist_suffix}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{filename}.png")
+    plt.close(fig)
+
+
+def plot_response_matrix_without_matching_type(
+    hists: Mapping[str, bh.Histogram],
+    substructure_variable: str,
+    grooming_methods: Sequence[str],
+    response_types: Sequence[skim_analysis_objects.ResponseType],
+    output_dir: Path,
+    rdf_plots: bool = True,
+    plot_png: bool = True,
+    smeared_kt_min: float | None = None,
+) -> None:
+    """ Simple plot of RM without matching type.
+
+    Derived from matching type function since I needed something quick for paper proposal.
+    """
+    # Setup
+    hybrid_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+    # Just for labeling
+    grooming_styling = define_grooming_styles()
+
+    if substructure_variable == "kt":
+        axis_label = r"k_{\text{T}}"
+    elif substructure_variable == "delta_R":
+        axis_label = r"R_{\text{g}}"
+    elif substructure_variable == "z":
+        axis_label = r"z_{\text{g}}"
+    else:
+        msg = f"Unknown substructure variable: {substructure_variable}"
+        raise ValueError(msg)
+
+    for grooming_method in grooming_methods:
+        for response_type in response_types:
+            # Improve the display of labels (such as "det_level" -> "det"
+            measured_like_label = response_type.measured_like.replace("_level", "")
+            generator_like_label = response_type.generator_like.replace("_level", "")
+            text = "Iterative splittings"
+            text += "\n" + f"${hybrid_jet_pt_bin.display_str(label='hybrid')}$"
+            text += "\n" + grooming_styling[grooming_method].label
+            _plot_response_without_matching_type(
+                hists=hists,
+                substructure_variable=substructure_variable,
+                grooming_method=grooming_method,
+                response_type=response_type,
+                hist_suffix="",
+                hybrid_jet_pt_bin=hybrid_jet_pt_bin,
+                smeared_kt_min=smeared_kt_min,
+                plot_config=PlotConfig(
+                    name=f"response_{substructure_variable}_{response_type}",
+                    panels=Panel(
+                        axes=[
+                            AxisConfig(
+                                "x",
+                                label=fr"${axis_label}^{{\text{{{measured_like_label}}}}}$",
+                            ),
+                            AxisConfig(
+                                "y",
+                                label=fr"${axis_label}^{{\text{{{generator_like_label}}}}}$",
+                            ),
+                        ],
+                        text=TextConfig(x=0.03, y=0.97, text=text),
+                        # legend=LegendConfig(location="upper left", font_size=14),
+                    ),
+                    figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+                ),
+                output_dir=output_dir,
+                rdf_plots=rdf_plots,
+                plot_png=plot_png,
+            )
+
+
 def _plot_response_by_matching_type(
     hists: Mapping[str, bh.Histogram],
     label: str,
