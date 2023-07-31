@@ -1534,6 +1534,7 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     plot_config: PlotConfig,
     output_dir: Path,
     substructure_variable: str,
+    smeared_kt_min: float | None = None,
     plot_png: bool = False,
 ) -> Path:
     logger.debug(f"Plotting {substructure_variable} vs jet pt for {grooming_method}.")
@@ -1543,6 +1544,9 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     # We want to plot the 2D hist, so no need for any projections.
     # However, first we need to rebin
     tag = f"_{jet_pt_bin.histogram_str(label=prefix)}" if rdf_plots else ""
+    if smeared_kt_min is not None:
+        tag += f"_min_smeared_kt_{smeared_kt_min:g}"
+
     try:
         bh_hist = hists[f"{grooming_method}_{prefix}_{substructure_variable}_stats{tag}"]
         # h = binned_data.BinnedData.from_existing_data(
@@ -1682,6 +1686,7 @@ def plot_Rg_vs_jet_pt_stats(
     system_label: str,
     jet_R: float = 0.2,
     substructure_var_range: helpers.RangeSelector | None = None,
+    smeared_min_kt: float | None = None
 ) -> List[Path]:
     # Validation
     if substructure_var_range is None:
@@ -1689,6 +1694,7 @@ def plot_Rg_vs_jet_pt_stats(
             substructure_var_range = helpers.KtRange(-0.1, 0.5)
         else:
             substructure_var_range = helpers.KtRange(-0.1, 0.3)
+
     # Setup
     # We want to round the jet pt up to ensure that we don't cut it off when rebinning
     # (ie. if 85 is the max, round up to 90. But if 120 is max, leave at 120)
@@ -1699,6 +1705,8 @@ def plot_Rg_vs_jet_pt_stats(
         text = "Iterative splittings"
         text += "\n" + " ".join(grooming_method.split("_")).capitalize()
         text += "\n" + system_label
+        if smeared_min_kt is not None:
+            text += "\n" + r"$k_{\text{T}} " + f"> {smeared_min_kt:g}$"
         try:
             filenames.append(
                 _plot_kt_vs_jet_pt_raw_with_labels(
@@ -1708,6 +1716,7 @@ def plot_Rg_vs_jet_pt_stats(
                     jet_pt_bin=jet_pt_bin,
                     rdf_plots=rdf_plots,
                     substructure_variable="delta_R",
+                    smeared_kt_min=smeared_min_kt,
                     plot_config=PlotConfig(
                         name="rg_vs_jet_pt_raw",
                         panels=Panel(
@@ -1745,6 +1754,7 @@ def plot_zg_vs_jet_pt_stats(
     system_label: str,
     jet_R: float = 0.2,
     substructure_var_range: helpers.RangeSelector | None = None,
+    smeared_min_kt: float | None = None
 ) -> List[Path]:
     # Validation
     if substructure_var_range is None:
@@ -1759,6 +1769,8 @@ def plot_zg_vs_jet_pt_stats(
         text = "Iterative splittings"
         text += "\n" + " ".join(grooming_method.split("_")).capitalize()
         text += "\n" + system_label
+        if smeared_min_kt is not None:
+            text += "\n" + r"$k_{\text{T}} " + f"> {smeared_min_kt:g}$"
         try:
             filenames.append(
                 _plot_kt_vs_jet_pt_raw_with_labels(
@@ -1768,6 +1780,7 @@ def plot_zg_vs_jet_pt_stats(
                     jet_pt_bin=jet_pt_bin,
                     rdf_plots=rdf_plots,
                     substructure_variable="z",
+                    smeared_kt_min=smeared_min_kt,
                     plot_config=PlotConfig(
                         name="zg_vs_jet_pt_raw",
                         panels=Panel(
