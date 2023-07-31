@@ -271,6 +271,116 @@ _filenames = plot_from_skim.plot_zg_vs_jet_pt_stats(
 )
 # -
 
+# ### Response
+
+# +
+# First, any required imports for embedding
+from jet_substructure.base import skim_analysis_objects
+
+# Next, any helper functions
+def grooming_name(grooming_method: str, prefixes: list[str]) -> str:
+    return f"{grooming_method}_prefixes_{'_'.join(prefixes)}"
+
+# Settings
+collision_system = "embed_pythia"
+#prefix = "hybrid"
+jet_pt_bin = helpers.JetPtRange(min=40, max=120)
+text_label = "Iterative splittings"
+#text_label += "\n" + f"${jet_pt_bin.display_str(label=prefix)}$"
+#tag = jet_pt_bin.histogram_str(prefix)
+
+# Setup
+_all_available_methods = [
+    "dynamical_core",
+    "dynamical_kt",
+    "dynamical_time",
+]
+_method_groups = [
+    _all_available_methods
+]
+#_all_available_methods = list(nb_utils.all_grooming_methods)
+#_method_groups = [
+#    nb_utils.leading_kt_grooming_methods,
+#    nb_utils.dynamical_grooming_methods,
+#    nb_utils.soft_drop_grooming_methods,
+#    _all_available_methods,
+#]
+
+# Helpers for plotting responses
+_matching_name_to_axis_value: dict[str, int] = {
+    "all": 0,
+    #"pure": 1,
+    #"leading_untagged_subleading_correct": 2,
+    #"leading_correct_subleading_untagged": 3,
+    #"leading_correct_subleading_mistag": 4,
+    #"leading_mistag_subleading_correct": 5,
+    #"leading_untagged_subleading_mistag": 6,
+    #"leading_mistag_subleading_untagged": 7,
+    #"swap": 8,
+    #"both_untagged": 9,
+}
+_response_types = [
+    #skim_analysis_objects.ResponseType(measured_like="hybrid", generator_like="det_level"),
+    skim_analysis_objects.ResponseType(measured_like="hybrid", generator_like="true"),
+    #skim_analysis_objects.ResponseType(measured_like="det_level", generator_like="true"),
+]
+
+# Output
+_output_dir = output_dir / collision_system / "RDF" / "jupyter" / "2023-paper" / "central_R02" / "pass3"
+_output_dir.mkdir(parents=True, exist_ok=True)
+_fig_output_dir = _output_dir / "png"
+
+# Load data for comparison
+hists_embedding = {}
+_successfully_loaded_methods = []
+#for dataset_name in ["LHC19f4_embedded_into_LHC18qr_central_6338_6357", "LHC19f4_embedded_into_LHC18qr_central_R02_6456_6475"]:
+#for dataset_name in ["LHC20g4_embedded_into_LHC18qr_semi_central_R02_6932_6951"]:
+for dataset_name in ["LHC20g4_embedded_into_LHC18qr_central_R02_0071"]:
+    for grooming_method in _all_available_methods:
+        try:
+            hists_embedding.update(nb_utils.load_histograms(
+                filename = f"{dataset_name}_{grooming_name(grooming_method, prefixes=['hybrid', 'true', 'det_level'])}_response.root", collision_system=collision_system,
+                tag = "RDF", base_path = Path("output")
+            ))
+            _successfully_loaded_methods.append(grooming_method)
+        except FileNotFoundError:
+            logger.info(f"Skipping grooming method {grooming_method} because the output file isn't available")
+        
+# Convert to boost_histogram because it simplifies projections later.
+hists_embedding = {k: v.to_boost_histogram() for k, v in hists_embedding.items()}
+# -
+
+logger.info(_successfully_loaded_methods)
+
+from importlib import reload
+reload(plot_from_skim)
+
+# +
+smeared_min_kt_central = 1.5
+
+plot_from_skim.plot_response_matrix_without_matching_type(
+    hists=hists_embedding,
+    substructure_variable="delta_R",
+    grooming_methods=_all_available_methods,
+    response_types=_response_types,
+    output_dir=_output_dir,
+    rdf_plots=True,
+    plot_png=False,
+    smeared_kt_min=smeared_min_kt_central,
+)
+
+plot_from_skim.plot_response_matrix_without_matching_type(
+    hists=hists_embedding,
+    substructure_variable="z",
+    grooming_methods=_all_available_methods,
+    response_types=_response_types,
+    output_dir=_output_dir,
+    rdf_plots=True,
+    plot_png=False,
+    smeared_kt_min=smeared_min_kt_central,
+)
+# -
+
 
 
 # ## Semi-central PbPb
@@ -372,6 +482,116 @@ _filenames = plot_from_skim.plot_zg_vs_jet_pt_stats(
     plot_png=plot_png,
     system_label=system_label,
     smeared_min_kt=smeared_min_kt_semi_central,
+)
+# -
+
+# ### Response
+
+# +
+# First, any required imports for embedding
+from jet_substructure.base import skim_analysis_objects
+
+# Next, any helper functions
+def grooming_name(grooming_method: str, prefixes: list[str]) -> str:
+    return f"{grooming_method}_prefixes_{'_'.join(prefixes)}"
+
+# Settings
+collision_system = "embed_pythia"
+#prefix = "hybrid"
+jet_pt_bin = helpers.JetPtRange(min=40, max=120)
+text_label = "Iterative splittings"
+#text_label += "\n" + f"${jet_pt_bin.display_str(label=prefix)}$"
+#tag = jet_pt_bin.histogram_str(prefix)
+
+# Setup
+_all_available_methods = [
+    "dynamical_core",
+    "dynamical_kt",
+    "dynamical_time",
+]
+_method_groups = [
+    _all_available_methods
+]
+#_all_available_methods = list(nb_utils.all_grooming_methods)
+#_method_groups = [
+#    nb_utils.leading_kt_grooming_methods,
+#    nb_utils.dynamical_grooming_methods,
+#    nb_utils.soft_drop_grooming_methods,
+#    _all_available_methods,
+#]
+
+# Helpers for plotting responses
+_matching_name_to_axis_value: dict[str, int] = {
+    "all": 0,
+    #"pure": 1,
+    #"leading_untagged_subleading_correct": 2,
+    #"leading_correct_subleading_untagged": 3,
+    #"leading_correct_subleading_mistag": 4,
+    #"leading_mistag_subleading_correct": 5,
+    #"leading_untagged_subleading_mistag": 6,
+    #"leading_mistag_subleading_untagged": 7,
+    #"swap": 8,
+    #"both_untagged": 9,
+}
+_response_types = [
+    #skim_analysis_objects.ResponseType(measured_like="hybrid", generator_like="det_level"),
+    skim_analysis_objects.ResponseType(measured_like="hybrid", generator_like="true"),
+    #skim_analysis_objects.ResponseType(measured_like="det_level", generator_like="true"),
+]
+
+# Output
+_output_dir = output_dir / collision_system / "RDF" / "jupyter" / "2023-paper" / "semi_central_R02" / "pass3"
+_output_dir.mkdir(parents=True, exist_ok=True)
+_fig_output_dir = _output_dir / "png"
+
+# Load data for comparison
+hists_embedding = {}
+_successfully_loaded_methods = []
+#for dataset_name in ["LHC19f4_embedded_into_LHC18qr_central_6338_6357", "LHC19f4_embedded_into_LHC18qr_central_R02_6456_6475"]:
+#for dataset_name in ["LHC20g4_embedded_into_LHC18qr_semi_central_R02_6932_6951"]:
+for dataset_name in ["LHC20g4_embedded_into_LHC18qr_semi_central_R02_0067"]:
+    for grooming_method in _all_available_methods:
+        try:
+            hists_embedding.update(nb_utils.load_histograms(
+                filename = f"{dataset_name}_{grooming_name(grooming_method, prefixes=['hybrid', 'true', 'det_level'])}_response.root", collision_system=collision_system,
+                tag = "RDF", base_path = Path("output")
+            ))
+            _successfully_loaded_methods.append(grooming_method)
+        except FileNotFoundError:
+            logger.info(f"Skipping grooming method {grooming_method} because the output file isn't available")
+        
+# Convert to boost_histogram because it simplifies projections later.
+hists_embedding = {k: v.to_boost_histogram() for k, v in hists_embedding.items()}
+# -
+
+logger.info(_successfully_loaded_methods)
+
+from importlib import reload
+reload(plot_from_skim)
+
+# +
+smeared_min_kt_semi_central = 1.0
+
+plot_from_skim.plot_response_matrix_without_matching_type(
+    hists=hists_embedding,
+    substructure_variable="delta_R",
+    grooming_methods=_all_available_methods,
+    response_types=_response_types,
+    output_dir=_output_dir,
+    rdf_plots=True,
+    plot_png=False,
+    smeared_kt_min=smeared_min_kt_semi_central,
+)
+
+plot_from_skim.plot_response_matrix_without_matching_type(
+    hists=hists_embedding,
+    substructure_variable="z",
+    grooming_methods=_all_available_methods,
+    response_types=_response_types,
+    output_dir=_output_dir,
+    rdf_plots=True,
+    plot_png=False,
+    smeared_kt_min=smeared_min_kt_semi_central,
 )
 # -
 
