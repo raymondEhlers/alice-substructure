@@ -1603,6 +1603,9 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
 
     # Store and cleanup
     filename = f"{plot_config.name}_{jet_pt_bin}_iterative_splittings_{grooming_method}_stats"
+    if smeared_kt_min is not None:
+        _min_smeared_kt_str = str(smeared_kt_min).replace(".", "p")
+        filename += f"_min_smeared_kt_{_min_smeared_kt_str}"
     fig.savefig(output_dir / f"{filename}.pdf")
     if plot_png:
         output_dir_png = output_dir / "png"
