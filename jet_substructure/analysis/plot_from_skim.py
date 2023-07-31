@@ -1689,7 +1689,7 @@ def plot_Rg_vs_jet_pt_stats(
     system_label: str,
     jet_R: float = 0.2,
     substructure_var_range: helpers.RangeSelector | None = None,
-    smeared_min_kt: float | None = None
+    smeared_kt_min: float | None = None
 ) -> List[Path]:
     # Validation
     if substructure_var_range is None:
@@ -1708,8 +1708,8 @@ def plot_Rg_vs_jet_pt_stats(
         text = "Iterative splittings"
         text += "\n" + " ".join(grooming_method.split("_")).capitalize()
         text += "\n" + system_label
-        if smeared_min_kt is not None:
-            text += "\n" + r"$k_{\text{T}} " + f"> {smeared_min_kt:g}$"
+        if smeared_kt_min is not None:
+            text += "\n" + r"$k_{\text{T}} " + f"> {smeared_kt_min:g}$"
         try:
             filenames.append(
                 _plot_kt_vs_jet_pt_raw_with_labels(
@@ -1719,7 +1719,7 @@ def plot_Rg_vs_jet_pt_stats(
                     jet_pt_bin=jet_pt_bin,
                     rdf_plots=rdf_plots,
                     substructure_variable="delta_R",
-                    smeared_kt_min=smeared_min_kt,
+                    smeared_kt_min=smeared_kt_min,
                     plot_config=PlotConfig(
                         name="rg_vs_jet_pt_raw",
                         panels=Panel(
@@ -1757,7 +1757,7 @@ def plot_zg_vs_jet_pt_stats(
     system_label: str,
     jet_R: float = 0.2,
     substructure_var_range: helpers.RangeSelector | None = None,
-    smeared_min_kt: float | None = None
+    smeared_kt_min: float | None = None
 ) -> List[Path]:
     # Validation
     if substructure_var_range is None:
@@ -1772,8 +1772,8 @@ def plot_zg_vs_jet_pt_stats(
         text = "Iterative splittings"
         text += "\n" + " ".join(grooming_method.split("_")).capitalize()
         text += "\n" + system_label
-        if smeared_min_kt is not None:
-            text += "\n" + r"$k_{\text{T}} " + f"> {smeared_min_kt:g}$"
+        if smeared_kt_min is not None:
+            text += "\n" + r"$k_{\text{T}} " + f"> {smeared_kt_min:g}$"
         try:
             filenames.append(
                 _plot_kt_vs_jet_pt_raw_with_labels(
@@ -1783,7 +1783,7 @@ def plot_zg_vs_jet_pt_stats(
                     jet_pt_bin=jet_pt_bin,
                     rdf_plots=rdf_plots,
                     substructure_variable="z",
-                    smeared_kt_min=smeared_min_kt,
+                    smeared_kt_min=smeared_kt_min,
                     plot_config=PlotConfig(
                         name="zg_vs_jet_pt_raw",
                         panels=Panel(
