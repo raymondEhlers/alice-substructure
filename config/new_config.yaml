@@ -1963,7 +1963,9 @@ analysis_configurations:
                         additional_substructure_variable_cut:
                             variable_name: "kt"
                             # NOTE: Need to match the min cut in both central and semi-central, so take the max of all options (ie. 1.5)
-                            min: 1.5
+                            # NOTE: July 2023: Central didn't work (awful kinematic efficiency in region of interest), so tried
+                            #       semi-central instead. zg looks interesting but unstable, while Rg still doesn't look possible.
+                            min: 1.0
                             max: null
                             apply_to_smeared: true
                             apply_to_true: true
@@ -1973,7 +1975,9 @@ analysis_configurations:
                         additional_substructure_variable_cut:
                             variable_name: "kt"
                             # NOTE: Need to match the min cut in both central and semi-central, so take the max of all options (ie. 1.5)
-                            min: 1.5
+                            # NOTE: July 2023: Central didn't work (awful kinematic efficiency in region of interest), so tried
+                            #       semi-central instead. zg looks interesting but unstable, while Rg still doesn't look possible.
+                            min: 1.0
                             max: null
                             apply_to_smeared: true
                             apply_to_true: true
