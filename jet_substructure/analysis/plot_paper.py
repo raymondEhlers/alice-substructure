@@ -1131,13 +1131,8 @@ def _plot_single_system_comparison(
             h.errors[h.values == 0] = np.nan
             h.values[h.values == 0] = np.nan
 
-        ## Plot options
-        #kwargs = {
-        #    "markerfacecolor": "white" if style.fillstyle == "none" else style.color,
-        #    "alpha": 1 if style.fillstyle == "none" else 0.8,
-        #}
-        #if style.fillstyle != "none":
-        #    kwargs["markeredgewidth"] = 0
+        # Plot options
+        kwargs_plot_errorbar = grooming_styles[grooming_method].kwargs_for_plot_errorbar()
 
         # Main data points
         p = ax.errorbar(
@@ -1145,17 +1140,14 @@ def _plot_single_system_comparison(
             h.values,
             yerr=h.errors,
             xerr=h.axes[0].bin_widths / 2,
-            marker=grooming_styles[grooming_method].marker,
-            markersize=11,
-            linestyle="",
-            linewidth=3,
             label=grooming_styles[grooming_method].label_short,
-            color=grooming_styles[grooming_method].color,
             # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
             zorder=3 + _plot_counter,
+            **kwargs_plot_errorbar,
         )
 
         # Systematic uncertainty
+        kwargs_plot_error_boxes = grooming_styles[grooming_method].kwargs_for_plot_error_boxes()
         pachyderm.plot.error_boxes(
             ax=ax,
             x_data=h.axes[0].bin_centers,
@@ -1167,10 +1159,7 @@ def _plot_single_system_comparison(
                     h.metadata["y_systematic"]["quadrature"].high,
                 ]
             ),
-            color=p[0].get_color(),
-            linewidth=0,
-            alpha=0.3,
-            zorder=2,
+            **kwargs_plot_error_boxes,
         )
 
         # Ratio
@@ -1208,13 +1197,9 @@ def _plot_single_system_comparison(
             ratio.values,
             yerr=ratio.errors,
             xerr=ratio.axes[0].bin_widths / 2,
-            color=p[0].get_color(),
-            #marker="o",
-            markersize=11,
-            linestyle="",
-            linewidth=3,
             # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
             zorder=3 + _plot_counter,
+            **kwargs_plot_errorbar,
         )
         # Systematic errors.
         y_relative_error_low = full_results_helpers.relative_error(
@@ -1244,10 +1229,7 @@ def _plot_single_system_comparison(
             y_data=ratio.values,
             x_errors=ratio.axes[0].bin_widths / 2,
             y_errors=np.array([y_systematic.low, y_systematic.high]),
-            color=p[0].get_color(),
-            linewidth=0,
-            alpha=0.3,
-            zorder=2,
+            **kwargs_plot_error_boxes,
         )
 
     # Reference value for ratio
@@ -1341,7 +1323,7 @@ def plot_comparisons_of_grooming_methods_for_single_system(
                     ],
                 ),
             ],
-            figure=pb.Figure(edge_padding={"left": 0.15, "bottom": 0.07, "top": 0.975}),
+            figure=pb.Figure(edge_padding={"left": 0.15, "bottom": 0.095, "top": 0.975}),
         ),
         output_dir=output_dir,
     )
