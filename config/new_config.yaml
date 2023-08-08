@@ -2157,6 +2157,192 @@ analysis_configurations:
                 ####################
                 # Binning variations
                 ####################
+                # ------------------------------------------------------------
+                # Test DyG core (as proxy for others) with no smeared untagged
+                # ------------------------------------------------------------
+                no_smeared_untagged:
+                    label: "no_smeared_untagged"
+                    closures: true
+                    closure_settings:
+                        # If using the data precision, the split MC fraction is applied, but then
+                        # the uncertainties on the smeared are matched to those seen in data.
+                        split_MC_fraction_for_response: 0.75
+                        use_data_stat_precision_for_smeared: true
+                        max_untagged_bin: 10
+                    compare_pure_matches: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "nominal"
+                    binning:
+                        dynamical_core:
+                            kt:
+                                "true": [-0.05, 0, 1, 1.5, 2, 3, 4, 6, 100]
+                                "smeared": [1, 1, 1.5, 2, 3, 4, 6, 8]
+                no_smeared_untagged_tracking_efficiency:
+                    label: "no_smeared_untagged_tracking_efficiency"
+                    additional_settings_names_for_property_lookup: ["no_smeared_untagged"]
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "tracking_efficiency"
+                no_smeared_untagged_truncation_low:
+                    label: "no_smeared_untagged_truncation"
+                    additional_settings_names_for_property_lookup: ["no_smeared_untagged"]
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "nominal"
+                    binning:
+                        default:
+                            jet_pt:
+                                "smeared": [35, 50, 60, 80, 100, 120]
+                no_smeared_untagged_truncation_high:
+                    label: "no_smeared_untagged_truncation"
+                    additional_settings_names_for_property_lookup: ["no_smeared_untagged"]
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "nominal"
+                    binning:
+                        default:
+                            jet_pt:
+                                "smeared": [45, 50, 60, 80, 100, 120]
+                no_smeared_untagged_random_binning:
+                    label: "no_smeared_untagged_random_binning"
+                    additional_settings_names_for_property_lookup: ["no_smeared_untagged"]
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "nominal"
+                    binning:
+                        dynamical_core:
+                            kt:
+                                "smeared": [1, 1, 1.45, 1.94, 2.87, 4.07, 6.05, 8]
+                no_smeared_untagged_reweight_prior:
+                    label: "no_smeared_untagged_reweight_prior"
+                    additional_settings_names_for_property_lookup: ["no_smeared_untagged"]
+                    closures: false
+                    reweight_prior: true
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "nominal"
+                no_smeared_untagged_background_low:
+                    label: "no_smeared_untagged_Rmax005"
+                    additional_settings_names_for_property_lookup: ["no_smeared_untagged"]
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "rmax_005"
+                no_smeared_untagged_background_high:
+                    label: "no_smeared_untagged_Rmax050"
+                    additional_settings_names_for_property_lookup: ["no_smeared_untagged"]
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "rmax_050"
+                no_smeared_untagged_thermal_model:
+                    label: "no_smeared_untagged_thermal_model"
+                    additional_settings_names_for_property_lookup: ["no_smeared_untagged"]
+                    closures: true
+                    closure_settings:
+                        use_data_stat_precision_for_smeared: true
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "thermal_model"
+                # ----------------------------------------------------------------------
+                # Test DyG core (as proxy for others) with no untagged (smeared or true)
+                # ----------------------------------------------------------------------
+                no_untagged:
+                    label: "no_untagged"
+                    closures: true
+                    closure_settings:
+                        # If using the data precision, the split MC fraction is applied, but then
+                        # the uncertainties on the smeared are matched to those seen in data.
+                        split_MC_fraction_for_response: 0.75
+                        use_data_stat_precision_for_smeared: true
+                        max_untagged_bin: 10
+                    compare_pure_matches: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "nominal"
+                    binning:
+                        dynamical_core:
+                            kt:
+                                "true": [0, 1, 1.5, 2, 3, 4, 6, 100]
+                                "smeared": [1, 1, 1.5, 2, 3, 4, 6, 8]
+                no_untagged_tracking_efficiency:
+                    label: "no_untagged_tracking_efficiency"
+                    additional_settings_names_for_property_lookup: ["no_untagged"]
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "tracking_efficiency"
+                no_untagged_truncation_low:
+                    label: "no_untagged_truncation"
+                    additional_settings_names_for_property_lookup: ["no_untagged"]
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "nominal"
+                    binning:
+                        default:
+                            jet_pt:
+                                "smeared": [35, 50, 60, 80, 100, 120]
+                no_untagged_truncation_high:
+                    label: "no_untagged_truncation"
+                    additional_settings_names_for_property_lookup: ["no_untagged"]
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "nominal"
+                    binning:
+                        default:
+                            jet_pt:
+                                "smeared": [45, 50, 60, 80, 100, 120]
+                no_untagged_random_binning:
+                    label: "no_untagged_random_binning"
+                    additional_settings_names_for_property_lookup: ["no_untagged"]
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "nominal"
+                    binning:
+                        dynamical_core:
+                            kt:
+                                "smeared": [1, 1, 1.45, 1.94, 2.87, 4.07, 6.05, 8]
+                no_untagged_reweight_prior:
+                    label: "no_untagged_reweight_prior"
+                    additional_settings_names_for_property_lookup: ["no_untagged"]
+                    closures: false
+                    reweight_prior: true
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "nominal"
+                no_untagged_background_low:
+                    label: "no_untagged_Rmax005"
+                    additional_settings_names_for_property_lookup: ["no_untagged"]
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "rmax_005"
+                no_untagged_background_high:
+                    label: "no_untagged_Rmax050"
+                    additional_settings_names_for_property_lookup: ["no_untagged"]
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "rmax_050"
+                no_untagged_thermal_model:
+                    label: "no_untagged_thermal_model"
+                    additional_settings_names_for_property_lookup: ["no_untagged"]
+                    closures: true
+                    closure_settings:
+                        use_data_stat_precision_for_smeared: true
+                        split_MC_fraction_for_response: 0.75
+                        max_untagged_bin: 10
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "thermal_model"
                 # -------------------------------------
                 # Merge the last kt bin for SD zcut 0.4.
                 # Since we found this to be effective, I moved it to the standard binning.
