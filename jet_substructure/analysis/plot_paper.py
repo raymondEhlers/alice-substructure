@@ -1285,7 +1285,8 @@ def plot_comparisons_of_grooming_methods_for_single_system(
     jet_pt_bin = next(iter(hists.values())).ranges[0]
 
     text = plot_style.label_to_display_string["ALICE"][alice_status]
-    if alice_status != "final":
+    # We skip this in PbPb because the name becomes too long!
+    if alice_status != "final" or collision_system != "pp":
         text += "\n"
     else:
         text += " "
