@@ -1865,3 +1865,56 @@ for grooming_method in grooming_methods:
     )
 
 # %%
+
+# %% [markdown]
+# ### Debug area
+
+# %%
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+
+# %%
+fig, ax = plt.subplots(figsize=(8, 6))
+
+# %%
+x = np.linspace(0, 10, 20)
+x2 = x + 0.01
+y = np.sin(x)
+y2 = np.sin(x2)
+
+# %%
+x1_res = ax.errorbar(x=x, y=y, xerr=np.sqrt(np.abs(y)), yerr=np.sqrt(np.abs(y)), fmt="o", fillstyle="none", label="x")
+x2_res = ax.errorbar(x=x2, y=y2, xerr=np.sqrt(np.abs(y2)),  yerr=np.sqrt(np.abs(y2)), fmt="o", fillstyle="none", label="x2")
+
+# %%
+fig
+
+# %%
+x2_res.lines[2][1].get_segments()
+
+# %%
+x2_res.lines[0].get_markeredgewidth()
+
+# %%
+# Find the position of the left edge of the marker in display coordinates
+# NOTE: This is dependent on the marker being symmetric
+marker_center_in_display_coordinates = ax.transData.transform((x[1], y[1]))
+marker_left_edge_in_display_coordinates = marker_center_in_display_coordinates - (x2_res.lines[0].get_markersize()/ 2, 0)
+marker_left_edge_in_display_coordinates
+
+# %%
+# Translate back from display coordinates to data coordinates
+data_edge = ax.transData.inverted().transform(marker_left_edge_in_display_coordinates)
+data_edge
+
+# %%
+ax.plot(*data_edge, marker="o", markersize=5, color="black")
+
+# %%
+fig
+
+# %%
+plt.close(fig)
+
+# %%
