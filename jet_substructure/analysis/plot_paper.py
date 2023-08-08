@@ -1142,12 +1142,14 @@ def _plot_single_system_comparison(
             xerr=h.axes[0].bin_widths / 2,
             label=grooming_styles[grooming_method].label_short,
             # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
-            zorder=3 + _plot_counter,
+            # NOTE: The extra 2 * is to ensure we stay on top of the systematic error boxes
+            zorder=3 + 2 * len(grooming_methods) - _plot_counter,
             **kwargs_plot_errorbar,
         )
 
         # Systematic uncertainty
         kwargs_plot_error_boxes = grooming_styles[grooming_method].kwargs_for_plot_error_boxes()
+        kwargs_plot_error_boxes["zorder"] = 2 + len(grooming_methods) - _plot_counter
         pachyderm.plot.error_boxes(
             ax=ax,
             x_data=h.axes[0].bin_centers,
@@ -1198,7 +1200,8 @@ def _plot_single_system_comparison(
             yerr=ratio.errors,
             xerr=ratio.axes[0].bin_widths / 2,
             # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
-            zorder=3 + _plot_counter,
+            # NOTE: The extra 2 * is to ensure we stay on top of the systematic error boxes
+            zorder=3 + 2 * len(grooming_methods) - _plot_counter,
             **kwargs_plot_errorbar,
         )
         # Systematic errors.
@@ -1282,7 +1285,11 @@ def plot_comparisons_of_grooming_methods_for_single_system(
     jet_pt_bin = next(iter(hists.values())).ranges[0]
 
     text = plot_style.label_to_display_string["ALICE"][alice_status]
-    text += "\n" + event_activity + plot_style.label_to_display_string["collision_system"][collision_system_key]
+    if alice_status != "final":
+        text += "\n"
+    else:
+        text += " "
+    text += event_activity + plot_style.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + plot_style.label_to_display_string["jets"]["general"]
     text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
     text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003

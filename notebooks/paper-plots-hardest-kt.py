@@ -101,7 +101,7 @@ input_dir_tag = "2023-02-HP"
 ###################
 # Setup I/O options
 ###################
-_use_qm22_inputs = True
+_use_qm22_inputs = False
 _grooming_methods_using_qm_result_conventions = _OG_grooming_methods if _use_qm22_inputs else []
 _grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inputs else grooming_methods
 
@@ -1208,7 +1208,7 @@ _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / su
 _output_dir.mkdir(parents=True, exist_ok=True)
 
 for _temp_grooming_methods, _reference_method, _label in [
-    (["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"], "soft_drop_z_cut_02", "primary"),
+    (["soft_drop_z_cut_02", "dynamical_core", "dynamical_kt", "dynamical_time"], "soft_drop_z_cut_02", "primary"),
     (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "secondary"),
     (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "summary"),
 ]:
@@ -1857,9 +1857,11 @@ for grooming_method in grooming_methods:
             "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
             "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
         },
+        model_labels_on_axes=[[], ["hybrid_without_moliere", "hybrid_moliere"], ["jetscape"]],
         kt_display_range=(0.0, 6.25),
         jet_R_str=jet_R_str,
         alice_status=alice_status,
+        logy=False,
     )
 
 # %%

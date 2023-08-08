@@ -69,9 +69,15 @@ class GroomingMethodStyle:
             linestyle="",
             linewidth=3,
         )
+        # This marker is a bit small, so try to boost it up
+        if self.marker in ["P", "d", "D"]:
+            d["markersize"] += 2
         if self.fillstyle == "none":
             # Update the fillstyle to be solid white. Transparent would be better, but it doesn't work because
             # it shows the errorbar lines going through the point :-(
+            # One possibility: calculate the marker size, find the edge in display space, and then basically stop the lines
+            # at the marker edge. I can imagine this might look terrible though and/or be buggy and/or be a lot of work.
+            # So wait on this step for now (Aug 2023). See the ChatGPT logs and the debug section n the paper-plots notebook.
             d.update({
                 "fillstyle": "full",
                 "markerfacecolor": "white",
