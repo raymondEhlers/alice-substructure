@@ -1236,7 +1236,7 @@ _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / su
 _output_dir.mkdir(parents=True, exist_ok=True)
 
 for _temp_grooming_methods, _reference_method, _label in [
-    (["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"], "soft_drop_z_cut_02", "primary"),
+    (["soft_drop_z_cut_02", "dynamical_core", "dynamical_kt", "dynamical_time"], "soft_drop_z_cut_02", "primary"),
     (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "secondary"),
     (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "summary"),
 ]:
@@ -1491,7 +1491,7 @@ for _collision_system, _hists in [
 ]:
     logger.info(f"Plotting {_collision_system}")
     for _temp_grooming_methods, _reference_method, _label in [
-        (["dynamical_core", "dynamical_kt", "dynamical_time", "soft_drop_z_cut_02"], "soft_drop_z_cut_02", "primary"),
+        (["soft_drop_z_cut_02", "dynamical_core", "dynamical_kt", "dynamical_time"], "soft_drop_z_cut_02", "primary"),
         (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "secondary"),
         (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "summary"),
     ]:
