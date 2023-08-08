@@ -1997,7 +1997,8 @@ analysis_configurations:
                         "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
                 soft_drop_z_cut_04:
                     kt:
-                        <<: *_semi_central_R02_kt_binning_with_untagged_bin
+                        "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 6, 100]
+                        "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
                 dynamical_core_z_cut_02:
                     kt:
                         <<: *_semi_central_R02_kt_binning_with_untagged_bin
@@ -2020,6 +2021,7 @@ analysis_configurations:
                     reweight_prior: false
                     # For QM+HP prelim
                     #double_counting_cut: "OG_det_level_track_pt"
+                    # For final results
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                 default_delta_R:
@@ -2047,16 +2049,12 @@ analysis_configurations:
                     label: "tracking_efficiency"
                     closures: false
                     reweight_prior: false
-                    # For QM+HP prelim
-                    #double_counting_cut: "OG_det_level_track_pt"
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "tracking_efficiency"
                 truncation_low:
                     label: "truncation"
                     closures: false
                     reweight_prior: false
-                    # For QM+HP prelim
-                    #double_counting_cut: "OG_det_level_track_pt"
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                     binning:
@@ -2067,8 +2065,6 @@ analysis_configurations:
                     label: "truncation"
                     closures: false
                     reweight_prior: false
-                    # For QM+HP prelim
-                    #double_counting_cut: "OG_det_level_track_pt"
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                     binning:
@@ -2079,8 +2075,6 @@ analysis_configurations:
                     label: "random_binning"
                     closures: false
                     reweight_prior: false
-                    # For QM+HP prelim
-                    #double_counting_cut: "OG_det_level_track_pt"
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                     binning:
@@ -2118,6 +2112,8 @@ analysis_configurations:
                                 "smeared": [0, 0.25, 0.52, 0.99, 1.51, 1.94, 3.05, 3.91, 6.01, 8]
                         soft_drop_z_cut_04:
                             kt:
+                                # NOTE: We can use the same as the 02 because the 3-6 bin is
+                                #       **only** merged at true level.
                                 <<: *_semi_central_R02_kt_random_binning_with_untagged_bin
                         dynamical_core_z_cut_02:
                             kt:
@@ -2132,24 +2128,18 @@ analysis_configurations:
                     label: "reweight_prior"
                     closures: false
                     reweight_prior: true
-                    # For QM+HP prelim
-                    #double_counting_cut: "OG_det_level_track_pt"
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                 background_low:
                     label: "Rmax005"
                     closures: false
                     reweight_prior: false
-                    # For QM+HP prelim
-                    #double_counting_cut: "OG_det_level_track_pt"
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "rmax_005"
                 background_high:
                     label: "Rmax050"
                     closures: false
                     reweight_prior: false
-                    # For QM+HP prelim
-                    #double_counting_cut: "OG_det_level_track_pt"
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "rmax_050"
                 thermal_model:
@@ -2160,8 +2150,6 @@ analysis_configurations:
                         split_MC_fraction_for_response: 0.75
                         max_untagged_bin: 10
                     reweight_prior: false
-                    # For QM+HP prelim
-                    #double_counting_cut: "OG_det_level_track_pt"
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "thermal_model"
 
@@ -2170,7 +2158,9 @@ analysis_configurations:
                 # Binning variations
                 ####################
                 # -------------------------------------
-                # Merge the last kt bin for SD zcut 0.4
+                # Merge the last kt bin for SD zcut 0.4.
+                # Since we found this to be effective, I moved it to the standard binning.
+                # We had kept it separate so we could compare the cases.
                 # -------------------------------------
                 merge_3_6:
                     label: "merge_3_6"
@@ -2183,10 +2173,15 @@ analysis_configurations:
                         max_untagged_bin: 10
                     compare_pure_matches: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                     binning:
                         # NOTE: At the moment (14 March 2023), we're only interested in the SD 0.4
+                        # NOTE: 8 August 2023, the smeared has a "typo", in that elsewhere we only merged
+                        #       at true level. This shouldn't have an impact, but for the final result
+                        #       (configured above), we split the smeared bin (ie. 3, 4, 6, 8) for consistency
+                        #       with the other systems. But we leave it as is here since this is how it was configured
+                        #       for the preliminary results.
                         soft_drop_z_cut_04:
                             kt:
                                 "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 6, 100]
@@ -2196,14 +2191,14 @@ analysis_configurations:
                     additional_settings_names_for_property_lookup: ["merge_3_6"]
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "tracking_efficiency"
                 merge_3_6_truncation_low:
                     label: "merge_3_6_truncation"
                     additional_settings_names_for_property_lookup: ["merge_3_6"]
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                     binning:
                         default:
@@ -2214,7 +2209,7 @@ analysis_configurations:
                     additional_settings_names_for_property_lookup: ["merge_3_6"]
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                     binning:
                         default:
@@ -2225,7 +2220,7 @@ analysis_configurations:
                     additional_settings_names_for_property_lookup: ["merge_3_6"]
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                     binning:
                         soft_drop_z_cut_04:
@@ -2241,21 +2236,21 @@ analysis_configurations:
                     additional_settings_names_for_property_lookup: ["merge_3_6"]
                     closures: false
                     reweight_prior: true
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "nominal"
                 merge_3_6_background_low:
                     label: "merge_3_6_Rmax005"
                     additional_settings_names_for_property_lookup: ["merge_3_6"]
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "rmax_005"
                 merge_3_6_background_high:
                     label: "merge_3_6_Rmax050"
                     additional_settings_names_for_property_lookup: ["merge_3_6"]
                     closures: false
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "rmax_050"
                 merge_3_6_thermal_model:
                     label: "merge_3_6_thermal_model"
@@ -2266,7 +2261,7 @@ analysis_configurations:
                         split_MC_fraction_for_response: 0.75
                         max_untagged_bin: 10
                     reweight_prior: false
-                    double_counting_cut: "OG_det_level_track_pt"
+                    double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "thermal_model"
 
                 # ---------------
@@ -2885,7 +2880,9 @@ analysis_configurations:
                     z:
                         <<: *_R02_z_additional_kt_cut_no_z_cut
                         # From Laura, pg 30
-                        # TODO: This is really speculative - need to look at the stats
+                        # NOTE: This is really speculative - need to look at the stats.
+                        #       This is all driven by the kt requirements, which turned out to mess
+                        #       with the kinematic eff and closure.
                         "true": [-0.05, 0, 0.1, 0.2, 0.275, 0.35, 0.5, 0.8]
                         "smeared": [-0.05, 0, 0.1, 0.2, 0.275, 0.35, 0.5]
                 dynamical_time:
@@ -2899,7 +2896,8 @@ analysis_configurations:
                         "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
                 soft_drop_z_cut_04:
                     kt:
-                        <<: *_central_R02_kt_binning_with_untagged_bin
+                        "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 6, 100]
+                        "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
                 dynamical_core_z_cut_02:
                     kt:
                         <<: *_central_R02_kt_binning_with_untagged_bin
@@ -3005,6 +3003,8 @@ analysis_configurations:
                                 "smeared": [0, 0.25, 0.52, 0.99, 1.51, 1.94, 3.05, 3.91, 6.01, 8]
                         soft_drop_z_cut_04:
                             kt:
+                                # NOTE: We can use the same as the 02 because the 3-6 bin is
+                                #       **only** merged at true level.
                                 <<: *_central_R02_kt_random_binning_with_untagged_bin
                         dynamical_core_z_cut_02:
                             kt:
@@ -3050,6 +3050,8 @@ analysis_configurations:
                 ####################
                 # -------------------------------------
                 # Merge the last kt bin for SD zcut 0.4
+                # Since we found this to be effective, I moved it to the standard binning.
+                # We had kept it separate so we could compare the cases.
                 # -------------------------------------
                 merge_3_6:
                     label: "merge_3_6"
@@ -3377,7 +3379,6 @@ analysis_configurations:
                     binning:
                         default:
                             kt:
-                                # TODO: Update!
                                 # In [1]: arr = np.array([0.5, 1., 1.5, 2., 3., 4., 6.], dtype=np.float64)
                                 # In [2]: r = np.random.random_sample(len(arr)) / 10 + 0.95
                                 # In [3]: r
@@ -3419,7 +3420,7 @@ analysis_configurations:
                 pythia: *LHC18b8_pythia_R02_mammoth
             tracking_efficiency:
                 pp: *LHC17pq_pp_R02_mammoth
-                pythia: *LHC18b8_pythia_R02_mammoth_tracking_efficiency
+                pythia: *LHC18b8_pythia_R02_mammoth_tracking_efficiency_pt_dep
             herwig_fastsim:
                 pp: *LHC17pq_pp_R02_mammoth
                 pythia: *LHC18b8_herwig_R02_mammoth_fastsim
@@ -3482,7 +3483,10 @@ analysis_configurations:
                         "smeared": [0, 0.25, 0.5, 1., 1.5, 2., 3, 4, 6]
                 soft_drop_z_cut_04:
                     kt:
-                        <<: *_pp_R02_kt_binning_with_untagged_bin
+                        # Similar to above, but this merges the 3-4-6 bin into at
+                        # true level because the stats + closure are sketchy (in PbPb)
+                        "true": [-0.05, 0., 0.25, 0.5, 1, 1.5, 2, 3, 6, 10]
+                        "smeared": [0, 0.25, 0.5, 1., 1.5, 2., 3, 4, 6]
                 dynamical_core_z_cut_02:
                     kt:
                         <<: *_pp_R02_kt_binning_with_untagged_bin
@@ -3596,6 +3600,8 @@ analysis_configurations:
                                 "smeared": [0, 0.25, 0.52, 0.97, 1.52, 2.05, 3.01, 4., 6]
                         soft_drop_z_cut_04:
                             kt:
+                                # NOTE: We can use the same as the 02 because the 3-6 bin is
+                                #       **only** merged at true level.
                                 <<: *_pp_R02_kt_random_binning_with_untagged_bin
                         dynamical_core_z_cut_02:
                             kt:
@@ -3618,11 +3624,13 @@ analysis_configurations:
                     datasets: "pythia_fastsim"
 
 
-                ############
-                # Variations
-                ############
+                ####################
+                # Binning variations
+                ####################
                 # -------------------------------------
                 # Merge the last kt bin for SD zcut 0.4
+                # Since we found this to be effective, I moved it to the standard binning.
+                # We had kept it separate so we could compare the cases.
                 # -------------------------------------
                 merge_3_6:
                     label: "merge_3_6"
