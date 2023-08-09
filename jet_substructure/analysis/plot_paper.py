@@ -955,7 +955,7 @@ def plot_grooming_methods_comparison_with_model_for_single_system(
 
 def plot_grooming_methods_comparison_with_model_for_single_system_one_figure(
     hists: Mapping[str, unfolding_analysis.SingleResult],
-    models: Mapping[str, tuple[model_calculations.ModelCalculation, Mapping[str, binned_data.BinnedData]]],
+    models: Mapping[str, model_calculations.ModelCalculation],
     grooming_methods: Sequence[str],
     collision_system: str,
     collision_system_key: str,
