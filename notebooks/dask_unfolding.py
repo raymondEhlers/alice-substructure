@@ -65,16 +65,16 @@ conda_environment_name = "substructure_c_28_04"
 #base_dataset_name = "pp_R02"
 #collision_system = "pp"
 #collision_system = "pythia"
-#base_dataset_name = "PbPb_semi_central_R02_pass3"
-#collision_system = "PbPb"
-#collision_system = "embed_pythia"
-base_dataset_name = "PbPb_central_R02_pass3"
+base_dataset_name = "PbPb_semi_central_R02_pass3"
 #collision_system = "PbPb"
 collision_system = "embed_pythia"
+#base_dataset_name = "PbPb_central_R02_pass3"
+#collision_system = "PbPb"
+#collision_system = "embed_pythia"
 dataset_type = "nominal"
 # Detailed analysis settings
 jobs_to_execute = [
-    "root_data_frame",
+    #"root_data_frame",
     "root_data_frame_response",
 ]
 grooming_methods = [
@@ -85,11 +85,11 @@ grooming_methods = [
     "dynamical_core",
     "dynamical_kt",
     "dynamical_time",
-    "soft_drop_z_cut_02",
-    "soft_drop_z_cut_04",
-    "dynamical_core_z_cut_02",
-    "dynamical_kt_z_cut_02",
-    "dynamical_time_z_cut_02",
+    #"soft_drop_z_cut_02",
+    #"soft_drop_z_cut_04",
+    #"dynamical_core_z_cut_02",
+    #"dynamical_kt_z_cut_02",
+    #"dynamical_time_z_cut_02",
 ]
 # Just need the default object
 unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings()
@@ -141,14 +141,14 @@ conda_environment_name = "substructure_c_28_04"
 # pp
 #base_dataset_name = "pp_R02"
 #collision_system = "pp"
-base_dataset_name = "pp_R04"
-collision_system = "pp"
+#base_dataset_name = "pp_R04"
+#collision_system = "pp"
 # Semi-central
 #base_dataset_name = "PbPb_semi_central_R02_pass3"
 #collision_system = "PbPb"
 # Central
-#base_dataset_name = "PbPb_central_R02_pass3"
-#collision_system = "PbPb"
+base_dataset_name = "PbPb_central_R02_pass3"
+collision_system = "PbPb"
 dataset_type = "nominal"
 # Detailed analysis settings
 jobs_to_execute = [
@@ -162,11 +162,11 @@ grooming_methods = [
     "dynamical_core",
     "dynamical_kt",
     "dynamical_time",
-    #"soft_drop_z_cut_02",
-    #"soft_drop_z_cut_04",
-    #"dynamical_core_z_cut_02",
-    #"dynamical_kt_z_cut_02",
-    #"dynamical_time_z_cut_02",
+    "soft_drop_z_cut_02",
+    "soft_drop_z_cut_04",
+    "dynamical_core_z_cut_02",
+    "dynamical_kt_z_cut_02",
+    "dynamical_time_z_cut_02",
 ]
 unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
     variable_to_unfold="kt",
@@ -177,10 +177,10 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
         #########
         # Nominal
         #########
-        "default",
+        ##"default",
         #"default_delta_R",
         #"default_z",
-        ## Systematics
+        # Systematics
         ## Unfolding
         #"truncation_low",
         #"truncation_high",
@@ -195,12 +195,48 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
         #"background_high",
         ## PbPb unfolding
         #"reweight_prior",
-        ## PbPb thermal model
-        #"thermal_model",
+        # PbPb thermal model
+        "thermal_model",
 
         ####################
         # Binning variations
         ####################
+        ## ---------------------------------------
+        ## No smeared untagged (DyG test via core)
+        ## ---------------------------------------
+        #"no_smeared_untagged",
+        ## Systematics
+        ## Unfolding
+        #"no_smeared_untagged_truncation_low",
+        #"no_smeared_untagged_truncation_high",
+        #"no_smeared_untagged_random_binning",
+        ## Tracking efficiency
+        #"no_smeared_untagged_tracking_efficiency",
+        ## PbPb background
+        #"no_smeared_untagged_background_low",
+        #"no_smeared_untagged_background_high",
+        ## PbPb unfolding
+        #"no_smeared_untagged_reweight_prior",
+        ## PbPb thermal model
+        #"no_smeared_untagged_thermal_model",
+        ## -------------------------------
+        ## No untagged (DyG test via core)
+        ## -------------------------------
+        #"no_untagged",
+        ## Systematics
+        ## Unfolding
+        #"no_untagged_truncation_low",
+        #"no_untagged_truncation_high",
+        #"no_untagged_random_binning",
+        ## Tracking efficiency
+        #"no_untagged_tracking_efficiency",
+        ## PbPb background
+        #"no_untagged_background_low",
+        #"no_untagged_background_high",
+        ## PbPb unfolding
+        #"no_untagged_reweight_prior",
+        ## PbPb thermal model
+        #"no_untagged_thermal_model",
         ## ------------------------------
         ## Merge 3-6 bin for SD zcut 0.4
         ## ------------------------------
@@ -240,8 +276,8 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
         #"peter_binning_background_low",
         #"peter_binning_background_high",
     ],
+    #output_dir_tag="2023-pre-PF-DyG-untagged-tests",
     output_dir_tag="2023-paper",
-    #output_dir_tag="2023-conda-test",
 )
 
 # Job execution configuration
