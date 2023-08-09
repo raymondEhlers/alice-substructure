@@ -1258,18 +1258,27 @@ def plot_comparisons_of_grooming_methods_for_single_system(
     output_dir: Path,
     kt_range: helpers.KtRange | Mapping[str, helpers.KtRange],
     figure_kt_range: helpers.KtRange | None = None,
+    ratio_y_range: tuple[float, float] | Mapping[str, tuple[float, float]] | None = None,
     jet_R_str: str = "R04",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
     label: str = "",
 ) -> None:
     """Plot comparison of grooming methods for a single system."""
-
     # Validation
     if figure_kt_range is None:
         figure_kt_range = helpers.KtRange(1.5, 15)
     if isinstance(kt_range, helpers.KtRange):
         kt_range = {grooming_method: kt_range for grooming_method in [*grooming_methods, reference_grooming_method]}
+    if ratio_y_range is None:
+        ratio_y_range = (0.45, 1.55) if "soft_drop_z_cut_04" not in grooming_methods else (0.1, 1.9)
+    if isinstance(ratio_y_range, tuple):
+        ratio_y_range_map = {grooming_method: ratio_y_range for grooming_method in [*grooming_methods, reference_grooming_method]}
+        ratio_y_range = (
+            min([r[0] for r in ratio_y_range_map.values()]),
+            max([r[1] for r in ratio_y_range_map.values()]),
+        )
+    assert isinstance(ratio_y_range, tuple), f"Invalid y range for ratio. Provided: {ratio_y_range}"
     if label:
         label = f"_{label}"
 
@@ -1325,7 +1334,7 @@ def plot_comparisons_of_grooming_methods_for_single_system(
                             label=r"$\frac{\text{Method}}{\text{"
                             + grooming_styling[reference_grooming_method].label_short
                             + "}}$",
-                            range=(0.45, 1.55) if "soft_drop_z_cut_04" not in grooming_methods else (0.1, 1.9),
+                            range=ratio_y_range,
                             font_size=text_font_size,
                         ),
                     ],

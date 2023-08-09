@@ -97,7 +97,7 @@ _new_grooming_methods = [
     "dynamical_time_z_cut_02",
     "soft_drop_z_cut_04",
 ]
-input_dir_tag = "2023-02-HP"
+input_dir_tag = "2023-paper"
 ###################
 # Setup I/O options
 ###################
@@ -146,7 +146,6 @@ _output_dir_tag.update({
 _tag_after_suffix = {
     grooming_method: "" for grooming_method in grooming_methods
 }
-_tag_after_suffix["soft_drop_z_cut_04"] = "merge_3_6"
 ####################################
 # Grooming method dependent settings
 ####################################
@@ -260,8 +259,7 @@ print(pp_R02_unfolded_with_systematics["dynamical_core"].data.metadata["y_system
 
 # %%
 plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
-    #grooming_methods=grooming_methods,
-    grooming_methods=_grooming_methods_using_qm_result_conventions,
+    grooming_methods=grooming_methods,
     unfolded_with_systematics=pp_R02_unfolded_with_systematics,
     unfolding_systematics_outputs=pp_R02_unfolding_systematics_outputs,
     unfolding_closure_outputs=pp_R02_unfolding_closure_outputs,
@@ -270,7 +268,9 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     plot_systematic_breakdown=True,
     plot_systematics=False,
     plot_closures=False,
-    # NOTE: For the prior variation, passing the HERwIG model dependence includes both:
+    # NOTE: All of the commentary below is **only** related to plotting of the prior for selecting the
+    #       number of iterations. The actual prior systematic is evaluated properly!
+    # NOTE: For the prior variation, passing the HERWIG model dependence includes both:
     #       - HERWIG vs PYTHIA
     #       - fastsim vs full sim as well as whatever HERWIG
     #       Consequently, the fastsim output may not be the most accurate overall magnitude, but we can
@@ -317,7 +317,8 @@ _input_dir_tag.update({
 })
 _output_dir_tag = {
     #_method: input_dir_tag + "-from-QM22-results"
-    _method: "2023-paper-plots-from-QM22-results"
+    #_method: "2023-paper-plots-from-QM22-results"
+    _method: "2023-pre-PF-DyG-untagged-tests"
     for _method in _grooming_methods_using_qm_result_conventions
 }
 _output_dir_tag.update({
@@ -326,10 +327,12 @@ _output_dir_tag.update({
 #_tag_after_suffix = "pass3"
 #_tag_after_suffix = "pass3_peter_binning"
 _tag_after_suffix_base = "pass3"
+#_tag_after_suffix_base = "pass3_no_smeared_untagged"
+#_tag_after_suffix_base = "pass3_no_untagged"
 _tag_after_suffix = {
     grooming_method: _tag_after_suffix_base for grooming_method in grooming_methods
 }
-_tag_after_suffix["soft_drop_z_cut_04"] = f"{_tag_after_suffix_base}_merge_3_6"
+#_tag_after_suffix["soft_drop_z_cut_04"] = f"{_tag_after_suffix_base}_merge_3_6"
 ####################################
 # Grooming method dependent settings
 ####################################
@@ -344,9 +347,9 @@ _smeared_var_range = {
     "dynamical_time_z_cut_02": helpers.KtRange(0.25, 8),
 }
 _smeared_untagged_var = {
-    "dynamical_core": helpers.KtRange(0, 1),
-    "dynamical_kt": helpers.KtRange(0, 1),
-    "dynamical_time": helpers.KtRange(0, 1),
+    "dynamical_core": helpers.KtRange(1, 1),
+    "dynamical_kt": helpers.KtRange(1, 1),
+    "dynamical_time": helpers.KtRange(1, 1),
     "soft_drop_z_cut_02": helpers.KtRange(0, 0.25),
     "soft_drop_z_cut_04": helpers.KtRange(0, 0.25),
     "dynamical_core_z_cut_02": helpers.KtRange(0, 0.25),
@@ -354,14 +357,14 @@ _smeared_untagged_var = {
     "dynamical_time_z_cut_02": helpers.KtRange(0, 0.25),
 }
 _n_iter_compare = {
-    "dynamical_core": 6,
-    "dynamical_kt": 6,
-    "dynamical_time": 6,
+    "dynamical_core": 7,
+    "dynamical_kt": 7,
+    "dynamical_time": 7,
     "soft_drop_z_cut_02": 9,
     "dynamical_core_z_cut_02": 9,
     "dynamical_kt_z_cut_02": 9,
     "dynamical_time_z_cut_02": 9,
-    "soft_drop_z_cut_04": 9,
+    "soft_drop_z_cut_04": 10,
 }
 if _use_qm22_inputs:
     _n_iter_compare.update({
@@ -385,7 +388,7 @@ _double_counting_cut = {
     for _method in _grooming_methods_using_qm_result_conventions
 }
 _double_counting_cut.update({
-    _method: "OG_det_level_track_pt"
+    _method: "min_true_10_pt_hat_3"
     for _method in _grooming_methods_using_new_conventions
 })
 # Model dependence.
@@ -509,7 +512,7 @@ _tag_after_suffix_base = "pass3"
 _tag_after_suffix = {
     grooming_method: _tag_after_suffix_base for grooming_method in grooming_methods
 }
-_tag_after_suffix["soft_drop_z_cut_04"] = f"{_tag_after_suffix_base}_merge_3_6"
+#_tag_after_suffix["soft_drop_z_cut_04"] = f"{_tag_after_suffix_base}_merge_3_6"
 ####################################
 # Grooming method dependent settings
 ####################################
@@ -524,9 +527,9 @@ _smeared_var_range = {
     "dynamical_time_z_cut_02": helpers.KtRange(0.25, 8),
 }
 _smeared_untagged_var = {
-    "dynamical_core": helpers.KtRange(0, 1.5),
-    "dynamical_kt": helpers.KtRange(0, 1.5),
-    "dynamical_time": helpers.KtRange(0, 1.5),
+    "dynamical_core": helpers.KtRange(1.5, 1.5),
+    "dynamical_kt": helpers.KtRange(1.5, 1.5),
+    "dynamical_time": helpers.KtRange(1.5, 1.5),
     "soft_drop_z_cut_02": helpers.KtRange(0, 0.25),
     "soft_drop_z_cut_04": helpers.KtRange(0, 0.25),
     "dynamical_core_z_cut_02": helpers.KtRange(0, 0.25),
@@ -617,8 +620,8 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     plot=True,
     plot_png=False,
     plot_systematic_breakdown=True,
-    plot_systematics=True,
-    plot_closures=True,
+    plot_systematics=False,
+    plot_closures=False,
     prior_variation_output_name="reweight_prior",
     unfolding_kt_display_range={
         grooming_method: (0.25, 6) if "z_cut" in grooming_method else (1.5, 6)
@@ -697,7 +700,6 @@ _displaced_extremum = 10
 ###################
 # Input directory location
 # Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
-# TODO: I don't think this is correct. Just need to re
 _input_dir_tag = {
     _method: "parsl"
     for _method in _grooming_methods_using_qm_result_conventions
@@ -731,15 +733,14 @@ _smeared_untagged_var = {
     "soft_drop_z_cut_04": helpers.KtRange(0, 0.25),
 }
 _n_iter_compare = {
-    # TODO: To be optimized!
-    "dynamical_core": 5,
-    "dynamical_kt": 5,
-    "dynamical_time": 5,
-    "soft_drop_z_cut_02": 5,
-    "dynamical_core_z_cut_02": 5,
-    "dynamical_kt_z_cut_02": 5,
-    "dynamical_time_z_cut_02": 5,
-    "soft_drop_z_cut_04": 5,
+    "dynamical_core": 7,
+    "dynamical_kt": 7,
+    "dynamical_time": 7,
+    "soft_drop_z_cut_02": 11,
+    "dynamical_core_z_cut_02": 11,
+    "dynamical_kt_z_cut_02": 11,
+    "dynamical_time_z_cut_02": 11,
+    "soft_drop_z_cut_04": 12,
 }
 if _use_qm22_inputs:
     _n_iter_compare.update({
@@ -750,9 +751,7 @@ if _use_qm22_inputs:
     })
 _max_n_iter: dict[str, int | None] = {
     # Need +1 for convenience with range iteration
-    # TODO: Update this once we've rerun it.
     "soft_drop_z_cut_04": 30,
-    #"soft_drop_z_cut_04": 20,
 }
 _max_n_iter.update({
     grooming_method: 20 for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
@@ -843,7 +842,9 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     plot_systematic_breakdown=True,
     plot_systematics=False,
     plot_closures=False,
-    # NOTE: For the prior variation, passing the HERwIG model dependence includes both:
+    # NOTE: All of the commentary below is **only** related to plotting of the prior for selecting the
+    #       number of iterations. The actual prior systematic is evaluated properly!
+    # NOTE: For the prior variation, passing the HERWIG model dependence includes both:
     #       - HERWIG vs PYTHIA
     #       - fastsim vs full sim as well as whatever HERWIG
     #       Consequently, the fastsim output may not be the most accurate overall magnitude, but we can
@@ -1207,10 +1208,10 @@ jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
-for _temp_grooming_methods, _reference_method, _label in [
-    (["soft_drop_z_cut_02", "dynamical_core", "dynamical_kt", "dynamical_time"], "soft_drop_z_cut_02", "primary"),
-    (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "secondary"),
-    (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "summary"),
+for _temp_grooming_methods, _reference_method, _label, _ratio_y_range in [
+    (["soft_drop_z_cut_02", "dynamical_core", "dynamical_kt", "dynamical_time"], "soft_drop_z_cut_02", "primary", (0.35, 1.65)),
+    (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "secondary", (0.2, 1.8)),
+    (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "summary", (0.2, 1.8)),
 ]:
     plot_paper.plot_comparisons_of_grooming_methods_for_single_system(
         hists=pp_R02_unfolded_with_systematics,
@@ -1221,6 +1222,7 @@ for _temp_grooming_methods, _reference_method, _label in [
         output_dir=_output_dir,
         kt_range=helpers.KtRange(0.25, 6),
         figure_kt_range=helpers.KtRange(0, 6.25),
+        ratio_y_range=_ratio_y_range,
         jet_R_str=jet_R_str,
         alice_status=alice_status,
         label=_label,
@@ -1235,10 +1237,10 @@ jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
-for _temp_grooming_methods, _reference_method, _label in [
-    (["soft_drop_z_cut_02", "dynamical_core", "dynamical_kt", "dynamical_time"], "soft_drop_z_cut_02", "primary"),
-    (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "secondary"),
-    (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "summary"),
+for _temp_grooming_methods, _reference_method, _label, _ratio_y_range in [
+    (["soft_drop_z_cut_02", "dynamical_core", "dynamical_kt", "dynamical_time"], "soft_drop_z_cut_02", "primary", (0.2, 1.8)),
+    (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "secondary", (0.1, 1.9)),
+    (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "summary", (0.1, 1.9)),
 ]:
     plot_paper.plot_comparisons_of_grooming_methods_for_single_system(
         hists=pp_R04_unfolded_with_systematics,
