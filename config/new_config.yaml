@@ -2001,7 +2001,7 @@ analysis_configurations:
                 soft_drop_z_cut_04:
                     kt:
                         "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 6, 100]
-                        "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
+                        "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 6, 8]
                 dynamical_core_z_cut_02:
                     kt:
                         <<: *_semi_central_R02_kt_binning_with_untagged_bin
@@ -2115,9 +2115,8 @@ analysis_configurations:
                                 "smeared": [0, 0.25, 0.52, 0.99, 1.51, 1.94, 3.05, 3.91, 6.01, 8]
                         soft_drop_z_cut_04:
                             kt:
-                                # NOTE: We can use the same as the 02 because the 3-6 bin is
-                                #       **only** merged at true level.
-                                <<: *_semi_central_R02_kt_random_binning_with_untagged_bin
+                                # Based on the SD z_cut_02 above
+                                "smeared": [0, 0.25, 0.52, 0.99, 1.51, 1.94, 3.05, 6.01, 8]
                         dynamical_core_z_cut_02:
                             kt:
                                 <<: *_semi_central_R02_kt_random_binning_with_untagged_bin
@@ -3087,7 +3086,7 @@ analysis_configurations:
                 soft_drop_z_cut_04:
                     kt:
                         "true": [-0.05, 0, 0.25, 0.5, 1, 1.5, 2, 3, 6, 100]
-                        "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
+                        "smeared": [0, 0.25, 0.5, 1, 1.5, 2, 3, 6, 8]
                 dynamical_core_z_cut_02:
                     kt:
                         <<: *_central_R02_kt_binning_with_untagged_bin
@@ -3193,9 +3192,8 @@ analysis_configurations:
                                 "smeared": [0, 0.25, 0.52, 0.99, 1.51, 1.94, 3.05, 3.91, 6.01, 8]
                         soft_drop_z_cut_04:
                             kt:
-                                # NOTE: We can use the same as the 02 because the 3-6 bin is
-                                #       **only** merged at true level.
-                                <<: *_central_R02_kt_random_binning_with_untagged_bin
+                                # Based on the SD z_cut_02 above
+                                "smeared": [0, 0.25, 0.52, 0.99, 1.51, 1.94, 3.05, 6.01, 8]
                         dynamical_core_z_cut_02:
                             kt:
                                 <<: *_central_R02_kt_random_binning_with_untagged_bin
@@ -3676,7 +3674,7 @@ analysis_configurations:
                         # Similar to above, but this merges the 3-4-6 bin into at
                         # true level because the stats + closure are sketchy (in PbPb)
                         "true": [-0.05, 0., 0.25, 0.5, 1, 1.5, 2, 3, 6, 10]
-                        "smeared": [0, 0.25, 0.5, 1., 1.5, 2., 3, 4, 6]
+                        "smeared": [0, 0.25, 0.5, 1., 1.5, 2., 3, 6]
                 dynamical_core_z_cut_02:
                     kt:
                         <<: *_pp_R02_kt_binning_with_untagged_bin
@@ -3787,7 +3785,7 @@ analysis_configurations:
                         soft_drop_z_cut_02:
                             kt: &_pp_R02_kt_random_binning_with_untagged_bin
                                 # Same as above, but including the untagged bin.
-                                "smeared": [0, 0.25, 0.52, 0.97, 1.52, 2.05, 3.01, 4., 6]
+                                "smeared": [0, 0.25, 0.52, 0.97, 1.52, 2.05, 3.01, 6]
                         soft_drop_z_cut_04:
                             kt:
                                 # NOTE: We can use the same as the 02 because the 3-6 bin is
