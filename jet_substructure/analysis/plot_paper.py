@@ -629,23 +629,25 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
             h.errors[h.values == 0] = np.nan
             h.values[h.values == 0] = np.nan
 
+        # Plot options
+        kwargs_plot_errorbar = grooming_styles[grooming_method].kwargs_for_plot_errorbar()
+
         # Main data points
         p = ax.errorbar(
             h.axes[0].bin_centers,
             h.values,
             yerr=h.errors,
             xerr=h.axes[0].bin_widths / 2,
-            marker=grooming_styles[grooming_method].marker,
-            markersize=11,
-            linestyle="",
-            linewidth=3,
             label=grooming_styles[grooming_method].label_short,
-            color=grooming_styles[grooming_method].color,
             # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
-            zorder=3 + _plot_counter + grooming_styles[grooming_method].zorder,
+            # NOTE: The extra 2 * is to ensure we stay on top of the systematic error boxes
+            zorder=3 + 2 * len(grooming_methods) - _plot_counter,
+            **kwargs_plot_errorbar,
         )
 
         # Systematic uncertainty
+        kwargs_plot_error_boxes = grooming_styles[grooming_method].kwargs_for_plot_error_boxes()
+        kwargs_plot_error_boxes["zorder"] = 2 + len(grooming_methods) - _plot_counter
         pachyderm.plot.error_boxes(
             ax=ax,
             x_data=h.axes[0].bin_centers,
@@ -657,25 +659,26 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
                     h.metadata["y_systematic"]["quadrature"].high,
                 ]
             ),
-            color=p[0].get_color(),
-            linewidth=0,
-            alpha=0.3,
+            **kwargs_plot_error_boxes,
         )
 
         # Next, draw the data and uncertainties at one as black and grey boxes
         # Ratio + statistical error bars at one
+        kwargs_plot_errorbar = grooming_styles[grooming_method].kwargs_for_plot_errorbar()
+        kwargs_plot_errorbar["color"] = "black"
+        kwargs_plot_errorbar["markeredgecolor"] = "black"
+        kwargs_plot_errorbar["markerfacecolor"] = "white" if kwargs_plot_errorbar["markerfacecolor"] == "white" else "black"
+        kwargs_plot_errorbar["zorder"] = 6
         ax_ratio.errorbar(
             h.axes[0].bin_centers,
             np.ones_like(h.axes[0].bin_centers),
             yerr=h.errors / h.values,
             xerr=h.axes[0].bin_widths / 2,
-            color="black",
-            marker=grooming_styles[grooming_method].marker,
-            markersize=11,
-            linestyle="",
-            linewidth=3,
-            zorder=6,
+            **kwargs_plot_errorbar,
         )
+        kwargs_plot_error_boxes = grooming_styles[grooming_method].kwargs_for_plot_error_boxes()
+        kwargs_plot_error_boxes["color"] = "black"
+        kwargs_plot_error_boxes["zorder"] = 5.5
         pachyderm.plot.error_boxes(
             ax=ax_ratio,
             x_data=h.axes[0].bin_centers,
@@ -687,10 +690,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
                     h.metadata["y_systematic"]["quadrature"].high / h.values,
                 ]
             ),
-            color="black",
-            linewidth=0,
-            alpha=0.3,
-            zorder=5.5,
+            **kwargs_plot_error_boxes,
         )
 
         for model_name, model_calculation in models.items():
