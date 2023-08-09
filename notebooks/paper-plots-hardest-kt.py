@@ -736,11 +736,11 @@ _n_iter_compare = {
     "dynamical_core": 7,
     "dynamical_kt": 7,
     "dynamical_time": 7,
-    "soft_drop_z_cut_02": 11,
-    "dynamical_core_z_cut_02": 11,
-    "dynamical_kt_z_cut_02": 11,
-    "dynamical_time_z_cut_02": 11,
-    "soft_drop_z_cut_04": 12,
+    "soft_drop_z_cut_02": 9,
+    "dynamical_core_z_cut_02": 9,
+    "dynamical_kt_z_cut_02": 9,
+    "dynamical_time_z_cut_02": 9,
+    "soft_drop_z_cut_04": 10,
 }
 if _use_qm22_inputs:
     _n_iter_compare.update({
