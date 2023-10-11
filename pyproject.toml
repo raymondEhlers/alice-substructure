@@ -1,7 +1,7 @@
 [build-system]
 # pdm
-requires = ["pdm-pep517"]
-build-backend = "pdm.pep517.api"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
 # hatch
 #requires = ["hatchling"]
 #build-backend = "hatchling.build"
@@ -15,7 +15,7 @@ authors = [
   { name = "Raymond Ehlers", email = "raymond.ehlers@cern.ch" },
 ]
 # For hatch, need to remove the dependencies references here
-dynamic = ["dependencies", "optional-dependencies", "version"]
+dynamic = ["optional-dependencies", "version"]
 dependencies = [
     "awkward >=1.7",
     "uproot >=4.2",
@@ -90,12 +90,10 @@ build.include = [
     "jet_substructure/py.typed",
 ]
 
-[tool.pdm]
 # NOTE: I didn't switch to a src layout yet since as of Nov 2022 it would be too painful updating scripts, etc
-version = { source = "file", path = "jet_substructure/__init__.py" }
-include = [
-    "jet_substructure/py.typed",
-]
+[tool.pdm.version]
+source = "file"
+path = "jet_substructure/__init__.py"
 
 [tool.pdm.scripts]
 embedPythia = { call = "jet_substructure.analysis.analyze_tree:embed_pythia_entry_point" }
