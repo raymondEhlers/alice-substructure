@@ -1361,6 +1361,7 @@ def _plot_pp_PbPb_comparison_single_panel(
         axes_ratio = [axes_ratio]
 
     # Setup
+    grooming_styles = plot_style.define_paper_grooming_styles()
     _event_activity_to_color = plot_style.define_paper_event_activity_comparison_styles()
 
     # Use pp as reference, but only in the range where the others are measured.
@@ -1385,23 +1386,27 @@ def _plot_pp_PbPb_comparison_single_panel(
             h.errors[h.values == 0] = np.nan
             h.values[h.values == 0] = np.nan
 
+
         # Main data points
+        kwargs_plot_errorbar = grooming_styles[grooming_method].kwargs_for_plot_errorbar()
+        kwargs_plot_errorbar["color"] = _event_activity_to_color[collision_system]
+        kwargs_plot_errorbar["markeredgecolor"] = kwargs_plot_errorbar["color"]
+        kwargs_plot_errorbar["markerfacecolor"] = "white" if kwargs_plot_errorbar["markerfacecolor"] == "white" else kwargs_plot_errorbar["color"]
         p = ax.errorbar(
             h.axes[0].bin_centers,
             h.values,
             yerr=h.errors,
             xerr=h.axes[0].bin_widths / 2,
-            marker="s" if "soft_drop" in grooming_method else "o",
-            markersize=11,
-            linestyle="",
-            linewidth=3,
             label=_event_activity_full_label_map[collision_system],
             # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
             zorder=3 + _plot_counter,
-            color=_event_activity_to_color[collision_system],
+            **kwargs_plot_errorbar,
         )
 
         # Systematic uncertainty
+        kwargs_plot_error_boxes = grooming_styles[grooming_method].kwargs_for_plot_error_boxes()
+        kwargs_plot_error_boxes["color"] = p[0].get_color()
+        kwargs_plot_error_boxes["zorder"] = 2
         pachyderm.plot.error_boxes(
             ax=ax,
             x_data=h.axes[0].bin_centers,
@@ -1413,10 +1418,7 @@ def _plot_pp_PbPb_comparison_single_panel(
                     h.metadata["y_systematic"]["quadrature"].high,
                 ]
             ),
-            color=p[0].get_color(),
-            linewidth=0,
-            alpha=0.3,
-            zorder=2,
+            **kwargs_plot_error_boxes,
         )
 
         # Ratio
@@ -1430,18 +1432,18 @@ def _plot_pp_PbPb_comparison_single_panel(
         )
         ratio = h / ratio_reference_hist
         # Ratio + statistical error bars
+        kwargs_plot_errorbar = grooming_styles[grooming_method].kwargs_for_plot_errorbar()
+        kwargs_plot_errorbar["color"] = "black" if plot_ratio_black_and_white else p[0].get_color()
+        kwargs_plot_errorbar["markeredgecolor"] = kwargs_plot_errorbar["color"]
+        kwargs_plot_errorbar["markerfacecolor"] = "white" if kwargs_plot_errorbar["markerfacecolor"] == "white" else kwargs_plot_errorbar["color"]
         axes_ratio[axis_ratio_counter].errorbar(
             ratio.axes[0].bin_centers,
             ratio.values,
             yerr=ratio.errors,
             xerr=ratio.axes[0].bin_widths / 2,
-            color="black" if plot_ratio_black_and_white else p[0].get_color(),
-            marker="s" if "soft_drop" in grooming_method else "o",
-            markersize=11,
-            linestyle="",
-            linewidth=3,
             # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
             zorder=3 + _plot_counter,
+            **kwargs_plot_errorbar,
         )
         # Systematic errors.
         y_relative_error_low = full_results_helpers.relative_error(
@@ -1464,16 +1466,16 @@ def _plot_pp_PbPb_comparison_single_panel(
             high=y_relative_error_high * ratio.values,
         )
         y_systematic = ratio.metadata["y_systematic"]["quadrature"]
+        kwargs_plot_error_boxes = grooming_styles[grooming_method].kwargs_for_plot_error_boxes()
+        kwargs_plot_error_boxes["color"] = "grey" if plot_ratio_black_and_white else p[0].get_color()
+        kwargs_plot_error_boxes["zorder"] = 2
         pachyderm.plot.error_boxes(
             ax=axes_ratio[axis_ratio_counter],
             x_data=ratio.axes[0].bin_centers,
             y_data=ratio.values,
             x_errors=ratio.axes[0].bin_widths / 2,
             y_errors=np.array([y_systematic.low, y_systematic.high]),
-            color="grey" if plot_ratio_black_and_white else p[0].get_color(),
-            linewidth=0,
-            alpha=0.3,
-            zorder=2,
+            **kwargs_plot_error_boxes,
         )
 
         # Plot model comparison if available
@@ -1509,7 +1511,10 @@ def _plot_pp_PbPb_comparison_single_panel(
             )
 
         # Advance to the next ratio axis
-        axis_ratio_counter += 1
+        # NOTE: Can only advance if is more than one axis
+        # TODO: I'm not sure this is done quite right as of 9 August 2023, but need to finish for the PF, so will come back to it later
+        if len(axes_ratio) > 1:
+            axis_ratio_counter += 1
 
     # Reference value for ratio
     for ax_ratio in axes_ratio:
@@ -1631,29 +1636,31 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
         for _ax in all_axes[::2].flatten():
             _ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
     else:
-        # Grab the axes which has the legend config.
-        ratio_axes_with_legend_config = [ax for ax, panel_config in zip(axes_ratio, plot_config.panels[1:]) if panel_config.legend is not None]
-        if len(ratio_axes_with_legend_config) != 1:
-            msg = f"Expected exactly one ratio axis to have a legend, got {len(ratio_axes_with_legend_config)}"
-            raise ValueError(msg)
-        ax_ratio_legend = ratio_axes_with_legend_config[0]
-
-        # Labeling and presentation
+        # TODO: I'm not sure this is done quite right as of 9 August 2023, but need to finish for the PF, so will come back to it later
         ax_ratio_legend_config = None
-        ax_ratio_handles, ax_ratio_labels = ax_ratio_legend.get_legend_handles_labels()
-        #logger.info(f"{len(ax_ratio_handles)=}")
-        #logger.info(f"{len(ax_ratio_labels)=}, {ax_ratio_labels=}")
-        if models_ratio and len(ax_ratio_handles) % 2 == 1:
-            #logger.info("Handling manually")
-            # Pop out legend handler so that it skips due the plot config and
-            # and we can handle it manually
-            ax_ratio_legend_config = plot_config.panels[1].legend
-            plot_config.panels[1].legend = None
-            insert_position = round((len(ax_ratio_handles) + 1)/2)
-            ax_ratio_handles.insert(insert_position, ax_ratio_legend.plot([], [], color=(0, 0, 0, 0), label=" ")[0])
-            ax_ratio_labels.insert(insert_position, "")
-            #ax_ratio_handles.insert(insert_position, ax_ratio_handles[0])
-            #ax_ratio_labels.insert(insert_position, ax_ratio_labels[0])
+        if models_ratio:
+            # Grab the axes which has the legend config.
+            ratio_axes_with_legend_config = [ax for ax, panel_config in zip(axes_ratio, plot_config.panels[1:]) if panel_config.legend is not None]
+            if len(ratio_axes_with_legend_config) != 1:
+                msg = f"Expected exactly one ratio axis to have a legend, got {len(ratio_axes_with_legend_config)}"
+                raise ValueError(msg)
+            ax_ratio_legend = ratio_axes_with_legend_config[0]
+
+            # Labeling and presentation
+            ax_ratio_handles, ax_ratio_labels = ax_ratio_legend.get_legend_handles_labels()
+            #logger.info(f"{len(ax_ratio_handles)=}")
+            #logger.info(f"{len(ax_ratio_labels)=}, {ax_ratio_labels=}")
+            if models_ratio and len(ax_ratio_handles) % 2 == 1:
+                #logger.info("Handling manually")
+                # Pop out legend handler so that it skips due the plot config and
+                # and we can handle it manually
+                ax_ratio_legend_config = plot_config.panels[1].legend
+                plot_config.panels[1].legend = None
+                insert_position = round((len(ax_ratio_handles) + 1)/2)
+                ax_ratio_handles.insert(insert_position, ax_ratio_legend.plot([], [], color=(0, 0, 0, 0), label=" ")[0])
+                ax_ratio_labels.insert(insert_position, "")
+                #ax_ratio_handles.insert(insert_position, ax_ratio_handles[0])
+                #ax_ratio_labels.insert(insert_position, ax_ratio_labels[0])
 
         plot_config.apply(fig=fig, axes=[ax, *axes_ratio])
         # A few additional tweaks.
