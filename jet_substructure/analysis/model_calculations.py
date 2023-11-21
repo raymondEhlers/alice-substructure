@@ -91,6 +91,8 @@ class ModelLoader(Protocol):
 class Jetscape:
     base_dir: Path
     needs_normalization: bool = attrs.field(default=False)
+    # NOTE: The HP2023 range was 1.1
+    hadron_rapidity_range: float = attrs.field(default=2.0)
     metadata: dict[str, Any] = attrs.field(factory=dict)
 
     def load_predictions(self, grooming_methods: list[str] | None = None) -> ModelCalculation:
@@ -124,6 +126,11 @@ class Jetscape:
         _jet_R = self.metadata["jet_R"]
         _jet_rapidity_range =_jet_rapidity_ranges[_jet_R]
 
+        # NOTE: The files Yasuki sent in 2023 October have a wider hadron rapidity range in the label.
+        #       This won't matter since he used the fiducial acceptance for the jets (he confirmed on
+        #       slack that it doesn't matter), so we just need to hack the label.
+        hadron_rapidity_label = f"rap0.0-{self.hadron_rapidity_range:.1f}"
+
         # After setup, grab the predictions
         values: dict[str, dict[str, binned_data.BinnedData]] = {}
         for grooming_method in grooming_methods:
@@ -132,9 +139,9 @@ class Jetscape:
             _grooming_param, _z_cut = grooming_methods_to_parameters[grooming_method]
             _grooming_label = "DynamicalGroom" if "dynamical" in grooming_method else "SoftDropGroom"
             _grooming_parameter_label = "aDyn" if "dynamical" in grooming_method else "beta"
-            input_dir = self.base_dir / "combined"
+            input_dir = self.base_dir
             for _cent_bin, _cent_bin_label in _centrality_bins.items():
-                filename = f"{_cent_bin_label}_{_grooming_label}_ktG_jetr{_jet_R}_ptj60-80_rapj0.0-{_jet_rapidity_range}_pt0.0-2510.0_rap0.0-1.1_{_grooming_parameter_label}{_grooming_param:.02f}_zCut{_z_cut:.02f}.txt"
+                filename = f"{_cent_bin_label}_{_grooming_label}_ktG_jetr{_jet_R}_ptj60-80_rapj0.0-{_jet_rapidity_range}_pt0.0-2510.0_{hadron_rapidity_label}_{_grooming_parameter_label}{_grooming_param:.02f}_zCut{_z_cut:.02f}.txt"
                 #logger.debug(f"Loading {grooming_method}, {_cent_bin} from {filename}")
                 try:
                     loaded_data = np.loadtxt(input_dir / _cent_bin_label / filename)
