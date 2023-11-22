@@ -2042,6 +2042,7 @@ def _plot_pp_PbPb_only_ratios(
     set_zero_to_nan: bool,
     all_methods_on_one_figure: bool,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
+    compare_to_fit: bool,
     plot_config: pb.PlotConfig,
     output_dir: Path,
     models_ratio: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
@@ -2059,9 +2060,25 @@ def _plot_pp_PbPb_only_ratios(
         sharex=True,
     )
 
+    # TODO: Fill these in or pass them...
+    _fit_parameters = {
+        "pp": {
+            "tanh_transition_scale": 0.5,
+            "x0": 1.25,
+        },
+        "semi_central": {
+            "tanh_transition_scale": 0.1,
+            "x0": 1.25,
+        },
+        "central": {
+            "tanh_transition_scale": 0.1,
+            "x0": 1.25,
+        },
+    }
+
     for _plot_counter, ((collision_system, hist), ax) in enumerate(zip(hists.items(), axes)):
         # Axes: jet_pt, attr_name
-        h = hist[grooming_method].data
+        h: binned_data.BinnedData = hist[grooming_method].data
 
         # Select range to display.
         h = full_results_helpers.select_hist_range(h, event_activity_to_kt_range[collision_system][grooming_method])
@@ -2071,12 +2088,28 @@ def _plot_pp_PbPb_only_ratios(
             h.errors[h.values == 0] = np.nan
             h.values[h.values == 0] = np.nan
 
+        if compare_to_fit:
+            from jet_substructure.analysis import fit_paper
+            popt = fit_paper.fit_spectra(
+                x0=_fit_parameters[collision_system]["x0"],
+                tanh_transition_scale=_fit_parameters[collision_system]["tanh_transition_scale"],
+                h=h,
+                fit_func=fit_paper.spectra_fit_function_with_y_scale,
+                initial_arguments=[-1, 1, 1, 3, 1],
+            )
+            reference_values = fit_paper.spectra_fit_function_with_y_scale(h.axes[0].bin_centers, *popt)
+            # TODO: Save parameters...
+        else:
+            reference_values = h.values
+        #logger.info(f"{reference_values=}")
+
         # Next, draw the data and uncertainties at one as black and grey boxes
         # Ratio + statistical error bars at one
+        hist_values = h.values / reference_values if compare_to_fit else np.ones_like(h.values)
         ax.errorbar(
             h.axes[0].bin_centers,
-            np.ones_like(h.axes[0].bin_centers),
-            yerr=h.errors / h.values,
+            hist_values,
+            yerr=h.errors / h.values * hist_values,
             xerr=h.axes[0].bin_widths / 2,
             color="black",
             marker=grooming_styles[grooming_method].marker,
@@ -2089,12 +2122,12 @@ def _plot_pp_PbPb_only_ratios(
         pachyderm.plot.error_boxes(
             ax=ax,
             x_data=h.axes[0].bin_centers,
-            y_data=np.ones_like(h.values),
+            y_data=hist_values,
             x_errors=h.axes[0].bin_widths / 2,
             y_errors=np.array(
                 [
-                    h.metadata["y_systematic"]["quadrature"].low / h.values,
-                    h.metadata["y_systematic"]["quadrature"].high / h.values,
+                    h.metadata["y_systematic"]["quadrature"].low / h.values * hist_values,
+                    h.metadata["y_systematic"]["quadrature"].high / h.values * hist_values,
                 ]
             ),
             color="black",
@@ -2130,7 +2163,7 @@ def _plot_pp_PbPb_only_ratios(
                 # NOTE: The `np.array` is really important here because we need to make a copy!
                 #       Otherwise, we modify the underlying values, and everything gets fucked up in
                 #       future loop iterations.
-                values=np.array(h.values),
+                values=np.array(reference_values, copy=True) if compare_to_fit else np.array(h.values, copy=True),
                 variances=np.zeros_like(h.values),
             )
 
@@ -2289,6 +2322,7 @@ def plot_pp_PbPb_only_model_data_ratios(
     text_font_size: int = 31,
     additional_label: str = "",
     logy: bool = False,
+    compare_to_fit: bool = False,
 ) -> None:
     """Compare pp and PbPb results with ratio."""
     # Validation
@@ -2310,6 +2344,8 @@ def plot_pp_PbPb_only_model_data_ratios(
         style = grooming_styles[grooming_method]
 
         name = "unfolded_kt_pp_PbPb"
+        if compare_to_fit:
+            name += "_spectra_fit"
         if additional_label:
             name += f"_{additional_label}"
         name += f"_model_data_ratios_{jet_R_str}"
@@ -2328,7 +2364,7 @@ def plot_pp_PbPb_only_model_data_ratios(
         panels = []
         standard_y_axis = pb.AxisConfig(
             "y",
-            label=r"$\frac{\text{Model}}{\text{Data}}$",
+            label=r"$\frac{\text{Model}}{\text{Data}}$" if not compare_to_fit else r"$\frac{\text{Spectra}}{\text{Parametrization}}$",
             range=_ratio_range,
             # Make the label a bit bigger since it's stack on top
             font_size=text_font_size * 1.05,
@@ -2420,6 +2456,7 @@ def plot_pp_PbPb_only_model_data_ratios(
             set_zero_to_nan=False,
             all_methods_on_one_figure=False,
             event_activity_to_kt_range=event_activity_to_kt_range,
+            compare_to_fit=compare_to_fit,
             plot_config=pb.PlotConfig(
                 name=name,
                 panels=panels,
