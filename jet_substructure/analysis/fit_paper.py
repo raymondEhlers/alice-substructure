@@ -154,6 +154,35 @@ def spectra_fit_function_without_y_scale(
     ) * _tanh_scale(x, x0, tanh_transition_scale)
 
 
+def fit_spectra(
+    x0: float,
+    tanh_transition_scale: float,
+    h: binned_data.BinnedData,
+    fit_func: callable[[npt.NDArray[np.float64] | float, ...], npt.NDArray[np.float64] | float],
+    initial_arguments: list[float],
+) -> npt.NDArray[np.float64]:
+    """Fit a function to a histogram.
+
+    Args:
+        x0: Location of the tanh scaling turnon.
+        tanh_transition_scale: Scale of the tanh scaling function. Sharpness of the switch from on to off.
+        h: Histogram to fit.
+        fit_func: Function to fit to the histogram.
+        initial_arguments: Initial arguments for the fit.
+
+    Returns:
+        Fit parameters.
+    """
+    popt, _ = optimize.curve_fit(
+        functools.partial(fit_func, x0=x0, tanh_transition_scale=tanh_transition_scale),
+        h.axes[0].bin_centers,
+        h.values,
+        p0=initial_arguments,
+        maxfev=500000,
+    )
+    return popt
+
+
 def fit_and_plot(
     x0: float,
     tanh_transition_scale: float,
@@ -166,6 +195,7 @@ def fit_and_plot(
     ax_ratio: mpl.axes.Axes | None = None,
     plot_components: bool = False,
     plot_components_without_y_scale: bool = False,
+    popt: npt.NDArray[np.float64] | None = None,
 ) -> npt.NDArray[np.float64]:
     """Fit a function to a histogram and plot the result.
 
@@ -185,18 +215,22 @@ def fit_and_plot(
         plot_components: If true, plot the individual components of the fit function.
         plot_components_without_y_scale: If true, plot the individual components of the fit function without
             the y-scaling. Default: False.
+        popt: Fit parameters. If None, the fit is performed here.
 
     Returns:
         Fit parameters.
     """
-    # For these functions, some reasonable initial arguments are: [-1, 1, 1, 3, 1],
-    popt, _ = optimize.curve_fit(
-        functools.partial(fit_func, x0=x0, tanh_transition_scale=tanh_transition_scale),
-        h.axes[0].bin_centers,
-        h.values,
-        p0=initial_arguments,
-        maxfev=500000,
-    )
+    # Allow the user to pass in the fit parameters (eg. then this function is plotting only),
+    # or to perform the fit here.
+    if popt is None:
+        # For these functions, some reasonable initial arguments are: [-1, 1, 1, 3, 1],
+        popt = fit_spectra(
+            x0=x0,
+            tanh_transition_scale=tanh_transition_scale,
+            h=h,
+            fit_func=fit_func,
+            initial_arguments=initial_arguments,
+        )
 
     # Main plot
     p = ax.plot(
@@ -278,6 +312,9 @@ def write_fit_result(
             To flip the scaling, use a negative value.
         output_path: Path to write the results to.
     """
+    import pachyderm.yaml
+
+    y = pachyderm.yaml.yaml()
     fit_params = {
         "x0": x0,
         "tanh_transition_scale": tanh_transition_scale,
@@ -289,4 +326,4 @@ def write_fit_result(
     }
     with output_path.open("w") as f:
         f.write(f"# Fit function: {fit_func.__name__}\n")
-        f.write(f"# Parameters: {fit_params}\n")
+        y.dump(fit_params, f)
