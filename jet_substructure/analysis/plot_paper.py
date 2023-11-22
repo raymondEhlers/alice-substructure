@@ -492,7 +492,7 @@ def plot_pp_grooming_comparison_with_models_2022(
     text += "\n" + plot_style.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + plot_style.label_to_display_string["jets"]["general"]
     text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     _plot_pp_grooming_comparison_with_models_2022(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -595,7 +595,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
             sharex="col",
             sharey="row",
         )
-        ax_pairs = [
+        ax_pairs = [  # noqa: C416
             (ax, ax_ratio)
             # NOTE: This is tricky because all_axes is 2x2 here, so stepping by 2 goes to
             #       the next row!
@@ -633,7 +633,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
         kwargs_plot_errorbar = grooming_styles[grooming_method].kwargs_for_plot_errorbar()
 
         # Main data points
-        p = ax.errorbar(
+        ax.errorbar(
             h.axes[0].bin_centers,
             h.values,
             yerr=h.errors,
@@ -904,7 +904,7 @@ def plot_grooming_methods_comparison_with_model_for_single_system(
     text += event_activity + plot_style.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + plot_style.label_to_display_string["jets"]["general"]
     text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     _plot_data_model_comparison_for_single_system(
         hists=hists,
         models=models,
@@ -993,7 +993,7 @@ def plot_grooming_methods_comparison_with_model_for_single_system_one_figure(
     text += event_activity + plot_style.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + plot_style.label_to_display_string["jets"]["general"]
     text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
 
     # Setup panels
     # We need to handle this carefully, so we do it slowly, and step-by-step
@@ -1135,7 +1135,7 @@ def _plot_single_system_comparison(
         kwargs_plot_errorbar = grooming_styles[grooming_method].kwargs_for_plot_errorbar()
 
         # Main data points
-        p = ax.errorbar(
+        ax.errorbar(
             h.axes[0].bin_centers,
             h.values,
             yerr=h.errors,
@@ -1302,7 +1302,7 @@ def plot_comparisons_of_grooming_methods_for_single_system(
     text += event_activity + plot_style.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + plot_style.label_to_display_string["jets"]["general"]
     text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     _plot_single_system_comparison(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -1716,7 +1716,7 @@ def plot_pp_PbPb_comparison(
         text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
         text += "\n" + plot_style.label_to_display_string["jets"]["general"]
         text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
-        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
 
         name = "unfolded_kt_pp_PbPb"
         if additional_label:
@@ -1824,7 +1824,7 @@ def plot_pp_PbPb_comparison_single_figure(
     text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
     text += "\n" + plot_style.label_to_display_string["jets"]["general"]
     text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
 
     # Setup panels
     # We need to handle this carefully, so we do it slowly, and step-by-step
@@ -1960,7 +1960,7 @@ def plot_pp_PbPb_comparison_with_multiple_model_ratios(
         text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
         text += "\n" + plot_style.label_to_display_string["jets"]["general"]
         text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
-        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
 
         name = "unfolded_kt_pp_PbPb"
         if additional_label:
@@ -2375,7 +2375,7 @@ def plot_pp_PbPb_only_model_data_ratios(
         text = plot_style.label_to_display_string["jets"]["general"]
         text += " " + plot_style.label_to_display_string["jets"][jet_R_str]
         #text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
-        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
         panels.append(
             pb.Panel(
                 axes=[
