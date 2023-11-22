@@ -1511,8 +1511,7 @@ def _plot_pp_PbPb_comparison_single_panel(
             )
 
         # Advance to the next ratio axis
-        # NOTE: Can only advance if is more than one axis
-        # TODO: I'm not sure this is done quite right as of 9 August 2023, but need to finish for the PF, so will come back to it later
+        # NOTE: Can only advance if is more than one axis. Otherwise, it will go out of bounds.
         if len(axes_ratio) > 1:
             axis_ratio_counter += 1
 
@@ -1636,7 +1635,6 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
         for _ax in all_axes[::2].flatten():
             _ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
     else:
-        # TODO: I'm not sure this is done quite right as of 9 August 2023, but need to finish for the PF, so will come back to it later
         ax_ratio_legend_config = None
         if models_ratio:
             # Grab the axes which has the legend config.
