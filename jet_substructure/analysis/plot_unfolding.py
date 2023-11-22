@@ -37,7 +37,7 @@ def hist_stat_tests_KS_chi2(
 ) -> tuple[float, float]:
     if use_ROOT:
         # Create ROOT hist (:-()
-        import ROOT  # noqa: F401
+        import ROOT  # # pyright: ignore [reportMissingImports] noqa: F401
 
         #data_hist = ROOT.TH1D("data", "data", len(hist.axes[0].bin_edges) - 1, hist.axes[0].bin_edges)
 

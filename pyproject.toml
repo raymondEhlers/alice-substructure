@@ -161,6 +161,7 @@ ignore = [
     "E722",
     "RUF001",  # Unicode chars
     "PLR",
+    "ISC001",  # Recommended to disable by ruff format
 ]
 unfixable = [
     "T20",  # Removes print statements
