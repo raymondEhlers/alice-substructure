@@ -2077,9 +2077,11 @@ def _plot_pp_PbPb_only_ratios(
             h_for_fit = h
             # This adds back in points since the phase space will be too restricted otherwise...
             # TODO: Try this out for a smaller value, like 2.0
-            if h.axes[0].bin_edges[0] >= 6.0:
+            #if h.axes[0].bin_edges[0] >= 3.0:
+            if h.axes[0].bin_edges[0] >= 2.0:
                 h_for_fit = full_results_helpers.select_hist_range(
                     hist[grooming_method].data,
+                    #helpers.KtRange(2.0, event_activity_to_kt_range[collision_system][grooming_method].max)
                     helpers.KtRange(1.5, event_activity_to_kt_range[collision_system][grooming_method].max)
                 )
             from jet_substructure.analysis import fit_paper
@@ -2115,17 +2117,17 @@ def _plot_pp_PbPb_only_ratios(
                 fig_QA, (ax_QA, ax_ratio_QA) = plt.subplots(2, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [2, 1]}, sharex=True)
                 # Data
                 ax_QA.errorbar(
-                    h.axes[0].bin_centers,
-                    h.values,
-                    yerr=h.errors,
-                    xerr=h.axes[0].bin_widths / 2,
+                    h_for_fit.axes[0].bin_centers,
+                    h_for_fit.values,
+                    yerr=h_for_fit.errors,
+                    xerr=h_for_fit.axes[0].bin_widths / 2,
                     color="black",
                     marker=grooming_styles[grooming_method].marker,
                     markersize=11,
                     linestyle="",
                     linewidth=3,
                     zorder=6,
-                    label="data",
+                    label="data (for fit)",
                 )
                 # Fit
                 fit_paper.fit_and_plot(
@@ -2134,7 +2136,7 @@ def _plot_pp_PbPb_only_ratios(
                     h=h_for_fit,
                     disable_y_scale=disable_y_scale,
                     initial_arguments=initial_arguments,
-                    x_for_plotting=np.linspace(h.axes[0].bin_centers[0], h.axes[0].bin_centers[-1], num=100, endpoint=True),
+                    x_for_plotting=np.linspace(h_for_fit.axes[0].bin_centers[0], h_for_fit.axes[0].bin_centers[-1], num=100, endpoint=True),
                     plot_label=f"{collision_system}, {grooming_method}",
                     plot_components=True,
                     ax=ax_QA,
