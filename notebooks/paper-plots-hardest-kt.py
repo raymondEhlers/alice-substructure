@@ -6,9 +6,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.5
+#       jupytext_version: 1.15.2
 #   kernelspec:
-#     display_name: substructure_c_24_06
+#     display_name: .venv-3.11
 #     language: python
 #     name: python3
 # ---
@@ -40,13 +40,6 @@ from jet_substructure.base import helpers
 # %load_ext autoreload
 # %autoreload 2
 
-# #%matplotlib inline
-# #%config InlineBackend.figure_formats = ["png", "pdf"]
-# Don't show mpl images inline. We'll handle displaying them separately.
-plt.ioff()
-# Ensure the axes are legible on a dark background
-mpl.rcParams['figure.facecolor'] = 'w'
-
 mammoth_helpers.setup_logging(level=logging.DEBUG)
 # Quiet down the matplotlib logging
 logging.getLogger("matplotlib").setLevel(logging.INFO)
@@ -64,6 +57,17 @@ output_dir.mkdir(parents=True, exist_ok=True)
 
 # %% [markdown]
 # # Load data
+
+# %%
+# Quick separate setup
+
+# #%matplotlib inline
+# #%config InlineBackend.figure_formats = ["png", "pdf"]
+# Don't show mpl images inline. We'll handle displaying them separately.
+plt.ioff()
+pb.configure(disable_interactive_backend=True)
+# Ensure the axes are legible on a dark background
+mpl.rcParams['figure.facecolor'] = 'w'
 
 # %% [markdown]
 # ## R = 0.2
@@ -913,8 +917,9 @@ pythia_predictions_R04 = model_calculations.ModelCalculation(
 
 # %%
 jetscape_R02 = model_calculations.Jetscape(
-    base_dir=Path("output/comparison/models/jetscape/2023-03-23-yasuki"),
+    base_dir=Path("output/comparison/models/jetscape/2023-10-yasuki"),
     needs_normalization=False,
+    hadron_rapidity_range=2.0,
     metadata={"jet_R": 0.2},
 )
 jetscape_predictions_R02 = jetscape_R02.load_predictions()
@@ -926,8 +931,9 @@ jetscape_predictions_R02 = jetscape_R02.load_predictions()
 
 # %%
 jetscape_R04 = model_calculations.Jetscape(
-    base_dir=Path("output/comparison/models/jetscape/2023-03-23-yasuki"),
+    base_dir=Path("output/comparison/models/jetscape/2023-10-yasuki"),
     needs_normalization=False,
+    hadron_rapidity_range=2.0,
     metadata={"jet_R": 0.4, "selected_collision_systems": ["pp"]},
 )
 jetscape_predictions_R04 = jetscape_R04.load_predictions()
@@ -1160,7 +1166,7 @@ method_to_color = dict(zip(
         _colors["blue2"]["dark"], _colors["blue2"]["light"],
         #_colors["blue2"]["dark"], _colors["blue"]["mid"],
         #*list(_colors["blue"].values())[:2],
-        _colors["green"]["dark"], _colors["green"]["light"], 
+        _colors["green"]["dark"], _colors["green"]["light"],
         #*list(_colors["green"].values())[:2],
         *list(_colors["orange"].values())[1:],
         #_colors["magenta"]["mid"],
@@ -1361,9 +1367,6 @@ plot_paper.plot_grooming_methods_comparison_with_model_for_single_system(
 )
 
 
-# %%
-# !echo $PATH
-
 # %% [markdown]
 # ### R = 0.4
 
@@ -1493,10 +1496,10 @@ for _collision_system, _hists in [
     ("central", central_R02_unfolded_with_systematics),
 ]:
     logger.info(f"Plotting {_collision_system}")
-    for _temp_grooming_methods, _reference_method, _label in [
-        (["soft_drop_z_cut_02", "dynamical_core", "dynamical_kt", "dynamical_time"], "soft_drop_z_cut_02", "primary"),
-        (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "secondary"),
-        (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "summary"),
+    for _temp_grooming_methods, _reference_method, _label, _ratio_y_range in [
+        (["soft_drop_z_cut_02", "dynamical_core", "dynamical_kt", "dynamical_time"], "soft_drop_z_cut_02", "primary", (0.45, 1.55)),
+        (["soft_drop_z_cut_04", "dynamical_core_z_cut_02", "dynamical_kt_z_cut_02", "dynamical_time_z_cut_02"], "soft_drop_z_cut_02", "secondary", (0.2, 1.8)),
+        (["soft_drop_z_cut_02", "soft_drop_z_cut_04", "dynamical_kt", "dynamical_kt_z_cut_02"], "soft_drop_z_cut_02", "summary", (0.2, 1.8)),
     ]:
         plot_paper.plot_comparisons_of_grooming_methods_for_single_system(
             hists=_hists,
@@ -1825,6 +1828,22 @@ models_ratio = {
     "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
     "jetscape": jetscape_predictions_R02,
 }
+# For the smoothed spectra
+fit_parameters = {
+    "pp": {
+        #"tanh_transition_scale": 0.3,
+        "tanh_transition_scale": 0.3,
+        "x0": 1.25,
+    },
+    "semi_central": {
+        "tanh_transition_scale": 0.1,
+        "x0": 1.25,
+    },
+    "central": {
+        "tanh_transition_scale": 0.1,
+        "x0": 1.25,
+    },
+}
 
 #plot_paper.plot_pp_PbPb_comparison_single_figure(
 #    hists={
@@ -1845,7 +1864,8 @@ models_ratio = {
 #    alice_status=alice_status,
 #)
 
-for grooming_method in grooming_methods:
+#for grooming_method in grooming_methods:
+for grooming_method in ["soft_drop_z_cut_02"]:
     plot_paper.plot_pp_PbPb_only_model_data_ratios(
         hists={
             "pp": pp_R02_unfolded_with_systematics,
@@ -1865,12 +1885,14 @@ for grooming_method in grooming_methods:
         jet_R_str=jet_R_str,
         alice_status=alice_status,
         logy=False,
+        fit_parameters=fit_parameters,
+        fit_QA_plot=True,
     )
 
 # %%
 
 # %% [markdown]
-# ### Debug area
+# # Debug area
 
 # %%
 import matplotlib as mpl
@@ -1919,5 +1941,10 @@ fig
 
 # %%
 plt.close(fig)
+
+# %%
+
+# %% [markdown]
+# ## Nov 2023
 
 # %%
