@@ -154,13 +154,162 @@ def spectra_fit_function_without_y_scale(
     ) * _tanh_scale(x, x0, tanh_transition_scale)
 
 
+import inspect
+
+import attrs
+
+
+
+#@attrs.define
+#class SpectraFitFunction:
+#    x0: float
+#    #h: binned_data.BinnedData
+#    initial_arguments: list[float]
+#    #disable_y_scale: bool = False
+#    f: callable[[npt.NDArray[np.float64] | float, ...], npt.NDArray[np.float64] | float]
+#
+#    def fit(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+#        popt, _ = optimize.curve_fit(
+#            functools.partial(self.f, x0=self.x0, tanh_transition_scale=self.tanh_transition_scale),
+#            h.axes[0].bin_centers,
+#            h.values,
+#            p0=initial_arguments,
+#            maxfev=500000,
+#        )
+#        return self.f(x, *self.initial_arguments)
+#
+#    def __call__(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+#        return self.fit(x)
+
+
+@attrs.define
+class FitResult:
+    f: callable[[npt.NDArray[np.float64] | float, ...], npt.NDArray[np.float64] | float]
+    parameters: dict[str, float]
+    metadata: dict[str, str] = attrs.field(factory=dict)
+
+    @property
+    def popt(self) -> list[float]:
+        return list(self.parameters.values())
+
+    def kw_parameters_by_name(self, names: list[str]) -> dict[str, float]:
+        return {
+            k: self.parameters[k]
+            for k in names
+        }
+
+    def parameters_by_name(self, names: list[str]) -> list[float]:
+        return list(self.kw_parameters_by_name(names=names).values())
+
+    def __call__(self, x: npt.NDArray[np.float64], **kwargs) -> npt.NDArray[np.float64]:
+        # Allow the possibility of replacing arguments
+        params = self.parameters | kwargs
+        return self.f(x, **params)
+
+
+@attrs.define
+class FitFunction:
+    f: callable[[npt.NDArray[np.float64] | float, ...], npt.NDArray[np.float64] | float]
+    initial_arguments: dict[str, float]
+    metadata: dict[str, str] = attrs.field(factory=dict)
+
+    def fit_to_histogram(self, h: binned_data.BinnedData) -> FitResult:
+        popt, _ = optimize.curve_fit(
+            self.f,
+            h.axes[0].bin_centers,
+            h.values,
+            p0=list(self.initial_arguments.values()),
+            maxfev=500000,
+        )
+        function_argument_names = [
+            v.name
+            for v in inspect.signature(self.f).parameters.values()
+            if v.default is v.empty
+        ]
+        # Skip the x argument, and then everything after we optimized.
+        function_argument_names = function_argument_names[1:]
+        # Cross check that we have the arguments that we expect.
+        assert list(self.initial_arguments) == function_argument_names, f"Argument mismatch! Expected {list(self.initial_arguments)=}, but got {function_argument_names=}"
+
+        return FitResult(
+            f=self.f,
+            parameters={
+                k: float(v)
+                for k, v in zip(function_argument_names, popt)
+            },
+            metadata=self.metadata
+        )
+
+# TODO: Implement this...
+
+#@attrs.define
+#class SpectrumFitFunction(FitFunction):
+#    using_power_law_only: bool
+#
+#    def fit_to_histogram(self, h: binned_data.BinnedData) -> FitResult:
+#        fit_result = super().fit_to_histogram(h=h)
+#        fit_result.metadata["using_power_law_only"] = self.using_power_law_only
+#        return fit_result
+
+
+def create_fit_function(
+    x0: float,
+    tanh_transition_scale: float,
+    h: binned_data.BinnedData,
+    initial_arguments: dict[str, float],
+    disable_y_scale: bool = False,
+) -> FitFunction:
+    """Determine the fit function and initial arguments based on the histogram.
+
+    Args:
+        x0: Location of the tanh scaling turnon.
+        tanh_transition_scale: Scale of the tanh scaling function. Sharpness of the switch from on to off.
+        h: Histogram to fit.
+        initial_arguments: Initial arguments for the fit. The keys are the argument names, and the values are
+            the initial values.
+        disable_y_scale: If true, disable the y-scale parameter. Default: False.
+
+    Returns:
+        Fit function class based on the provided configuration.
+    """
+    using_power_law_only = False
+    if min(h.axes[0].bin_centers) > x0:
+        logger.info("Using power law only")
+        using_power_law_only = True
+        # Unpack args for convenience
+        logger.info(f"{initial_arguments=}")
+        intercept, power_law_args = initial_arguments[2], initial_arguments[3,5]
+        # Only use the power low. We need to reduce the number of parameters since there
+        # are a restricted number of points.
+        fit_func = _power_law
+        if disable_y_scale:
+            initial_arguments = [*power_law_args, 0]
+        else:
+            initial_arguments = [*power_law_args, intercept]
+    else:
+        if disable_y_scale:
+            fit_func = spectra_fit_function_without_y_scale
+        else:
+            fit_func = spectra_fit_function_with_y_scale
+        original_name = fit_func.__name__
+        fit_func = functools.partial(fit_func, x0=x0, tanh_transition_scale=tanh_transition_scale)
+        # This is a hack, but it lets us keep the original name for the fit function,
+        # which is what we really need. So good enough.
+        fit_func.__name__ = original_name
+    return FitFunction(
+        f=fit_func,
+        initial_arguments=initial_arguments,
+        metadata={"using_power_law_only": using_power_law_only}
+    )
+
+
 def fit_spectra(
     x0: float,
     tanh_transition_scale: float,
     h: binned_data.BinnedData,
-    fit_func: callable[[npt.NDArray[np.float64] | float, ...], npt.NDArray[np.float64] | float],
     initial_arguments: list[float],
-) -> npt.NDArray[np.float64]:
+    disable_y_scale: bool,
+) -> FitResult:
     """Fit a function to a histogram.
 
     Args:
@@ -173,29 +322,29 @@ def fit_spectra(
     Returns:
         Fit parameters.
     """
-    popt, _ = optimize.curve_fit(
-        functools.partial(fit_func, x0=x0, tanh_transition_scale=tanh_transition_scale),
-        h.axes[0].bin_centers,
-        h.values,
-        p0=initial_arguments,
-        maxfev=500000,
+    fit_function = create_fit_function(
+        x0=x0,
+        tanh_transition_scale=tanh_transition_scale,
+        h=h,
+        initial_arguments=initial_arguments,
+        disable_y_scale=disable_y_scale,
     )
-    return popt
+    return fit_function.fit_to_histogram(h=h)
 
 
 def fit_and_plot(
     x0: float,
     tanh_transition_scale: float,
     h: binned_data.BinnedData,
-    fit_func: callable[[npt.NDArray[np.float64] | float, ...], npt.NDArray[np.float64] | float],
+    disable_y_scale: bool,
     initial_arguments: list[float],
     ax: mpl.axes.Axes,
     x_for_plotting: npt.NDArray[np.float64],
     plot_label: str,
+    fit_result: FitResult | None = None,
     ax_ratio: mpl.axes.Axes | None = None,
     plot_components: bool = False,
     plot_components_without_y_scale: bool = False,
-    popt: npt.NDArray[np.float64] | None = None,
 ) -> npt.NDArray[np.float64]:
     """Fit a function to a histogram and plot the result.
 
@@ -211,31 +360,33 @@ def fit_and_plot(
         ax: Axes to plot the fit on.
         x_for_plotting: x values to use for plotting the fit.
         plot_label: Label to use for the fit.
+        fit_result: Fit result. If None, the fit is performed here.
         ax_ratio: Axes to plot the ratio on. If None, no ratio is plotted.
         plot_components: If true, plot the individual components of the fit function.
         plot_components_without_y_scale: If true, plot the individual components of the fit function without
             the y-scaling. Default: False.
-        popt: Fit parameters. If None, the fit is performed here.
 
     Returns:
         Fit parameters.
     """
+    # Setup
+    fit_func = create_fit_function(
+        x0=x0,
+        tanh_transition_scale=tanh_transition_scale,
+        h=h,
+        initial_arguments=initial_arguments,
+        disable_y_scale=disable_y_scale,
+    )
     # Allow the user to pass in the fit parameters (eg. then this function is plotting only),
     # or to perform the fit here.
-    if popt is None:
+    if fit_result is None:
         # For these functions, some reasonable initial arguments are: [-1, 1, 1, 3, 1],
-        popt = fit_spectra(
-            x0=x0,
-            tanh_transition_scale=tanh_transition_scale,
-            h=h,
-            fit_func=fit_func,
-            initial_arguments=initial_arguments,
-        )
+        fit_result = fit_func.fit_to_histogram(h=h)
 
     # Main plot
     p = ax.plot(
         x_for_plotting,
-        fit_func(x_for_plotting, *popt),
+        fit_result(x_for_plotting),
         linestyle="--",
         linewidth=3,
         zorder=10,
@@ -243,37 +394,51 @@ def fit_and_plot(
     )
     # Plot components
     if plot_components:
+        using_power_law_only = fit_result.metadata["using_power_law_only"]
+        # Named under the combined function
+        power_law_kw_args = ["power_law", "power_law_amp"]
+        if using_power_law_only:
+            # Name when using the power law only
+            power_law_kw_args = ["power", "amplitude"]
+
         if plot_components_without_y_scale:
+            # Quadratic term
+            if not using_power_law_only:
+                ax.plot(
+                    x_for_plotting,
+                    _quadratic_polynomial(x_for_plotting, **fit_result.kw_parameters_by_name(["amplitude", "shift"]), intercept=0),
+                    linestyle="--",
+                    linewidth=3,
+                    zorder=10,
+                    label=f"{plot_label} (Poly)",
+                )
+            # Power law term
             ax.plot(
                 x_for_plotting,
-                _quadratic_polynomial(x_for_plotting, *popt[0:2], intercept=0),
-                linestyle="--",
-                linewidth=3,
-                zorder=10,
-                label=f"{plot_label} (Poly)",
-            )
-            ax.plot(
-                x_for_plotting,
-                _power_law(x_for_plotting, *popt[3:5], intercept=0),
+                _power_law(x_for_plotting, **fit_result.kw_parameters_by_name(power_law_kw_args), intercept=0),
                 linestyle="--",
                 linewidth=3,
                 zorder=10,
                 label=f"{plot_label} (PL)",
             )
         else:
+            # Quadratic term
+            if not using_power_law_only:
+                ax.plot(
+                    x_for_plotting,
+                    _quadratic_polynomial(x_for_plotting, **fit_result.kw_parameters_by_name(["amplitude", "shift"]), intercept=0) \
+                    + fit_result.parameters_by_name(["intercept"]) \
+                    - _quadratic_polynomial(x0, **fit_result.kw_parameters_by_name(["amplitude", "shift"]), intercept=0),
+                    linestyle="--",
+                    linewidth=3,
+                    zorder=10,
+                    label=f"{plot_label} (Poly)",
+                )
             ax.plot(
                 x_for_plotting,
-                _quadratic_polynomial(x_for_plotting, *popt[0:2], intercept=0)
-                + popt[2]
-                - _quadratic_polynomial(x0, *popt[0:2], intercept=0),
-                linestyle="--",
-                linewidth=3,
-                zorder=10,
-                label=f"{plot_label} (Poly)",
-            )
-            ax.plot(
-                x_for_plotting,
-                _power_law(x_for_plotting, *popt[3:5], intercept=0) + popt[2] - _power_law(x0, *popt[3:5], intercept=0),
+                _power_law(x_for_plotting, *fit_result.parameters_by_name(power_law_kw_args), intercept=0) \
+                + fit_result.parameters_by_name(["intercept"]) \
+                - _power_law(x0, *fit_result.parameters_by_name(power_law_kw_args), intercept=0),
                 linestyle="--",
                 linewidth=3,
                 zorder=10,
@@ -284,7 +449,7 @@ def fit_and_plot(
     if ax_ratio:
         ax_ratio.plot(
             h.axes[0].bin_centers,
-            fit_func(h.axes[0].bin_centers, *popt) / h.values,
+            fit_result(h.axes[0].bin_centers) / h.values,
             marker="o",
             linewidth=0,
             zorder=10,
@@ -292,12 +457,11 @@ def fit_and_plot(
             color=p[0].get_color(),
         )
 
-    return popt
+    return fit_result
 
 
 def write_fit_result(
-    fit_func: callable[[npt.NDArray[np.float64] | float, ...], npt.NDArray[np.float64] | float],
-    popt: npt.NDArray[np.float64],
+    fit_result: FitResult,
     x0: float,
     tanh_transition_scale: float,
     output_path: Path,
@@ -318,12 +482,8 @@ def write_fit_result(
     fit_params = {
         "x0": x0,
         "tanh_transition_scale": tanh_transition_scale,
-        "amplitude": float(popt[0]),
-        "shift": float(popt[1]),
-        "intercept": float(popt[2]),
-        "power_law": float(popt[3]),
-        "power_law_amp": float(popt[4]),
+        **fit_result.parameters,
     }
     with output_path.open("w") as f:
-        f.write(f"# Fit function: {fit_func.__name__}\n")
+        f.write(f"# Fit function: {fit_result.f.__name__}\n")
         y.dump(fit_params, f)

@@ -2074,23 +2074,37 @@ def _plot_pp_PbPb_only_ratios(
             h.values[h.values == 0] = np.nan
 
         if fit_parameters:
+            h_for_fit = h
+            # This adds back in points since the phase space will be too restricted otherwise...
+            # TODO: Try this out for a smaller value, like 2.0
+            if h.axes[0].bin_edges[0] >= 6.0:
+                h_for_fit = full_results_helpers.select_hist_range(
+                    hist[grooming_method].data,
+                    helpers.KtRange(1.5, event_activity_to_kt_range[collision_system][grooming_method].max)
+                )
             from jet_substructure.analysis import fit_paper
-            selected_fit_function = fit_paper.spectra_fit_function_with_y_scale
-            popt = fit_paper.fit_spectra(
+            disable_y_scale = False
+            initial_arguments = {
+                "amplitude": -1,
+                "shift": -1,
+                "intercept": 1,
+                "power_law": 3.,
+                "power_law_amp": 1.,
+            }
+            fit_result = fit_paper.fit_spectra(
                 x0=fit_parameters[collision_system][grooming_method]["x0"],
                 tanh_transition_scale=fit_parameters[collision_system][grooming_method]["tanh_transition_scale"],
-                h=h,
-                fit_func=selected_fit_function,
-                initial_arguments=[-1, 1, 1, 3, 1],
+                h=h_for_fit,
+                initial_arguments=initial_arguments,
+                disable_y_scale=disable_y_scale,
             )
-            reference_values = selected_fit_function(h.axes[0].bin_centers, *popt)
+            reference_values = fit_result(h.axes[0].bin_centers)
 
             # Save parameters
             spectra_fit_parameters_filename = output_dir / "spectra_fit" / f"{collision_system}_{grooming_method}.yaml"
             spectra_fit_parameters_filename.parent.mkdir(parents=True, exist_ok=True)
             fit_paper.write_fit_result(
-                fit_func=selected_fit_function,
-                popt=popt,
+                fit_result=fit_result,
                 x0=fit_parameters[collision_system][grooming_method]["x0"],
                 tanh_transition_scale=fit_parameters[collision_system][grooming_method]["tanh_transition_scale"],
                 output_path=spectra_fit_parameters_filename,
@@ -2117,15 +2131,15 @@ def _plot_pp_PbPb_only_ratios(
                 fit_paper.fit_and_plot(
                     x0=fit_parameters[collision_system][grooming_method]["x0"],
                     tanh_transition_scale=fit_parameters[collision_system][grooming_method]["tanh_transition_scale"],
-                    h=h,
-                    fit_func=fit_paper.spectra_fit_function_with_y_scale,
-                    initial_arguments=[-1, 1, 1, 3, 1],
+                    h=h_for_fit,
+                    disable_y_scale=disable_y_scale,
+                    initial_arguments=initial_arguments,
                     x_for_plotting=np.linspace(h.axes[0].bin_centers[0], h.axes[0].bin_centers[-1], num=100, endpoint=True),
                     plot_label=f"{collision_system}, {grooming_method}",
                     plot_components=True,
                     ax=ax_QA,
                     ax_ratio=ax_ratio_QA,
-                    popt=popt,
+                    fit_result=fit_result,
                 )
                 ax_ratio_QA.set_xlabel(r"$k_{\text{T,g}}\:(\text{GeV}/c)$")
                 ax_ratio_QA.set_ylabel("Fit/data")
@@ -2370,10 +2384,13 @@ def plot_pp_PbPb_only_model_data_ratios(
     for ev, kt_range in event_activity_to_kt_range.items():
         if isinstance(kt_range, helpers.KtRange):
             event_activity_to_kt_range[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
+    # NOTE: Need the deep copy because we modify the dict in place
+    fit_parameters = copy.deepcopy(fit_parameters)
     for ev, parameters in fit_parameters.items():
         # Proxy for whether just the values are provided.
         if "x0" in parameters:
             fit_parameters[ev] = {grooming_method: parameters for grooming_method in grooming_methods}
+    logger.info(f"{fit_parameters=}")
 
     # NOTE: This ordering is important to get the panels right!
     #       We want pp first, and then the order for the rest is determined by the order in which the hists are passed
