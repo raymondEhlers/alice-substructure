@@ -2040,7 +2040,8 @@ def _plot_pp_PbPb_only_ratios(
     set_zero_to_nan: bool,
     all_methods_on_one_figure: bool,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
-    compare_to_fit: bool,
+    fit_parameters: Mapping[str, Mapping[str, Mapping[str, float]]],
+    fit_QA_plot: bool,
     plot_config: pb.PlotConfig,
     output_dir: Path,
     models_ratio: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
@@ -2059,20 +2060,6 @@ def _plot_pp_PbPb_only_ratios(
     )
 
     # TODO: Fill these in or pass them...
-    _fit_parameters = {
-        "pp": {
-            "tanh_transition_scale": 0.5,
-            "x0": 1.25,
-        },
-        "semi_central": {
-            "tanh_transition_scale": 0.1,
-            "x0": 1.25,
-        },
-        "central": {
-            "tanh_transition_scale": 0.1,
-            "x0": 1.25,
-        },
-    }
 
     for _plot_counter, ((collision_system, hist), ax) in enumerate(zip(hists.items(), axes)):
         # Axes: jet_pt, attr_name
@@ -2086,24 +2073,79 @@ def _plot_pp_PbPb_only_ratios(
             h.errors[h.values == 0] = np.nan
             h.values[h.values == 0] = np.nan
 
-        if compare_to_fit:
+        if fit_parameters:
             from jet_substructure.analysis import fit_paper
+            selected_fit_function = fit_paper.spectra_fit_function_with_y_scale
             popt = fit_paper.fit_spectra(
-                x0=_fit_parameters[collision_system]["x0"],
-                tanh_transition_scale=_fit_parameters[collision_system]["tanh_transition_scale"],
+                x0=fit_parameters[collision_system][grooming_method]["x0"],
+                tanh_transition_scale=fit_parameters[collision_system][grooming_method]["tanh_transition_scale"],
                 h=h,
-                fit_func=fit_paper.spectra_fit_function_with_y_scale,
+                fit_func=selected_fit_function,
                 initial_arguments=[-1, 1, 1, 3, 1],
             )
-            reference_values = fit_paper.spectra_fit_function_with_y_scale(h.axes[0].bin_centers, *popt)
-            # TODO: Save parameters...
+            reference_values = selected_fit_function(h.axes[0].bin_centers, *popt)
+
+            # Save parameters
+            spectra_fit_parameters_filename = output_dir / "spectra_fit" / f"{collision_system}_{grooming_method}.yaml"
+            spectra_fit_parameters_filename.parent.mkdir(parents=True, exist_ok=True)
+            fit_paper.write_fit_result(
+                fit_func=selected_fit_function,
+                popt=popt,
+                x0=fit_parameters[collision_system][grooming_method]["x0"],
+                tanh_transition_scale=fit_parameters[collision_system][grooming_method]["tanh_transition_scale"],
+                output_path=spectra_fit_parameters_filename,
+            )
+
+            # Fit QA
+            if fit_QA_plot:
+                fig_QA, (ax_QA, ax_ratio_QA) = plt.subplots(2, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [2, 1]}, sharex=True)
+                # Data
+                ax_QA.errorbar(
+                    h.axes[0].bin_centers,
+                    h.values,
+                    yerr=h.errors,
+                    xerr=h.axes[0].bin_widths / 2,
+                    color="black",
+                    marker=grooming_styles[grooming_method].marker,
+                    markersize=11,
+                    linestyle="",
+                    linewidth=3,
+                    zorder=6,
+                    label="data",
+                )
+                # Fit
+                fit_paper.fit_and_plot(
+                    x0=fit_parameters[collision_system][grooming_method]["x0"],
+                    tanh_transition_scale=fit_parameters[collision_system][grooming_method]["tanh_transition_scale"],
+                    h=h,
+                    fit_func=fit_paper.spectra_fit_function_with_y_scale,
+                    initial_arguments=[-1, 1, 1, 3, 1],
+                    x_for_plotting=np.linspace(h.axes[0].bin_centers[0], h.axes[0].bin_centers[-1], num=100, endpoint=True),
+                    plot_label=f"{collision_system}, {grooming_method}",
+                    plot_components=True,
+                    ax=ax_QA,
+                    ax_ratio=ax_ratio_QA,
+                    popt=popt,
+                )
+                ax_ratio_QA.set_xlabel(r"$k_{\text{T,g}}\:(\text{GeV}/c)$")
+                ax_ratio_QA.set_ylabel("Fit/data")
+                ax_QA.set_yscale("log")
+                #ax_QA.set_ylim([1e-3, 1])
+                ax_QA.legend()
+                ax_ratio_QA.legend(loc="upper left")
+                ax_ratio_QA.set_ylim([0.75, 1.5])
+                fig_QA.tight_layout()
+                fig_QA.savefig(output_dir / "spectra_fit" / f"spectra_fit_QA_{collision_system}_{grooming_method}.pdf")
+
+                plt.close(fig_QA)
         else:
+            # If not fitting, just use the measured data
             reference_values = h.values
         #logger.info(f"{reference_values=}")
 
         # Next, draw the data and uncertainties at one as black and grey boxes
         # Ratio + statistical error bars at one
-        hist_values = h.values / reference_values if compare_to_fit else np.ones_like(h.values)
+        hist_values = h.values / reference_values if fit_parameters else np.ones_like(h.values)
         ax.errorbar(
             h.axes[0].bin_centers,
             hist_values,
@@ -2161,7 +2203,7 @@ def _plot_pp_PbPb_only_ratios(
                 # NOTE: The `np.array` is really important here because we need to make a copy!
                 #       Otherwise, we modify the underlying values, and everything gets fucked up in
                 #       future loop iterations.
-                values=np.array(reference_values, copy=True) if compare_to_fit else np.array(h.values, copy=True),
+                values=np.array(reference_values, copy=True) if fit_parameters else np.array(h.values, copy=True),
                 variances=np.zeros_like(h.values),
             )
 
@@ -2320,13 +2362,19 @@ def plot_pp_PbPb_only_model_data_ratios(
     text_font_size: int = 31,
     additional_label: str = "",
     logy: bool = False,
-    compare_to_fit: bool = False,
+    fit_parameters: Mapping[str, Mapping[str, float | Mapping[str, float]]] = {},
+    fit_QA_plot: bool = False,
 ) -> None:
     """Compare pp and PbPb results with ratio."""
     # Validation
     for ev, kt_range in event_activity_to_kt_range.items():
         if isinstance(kt_range, helpers.KtRange):
             event_activity_to_kt_range[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
+    for ev, parameters in fit_parameters.items():
+        # Proxy for whether just the values are provided.
+        if "x0" in parameters:
+            fit_parameters[ev] = {grooming_method: parameters for grooming_method in grooming_methods}
+
     # NOTE: This ordering is important to get the panels right!
     #       We want pp first, and then the order for the rest is determined by the order in which the hists are passed
     assert next(iter(list(hists.keys()))) == "pp"
@@ -2342,7 +2390,7 @@ def plot_pp_PbPb_only_model_data_ratios(
         style = grooming_styles[grooming_method]
 
         name = "unfolded_kt_pp_PbPb"
-        if compare_to_fit:
+        if fit_parameters:
             name += "_spectra_fit"
         if additional_label:
             name += f"_{additional_label}"
@@ -2362,7 +2410,7 @@ def plot_pp_PbPb_only_model_data_ratios(
         panels = []
         standard_y_axis = pb.AxisConfig(
             "y",
-            label=r"$\frac{\text{Model}}{\text{Data}}$" if not compare_to_fit else r"$\frac{\text{Spectra}}{\text{Parametrization}}$",
+            label=r"$\frac{\text{Model}}{\text{Data}}$" if not fit_parameters else r"$\frac{\text{Spectra}}{\text{Param.}}$",
             range=_ratio_range,
             # Make the label a bit bigger since it's stack on top
             font_size=text_font_size * 1.05,
@@ -2454,7 +2502,8 @@ def plot_pp_PbPb_only_model_data_ratios(
             set_zero_to_nan=False,
             all_methods_on_one_figure=False,
             event_activity_to_kt_range=event_activity_to_kt_range,
-            compare_to_fit=compare_to_fit,
+            fit_parameters=fit_parameters,
+            fit_QA_plot=fit_QA_plot,
             plot_config=pb.PlotConfig(
                 name=name,
                 panels=panels,

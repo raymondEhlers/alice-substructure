@@ -318,11 +318,11 @@ def write_fit_result(
     fit_params = {
         "x0": x0,
         "tanh_transition_scale": tanh_transition_scale,
-        "amplitude": popt[0],
-        "shift": popt[1],
-        "intercept": popt[2],
-        "power_law": popt[3],
-        "power_law_amp": popt[4],
+        "amplitude": float(popt[0]),
+        "shift": float(popt[1]),
+        "intercept": float(popt[2]),
+        "power_law": float(popt[3]),
+        "power_law_amp": float(popt[4]),
     }
     with output_path.open("w") as f:
         f.write(f"# Fit function: {fit_func.__name__}\n")
