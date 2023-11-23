@@ -276,16 +276,17 @@ def create_fit_function(
     if min(h.axes[0].bin_centers) > x0:
         logger.info("Using power law only")
         using_power_law_only = True
-        # Unpack args for convenience
-        logger.info(f"{initial_arguments=}")
-        intercept, power_law_args = initial_arguments[2], initial_arguments[3,5]
+        # Fix up the args for the power law only case
+        initial_arguments = {
+            "power": initial_arguments["power_law"],
+            "amplitude": initial_arguments["power_law_amp"],
+            "intercept": initial_arguments["intercept"],
+        }
         # Only use the power low. We need to reduce the number of parameters since there
         # are a restricted number of points.
         fit_func = _power_law
         if disable_y_scale:
-            initial_arguments = [*power_law_args, 0]
-        else:
-            initial_arguments = [*power_law_args, intercept]
+            initial_arguments["intercept"] = 0
     else:
         if disable_y_scale:
             fit_func = spectra_fit_function_without_y_scale
