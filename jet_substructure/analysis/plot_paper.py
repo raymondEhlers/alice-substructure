@@ -2076,7 +2076,10 @@ def _plot_pp_PbPb_only_ratios(
         if fit_parameters:
             h_for_fit = h
             # This adds back in points since the phase space will be too restricted otherwise...
-            # TODO: Try this out for a smaller value, like 2.0
+            # TODO: What is the best value here? If we include from 2.0, it will fit perfectly.
+            #       However, if we go lower (eg. 1.5), than it's starting to use quite low kin eff points.
+            #       That might be okay, but I start to worry that it's impacting the fit unphysically,
+            #       implying that there are fluctuations in the data that aren't real.
             #if h.axes[0].bin_edges[0] >= 3.0:
             if h.axes[0].bin_edges[0] >= 2.0:
                 h_for_fit = full_results_helpers.select_hist_range(
