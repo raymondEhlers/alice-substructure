@@ -2034,7 +2034,8 @@ def plot_pp_PbPb_comparison_with_multiple_model_ratios(
         )
 
 
-def _plot_pp_PbPb_only_ratios(
+def _plot_pp_PbPb_only_ratios_on_axes(
+    axes: list[mpl.axes.Axes],
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_method: str,
     set_zero_to_nan: bool,
@@ -2042,24 +2043,11 @@ def _plot_pp_PbPb_only_ratios(
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
     fit_parameters: Mapping[str, Mapping[str, Mapping[str, float]]],
     fit_QA_plot: bool,
-    plot_config: pb.PlotConfig,
     output_dir: Path,
     models_ratio: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
-    model_labels_on_axes: list[str],
 ) -> None:
-    """Plot model/data ratios for all provided collision systems."""
     # Setup
     grooming_styles = plot_style.define_paper_grooming_styles()
-
-    fig, axes = plt.subplots(
-        len(hists),
-        1,
-        figsize=(10, 10),
-        gridspec_kw={"height_ratios": [1] * len(hists)},
-        sharex=True,
-    )
-
-    # TODO: Fill these in or pass them...
 
     for _plot_counter, ((collision_system, hist), ax) in enumerate(zip(hists.items(), axes)):
         # Axes: jet_pt, attr_name
@@ -2080,12 +2068,12 @@ def _plot_pp_PbPb_only_ratios(
             #       However, if we go lower (eg. 1.5), than it's starting to use quite low kin eff points.
             #       That might be okay, but I start to worry that it's impacting the fit unphysically,
             #       implying that there are fluctuations in the data that aren't real.
-            #if h.axes[0].bin_edges[0] >= 3.0:
-            if h.axes[0].bin_edges[0] >= 2.0:
+            #if h.axes[0].bin_edges[0] >= 2.0:
+            if h.axes[0].bin_edges[0] >= 3.0:
                 h_for_fit = full_results_helpers.select_hist_range(
                     hist[grooming_method].data,
-                    #helpers.KtRange(2.0, event_activity_to_kt_range[collision_system][grooming_method].max)
-                    helpers.KtRange(1.5, event_activity_to_kt_range[collision_system][grooming_method].max)
+                    helpers.KtRange(2.0, event_activity_to_kt_range[collision_system][grooming_method].max)
+                    #helpers.KtRange(1.5, event_activity_to_kt_range[collision_system][grooming_method].max)
                 )
             from jet_substructure.analysis import fit_paper
             disable_y_scale = False
@@ -2288,8 +2276,47 @@ def _plot_pp_PbPb_only_ratios(
             )
 
     # Reference value for ratio
-    for _plot_counter, (ax_ratio, panel_config) in enumerate(zip(axes, plot_config.panels)):
+    for ax_ratio in axes:
         ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
+
+
+def _plot_pp_PbPb_only_ratios_single_column(
+    hists: Mapping[str, unfolding_analysis.SingleResult],
+    grooming_method: str,
+    set_zero_to_nan: bool,
+    all_methods_on_one_figure: bool,
+    event_activity_to_kt_range: Mapping[str, helpers.KtRange],
+    fit_parameters: Mapping[str, Mapping[str, Mapping[str, float]]],
+    fit_QA_plot: bool,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+    models_ratio: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
+    model_labels_on_axes: list[str],
+) -> None:
+    """Plot model/data ratios for all provided collision systems."""
+    fig, axes = plt.subplots(
+        len(hists),
+        1,
+        figsize=(10, 10),
+        gridspec_kw={"height_ratios": [1] * len(hists)},
+        sharex=True,
+    )
+
+    _plot_pp_PbPb_only_ratios_on_axes(
+        axes=axes,
+        hists=hists,
+        grooming_method=grooming_method,
+        set_zero_to_nan=set_zero_to_nan,
+        all_methods_on_one_figure=all_methods_on_one_figure,
+        event_activity_to_kt_range=event_activity_to_kt_range,
+        fit_parameters=fit_parameters,
+        fit_QA_plot=fit_QA_plot,
+        models_ratio=models_ratio,
+        output_dir=output_dir,
+    )
+
+    # Legend
+    for _plot_counter, (ax_ratio, panel_config) in enumerate(zip(axes, plot_config.panels)):
 
         # Update the data legends to show both the marker and box
         # NOTE: As of 2023 Jun 8, it wasn't worth the effort. The box was too small for the marker, etc.
@@ -2343,7 +2370,8 @@ def _plot_pp_PbPb_only_ratios(
             model_legend_elements.append(
                 mpl.patches.Patch(
                     facecolor=model_kwargs["color"],
-                    label=model_calculation.label(collision_system=collision_system)
+                    # NOTE: Same note as above
+                    label=model_calculation.label(collision_system="PbPb")
                 )
             )
         model_legend_object = legend_config.apply(
@@ -2361,7 +2389,7 @@ def _plot_pp_PbPb_only_ratios(
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=axes)
     # A few additional tweaks.
-    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    axes[-1].xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
 
     filename = f"{plot_config.name}"
     fig.savefig(output_dir / f"{filename}_{grooming_method}.pdf")
@@ -2516,7 +2544,7 @@ def plot_pp_PbPb_only_model_data_ratios(
             )
         )
 
-        _plot_pp_PbPb_only_ratios(
+        _plot_pp_PbPb_only_ratios_single_column(
             hists=hists,
             models_ratio=models_ratio,
             model_labels_on_axes=model_labels_on_axes,
@@ -2533,3 +2561,249 @@ def plot_pp_PbPb_only_model_data_ratios(
             ),
             output_dir=output_dir,
         )
+
+
+def batched(iterable, n):
+    """Group by n items at a time.
+
+    Taken from the "equivalent to" section of the python 3.12 itertools docs
+    (where it's actually implemented).
+    """
+    from itertools import islice
+    # batched('ABCDEFG', 3) --> ABC DEF G
+    if n < 1:
+        raise ValueError('n must be at least one')
+    it = iter(iterable)
+    while batch := tuple(islice(it, n)):
+        yield batch
+
+
+def _plot_pp_PbPb_only_ratios_condensed(
+    hists: Mapping[str, unfolding_analysis.SingleResult],
+    grooming_methods: list[str],
+    set_zero_to_nan: bool,
+    all_methods_on_one_figure: bool,
+    event_activity_to_kt_range: Mapping[str, helpers.KtRange],
+    fit_parameters: Mapping[str, Mapping[str, Mapping[str, float]]],
+    fit_QA_plot: bool,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+    models_ratio: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
+    model_labels_on_axes: list[str],
+) -> None:
+    """Plot model/data ratios for all provided collision systems."""
+    from matplotlib.gridspec import GridSpec
+
+    #fig = plt.figure(layout="constrained")
+    #gs = GridSpec(4, len(grooming_methods), figure=fig, height_ratios=[1, 4, 4, 4])
+    #axes = []
+    #axes.append(fig.add_subplot(gs[0, :]))
+    #for i in range(len(grooming_methods)):
+    #    for j in range(1, 4):
+    #        axes.append(fig.add_subplot(gs[j, i]))
+
+    n_rows = len(hists)
+    fig, axes = plt.subplots(
+        n_rows,
+        len(grooming_methods),
+        figsize=(10, 10),
+        gridspec_kw={"height_ratios": [1] * n_rows},
+        sharex=True,
+    )
+
+    # NOTE: This assumes that pp will be provided, but I think that's a fairly save bet.
+    for i_grooming_method, grooming_method in enumerate(grooming_methods):
+        logger.info(f"Plotting group of ratios for {grooming_method}")
+        _plot_pp_PbPb_only_ratios_on_axes(
+            axes=axes[:, i_grooming_method],
+            hists=hists,
+            grooming_method=grooming_method,
+            set_zero_to_nan=set_zero_to_nan,
+            all_methods_on_one_figure=all_methods_on_one_figure,
+            event_activity_to_kt_range=event_activity_to_kt_range,
+            fit_parameters=fit_parameters,
+            fit_QA_plot=fit_QA_plot,
+            models_ratio=models_ratio,
+            output_dir=output_dir,
+        )
+
+    # TODO: Double check if I need to None out the legends in the panels...
+
+    # Labeling and presentation
+    plot_config.apply(fig=fig, axes=[*axes[:, 0].flatten(), *axes[:, 1].flatten()])
+    # A few additional tweaks.
+    for i in range(len(grooming_methods)):
+        axes[i, -1].xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+
+    filename = f"{plot_config.name}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def plot_pp_PbPb_only_model_data_ratios_single_figure(
+    hists: Mapping[str, Mapping[str, unfolding_analysis.SingleResult]],
+    grooming_methods: list[str],
+    output_dir: Path,
+    event_activity_to_kt_range: Mapping[str, helpers.KtRange | Mapping[str, helpers.KtRange]],
+    models_ratio: Mapping[str, Mapping[str, binned_data.BinnedData]],
+    kt_display_range: tuple[float, float] = (1.5, 15),
+    jet_R_str: str = "R04",
+    alice_status: str = "work_in_progress",
+    text_font_size: int = 31,
+    additional_label: str = "",
+    logy: bool = False,
+    fit_parameters: Mapping[str, Mapping[str, float | Mapping[str, float]]] = {},
+    fit_QA_plot: bool = False,
+) -> None:
+    """Compare pp and PbPb results with ratio."""
+    # Validation
+    for ev, kt_range in event_activity_to_kt_range.items():
+        if isinstance(kt_range, helpers.KtRange):
+            event_activity_to_kt_range[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
+    # NOTE: Need the deep copy because we modify the dict in place
+    fit_parameters = copy.deepcopy(fit_parameters)
+    for ev, parameters in fit_parameters.items():
+        # Proxy for whether just the values are provided.
+        if "x0" in parameters:
+            fit_parameters[ev] = {grooming_method: parameters for grooming_method in grooming_methods}
+    logger.info(f"{fit_parameters=}")
+
+    # NOTE: This ordering is important to get the panels right!
+    #       We want pp first, and then the order for the rest is determined by the order in which the hists are passed
+    assert next(iter(list(hists.keys()))) == "pp"
+
+    # Setup
+    jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
+    grooming_styles = plot_style.define_paper_grooming_styles()
+
+    logger.info(f"Plotting all ratios for {grooming_methods}")
+    #style = grooming_styles[grooming_method]
+
+    name = "unfolded_kt_pp_PbPb"
+    if fit_parameters:
+        name += "_spectra_fit"
+    if additional_label:
+        name += f"_{additional_label}"
+    name += f"_model_data_ratios_{jet_R_str}"
+
+    _ratio_range = (0.3, 1.7)
+    if "central" in hists and models_ratio:
+        _ratio_range = (0.35, 1.6)
+    if any("z_cut_04" in m for m in grooming_methods):
+        _ratio_range = (-0.2, 2.2) if models_ratio else (0.1, 1.9)
+    if logy:
+        _ratio_range = (0.45, 1.8)
+        # If I move the collision system, I could try to make something like the below work
+        #_ratio_range = (0.55, 1.65)
+
+    # Define panels
+    panels = []
+    for grooming_method in grooming_methods:
+        event_activity_order = iter(list(hists))
+        #model_label_order = iter(model_labels_on_axes)
+        model_label_order = iter([[], [], []])
+
+        standard_y_axis = pb.AxisConfig(
+            "y",
+            label=r"$\frac{\text{Model}}{\text{Data}}$" if not fit_parameters else r"$\frac{\text{Spectra}}{\text{Param.}}$",
+            range=_ratio_range,
+            # Make the label a bit bigger since it's stacked on top
+            font_size=text_font_size * 1.05,
+            log=logy,
+        )
+        standard_model_legend = pb.LegendConfig(
+            location="lower left",
+            font_size=round(text_font_size * 0.8),
+            anchor=(0.02, 0.02),
+            #ncol=2,
+            marker_label_spacing=0.05,
+            label_spacing=0.1,
+            handle_height=1.3,
+            column_spacing=0.30,
+        )
+        # pp - top panel
+        # ALICE pp, PbPb 5.02 TeV
+        text = plot_style.label_to_display_string["ALICE"][alice_status]
+        # Since the final text is short, we can merge onto one line
+        if alice_status != "final":
+            text += "\n"
+        else:
+            text += " "
+        text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
+        panels.append(
+            pb.Panel(
+                axes=[
+                    copy.deepcopy(standard_y_axis)
+                ],
+                text=[
+                    pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
+                    # Add the grooming label in a separate location in the bottom right
+                    #pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
+                    # And the collision system
+                    pb.TextConfig(x=0.97, y=0.04, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
+                ],
+                #legend=copy.deepcopy(standard_data_legend),
+                # Only provide if there are model entries for this panel.
+                legend=copy.deepcopy(standard_model_legend) if next(model_label_order) else None,
+            )
+        )
+        # Middle panel
+        text = plot_style.label_to_display_string["jets"]["general"]
+        text += " " + plot_style.label_to_display_string["jets"][jet_R_str]
+        #text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
+        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+        panels.append(
+            pb.Panel(
+                axes=[
+                    copy.deepcopy(standard_y_axis)
+                ],
+                text=[
+                    pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
+                    # Add the grooming label in a separate location in the bottom right
+                    #pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
+                    # And the collision system
+                    pb.TextConfig(x=0.98, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
+                ],
+                #legend=copy.deepcopy(standard_data_legend),
+                # Only provide if there are model entries for this panel.
+                legend=copy.deepcopy(standard_model_legend) if next(model_label_order) else None,
+            )
+        )
+        # Bottom panel
+        panels.append(
+            pb.Panel(
+                axes=[
+                    copy.deepcopy(standard_y_axis),
+                    pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
+                ],
+                text=[
+                    # Add the grooming label in a separate location in the upper right
+                    #pb.TextConfig(x=0.95, y=0.97, text=style.label, font_size=text_font_size),
+                    pb.TextConfig(x=0.95, y=0.97, text="", font_size=text_font_size),
+                    # And the collision system
+                    pb.TextConfig(x=0.98, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
+                ],
+                #legend=copy.deepcopy(standard_data_legend),
+                # Only provide if there are model entries for this panel.
+                legend=copy.deepcopy(standard_model_legend) if next(model_label_order) else None,
+            )
+        )
+
+    _plot_pp_PbPb_only_ratios_condensed(
+        hists=hists,
+        models_ratio=models_ratio,
+        model_labels_on_axes=[],
+        grooming_methods=grooming_methods,
+        set_zero_to_nan=False,
+        all_methods_on_one_figure=False,
+        event_activity_to_kt_range=event_activity_to_kt_range,
+        fit_parameters=fit_parameters,
+        fit_QA_plot=fit_QA_plot,
+        plot_config=pb.PlotConfig(
+            name=name,
+            panels=panels,
+            figure=pb.Figure(edge_padding={"left": 0.125, "bottom": 0.095, "top": 0.975}),
+        ),
+        output_dir=output_dir,
+    )
+
