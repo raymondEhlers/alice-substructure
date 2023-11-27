@@ -1831,41 +1831,67 @@ models_ratio = {
 # For the smoothed spectra
 fit_parameters = {
     "pp": {
-        #"tanh_transition_scale": 0.3,
-        "tanh_transition_scale": 0.3,
-        "x0": 1.25,
+        "soft_drop_z_cut_02": {
+            "tanh_transition_scale": 0.3,
+            "x0": 1.25,
+        },
+        "dynamical_kt": {
+            #"tanh_transition_scale": 0.25,
+            "tanh_transition_scale": 0.2,
+            "x0": 1.25,
+        },
     },
     "semi_central": {
-        "tanh_transition_scale": 0.1,
-        "x0": 1.25,
+        "soft_drop_z_cut_02": {
+            "tanh_transition_scale": 0.1,
+            "x0": 1.25,
+        },
+        "dynamical_kt": {
+            "tanh_transition_scale": 0.1,
+            "x0": 1.25,
+        },
     },
     "central": {
-        "tanh_transition_scale": 0.1,
-        "x0": 1.25,
+        "soft_drop_z_cut_02": {
+            "tanh_transition_scale": 0.1,
+            "x0": 1.25,
+        },
+        "dynamical_kt": {
+            "tanh_transition_scale": 0.1,
+            "x0": 1.25,
+        },
     },
 }
 
-#plot_paper.plot_pp_PbPb_comparison_single_figure(
-#    hists={
-#        "pp": pp_R02_unfolded_with_systematics,
-#        "semi_central": semi_central_R02_unfolded_with_systematics,
-#        "central": central_R02_unfolded_with_systematics,
-#    },
-#    models_ratio=models_ratio,
-#    grooming_methods=grooming_methods,
-#    output_dir=_output_dir,
-#    event_activity_to_kt_range={
-#        "pp": helpers.KtRange(0.25, 6),
-#        "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
-#        "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
-#    },
-#    kt_display_range=(0.0, 6.25),
-#    jet_R_str=jet_R_str,
-#    alice_status=alice_status,
-#)
+# Single figure for Letter
+plot_paper.plot_pp_PbPb_only_model_data_ratios_single_figure(
+    hists={
+        "pp": pp_R02_unfolded_with_systematics,
+        "semi_central": semi_central_R02_unfolded_with_systematics,
+        "central": central_R02_unfolded_with_systematics,
+    },
+    models_ratio=models_ratio,
+    grooming_methods=["dynamical_kt", "soft_drop_z_cut_02"],
+    output_dir=_output_dir,
+    event_activity_to_kt_range={
+        "pp": helpers.KtRange(0.25, 6),
+        "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+        "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+    },
+    #model_labels_on_axes=[[], ["hybrid_without_moliere", "hybrid_moliere"], ["jetscape"]],
+    kt_display_range=(0.0, 6.25),
+    jet_R_str=jet_R_str,
+    alice_status=alice_status,
+    logy=False,
+    fit_parameters=fit_parameters,
+    fit_QA_plot=True,
+)
 
 #for grooming_method in grooming_methods:
-for grooming_method in ["soft_drop_z_cut_02"]:
+for grooming_method in ["dynamical_kt", "soft_drop_z_cut_02"]:
+    # TEMP
+    #continue
+    # ENDTEMP
     plot_paper.plot_pp_PbPb_only_model_data_ratios(
         hists={
             "pp": pp_R02_unfolded_with_systematics,
@@ -1888,6 +1914,7 @@ for grooming_method in ["soft_drop_z_cut_02"]:
         fit_parameters=fit_parameters,
         fit_QA_plot=True,
     )
+
 
 # %%
 
