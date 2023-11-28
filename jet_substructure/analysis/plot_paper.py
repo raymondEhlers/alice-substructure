@@ -2563,21 +2563,6 @@ def plot_pp_PbPb_only_model_data_ratios(
         )
 
 
-def batched(iterable, n):
-    """Group by n items at a time.
-
-    Taken from the "equivalent to" section of the python 3.12 itertools docs
-    (where it's actually implemented).
-    """
-    from itertools import islice
-    # batched('ABCDEFG', 3) --> ABC DEF G
-    if n < 1:
-        raise ValueError('n must be at least one')
-    it = iter(iterable)
-    while batch := tuple(islice(it, n)):
-        yield batch
-
-
 def _plot_pp_PbPb_only_ratios_condensed(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: list[str],
@@ -2647,7 +2632,7 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
     event_activity_to_kt_range: Mapping[str, helpers.KtRange | Mapping[str, helpers.KtRange]],
     models_ratio: Mapping[str, Mapping[str, binned_data.BinnedData]],
     kt_display_range: tuple[float, float] = (1.5, 15),
-    jet_R_str: str = "R04",
+    jet_R_str: str = "R02",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
     additional_label: str = "",
@@ -2655,7 +2640,11 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
     fit_parameters: Mapping[str, Mapping[str, float | Mapping[str, float]]] = {},
     fit_QA_plot: bool = False,
 ) -> None:
-    """Compare pp and PbPb results with ratio."""
+    """Compare pp and PbPb results with ratio.
+
+    Args:
+        hists: Dict of {collision_system: {grooming_method: SingleResult}}
+    """
     # Validation
     for ev, kt_range in event_activity_to_kt_range.items():
         if isinstance(kt_range, helpers.KtRange):
@@ -2666,26 +2655,29 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
         # Proxy for whether just the values are provided.
         if "x0" in parameters:
             fit_parameters[ev] = {grooming_method: parameters for grooming_method in grooming_methods}
-    logger.info(f"{fit_parameters=}")
 
     # NOTE: This ordering is important to get the panels right!
     #       We want pp first, and then the order for the rest is determined by the order in which the hists are passed
     assert next(iter(list(hists.keys()))) == "pp"
 
     # Setup
+    logger.info(f"Plotting all ratios for {grooming_methods}")
     jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
     grooming_styles = plot_style.define_paper_grooming_styles()
-
-    logger.info(f"Plotting all ratios for {grooming_methods}")
-    #style = grooming_styles[grooming_method]
-
+    # Setup output name
     name = "unfolded_kt_pp_PbPb"
     if fit_parameters:
         name += "_spectra_fit"
     if additional_label:
         name += f"_{additional_label}"
     name += f"_model_data_ratios_{jet_R_str}"
+    rotation_kwargs = dict(
+        rotation=90,
+        horizontalalignment="center",
+        verticalalignment="center",
+    )
 
+    # Consistent ratio ranges
     _ratio_range = (0.3, 1.7)
     if "central" in hists and models_ratio:
         _ratio_range = (0.35, 1.6)
@@ -2699,18 +2691,25 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
     # Define panels
     panels = []
     for grooming_method in grooming_methods:
+        # Setup per column
+        last_grooming_method = (grooming_method == grooming_methods[-1])
+        y_label = ""
+        if (grooming_method == grooming_methods[0]):
+            y_label = r"$\frac{\text{Model}}{\text{Data}}$" if not fit_parameters else r"$\frac{\text{Spectra}}{\text{Param.}}$"
+        #style = grooming_styles[grooming_method]
         event_activity_order = iter(list(hists))
         #model_label_order = iter(model_labels_on_axes)
         model_label_order = iter([[], [], []])
 
         standard_y_axis = pb.AxisConfig(
             "y",
-            label=r"$\frac{\text{Model}}{\text{Data}}$" if not fit_parameters else r"$\frac{\text{Spectra}}{\text{Param.}}$",
+            label=y_label,
             range=_ratio_range,
             # Make the label a bit bigger since it's stacked on top
             font_size=text_font_size * 1.05,
             log=logy,
         )
+        # TODO: Implement this properly...
         standard_model_legend = pb.LegendConfig(
             location="lower left",
             font_size=round(text_font_size * 0.8),
@@ -2722,51 +2721,30 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
             column_spacing=0.30,
         )
         # pp - top panel
-        # ALICE pp, PbPb 5.02 TeV
-        text = plot_style.label_to_display_string["ALICE"][alice_status]
-        # Since the final text is short, we can merge onto one line
-        if alice_status != "final":
-            text += "\n"
-        else:
-            text += " "
-        text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
         panels.append(
             pb.Panel(
                 axes=[
                     copy.deepcopy(standard_y_axis)
                 ],
                 text=[
-                    pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
-                    # Add the grooming label in a separate location in the bottom right
-                    #pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
-                    # And the collision system
-                    pb.TextConfig(x=0.97, y=0.04, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
-                ],
+                    # The collision system
+                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size, text_kwargs=rotation_kwargs),
+                ] if last_grooming_method else [],
                 #legend=copy.deepcopy(standard_data_legend),
                 # Only provide if there are model entries for this panel.
                 legend=copy.deepcopy(standard_model_legend) if next(model_label_order) else None,
             )
         )
         # Middle panel
-        text = plot_style.label_to_display_string["jets"]["general"]
-        text += " " + plot_style.label_to_display_string["jets"][jet_R_str]
-        #text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
-        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
         panels.append(
             pb.Panel(
                 axes=[
                     copy.deepcopy(standard_y_axis)
                 ],
                 text=[
-                    pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
-                    # Add the grooming label in a separate location in the bottom right
-                    #pb.TextConfig(x=0.98, y=0.02, text=style.label, font_size=text_font_size),
-                    # And the collision system
-                    pb.TextConfig(x=0.98, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
-                ],
-                #legend=copy.deepcopy(standard_data_legend),
-                # Only provide if there are model entries for this panel.
-                legend=copy.deepcopy(standard_model_legend) if next(model_label_order) else None,
+                    # The collision system
+                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size, text_kwargs=rotation_kwargs),
+                ] if last_grooming_method else [],
             )
         )
         # Bottom panel
@@ -2777,17 +2755,26 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
                     pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
                 ],
                 text=[
-                    # Add the grooming label in a separate location in the upper right
-                    #pb.TextConfig(x=0.95, y=0.97, text=style.label, font_size=text_font_size),
-                    pb.TextConfig(x=0.95, y=0.97, text="", font_size=text_font_size),
-                    # And the collision system
-                    pb.TextConfig(x=0.98, y=0.02, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size),
-                ],
-                #legend=copy.deepcopy(standard_data_legend),
-                # Only provide if there are model entries for this panel.
-                legend=copy.deepcopy(standard_model_legend) if next(model_label_order) else None,
+                    # The collision system
+                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size, text_kwargs=rotation_kwargs),
+                ] if last_grooming_method else [],
             )
         )
+
+    # Overall figure label text:
+    text = plot_style.label_to_display_string["ALICE"][alice_status]
+    # Since the final text is short, we can merge onto one line
+    if alice_status != "final":
+        text += "\n"
+    else:
+        text += " "
+    #text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
+    collision_system_text = ",".join(_event_activity_full_label_map[collision_system] for collision_system in hists)
+    text += f"\n{collision_system_text}"
+    #text += event_activity + plot_style.label_to_display_string["collision_system"][collision_system_key]
+    text += "\n" + plot_style.label_to_display_string["jets"]["general"]
+    text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
 
     _plot_pp_PbPb_only_ratios_condensed(
         hists=hists,
@@ -2802,7 +2789,10 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
         plot_config=pb.PlotConfig(
             name=name,
             panels=panels,
-            figure=pb.Figure(edge_padding={"left": 0.125, "bottom": 0.095, "top": 0.975}),
+            figure=pb.Figure(
+                text=pb.TextConfig(x=0.2, y=1.0, text=text, font_size=text_font_size),
+                edge_padding={"left": 0.125, "bottom": 0.095, "top": 0.975, "right": 0.95}
+            ),
         ),
         output_dir=output_dir,
     )
