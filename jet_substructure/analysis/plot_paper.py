@@ -2064,16 +2064,13 @@ def _plot_pp_PbPb_only_ratios_on_axes(
         if fit_parameters:
             h_for_fit = h
             # This adds back in points since the phase space will be too restricted otherwise...
-            # TODO: What is the best value here? If we include from 2.0, it will fit perfectly.
-            #       However, if we go lower (eg. 1.5), than it's starting to use quite low kin eff points.
-            #       That might be okay, but I start to worry that it's impacting the fit unphysically,
-            #       implying that there are fluctuations in the data that aren't real.
-            #if h.axes[0].bin_edges[0] >= 2.0:
+            # NOTE: We decide to go down to 2.0 in the fit because going to 1.5 appears to imply
+            #       that there are fluctuations in the data that aren't real. In practice, this really
+            #       only impacts standard DyG for central.
             if h.axes[0].bin_edges[0] >= 3.0:
                 h_for_fit = full_results_helpers.select_hist_range(
                     hist[grooming_method].data,
                     helpers.KtRange(2.0, event_activity_to_kt_range[collision_system][grooming_method].max)
-                    #helpers.KtRange(1.5, event_activity_to_kt_range[collision_system][grooming_method].max)
                 )
             from jet_substructure.analysis import fit_paper
             disable_y_scale = False
@@ -2153,24 +2150,28 @@ def _plot_pp_PbPb_only_ratios_on_axes(
         # Next, draw the data and uncertainties at one as black and grey boxes
         # Ratio + statistical error bars at one
         hist_values = h.values / reference_values if fit_parameters else np.ones_like(h.values)
+        # This is a fairly reasonable alternative value if I decide I prefer it.
+        #fraction_of_x_error = 0.6
+        fraction_of_x_error = 1.0
         ax.errorbar(
             h.axes[0].bin_centers,
             hist_values,
             yerr=h.errors / h.values * hist_values,
-            xerr=h.axes[0].bin_widths / 2,
+            xerr=h.axes[0].bin_widths / 2 * fraction_of_x_error,
             color="black",
             marker=grooming_styles[grooming_method].marker,
             markersize=11,
             linestyle="",
             linewidth=3,
             zorder=6,
-            #label=_event_activity_short_label_map[collision_system],
+            label="ALICE data",
         )
+        fraction_of_x_error = 0.3
         pachyderm.plot.error_boxes(
             ax=ax,
             x_data=h.axes[0].bin_centers,
             y_data=hist_values,
-            x_errors=h.axes[0].bin_widths / 2,
+            x_errors=h.axes[0].bin_widths / 2 * fraction_of_x_error,
             y_errors=np.array(
                 [
                     h.metadata["y_systematic"]["quadrature"].low / h.values * hist_values,
@@ -2179,7 +2180,9 @@ def _plot_pp_PbPb_only_ratios_on_axes(
             ),
             color="black",
             linewidth=0,
-            alpha=0.3,
+            # NOTE: This is a bit darker than usual because one of the uncertainties (3-4 central SD 0.2)
+            #       seems to be quite difficult to see. Slightly darker seems to help.
+            alpha=0.4,
             zorder=5.5,
         )
 
@@ -2627,7 +2630,7 @@ def _plot_pp_PbPb_only_ratios_condensed(
         n_rows + 1,
         len(grooming_methods),
         figsize=(10, 10),
-        gridspec_kw={"height_ratios": [2] + [4] * n_rows},
+        gridspec_kw={"height_ratios": [2.5] + [4] * n_rows},
         sharex="col",
         sharey="row",
     )
@@ -2660,6 +2663,7 @@ def _plot_pp_PbPb_only_ratios_condensed(
     assert legend_config is not None
 
     # Begin with the data legend...
+    # TODO: Data legend...
     #handles, labels = ax_ratio.get_legend_handles_labels()
 
     #import matplotlib.lines as mlines
@@ -2707,7 +2711,7 @@ def _plot_pp_PbPb_only_ratios_condensed(
     plot_config.apply(fig=fig, axes=[ax_header, *axes[1:, 0].flatten(), *axes[1:, 1].flatten()])
     # A few additional tweaks.
     for i in range(len(grooming_methods)):
-        axes[i, -1].xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+        axes[-1, i].xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
     ax_header.set_axis_off()
 
     filename = f"{plot_config.name}"
@@ -2771,7 +2775,7 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
     # NOTE: These are specialized to the letter. I haven't checked for the other methods.
     _ratio_range = {
         "pp": (0.7, 1.3),
-        "semi_central": (0.65, 1.35),
+        "semi_central": (0.6, 1.35),
         "central": (0.49, 1.39),
     }
     #_ratio_range = (0.3, 1.7)
@@ -2788,21 +2792,10 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
 
     # Define panels
     panels = []
-    # Header ax
-    # Overall figure label text:
-    #text = plot_style.label_to_display_string["ALICE"][alice_status]
-    ## Since the final text is short, we can merge onto one line
-    #if alice_status != "final":
-    #    text += "\n"
-    #else:
-    #    text += " "
-    #text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
-    #collision_system_text = ",".join(_event_activity_full_label_map[collision_system] for collision_system in hists)
-    #text += f"\n{collision_system_text}"
-
+    # Header ax, which only contains labels
     text_left = fr"$\textbf{{{plot_style.label_to_display_string['ALICE'][alice_status]}}}$"
-    text_left += "\n" + fr"{_event_activity_short_label_map['central']}, {_event_activity_short_label_map['semi_central']} " + r"$\text{Pb--Pb},\:\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV"
-    #text += event_activity + plot_style.label_to_display_string["collision_system"][collision_system_key]
+    # NOTE: The raisebox height is just tuned by hand...
+    text_left += "\n" + r"\raisebox{-0.5ex}{" fr"{_event_activity_short_label_map['central']}, {_event_activity_short_label_map['semi_central']} " + r"$\text{Pb--Pb},\:\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV" + "}"
     text_right = plot_style.label_to_display_string["jets"]["general"]
     text_right += ", " + plot_style.label_to_display_string["jets"][jet_R_str]
     text_right += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
@@ -2810,14 +2803,16 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
         pb.Panel(
             axes=[],
             text=[
-                pb.TextConfig(x=-0.05, y=1.0, text=text_left, font_size=text_font_size),
-                pb.TextConfig(x=0.995, y=1.0, text=text_right, font_size=text_font_size),
+                # NOTE: 0.04 shifted past the edge in each direction was the default, but I took a
+                #       bit of a hit to enlarge the font size.
+                pb.TextConfig(x=-0.135, y=1.0, text=text_left, font_size=text_font_size),
+                pb.TextConfig(x=1.04, y=1.0, text=text_right, font_size=text_font_size),
             ],
             # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
             legend=pb.LegendConfig(
-                location="lower center",
+                location="center",
                 font_size=round(text_font_size * 0.8),
-                #anchor=(0.02, 0.02),
+                anchor=(0.5, 0.35),
                 ncol=len(models_ratio),
                 marker_label_spacing=0.05,
                 label_spacing=0.1,
@@ -2828,11 +2823,11 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
     )
     for grooming_method in grooming_methods:
         # Setup per column
+        first_grooming_method = (grooming_method == grooming_methods[0])
         last_grooming_method = (grooming_method == grooming_methods[-1])
         y_label = ""
         if (grooming_method == grooming_methods[0]):
             y_label = r"$\frac{\text{Model}}{\text{Data}}$" if not fit_parameters else r"$\frac{\text{Spectra}}{\text{Param.}}$"
-        #style = grooming_styles[grooming_method]
         event_activity_order = iter(list(hists))
 
         standard_y_axis = pb.AxisConfig(
@@ -2844,6 +2839,7 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
             log=logy,
         )
         # pp - top panel
+        panel_event_activity = next(event_activity_order)
         panels.append(
             pb.Panel(
                 axes=[
@@ -2851,12 +2847,13 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
                 ],
                 text=[
                     # The collision system
-                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size, text_kwargs=rotation_kwargs),
+                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
                 ] if last_grooming_method else [],
                 title=pb.TitleConfig(grooming_styles[grooming_method].label, size=text_font_size),
             )
         )
-        # Middle panel
+        # Middle panel - semi-central
+        panel_event_activity = next(event_activity_order)
         panels.append(
             pb.Panel(
                 axes=[
@@ -2864,14 +2861,14 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
                 ],
                 text=[
                     # The collision system
-                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size, text_kwargs=rotation_kwargs),
+                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
                 ] if last_grooming_method else [],
             )
         )
-        # NOTE: This is a bit of a hard code...
-        panels[-1].axes[0].range = _ratio_range["semi_central"]
-        logger.info(f"semi_central: {panels[-1].axes[0].range}")
-        # Bottom panel
+        # Update the ratio range for semi-central
+        panels[-1].axes[0].range = _ratio_range[panel_event_activity]
+        # Bottom panel - central
+        panel_event_activity = next(event_activity_order)
         panels.append(
             pb.Panel(
                 axes=[
@@ -2880,20 +2877,29 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
                 ],
                 text=[
                     # The collision system
-                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size, text_kwargs=rotation_kwargs),
+                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
                 ] if last_grooming_method else [],
+                # This serves to plot the ALICE data
+                legend=pb.LegendConfig(
+                    location="lower left",
+                    font_size=round(text_font_size * 0.8),
+                    anchor=(0.025, 0.025),
+                    marker_label_spacing=0.05,
+                    label_spacing=0.1,
+                    handle_height=1.3,
+                    column_spacing=0.30,
+                ) if first_grooming_method else None
             )
         )
-        # NOTE: This is a bit of a hard code...
-        panels[-1].axes[0].range = _ratio_range["central"]
-        logger.info(f"central: {panels[-1].axes[0].range}")
+        # Update the ratio range for central
+        panels[-1].axes[0].range = _ratio_range[panel_event_activity]
 
     _plot_pp_PbPb_only_ratios_condensed(
         hists=hists,
         models_ratio=models_ratio,
         grooming_methods=grooming_methods,
         set_zero_to_nan=False,
-        all_methods_on_one_figure=False,
+        all_methods_on_one_figure=True,
         event_activity_to_kt_range=event_activity_to_kt_range,
         fit_parameters=fit_parameters,
         fit_QA_plot=fit_QA_plot,
@@ -2901,7 +2907,7 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
             name=name,
             panels=panels,
             figure=pb.Figure(
-                edge_padding={"left": 0.125, "bottom": 0.095, "top": 0.995, "right": 0.94}
+                edge_padding={"left": 0.125, "bottom": 0.085, "top": 0.995, "right": 0.96}
             ),
         ),
         output_dir=output_dir,
