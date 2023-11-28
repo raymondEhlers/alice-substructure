@@ -2574,74 +2574,75 @@ def _plot_pp_PbPb_only_ratios_condensed(
     plot_config: pb.PlotConfig,
     output_dir: Path,
     models_ratio: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
-    model_labels_on_axes: list[str],
 ) -> None:
     """Plot model/data ratios for all provided collision systems."""
     from matplotlib.gridspec import GridSpec
 
-    n_rows = len(hists)
-    fig = plt.figure(layout="constrained")
-    gs = GridSpec(1 + n_rows, len(grooming_methods), figure=fig, height_ratios=[1] + [4] * n_rows)
-    axes = []
-    axes.append(fig.add_subplot(gs[0, :]))
-    # To be able to share axes, we need to carefully define the axis in a careful order:
-    # - First, the bottom left panel, to define the x-axis.
-    # - Next, all of the axes in the first column, starting from the top, to define the y-axis.
-    #   Make sure to share the x-axis with the bottom panel.
-    # - For the next grooming method, we approximately repeat the above:
-    #   - First, define the bottom panel for the x-axis
-    #   - Next, define the rest of the column, starting from the top, using the x-axis we just define
-    #     and the y-axis that we already defined in the first row!
-    ax_bottom_left = fig.add_subplot(gs[-1, 0])
-    ax_left_column = []
-    for i in range(1, n_rows):
-        ax_left_column.append(
-            fig.add_subplot(gs[i, 0], sharex=ax_bottom_left)
-        )
-    # Finally, add this in
-    ax_left_column.append(ax_bottom_left)
-    # And store in the full set of axes
-    axes.extend(ax_left_column)
-    # Now, onto the rest of the grooming methods
-    # NOTE: In principle, there's room to refactor this, but it's a bit tricky because of the sharey, etc.
-    #       So it doesn't seem to be worth the effort at the moment, and I leave it alone...
-    # We start at 1 to skip over the leftmost column that we've already defined
-    for j in range(1, len(grooming_methods)):
-        ax_column = []
-        bottom_row = fig.add_subplot(gs[-1, j])
-        # Here, we start at 1 to avoid the initial row with the labeling
-        for i in range(1, n_rows):
-            ax_column.append(
-                fig.add_subplot(gs[i, j], sharex=bottom_row, sharey=axes[i])
-            )
-        ax_column.append(bottom_row)
-        # Also need to turn off the y-axis tick labels
-        for _ax in ax_column:
-            _ax.set_yticklabels([])
-        axes.extend(ax_column)
-
-    #for i in range(len(grooming_methods)):
-    #    for j in range(1, 4):
-    #        axes.append(fig.add_subplot(gs[j, i]))
+    #n_rows = len(hists)
+    #fig = plt.figure(layout="constrained")
+    #gs = GridSpec(1 + n_rows, len(grooming_methods), figure=fig, height_ratios=[1] + [4] * n_rows)
+    #axes = []
+    #axes.append(fig.add_subplot(gs[0, :]))
+    ## To be able to share axes, we need to carefully define the axis in a careful order:
+    ## - First, the bottom left panel, to define the x-axis.
+    ## - Next, all of the axes in the first column, starting from the top, to define the y-axis.
+    ##   Make sure to share the x-axis with the bottom panel.
+    ## - For the next grooming method, we approximately repeat the above:
+    ##   - First, define the bottom panel for the x-axis
+    ##   - Next, define the rest of the column, starting from the top, using the x-axis we just define
+    ##     and the y-axis that we already defined in the first row!
+    #ax_bottom_left = fig.add_subplot(gs[-1, 0])
+    #ax_left_column = []
+    #for i in range(1, n_rows):
+    #    ax_left_column.append(
+    #        fig.add_subplot(gs[i, 0], sharex=ax_bottom_left)
+    #    )
+    ## Finally, add this in
+    #ax_left_column.append(ax_bottom_left)
+    ## And store in the full set of axes
+    #axes.extend(ax_left_column)
+    ## Now, onto the rest of the grooming methods
+    ## NOTE: In principle, there's room to refactor this, but it's a bit tricky because of the sharey, etc.
+    ##       So it doesn't seem to be worth the effort at the moment, and I leave it alone...
+    ## We start at 1 to skip over the leftmost column that we've already defined
+    #for j in range(1, len(grooming_methods)):
+    #    ax_column = []
+    #    bottom_row = fig.add_subplot(gs[-1, j])
+    #    # Here, we start at 1 to avoid the initial row with the labeling
+    #    for i in range(1, n_rows):
+    #        ax_column.append(
+    #            fig.add_subplot(gs[i, j], sharex=bottom_row, sharey=axes[i])
+    #        )
+    #    ax_column.append(bottom_row)
+    #    # Also need to turn off the y-axis tick labels
+    #    for _ax in ax_column:
+    #        _ax.set_yticklabels([])
+    #    axes.extend(ax_column)
 
     # Older approach using the standard subplots. It doesn't work so well because we want to have
     # a legend that spans across the top of the entire image. This isn't so easy to do without the
     # full flexibility of the GridSpec.
-    #n_rows = len(hists)
-    #fig, axes = plt.subplots(
-    #    n_rows,
-    #    len(grooming_methods),
-    #    figsize=(10, 10),
-    #    gridspec_kw={"height_ratios": [1] * n_rows},
-    #    sharex=True,
-    #    sharey=True,
-    #)
+    n_rows = len(hists)
+    fig, axes = plt.subplots(
+        n_rows + 1,
+        len(grooming_methods),
+        figsize=(10, 10),
+        gridspec_kw={"height_ratios": [2] + [4] * n_rows},
+        sharex="col",
+        sharey="row",
+    )
+    # According to gpt, all the axes will return the same gridspec.
+    gs = axes[0, 0].get_gridspec()
+    # Remove the underlying axes
+    for ax in axes[0, :]:
+        ax.remove()
+    ax_header = fig.add_subplot(gs[0, :])
 
     # NOTE: This assumes that pp will be provided, but I think that's a fairly save bet.
     for i_grooming_method, grooming_method in enumerate(grooming_methods):
         logger.info(f"Plotting group of ratios for {grooming_method}")
         _plot_pp_PbPb_only_ratios_on_axes(
-            axes=axes[:, i_grooming_method],
+            axes=axes[1:, i_grooming_method],
             hists=hists,
             grooming_method=grooming_method,
             set_zero_to_nan=set_zero_to_nan,
@@ -2653,13 +2654,61 @@ def _plot_pp_PbPb_only_ratios_condensed(
             output_dir=output_dir,
         )
 
-    # TODO: Double check if I need to None out the legends in the panels...
+    # Legend
+    # Setup
+    legend_config = plot_config.panels[0].legend
+    assert legend_config is not None
+
+    # Begin with the data legend...
+    #handles, labels = ax_ratio.get_legend_handles_labels()
+
+    #import matplotlib.lines as mlines
+    #handles = [
+    #    (
+    #        copy.deepcopy(handle),
+    #        mpl.patches.Patch(
+    #            facecolor=p_boxes_data.get_facecolor()[0],
+    #            alpha=p_boxes_data.get_alpha(),
+    #        ),
+    #    )
+    #    for handle in handles
+    #]
+    #logger.info(f"{handles=}")
+    #legend_object = legend_config.apply(
+    #    ax=ax_ratio,
+    #    legend_handles=handles,
+    #    legend_labels=labels
+    #)
+
+    ######
+    # Create handles and labels by hand, using all models
+    ######
+    model_legend_elements = []
+    for model_name, model_calculation in models_ratio.items():
+        # NOTE: This is assuming we'll only plot PbPb model colors here, but I think that's a reasonable assumption,
+        #       since that's the only models that could compare to the PbPb/pp ratio
+        model_kwargs = retrieve_model_styles(event_activity="PbPb", model_name=model_name)
+        model_legend_elements.append(
+            mpl.patches.Patch(
+                facecolor=model_kwargs["color"],
+                # NOTE: Same note as above
+                label=model_calculation.label(collision_system="PbPb")
+            )
+        )
+    model_legend_object = legend_config.apply(
+        ax=ax_header,
+        legend_handles=model_legend_elements,
+    )
+    ax_header.add_artist(model_legend_object)
+    # Finally, turn off the legend in the config
+    plot_config.panels[0].legend = None
 
     # Labeling and presentation
-    plot_config.apply(fig=fig, axes=[*axes[:, 0].flatten(), *axes[:, 1].flatten()])
+    plot_config.apply(fig=fig, axes=[ax_header, *axes[1:, 0].flatten(), *axes[1:, 1].flatten()])
     # A few additional tweaks.
     for i in range(len(grooming_methods)):
         axes[i, -1].xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    ax_header.set_axis_off()
 
     filename = f"{plot_config.name}"
     fig.savefig(output_dir / f"{filename}.pdf")
@@ -2719,18 +2768,64 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
     )
 
     # Consistent ratio ranges
-    _ratio_range = (0.3, 1.7)
-    if "central" in hists and models_ratio:
-        _ratio_range = (0.35, 1.6)
-    if any("z_cut_04" in m for m in grooming_methods):
-        _ratio_range = (-0.2, 2.2) if models_ratio else (0.1, 1.9)
+    # NOTE: These are specialized to the letter. I haven't checked for the other methods.
+    _ratio_range = {
+        "pp": (0.7, 1.3),
+        "semi_central": (0.65, 1.35),
+        "central": (0.49, 1.39),
+    }
+    #_ratio_range = (0.3, 1.7)
+    #if "central" in hists and models_ratio:
+    #    _ratio_range = (0.35, 1.6)
     if logy:
-        _ratio_range = (0.45, 1.8)
+        _ratio_range = {
+            "pp": (0.45, 1.8),
+            "semi_central": (0.45, 1.8),
+            "central": (0.45, 1.8),
+        }
         # If I move the collision system, I could try to make something like the below work
         #_ratio_range = (0.55, 1.65)
 
     # Define panels
     panels = []
+    # Header ax
+    # Overall figure label text:
+    #text = plot_style.label_to_display_string["ALICE"][alice_status]
+    ## Since the final text is short, we can merge onto one line
+    #if alice_status != "final":
+    #    text += "\n"
+    #else:
+    #    text += " "
+    #text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
+    #collision_system_text = ",".join(_event_activity_full_label_map[collision_system] for collision_system in hists)
+    #text += f"\n{collision_system_text}"
+
+    text_left = fr"$\textbf{{{plot_style.label_to_display_string['ALICE'][alice_status]}}}$"
+    text_left += "\n" + fr"${_event_activity_short_label_map['central']},\:{_event_activity_short_label_map['semi_central']}\:" + r"\text{Pb--Pb},\:\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV"
+    #text += event_activity + plot_style.label_to_display_string["collision_system"][collision_system_key]
+    text_right = "\n" + plot_style.label_to_display_string["jets"]["general"]
+    text_right += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
+    text_right += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    panels.append(
+        pb.Panel(
+            axes=[],
+            text=[
+                pb.TextConfig(x=-0.05, y=1.0, text=text_left, font_size=text_font_size),
+                pb.TextConfig(x=0.995, y=1.0, text=text_right, font_size=text_font_size)
+            ],
+            # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
+            legend=pb.LegendConfig(
+                location="lower center",
+                font_size=round(text_font_size * 0.8),
+                #anchor=(0.02, 0.02),
+                ncol=len(models_ratio),
+                marker_label_spacing=0.05,
+                label_spacing=0.1,
+                handle_height=1.3,
+                column_spacing=0.30,
+            )
+        )
+    )
     for grooming_method in grooming_methods:
         # Setup per column
         last_grooming_method = (grooming_method == grooming_methods[-1])
@@ -2739,27 +2834,14 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
             y_label = r"$\frac{\text{Model}}{\text{Data}}$" if not fit_parameters else r"$\frac{\text{Spectra}}{\text{Param.}}$"
         #style = grooming_styles[grooming_method]
         event_activity_order = iter(list(hists))
-        #model_label_order = iter(model_labels_on_axes)
-        model_label_order = iter([[], [], []])
 
         standard_y_axis = pb.AxisConfig(
             "y",
             label=y_label,
-            range=_ratio_range,
+            range=_ratio_range["pp"],
             # Make the label a bit bigger since it's stacked on top
             font_size=text_font_size * 1.05,
             log=logy,
-        )
-        # TODO: Implement this properly...
-        standard_model_legend = pb.LegendConfig(
-            location="lower left",
-            font_size=round(text_font_size * 0.8),
-            anchor=(0.02, 0.02),
-            #ncol=2,
-            marker_label_spacing=0.05,
-            label_spacing=0.1,
-            handle_height=1.3,
-            column_spacing=0.30,
         )
         # pp - top panel
         panels.append(
@@ -2771,9 +2853,7 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
                     # The collision system
                     pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size, text_kwargs=rotation_kwargs),
                 ] if last_grooming_method else [],
-                #legend=copy.deepcopy(standard_data_legend),
-                # Only provide if there are model entries for this panel.
-                legend=copy.deepcopy(standard_model_legend) if next(model_label_order) else None,
+                title=grooming_styles[grooming_method].label,
             )
         )
         # Middle panel
@@ -2788,6 +2868,9 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
                 ] if last_grooming_method else [],
             )
         )
+        # NOTE: This is a bit of a hard code...
+        panels[-1].axes[0].range = _ratio_range["semi_central"]
+        logger.info(f"semi_central: {panels[-1].axes[0].range}")
         # Bottom panel
         panels.append(
             pb.Panel(
@@ -2801,26 +2884,13 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
                 ] if last_grooming_method else [],
             )
         )
-
-    # Overall figure label text:
-    text = plot_style.label_to_display_string["ALICE"][alice_status]
-    # Since the final text is short, we can merge onto one line
-    if alice_status != "final":
-        text += "\n"
-    else:
-        text += " "
-    #text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
-    collision_system_text = ",".join(_event_activity_full_label_map[collision_system] for collision_system in hists)
-    text += f"\n{collision_system_text}"
-    #text += event_activity + plot_style.label_to_display_string["collision_system"][collision_system_key]
-    text += "\n" + plot_style.label_to_display_string["jets"]["general"]
-    text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+        # NOTE: This is a bit of a hard code...
+        panels[-1].axes[0].range = _ratio_range["central"]
+        logger.info(f"central: {panels[-1].axes[0].range}")
 
     _plot_pp_PbPb_only_ratios_condensed(
         hists=hists,
         models_ratio=models_ratio,
-        model_labels_on_axes=[],
         grooming_methods=grooming_methods,
         set_zero_to_nan=False,
         all_methods_on_one_figure=False,
@@ -2831,8 +2901,7 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
             name=name,
             panels=panels,
             figure=pb.Figure(
-                text=pb.TextConfig(x=0.2, y=1.0, text=text, font_size=text_font_size),
-                edge_padding={"left": 0.125, "bottom": 0.095, "top": 0.975, "right": 0.95}
+                edge_padding={"left": 0.125, "bottom": 0.095, "top": 0.995, "right": 0.94}
             ),
         ),
         output_dir=output_dir,
