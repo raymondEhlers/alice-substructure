@@ -2579,22 +2579,63 @@ def _plot_pp_PbPb_only_ratios_condensed(
     """Plot model/data ratios for all provided collision systems."""
     from matplotlib.gridspec import GridSpec
 
-    #fig = plt.figure(layout="constrained")
-    #gs = GridSpec(4, len(grooming_methods), figure=fig, height_ratios=[1, 4, 4, 4])
-    #axes = []
-    #axes.append(fig.add_subplot(gs[0, :]))
+    n_rows = len(hists)
+    fig = plt.figure(layout="constrained")
+    gs = GridSpec(1 + n_rows, len(grooming_methods), figure=fig, height_ratios=[1] + [4] * n_rows)
+    axes = []
+    axes.append(fig.add_subplot(gs[0, :]))
+    # To be able to share axes, we need to carefully define the axis in a careful order:
+    # - First, the bottom left panel, to define the x-axis.
+    # - Next, all of the axes in the first column, starting from the top, to define the y-axis.
+    #   Make sure to share the x-axis with the bottom panel.
+    # - For the next grooming method, we approximately repeat the above:
+    #   - First, define the bottom panel for the x-axis
+    #   - Next, define the rest of the column, starting from the top, using the x-axis we just define
+    #     and the y-axis that we already defined in the first row!
+    ax_bottom_left = fig.add_subplot(gs[-1, 0])
+    ax_left_column = []
+    for i in range(1, n_rows):
+        ax_left_column.append(
+            fig.add_subplot(gs[i, 0], sharex=ax_bottom_left)
+        )
+    # Finally, add this in
+    ax_left_column.append(ax_bottom_left)
+    # And store in the full set of axes
+    axes.extend(ax_left_column)
+    # Now, onto the rest of the grooming methods
+    # NOTE: In principle, there's room to refactor this, but it's a bit tricky because of the sharey, etc.
+    #       So it doesn't seem to be worth the effort at the moment, and I leave it alone...
+    # We start at 1 to skip over the leftmost column that we've already defined
+    for j in range(1, len(grooming_methods)):
+        ax_column = []
+        bottom_row = fig.add_subplot(gs[-1, j])
+        # Here, we start at 1 to avoid the initial row with the labeling
+        for i in range(1, n_rows):
+            ax_column.append(
+                fig.add_subplot(gs[i, j], sharex=bottom_row, sharey=axes[i])
+            )
+        ax_column.append(bottom_row)
+        # Also need to turn off the y-axis tick labels
+        for _ax in ax_column:
+            _ax.set_yticklabels([])
+        axes.extend(ax_column)
+
     #for i in range(len(grooming_methods)):
     #    for j in range(1, 4):
     #        axes.append(fig.add_subplot(gs[j, i]))
 
-    n_rows = len(hists)
-    fig, axes = plt.subplots(
-        n_rows,
-        len(grooming_methods),
-        figsize=(10, 10),
-        gridspec_kw={"height_ratios": [1] * n_rows},
-        sharex=True,
-    )
+    # Older approach using the standard subplots. It doesn't work so well because we want to have
+    # a legend that spans across the top of the entire image. This isn't so easy to do without the
+    # full flexibility of the GridSpec.
+    #n_rows = len(hists)
+    #fig, axes = plt.subplots(
+    #    n_rows,
+    #    len(grooming_methods),
+    #    figsize=(10, 10),
+    #    gridspec_kw={"height_ratios": [1] * n_rows},
+    #    sharex=True,
+    #    sharey=True,
+    #)
 
     # NOTE: This assumes that pp will be provided, but I think that's a fairly save bet.
     for i_grooming_method, grooming_method in enumerate(grooming_methods):
