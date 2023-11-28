@@ -2801,17 +2801,17 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
     #text += f"\n{collision_system_text}"
 
     text_left = fr"$\textbf{{{plot_style.label_to_display_string['ALICE'][alice_status]}}}$"
-    text_left += "\n" + fr"${_event_activity_short_label_map['central']},\:{_event_activity_short_label_map['semi_central']}\:" + r"\text{Pb--Pb},\:\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV"
+    text_left += "\n" + fr"{_event_activity_short_label_map['central']}, {_event_activity_short_label_map['semi_central']} " + r"$\text{Pb--Pb},\:\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV"
     #text += event_activity + plot_style.label_to_display_string["collision_system"][collision_system_key]
-    text_right = "\n" + plot_style.label_to_display_string["jets"]["general"]
-    text_right += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
+    text_right = plot_style.label_to_display_string["jets"]["general"]
+    text_right += ", " + plot_style.label_to_display_string["jets"][jet_R_str]
     text_right += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     panels.append(
         pb.Panel(
             axes=[],
             text=[
                 pb.TextConfig(x=-0.05, y=1.0, text=text_left, font_size=text_font_size),
-                pb.TextConfig(x=0.995, y=1.0, text=text_right, font_size=text_font_size)
+                pb.TextConfig(x=0.995, y=1.0, text=text_right, font_size=text_font_size),
             ],
             # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
             legend=pb.LegendConfig(
@@ -2853,7 +2853,7 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
                     # The collision system
                     pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[next(event_activity_order)], font_size=text_font_size, text_kwargs=rotation_kwargs),
                 ] if last_grooming_method else [],
-                title=grooming_styles[grooming_method].label,
+                title=pb.TitleConfig(grooming_styles[grooming_method].label, size=text_font_size),
             )
         )
         # Middle panel
