@@ -1346,7 +1346,213 @@ def plot_comparisons_of_grooming_methods_for_single_system(
     )
 
 
-def _plot_pp_PbPb_comparison_single_panel(
+def _plot_spectra_only_impl(
+    ax: mpl.axes.Axes,
+    hists: Mapping[str, unfolding_analysis.SingleResult],
+    grooming_method: str,
+    set_zero_to_nan: bool,
+    all_methods_on_one_figure: bool,
+    event_activity_to_kt_range: Mapping[str, helpers.KtRange],
+) -> None:
+    # Setup
+    grooming_styles = plot_style.define_paper_grooming_styles()
+    _event_activity_to_color = plot_style.define_paper_event_activity_comparison_styles()
+
+    for _plot_counter, (collision_system, hist) in enumerate(hists.items()):
+        # Axes: jet_pt, attr_name
+        h = hist.data
+
+        # Select range to display.
+        h = full_results_helpers.select_hist_range(h, event_activity_to_kt_range[collision_system])
+
+        # Set 0s to NaN
+        if set_zero_to_nan:
+            h.errors[h.values == 0] = np.nan
+            h.values[h.values == 0] = np.nan
+
+        # Main data points
+        kwargs_plot_errorbar = grooming_styles[grooming_method].kwargs_for_plot_errorbar()
+        kwargs_plot_errorbar["color"] = _event_activity_to_color[collision_system]
+        kwargs_plot_errorbar["markeredgecolor"] = kwargs_plot_errorbar["color"]
+        kwargs_plot_errorbar["markerfacecolor"] = "white" if kwargs_plot_errorbar["markerfacecolor"] == "white" else kwargs_plot_errorbar["color"]
+        p = ax.errorbar(
+            h.axes[0].bin_centers,
+            h.values,
+            yerr=h.errors,
+            xerr=h.axes[0].bin_widths / 2,
+            label=_event_activity_full_label_map[collision_system],
+            # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+            zorder=3 + _plot_counter,
+            **kwargs_plot_errorbar,
+        )
+
+        # Systematic uncertainty
+        kwargs_plot_error_boxes = grooming_styles[grooming_method].kwargs_for_plot_error_boxes()
+        kwargs_plot_error_boxes["color"] = p[0].get_color()
+        kwargs_plot_error_boxes["zorder"] = 2
+        pachyderm.plot.error_boxes(
+            ax=ax,
+            x_data=h.axes[0].bin_centers,
+            y_data=h.values,
+            x_errors=h.axes[0].bin_widths / 2,
+            y_errors=np.array(
+                [
+                    h.metadata["y_systematic"]["quadrature"].low,
+                    h.metadata["y_systematic"]["quadrature"].high,
+                ]
+            ),
+            **kwargs_plot_error_boxes,
+        )
+
+
+def _plot_spectra_only(
+    hists: Mapping[str, Mapping[str, unfolding_analysis.SingleResult]],
+    grooming_methods: list[str],
+    set_zero_to_nan: bool,
+    all_methods_on_one_figure: bool,
+    event_activity_to_kt_range: Mapping[str, Mapping[str, helpers.KtRange]],
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+) -> tuple[dict[str, float], dict[str, float]]:
+    """Plot PbPb with systematics compared to pp with systematics for a set of grooming methods."""
+    # Validations
+    logger.info(f"Plotting pp, PbPb spectra comparison for {grooming_methods}")
+
+    # Setup
+    if all_methods_on_one_figure:
+        n_horizontal_panels = int(np.ceil(len(grooming_methods) / 2))
+        fig, all_axes = plt.subplots(
+            1,
+            n_horizontal_panels,
+            figsize=(7.5 * n_horizontal_panels, 15),
+        )
+        axes = all_axes if n_horizontal_panels > 1 else [all_axes]
+    else:
+        fig, all_axes = plt.subplots(
+            1,
+            1,
+            figsize=(10, 10),
+            sharex=True,
+        )
+        axes = [all_axes]
+
+    # Loop over grooming methods to plot
+    for grooming_method, ax in zip(grooming_methods, axes):
+        _plot_spectra_only_impl(
+            ax=ax,
+            hists={
+                k: v[grooming_method]
+                for k, v in hists.items()
+            },
+            grooming_method=grooming_method,
+            set_zero_to_nan=set_zero_to_nan,
+            all_methods_on_one_figure=all_methods_on_one_figure,
+            event_activity_to_kt_range={
+                k: v[grooming_method]
+                for k, v in event_activity_to_kt_range.items()
+            },
+        )
+
+    # Labeling and presentation
+    plot_config.apply(fig=fig, ax=ax)
+    # A few additional tweaks.
+    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    # ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.2))
+
+    filename = f"{plot_config.name}"
+    if len(grooming_methods) == 1:
+        filename += f"_{grooming_methods[0]}"
+    fig.savefig(output_dir / f"{filename}.pdf")
+    plt.close(fig)
+
+
+def plot_spectra_only(
+    hists: Mapping[str, Mapping[str, unfolding_analysis.SingleResult]],
+    grooming_methods: list[str],
+    output_dir: Path,
+    event_activity_to_kt_range: Mapping[str, helpers.KtRange | Mapping[str, helpers.KtRange]],
+    kt_display_range: tuple[float, float] = (0., 6.25),
+    jet_R_str: str = "R02",
+    alice_status: str = "work_in_progress",
+    text_font_size: int = 31,
+    additional_label: str = "",
+) -> None:
+    """Compare pp and PbPb spectra.
+
+    In principle, plot_pp_PbPb_comparison has all of this functionality contained inside
+    of this. However, adding options to disable ratios, add axes, etc, would have added a
+    lot of complexity to that function. So, we instead create a separate function for this.
+    """
+    # Validation
+    for ev, kt_range in event_activity_to_kt_range.items():
+        if isinstance(kt_range, helpers.KtRange):
+            event_activity_to_kt_range[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
+
+    # Setup
+    jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
+    grooming_styles = plot_style.define_paper_grooming_styles()
+
+    for grooming_method in grooming_methods:
+        style = grooming_styles[grooming_method]
+
+        text = plot_style.label_to_display_string["ALICE"][alice_status]
+        # Since the final text is short, we can merge onto one line
+        if alice_status != "final":
+            text += "\n"
+        else:
+            text += " "
+        text += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
+        text += "\n" + plot_style.label_to_display_string["jets"]["general"]
+        text += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
+        text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+
+        name = "unfolded_kt_pp_PbPb_spectra_only"
+        if additional_label:
+            name += f"_{additional_label}"
+        name += f"_comparison_{jet_R_str}"
+
+        _plot_spectra_only(
+            hists=hists,
+            grooming_methods=[grooming_method],
+            set_zero_to_nan=False,
+            all_methods_on_one_figure=False,
+            event_activity_to_kt_range=event_activity_to_kt_range,
+            plot_config=pb.PlotConfig(
+                name=name,
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
+                            pb.AxisConfig(
+                                "y",
+                                label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
+                                log=True,
+                                #range=(7e-3, 1),
+                                range=(4e-3, 1),
+                                font_size=text_font_size,
+                            ),
+                        ],
+                        text=[
+                            pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
+                            # Add the grooming label in a separate location in the bottom left
+                            # Otherwise, it will overlap with the data
+                            pb.TextConfig(x=0.02, y=0.02, text=style.label, font_size=text_font_size),
+                        ],
+                        legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.0, 0.10), marker_label_spacing=-0.2),
+                    ),
+                ],
+                figure=pb.Figure(edge_padding={"left": 0.14, "bottom": 0.095, "top": 0.975}),
+            ),
+            output_dir=output_dir,
+        )
+
+def plot_spectra_only_condensed() -> None:
+    ...
+
+
+
+def _plot_pp_PbPb_comparison_single_grooming_method(
     ax: mpl.axes.Axes,
     axes_ratio: mpl.axes.Axes | list[mpl.axes.Axes],
     hists: Mapping[str, unfolding_analysis.SingleResult],
@@ -1573,7 +1779,7 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
 
     # Loop over grooming methods to plot
     for grooming_method, (ax, axes_ratio) in zip(grooming_methods, ax_pairs):
-        _plot_pp_PbPb_comparison_single_panel(
+        _plot_pp_PbPb_comparison_single_grooming_method(
             ax=ax, axes_ratio=axes_ratio,
             hists={
                 k: v[grooming_method]
