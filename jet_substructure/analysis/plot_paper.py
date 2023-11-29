@@ -60,6 +60,26 @@ def retrieve_model_styles(event_activity: str, model_name: str) -> dict[str, Any
     return dict(model_styles[f"{_event_activity_to_model_styles_key_map[event_activity]}_{model_name}"])
 
 
+def validate_event_activity_to_kt_range(
+    event_activity_to_kt_range: Mapping[str, helpers.KtRange | Mapping[str, helpers.KtRange]],
+    grooming_methods: list[str],
+) -> dict[str, dict[str, helpers.KtRange]]:
+    """Validate there is a kt range for each grooming method for each event activity.
+
+    Args:
+        event_activity_to_kt_range: Mapping from event activity to kt range.
+        grooming_methods: List of grooming methods.
+
+    Returns:
+        Mapping from event activity to kt range for each grooming method.
+    """
+    output = copy.deepcopy(event_activity_to_kt_range)
+    for ev, kt_range in event_activity_to_kt_range.items():
+        if isinstance(kt_range, helpers.KtRange):
+            output[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
+    return output
+
+
 def _plot_pp_grooming_comparison_with_models_2022(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
@@ -1420,11 +1440,13 @@ def _plot_spectra_only(
 
     # Setup
     if all_methods_on_one_figure:
-        n_horizontal_panels = int(np.ceil(len(grooming_methods) / 2))
+        n_horizontal_panels = len(grooming_methods)
         fig, all_axes = plt.subplots(
             1,
             n_horizontal_panels,
-            figsize=(7.5 * n_horizontal_panels, 15),
+            # NOTE: Optimized for the consolidated figure (eg. 2 grooming methods)
+            figsize=(6.75 * n_horizontal_panels, 10),
+            sharey="row",
         )
         axes = all_axes if n_horizontal_panels > 1 else [all_axes]
     else:
@@ -1454,10 +1476,10 @@ def _plot_spectra_only(
         )
 
     # Labeling and presentation
-    plot_config.apply(fig=fig, ax=ax)
+    plot_config.apply(fig=fig, axes=axes)
     # A few additional tweaks.
-    ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
-    # ax_ratio.yaxis.set_major_locator(mpl.ticker.MultipleLocator(base=0.2))
+    for ax in axes:
+        ax.xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
 
     filename = f"{plot_config.name}"
     if len(grooming_methods) == 1:
@@ -1484,9 +1506,7 @@ def plot_spectra_only(
     lot of complexity to that function. So, we instead create a separate function for this.
     """
     # Validation
-    for ev, kt_range in event_activity_to_kt_range.items():
-        if isinstance(kt_range, helpers.KtRange):
-            event_activity_to_kt_range[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
+    event_activity_to_kt_range = validate_event_activity_to_kt_range(event_activity_to_kt_range=event_activity_to_kt_range, grooming_methods=grooming_methods)
 
     # Setup
     jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
@@ -1547,8 +1567,106 @@ def plot_spectra_only(
             output_dir=output_dir,
         )
 
-def plot_spectra_only_condensed() -> None:
-    ...
+
+def plot_spectra_only_for_letter(
+    hists: Mapping[str, Mapping[str, unfolding_analysis.SingleResult]],
+    grooming_methods: list[str],
+    output_dir: Path,
+    event_activity_to_kt_range: Mapping[str, helpers.KtRange | Mapping[str, helpers.KtRange]],
+    kt_display_range: tuple[float, float] = (0., 6.25),
+    jet_R_str: str = "R02",
+    alice_status: str = "work_in_progress",
+    text_font_size: int = 31,
+    additional_label: str = "",
+) -> None:
+    """Plot spectra only for the Letter (ie. consolidated together)
+
+    """
+    # Validation
+    event_activity_to_kt_range = validate_event_activity_to_kt_range(event_activity_to_kt_range=event_activity_to_kt_range, grooming_methods=grooming_methods)
+
+    # Setup
+    jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
+    grooming_styles = plot_style.define_paper_grooming_styles()
+
+    text_left = fr"$\textbf{{{plot_style.label_to_display_string['ALICE'][alice_status]}}}$"
+    # Since the final text is short, we can merge onto one line
+    if alice_status != "final":
+        text_left += "\n"
+    else:
+        text_left += " "
+    #text_left += plot_style.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
+    text_left += r"$\text{pp},\:\text{Pb--Pb}$"
+    text_left += "\n" + r"$\sqrt{s_{\text{NN}}} = 5.02$ TeV"
+    text_right = plot_style.label_to_display_string["jets"]["general"]
+    text_right += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    text_right += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
+
+    name = "unfolded_kt_pp_PbPb_spectra_only"
+    if additional_label:
+        name += f"_{additional_label}"
+    name += f"_comparison_{jet_R_str}"
+
+    panels = []
+    grooming_methods_iter = iter(grooming_methods)
+    # Left most
+    current_grooming_method = next(grooming_methods_iter)
+    panels.append(
+        pb.Panel(
+            axes=[
+                pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
+                pb.AxisConfig(
+                    "y",
+                    label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
+                    log=True,
+                    #range=(4e-3, 1),
+                    range=(6e-3, 1.0),
+                    font_size=text_font_size,
+                ),
+            ],
+            text=[
+                pb.TextConfig(x=0.98, y=0.98, text=text_left, font_size=text_font_size),
+                # Add the grooming label in a separate location in the bottom left
+                # Otherwise, it will overlap with the data
+                pb.TextConfig(x=0.02, y=0.02, text=grooming_styles[current_grooming_method].label, font_size=text_font_size),
+            ],
+            legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.0, 0.10), marker_label_spacing=-0.2),
+        ),
+    )
+    # Right most
+    current_grooming_method = next(grooming_methods_iter)
+    panels.append(
+        pb.Panel(
+            axes=[
+                pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
+                pb.AxisConfig(
+                    "y",
+                    log=True,
+                    range=(6e-3, 1.0),
+                ),
+            ],
+            text=[
+                pb.TextConfig(x=0.98, y=0.98, text=text_right, font_size=text_font_size),
+                # Add the grooming label in a separate location in the bottom left
+                # Otherwise, it will overlap with the data
+                pb.TextConfig(x=0.02, y=0.02, text=grooming_styles[current_grooming_method].label, font_size=text_font_size),
+            ],
+        ),
+    )
+
+    _plot_spectra_only(
+        hists=hists,
+        grooming_methods=grooming_methods,
+        set_zero_to_nan=False,
+        all_methods_on_one_figure=True,
+        event_activity_to_kt_range=event_activity_to_kt_range,
+        plot_config=pb.PlotConfig(
+            name=name,
+            panels=panels,
+            figure=pb.Figure(edge_padding={"left": 0.105, "bottom": 0.095, "top": 0.975}),
+        ),
+        output_dir=output_dir,
+    )
 
 
 
