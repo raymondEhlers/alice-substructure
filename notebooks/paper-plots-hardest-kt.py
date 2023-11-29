@@ -1864,7 +1864,7 @@ fit_parameters = {
 }
 
 # Single figure for Letter
-plot_paper.plot_pp_PbPb_only_model_data_ratios_single_figure(
+plot_paper.plot_pp_PbPb_only_model_data_ratios_for_letter(
     hists={
         "pp": pp_R02_unfolded_with_systematics,
         "semi_central": semi_central_R02_unfolded_with_systematics,

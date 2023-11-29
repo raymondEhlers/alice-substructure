@@ -2890,7 +2890,7 @@ def plot_pp_PbPb_only_model_data_ratios(
         )
 
 
-def _plot_pp_PbPb_only_ratios_condensed(
+def _plot_pp_PbPb_only_ratios_for_letter(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: list[str],
     set_zero_to_nan: bool,
@@ -3043,7 +3043,7 @@ def _plot_pp_PbPb_only_ratios_condensed(
     plt.close(fig)
 
 
-def plot_pp_PbPb_only_model_data_ratios_single_figure(
+def plot_pp_PbPb_only_model_data_ratios_for_letter(
     hists: Mapping[str, Mapping[str, unfolding_analysis.SingleResult]],
     grooming_methods: list[str],
     output_dir: Path,
@@ -3151,15 +3151,22 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
         last_grooming_method = (grooming_method == grooming_methods[-1])
         y_label = ""
         if (grooming_method == grooming_methods[0]):
-            y_label = r"$\frac{\text{Model}}{\text{Data}}$" if not fit_parameters else r"$\frac{\text{Spectra}}{\text{Param.}}$"
+            y_label = r"$\frac{\text{Model}}{\text{Data}}$" if not fit_parameters else r"$\frac{\text{Spectra}}{\text{Parametrized data}}$"
+            # Simpler option, which I would just put in the middle.
+            #y_label = r"Model/Data" if not fit_parameters else r"Spectra/Parametrized data"
         event_activity_order = iter(list(hists))
 
         standard_y_axis = pb.AxisConfig(
             "y",
-            label=y_label,
             range=_ratio_range["pp"],
             # Make the label a bit bigger since it's stacked on top
+            # When using an actual latex fraction
+            label=y_label,
             font_size=text_font_size * 1.05,
+            # If using the simple option, probably better to make it bigger.
+            # NOTE: Setting the tick font size is needed so that the tick labels don't grow too much.
+            #font_size=text_font_size * 1.2,
+            #tick_font_size=text_font_size * 1.05,
             log=logy,
         )
         # pp - top panel
@@ -3191,6 +3198,7 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
         )
         # Update the ratio range for semi-central
         panels[-1].axes[0].range = _ratio_range[panel_event_activity]
+        #panels[-1].axes[0].label = y_label
         # Bottom panel - central
         panel_event_activity = next(event_activity_order)
         panels.append(
@@ -3218,7 +3226,7 @@ def plot_pp_PbPb_only_model_data_ratios_single_figure(
         # Update the ratio range for central
         panels[-1].axes[0].range = _ratio_range[panel_event_activity]
 
-    _plot_pp_PbPb_only_ratios_condensed(
+    _plot_pp_PbPb_only_ratios_for_letter(
         hists=hists,
         models_ratio=models_ratio,
         grooming_methods=grooming_methods,
