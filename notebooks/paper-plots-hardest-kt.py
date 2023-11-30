@@ -1065,6 +1065,7 @@ hybrid_model_with_wake_without_moliere_predictions_R02.semi_central_ratio["soft_
 # %%
 alice_status = "final"
 plot_output_dir_tag = "2023-paper-plots"
+grooming_methods_for_letter = ["dynamical_kt", "soft_drop_z_cut_02"]
 
 # %% [markdown]
 # #### Temp testing code
@@ -1692,6 +1693,57 @@ for grooming_method in grooming_methods:
     )
 
 # %% [markdown]
+# ## PbPb-pp spectra only
+#
+# ### R = 0.2
+
+# %%
+
+jet_R = 0.2
+jet_R_str = f"R{int(jet_R*10):02}"
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
+_output_dir.mkdir(parents=True, exist_ok=True)
+
+plot_paper.plot_spectra_only_for_letter(
+    hists={
+        "pp": pp_R02_unfolded_with_systematics,
+        "semi_central": semi_central_R02_unfolded_with_systematics,
+        "central": central_R02_unfolded_with_systematics,
+    },
+    grooming_methods=grooming_methods_for_letter,
+    output_dir=_output_dir,
+    event_activity_to_kt_range={
+        "pp": helpers.KtRange(0.25, 6),
+        "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+        "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+    },
+    kt_display_range=(0.0, 6.35),
+    jet_R_str=jet_R_str,
+    alice_status=alice_status,
+    additional_label="_".join(grooming_methods_for_letter),
+)
+
+for grooming_method in grooming_methods:
+    logger.info(f"Processing {grooming_method}")
+    plot_paper.plot_spectra_only(
+        hists={
+            "pp": pp_R02_unfolded_with_systematics,
+            "semi_central": semi_central_R02_unfolded_with_systematics,
+            "central": central_R02_unfolded_with_systematics,
+        },
+        grooming_methods=[grooming_method],
+        output_dir=_output_dir,
+        event_activity_to_kt_range={
+            "pp": helpers.KtRange(0.25, 6),
+            "semi_central": helpers.KtRange(0.25, 6) if "z_cut" in grooming_method else helpers.KtRange(2, 6),
+            "central": helpers.KtRange(0.25, 6) if "z_cut" in grooming_method else helpers.KtRange(3, 6),
+        },
+        kt_display_range=(0.0, 6.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+    )
+
+# %% [markdown]
 # ## PbPb-pp comparison to models
 #
 # ### R = 0.2
@@ -1702,7 +1754,7 @@ jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
-models_ratio = {
+models_calculation = {
     "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
     "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
     "jetscape": jetscape_predictions_R02,
@@ -1718,7 +1770,7 @@ for event_activity in ["semi_central", "central"]:
             "pp": pp_R02_unfolded_with_systematics,
             event_activity: _additional_hists[event_activity],
         },
-        models_ratio=models_ratio,
+        models_ratio=models_calculation,
         grooming_methods=grooming_methods,
         output_dir=_output_dir,
         event_activity_to_kt_range={
@@ -1738,7 +1790,7 @@ for event_activity in ["semi_central", "central"]:
                 "pp": pp_R02_unfolded_with_systematics,
                 event_activity: _additional_hists[event_activity],
             },
-            models_ratio=models_ratio,
+            models_ratio=models_calculation,
             grooming_methods=[grooming_method],
             output_dir=_output_dir,
             event_activity_to_kt_range={
@@ -1763,7 +1815,7 @@ jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
-models_ratio = {
+models_calculation = {
     "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
     "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
     "jetscape": jetscape_predictions_R02,
@@ -1795,7 +1847,7 @@ for grooming_method in grooming_methods:
             "semi_central": semi_central_R02_unfolded_with_systematics,
             "central": central_R02_unfolded_with_systematics,
         },
-        models_ratio=models_ratio,
+        models_ratio=models_calculation,
         grooming_methods=[grooming_method],
         output_dir=_output_dir,
         event_activity_to_kt_range={
@@ -1812,7 +1864,7 @@ for grooming_method in grooming_methods:
 # %%
 
 # %% [markdown]
-# ## PbPb+pp model/data ratios only
+# ## PbPb+pp spectra ratios for model + data
 
 # %% [markdown]
 # ### R = 0.2
@@ -1823,7 +1875,7 @@ jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
-models_ratio = {
+models_calculation = {
     "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
     "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
     "jetscape": jetscape_predictions_R02,
@@ -1870,35 +1922,37 @@ plot_paper.plot_pp_PbPb_only_model_data_ratios_for_letter(
         "semi_central": semi_central_R02_unfolded_with_systematics,
         "central": central_R02_unfolded_with_systematics,
     },
-    models_ratio=models_ratio,
-    grooming_methods=["dynamical_kt", "soft_drop_z_cut_02"],
+    models_calculation=models_calculation,
+    grooming_methods=grooming_methods_for_letter,
     output_dir=_output_dir,
     event_activity_to_kt_range={
         "pp": helpers.KtRange(0.25, 6),
         "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
         "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
     },
-    #model_labels_on_axes=[[], ["hybrid_without_moliere", "hybrid_moliere"], ["jetscape"]],
     kt_display_range=(0.0, 6.25),
     jet_R_str=jet_R_str,
     alice_status=alice_status,
+    additional_label="_".join(grooming_methods_for_letter),
     logy=False,
     fit_parameters=fit_parameters,
     fit_QA_plot=True,
+    # NOTE: This seems to need to be smaller to fit the header. Still could be tuned...
+    text_font_size=24,
 )
 
 #for grooming_method in grooming_methods:
 for grooming_method in ["dynamical_kt", "soft_drop_z_cut_02"]:
     # TEMP
-    #continue
+    continue
     # ENDTEMP
-    plot_paper.plot_pp_PbPb_only_model_data_ratios(
+    plot_paper.plot_pp_PbPb_only_spectra_ratios(
         hists={
             "pp": pp_R02_unfolded_with_systematics,
             "semi_central": semi_central_R02_unfolded_with_systematics,
             "central": central_R02_unfolded_with_systematics,
         },
-        models_ratio=models_ratio,
+        models_calculation=models_calculation,
         grooming_methods=[grooming_method],
         output_dir=_output_dir,
         event_activity_to_kt_range={
@@ -1969,9 +2023,43 @@ fig
 # %%
 plt.close(fig)
 
+
 # %%
 
 # %% [markdown]
 # ## Nov 2023
+
+# %%
+# Testing to determine how best to put text above the figure. The best approach seems to be using `Figure.text`,
+# but a possible alternative is to keep a blank axis and ten use `set_axis_off`
+def test_axis(output_dir: Path) -> None:
+    fig, axes = plt.subplots(4, 1, figsize=(10, 10), gridspec_kw={"height_ratios": [1, 5, 5, 5]}, sharex=True)
+    # Plot text on the figure. Note that this isn't accounted for with the subplots_adjust.
+    fig.text(0.5, 0.99, "Testing fig\nNew Line", va="center", ha="center", fontsize=31)
+
+    axes[1].plot(np.linspace(0, 10, num=100), np.linspace(0, 10, num=100))
+
+    # Try a blank axis
+    axes[0].text(0.1, 0.5, "Testing up here")
+    axes[0].set_axis_off()
+
+    fig.tight_layout()
+    fig.subplots_adjust(
+        **{
+            # Reduce spacing between subplots
+            "hspace": 0,
+            "wspace": 0,
+            # Reduce external spacing
+            "left": 0.10,
+            "bottom": 0.105,
+            "right": 0.98,
+            #"top": 0.98,
+            "top": 0.7,
+        }
+    )
+    fig.savefig(output_dir / "test.pdf")
+    plt.close(fig)
+
+test_axis(output_dir=_output_dir)
 
 # %%
