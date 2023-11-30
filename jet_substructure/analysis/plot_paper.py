@@ -2358,7 +2358,7 @@ def plot_pp_PbPb_comparison_with_multiple_model_ratios(
         )
 
 
-def _plot_pp_PbPb_only_ratios_on_axes(
+def _plot_pp_PbPb_only_spectra_ratios_on_axes(
     axes: list[mpl.axes.Axes],
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_method: str,
@@ -2368,7 +2368,7 @@ def _plot_pp_PbPb_only_ratios_on_axes(
     fit_parameters: Mapping[str, Mapping[str, Mapping[str, float]]],
     fit_QA_plot: bool,
     output_dir: Path,
-    models_ratio: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
+    models_calculation: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
 ) -> None:
     # Setup
     grooming_styles = plot_style.define_paper_grooming_styles()
@@ -2511,7 +2511,7 @@ def _plot_pp_PbPb_only_ratios_on_axes(
         )
 
         # Plot model comparisons
-        for model_name, model_calculation in models_ratio.items():
+        for model_name, model_calculation in models_calculation.items():
             model = model_calculation.spectra(event_activity=collision_system).get(grooming_method, None)
             if not model:
                 logger.debug(f"{model_calculation.ratio(event_activity=collision_system)}")
@@ -2607,7 +2607,7 @@ def _plot_pp_PbPb_only_ratios_on_axes(
         ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
 
 
-def _plot_pp_PbPb_only_ratios_single_column(
+def _plot_pp_PbPb_only_spectra_ratios_single_column(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_method: str,
     set_zero_to_nan: bool,
@@ -2617,7 +2617,7 @@ def _plot_pp_PbPb_only_ratios_single_column(
     fit_QA_plot: bool,
     plot_config: pb.PlotConfig,
     output_dir: Path,
-    models_ratio: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
+    models_calculation: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
     model_labels_on_axes: list[str],
 ) -> None:
     """Plot model/data ratios for all provided collision systems."""
@@ -2629,7 +2629,7 @@ def _plot_pp_PbPb_only_ratios_single_column(
         sharex=True,
     )
 
-    _plot_pp_PbPb_only_ratios_on_axes(
+    _plot_pp_PbPb_only_spectra_ratios_on_axes(
         axes=axes,
         hists=hists,
         grooming_method=grooming_method,
@@ -2638,7 +2638,7 @@ def _plot_pp_PbPb_only_ratios_single_column(
         event_activity_to_kt_range=event_activity_to_kt_range,
         fit_parameters=fit_parameters,
         fit_QA_plot=fit_QA_plot,
-        models_ratio=models_ratio,
+        models_calculation=models_calculation,
         output_dir=output_dir,
     )
 
@@ -2689,7 +2689,7 @@ def _plot_pp_PbPb_only_ratios_single_column(
 
         model_legend_elements = []
         for model_name in model_labels_on_axes[_plot_counter]:
-            model_calculation = models_ratio[model_name]
+            model_calculation = models_calculation[model_name]
 
             # NOTE: This is assuming we'll only plot PbPb model colors here, but I think that's a reasonable assumption,
             #       since that's the only models that could compare to the PbPb/pp ratio
@@ -2723,12 +2723,12 @@ def _plot_pp_PbPb_only_ratios_single_column(
     plt.close(fig)
 
 
-def plot_pp_PbPb_only_model_data_ratios(
+def plot_pp_PbPb_only_spectra_ratios(
     hists: Mapping[str, Mapping[str, unfolding_analysis.SingleResult]],
     grooming_methods: list[str],
     output_dir: Path,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange | Mapping[str, helpers.KtRange]],
-    models_ratio: Mapping[str, Mapping[str, binned_data.BinnedData]],
+    models_calculation: Mapping[str, Mapping[str, binned_data.BinnedData]],
     model_labels_on_axes: list[list[str]],
     kt_display_range: tuple[float, float] = (1.5, 15),
     jet_R_str: str = "R04",
@@ -2774,10 +2774,10 @@ def plot_pp_PbPb_only_model_data_ratios(
         name += f"_model_data_ratios_{jet_R_str}"
 
         _ratio_range = (0.3, 1.7)
-        if "central" in hists and models_ratio:
+        if "central" in hists and models_calculation:
             _ratio_range = (0.35, 1.6)
         if any("z_cut_04" in m for m in grooming_methods):
-            _ratio_range = (-0.2, 2.2) if models_ratio else (0.1, 1.9)
+            _ratio_range = (-0.2, 2.2) if models_calculation else (0.1, 1.9)
         if logy:
             _ratio_range = (0.45, 1.8)
             # If I move the collision system, I could try to make something like the below work
@@ -2871,9 +2871,9 @@ def plot_pp_PbPb_only_model_data_ratios(
             )
         )
 
-        _plot_pp_PbPb_only_ratios_single_column(
+        _plot_pp_PbPb_only_spectra_ratios_single_column(
             hists=hists,
-            models_ratio=models_ratio,
+            models_calculation=models_calculation,
             model_labels_on_axes=model_labels_on_axes,
             grooming_method=grooming_method,
             set_zero_to_nan=False,
@@ -2890,7 +2890,7 @@ def plot_pp_PbPb_only_model_data_ratios(
         )
 
 
-def _plot_pp_PbPb_only_ratios_for_letter(
+def _plot_pp_PbPb_only_spectra_ratios_for_letter(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: list[str],
     set_zero_to_nan: bool,
@@ -2900,7 +2900,7 @@ def _plot_pp_PbPb_only_ratios_for_letter(
     fit_QA_plot: bool,
     plot_config: pb.PlotConfig,
     output_dir: Path,
-    models_ratio: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
+    models_calculation: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
 ) -> None:
     """Plot model/data ratios for all provided collision systems."""
     from matplotlib.gridspec import GridSpec
@@ -2968,7 +2968,7 @@ def _plot_pp_PbPb_only_ratios_for_letter(
     # NOTE: This assumes that pp will be provided, but I think that's a fairly save bet.
     for i_grooming_method, grooming_method in enumerate(grooming_methods):
         logger.info(f"Plotting group of ratios for {grooming_method}")
-        _plot_pp_PbPb_only_ratios_on_axes(
+        _plot_pp_PbPb_only_spectra_ratios_on_axes(
             axes=axes[1:, i_grooming_method],
             hists=hists,
             grooming_method=grooming_method,
@@ -2977,7 +2977,7 @@ def _plot_pp_PbPb_only_ratios_for_letter(
             event_activity_to_kt_range=event_activity_to_kt_range,
             fit_parameters=fit_parameters,
             fit_QA_plot=fit_QA_plot,
-            models_ratio=models_ratio,
+            models_calculation=models_calculation,
             output_dir=output_dir,
         )
 
@@ -3012,7 +3012,7 @@ def _plot_pp_PbPb_only_ratios_for_letter(
     # Create handles and labels by hand, using all models
     ######
     model_legend_elements = []
-    for model_name, model_calculation in models_ratio.items():
+    for model_name, model_calculation in models_calculation.items():
         # NOTE: This is assuming we'll only plot PbPb model colors here, but I think that's a reasonable assumption,
         #       since that's the only models that could compare to the PbPb/pp ratio
         model_kwargs = retrieve_model_styles(event_activity="PbPb", model_name=model_name)
@@ -3048,7 +3048,7 @@ def plot_pp_PbPb_only_model_data_ratios_for_letter(
     grooming_methods: list[str],
     output_dir: Path,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange | Mapping[str, helpers.KtRange]],
-    models_ratio: Mapping[str, Mapping[str, binned_data.BinnedData]],
+    models_calculation: Mapping[str, Mapping[str, binned_data.BinnedData]],
     kt_display_range: tuple[float, float] = (1.5, 15),
     jet_R_str: str = "R02",
     alice_status: str = "work_in_progress",
@@ -3137,7 +3137,7 @@ def plot_pp_PbPb_only_model_data_ratios_for_letter(
                 location="center",
                 font_size=round(text_font_size * 0.8),
                 anchor=(0.5, 0.35),
-                ncol=len(models_ratio),
+                ncol=len(models_calculation),
                 marker_label_spacing=0.05,
                 label_spacing=0.1,
                 handle_height=1.3,
@@ -3226,9 +3226,9 @@ def plot_pp_PbPb_only_model_data_ratios_for_letter(
         # Update the ratio range for central
         panels[-1].axes[0].range = _ratio_range[panel_event_activity]
 
-    _plot_pp_PbPb_only_ratios_for_letter(
+    _plot_pp_PbPb_only_spectra_ratios_for_letter(
         hists=hists,
-        models_ratio=models_ratio,
+        models_calculation=models_calculation,
         grooming_methods=grooming_methods,
         set_zero_to_nan=False,
         all_methods_on_one_figure=True,
