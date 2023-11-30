@@ -2669,8 +2669,8 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
     # Consistent ratio ranges
     # NOTE: These are specialized to the letter. I haven't checked for the other methods.
     _ratio_range = {
-        "semi_central": (0.3, 1.7),
-        "central": (0.1, 1.9),
+        "semi_central": (0.55, 1.55),
+        "central": (0.425, 1.75),
     }
 
     # Define panels
@@ -2688,7 +2688,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
             text=[
                 # NOTE: 0.04 shifted past the edge in each direction was the default, but I took a
                 #       bit of a hit to enlarge the font size.
-                pb.TextConfig(x=-0.135, y=1.0, text=text_left, font_size=text_font_size),
+                pb.TextConfig(x=-0.11, y=1.0, text=text_left, font_size=text_font_size),
                 pb.TextConfig(x=1.04, y=1.0, text=text_right, font_size=text_font_size),
             ],
             # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
@@ -2776,7 +2776,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
         plot_config=pb.PlotConfig(
             name=name,
             panels=panels,
-            figure=pb.Figure(edge_padding={"left": 0.125, "bottom": 0.095, "top": 0.995, "right": 0.96}),
+            figure=pb.Figure(edge_padding={"left": 0.105, "bottom": 0.085, "top": 0.995, "right": 0.96}),
         ),
         output_dir=output_dir,
     )
@@ -3488,7 +3488,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
             text=[
                 # NOTE: 0.04 shifted past the edge in each direction was the default, but I took a
                 #       bit of a hit to enlarge the font size.
-                pb.TextConfig(x=-0.135, y=1.0, text=text_left, font_size=text_font_size),
+                pb.TextConfig(x=-0.125, y=1.0, text=text_left, font_size=text_font_size),
                 pb.TextConfig(x=1.04, y=1.0, text=text_right, font_size=text_font_size),
             ],
             # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
@@ -3598,7 +3598,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
             name=name,
             panels=panels,
             figure=pb.Figure(
-                edge_padding={"left": 0.125, "bottom": 0.085, "top": 0.995, "right": 0.96}
+                edge_padding={"left": 0.115, "bottom": 0.085, "top": 0.995, "right": 0.96}
             ),
         ),
         output_dir=output_dir,
