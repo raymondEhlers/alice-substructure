@@ -94,6 +94,11 @@ build.include = [
 source = "file"
 path = "jet_substructure/__init__.py"
 
+[tool.pdm.build]
+excludes = [
+    "**/.mypy_cache/",
+]
+
 [tool.pdm.scripts]
 embedPythia = { call = "jet_substructure.analysis.analyze_tree:embed_pythia_entry_point" }
 splitTree = { call = "jet_substructure.base.helpers:split_tree_entry_point" }
