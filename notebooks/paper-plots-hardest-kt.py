@@ -1744,127 +1744,7 @@ for grooming_method in grooming_methods:
     )
 
 # %% [markdown]
-# ## PbPb-pp comparison to models
-#
-# ### R = 0.2
-
-# %%
-jet_R = 0.2
-jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-models_calculation = {
-    "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
-    "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
-    "jetscape": jetscape_predictions_R02,
-}
-
-for event_activity in ["semi_central", "central"]:
-    _additional_hists = {
-        "semi_central": semi_central_R02_unfolded_with_systematics,
-        "central": central_R02_unfolded_with_systematics,
-    }
-    plot_paper.plot_pp_PbPb_comparison_single_figure(
-        hists={
-            "pp": pp_R02_unfolded_with_systematics,
-            event_activity: _additional_hists[event_activity],
-        },
-        models_ratio=models_calculation,
-        grooming_methods=grooming_methods,
-        output_dir=_output_dir,
-        event_activity_to_kt_range={
-            "pp": helpers.KtRange(0.25, 6),
-            "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
-            "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
-        },
-        kt_display_range=(0.0, 6.25),
-        jet_R_str=jet_R_str,
-        alice_status=alice_status,
-        additional_label=event_activity,
-    )
-
-    for grooming_method in grooming_methods:
-        plot_paper.plot_pp_PbPb_comparison(
-            hists={
-                "pp": pp_R02_unfolded_with_systematics,
-                event_activity: _additional_hists[event_activity],
-            },
-            models_ratio=models_calculation,
-            grooming_methods=[grooming_method],
-            output_dir=_output_dir,
-            event_activity_to_kt_range={
-                "pp": helpers.KtRange(0.25, 6),
-                "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
-                "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
-            },
-            kt_display_range=(0.0, 6.25),
-            jet_R_str=jet_R_str,
-            alice_status=alice_status,
-            additional_label=event_activity
-        )
-
-# %% [markdown]
-# ## PbPb-pp comparison by each grooming method with model ratios
-#
-# ### R = 0.2
-
-# %%
-jet_R = 0.2
-jet_R_str = f"R{int(jet_R*10):02}"
-_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
-
-models_calculation = {
-    "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
-    "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
-    "jetscape": jetscape_predictions_R02,
-}
-
-#plot_paper.plot_pp_PbPb_comparison_single_figure(
-#    hists={
-#        "pp": pp_R02_unfolded_with_systematics,
-#        "semi_central": semi_central_R02_unfolded_with_systematics,
-#        "central": central_R02_unfolded_with_systematics,
-#    },
-#    models_ratio=models_ratio,
-#    grooming_methods=grooming_methods,
-#    output_dir=_output_dir,
-#    event_activity_to_kt_range={
-#        "pp": helpers.KtRange(0.25, 6),
-#        "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
-#        "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
-#    },
-#    kt_display_range=(0.0, 6.25),
-#    jet_R_str=jet_R_str,
-#    alice_status=alice_status,
-#)
-
-for grooming_method in grooming_methods:
-    plot_paper.plot_pp_PbPb_comparison_with_multiple_model_ratios(
-        hists={
-            "pp": pp_R02_unfolded_with_systematics,
-            "semi_central": semi_central_R02_unfolded_with_systematics,
-            "central": central_R02_unfolded_with_systematics,
-        },
-        models_ratio=models_calculation,
-        grooming_methods=[grooming_method],
-        output_dir=_output_dir,
-        event_activity_to_kt_range={
-            "pp": helpers.KtRange(0.25, 6),
-            "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
-            "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
-        },
-        kt_display_range=(0.0, 6.25),
-        jet_R_str=jet_R_str,
-        alice_status=alice_status,
-        additional_label="multiple_ratios",
-    )
-
-# %%
-
-# %% [markdown]
-# ## PbPb+pp spectra ratios for model + data
+# ## PbPb+pp spectra ratios only for model + data
 
 # %% [markdown]
 # ### R = 0.2
@@ -1969,6 +1849,189 @@ for grooming_method in ["dynamical_kt", "soft_drop_z_cut_02"]:
         fit_QA_plot=True,
     )
 
+
+# %% [markdown]
+# ## PbPb-pp comparison (one centrality) to models
+#
+# ### R = 0.2
+
+# %%
+jet_R = 0.2
+jet_R_str = f"R{int(jet_R*10):02}"
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
+_output_dir.mkdir(parents=True, exist_ok=True)
+
+models_calculation = {
+    "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
+    "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
+    "jetscape": jetscape_predictions_R02,
+}
+
+for event_activity in ["semi_central", "central"]:
+    _additional_hists = {
+        "semi_central": semi_central_R02_unfolded_with_systematics,
+        "central": central_R02_unfolded_with_systematics,
+    }
+    plot_paper.plot_pp_PbPb_comparison_single_figure(
+        hists={
+            "pp": pp_R02_unfolded_with_systematics,
+            event_activity: _additional_hists[event_activity],
+        },
+        models_ratio=models_calculation,
+        grooming_methods=grooming_methods,
+        output_dir=_output_dir,
+        event_activity_to_kt_range={
+            "pp": helpers.KtRange(0.25, 6),
+            "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+            "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+        },
+        kt_display_range=(0.0, 6.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+        additional_label=event_activity,
+    )
+
+    for grooming_method in grooming_methods:
+        plot_paper.plot_pp_PbPb_comparison(
+            hists={
+                "pp": pp_R02_unfolded_with_systematics,
+                event_activity: _additional_hists[event_activity],
+            },
+            models_ratio=models_calculation,
+            grooming_methods=[grooming_method],
+            output_dir=_output_dir,
+            event_activity_to_kt_range={
+                "pp": helpers.KtRange(0.25, 6),
+                "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+                "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+            },
+            kt_display_range=(0.0, 6.25),
+            jet_R_str=jet_R_str,
+            alice_status=alice_status,
+            additional_label=event_activity
+        )
+
+# %% [markdown]
+# ## PbPb-pp comparison: spectra + multiple ratios (one per centrality) by each grooming method with model
+#
+# ### R = 0.2
+
+# %%
+jet_R = 0.2
+jet_R_str = f"R{int(jet_R*10):02}"
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
+_output_dir.mkdir(parents=True, exist_ok=True)
+
+models_calculation = {
+    "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
+    "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
+    "jetscape": jetscape_predictions_R02,
+}
+
+#plot_paper.plot_pp_PbPb_comparison_single_figure(
+#    hists={
+#        "pp": pp_R02_unfolded_with_systematics,
+#        "semi_central": semi_central_R02_unfolded_with_systematics,
+#        "central": central_R02_unfolded_with_systematics,
+#    },
+#    models_ratio=models_calculation,
+#    grooming_methods=grooming_methods,
+#    output_dir=_output_dir,
+#    event_activity_to_kt_range={
+#        "pp": helpers.KtRange(0.25, 6),
+#        "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+#        "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+#    },
+#    kt_display_range=(0.0, 6.25),
+#    jet_R_str=jet_R_str,
+#    alice_status=alice_status,
+#)
+
+for grooming_method in grooming_methods:
+    plot_paper.plot_pp_PbPb_comparison_with_multiple_model_ratios(
+        hists={
+            "pp": pp_R02_unfolded_with_systematics,
+            "semi_central": semi_central_R02_unfolded_with_systematics,
+            "central": central_R02_unfolded_with_systematics,
+        },
+        models_ratio=models_calculation,
+        grooming_methods=[grooming_method],
+        output_dir=_output_dir,
+        event_activity_to_kt_range={
+            "pp": helpers.KtRange(0.25, 6),
+            "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+            "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+        },
+        kt_display_range=(0.0, 6.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+        additional_label="multiple_ratios",
+    )
+
+# %% [markdown]
+# ## PbPb-pp comparison ratios only, including data + models
+#
+# ### R = 0.2
+
+# %%
+jet_R = 0.2
+jet_R_str = f"R{int(jet_R*10):02}"
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
+_output_dir.mkdir(parents=True, exist_ok=True)
+
+models_calculation = {
+    "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
+    "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
+    "jetscape": jetscape_predictions_R02,
+}
+
+plot_paper.plot_pp_PbPb_comparison_only_ratios_for_letter(
+    hists={
+        "pp": pp_R02_unfolded_with_systematics,
+        "semi_central": semi_central_R02_unfolded_with_systematics,
+        "central": central_R02_unfolded_with_systematics,
+    },
+    models_calculation=models_calculation,
+    grooming_methods=grooming_methods_for_letter,
+    output_dir=_output_dir,
+    event_activity_to_kt_range={
+        "pp": helpers.KtRange(0.25, 6),
+        "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+        "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+    },
+    kt_display_range=(0.0, 6.25),
+    jet_R_str=jet_R_str,
+    alice_status=alice_status,
+    additional_label="_".join(grooming_methods_for_letter),
+    # NOTE: This seems to need to be smaller to fit the header. Still could be tuned...
+    text_font_size=24,
+)
+
+for grooming_method in grooming_methods:
+    # TEMP
+    continue
+    # ENDTEMP
+    plot_paper.plot_pp_PbPb_comparison_with_multiple_model_ratios(
+        hists={
+            "pp": pp_R02_unfolded_with_systematics,
+            "semi_central": semi_central_R02_unfolded_with_systematics,
+            "central": central_R02_unfolded_with_systematics,
+        },
+        models_ratio=models_calculation,
+        grooming_methods=[grooming_method],
+        output_dir=_output_dir,
+        event_activity_to_kt_range={
+            "pp": helpers.KtRange(0.25, 6),
+            "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+            "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+        },
+        kt_display_range=(0.0, 6.25),
+        jet_R_str=jet_R_str,
+        alice_status=alice_status,
+        additional_label="multiple_ratios",
+    )
+
+# %%
 
 # %%
 
