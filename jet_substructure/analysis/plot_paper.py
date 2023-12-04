@@ -80,6 +80,108 @@ def validate_event_activity_to_kt_range(
     return output
 
 
+def _define_panel_config_for_letter_combined_plots(
+    two_column_header: bool,
+    alice_status: str,
+    jet_pt_bin: helpers.JetPtRange,
+    jet_R_str: str,
+    n_model_calculations: int,
+    text_font_size: int,
+) -> pb.Panel:
+    if two_column_header:
+        text_left = fr"{_event_activity_short_label_map['central']}, {_event_activity_short_label_map['semi_central']} " + r"$\text{Pb--Pb},\:\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV"
+        text_left += "\n" + plot_style.label_to_display_string["jets"]["general"]
+        text_left += ", " + plot_style.label_to_display_string["jets"][jet_R_str]
+        text_left += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+        text_right = ""
+        panel = pb.Panel(
+            axes=[
+                # NOTE: This is solely provided to avoid shifting the y-axis label.
+                #       This happens because the default axis range label is larger than
+                #       our usual range. In practice, this will be hidden and not used
+                #       for anything.
+                pb.AxisConfig(
+                    "y",
+                    range=(0, 1),
+                ),
+            ],
+            text=[
+                # NOTE: 0.04 shifted past the edge in each direction was the default, but I took a
+                #       bit of a hit to enlarge the font size.
+                pb.TextConfig(x=-0.11, y=1.0, text=text_left, font_size=text_font_size),
+                #pb.TextConfig(x=1.04, y=1.0, text=text_right, font_size=text_font_size),
+            ],
+            # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
+            legend=pb.LegendConfig(
+                location="upper right",
+                font_size=round(text_font_size * 0.8),
+                anchor=(1.03, 0.99),
+                marker_label_spacing=0.05,
+                label_spacing=0.1,
+                handle_height=1.3,
+                column_spacing=0.30,
+            )
+        )
+    else:
+        text_left = fr"$\textbf{{{plot_style.label_to_display_string['ALICE'][alice_status]}}}$"
+        # NOTE: The raisebox height is just tuned by hand...
+        text_left += "\n" + r"\raisebox{-0.5ex}{" + fr"{_event_activity_short_label_map['central']}, {_event_activity_short_label_map['semi_central']} " + r"$\text{Pb--Pb},\:\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV" + "}"
+        text_right = plot_style.label_to_display_string["jets"]["general"]
+        text_right += ", " + plot_style.label_to_display_string["jets"][jet_R_str]
+        text_right += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+        panel = pb.Panel(
+            axes=[
+                # NOTE: This is solely provided to avoid shifting the y-axis label.
+                #       This happens because the default axis range label is larger than
+                #       our usual range. In practice, this will be hidden and not used
+                #       for anything.
+                pb.AxisConfig(
+                    "y",
+                    range=(0, 1),
+                ),
+            ],
+            text=[
+                # NOTE: 0.04 shifted past the edge in each direction was the default, but I took a
+                #       bit of a hit to enlarge the font size.
+                pb.TextConfig(x=-0.11, y=1.0, text=text_left, font_size=text_font_size),
+                pb.TextConfig(x=1.04, y=1.0, text=text_right, font_size=text_font_size),
+            ],
+            # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
+            legend=pb.LegendConfig(
+                location="center",
+                font_size=round(text_font_size * 0.8),
+                anchor=(0.5, 0.35),
+                ncol=n_model_calculations,
+                marker_label_spacing=0.05,
+                label_spacing=0.1,
+                handle_height=1.3,
+                column_spacing=0.30,
+            )
+        )
+
+    return panel
+
+
+def _draw_line_separating_header_and_figure(ax: mpl.axes.Axes) -> None:
+    """ Draw a line separating the header and the figure.
+
+    Strictly speaking, it would be better to constrain this w.r.t. the titles in
+    the figures below. However, this isn't so trivial since it doesn't extend across
+    the entire figure. Since both have downsides, we'll just use this approach.
+
+    Args:
+        ax: Axis to draw on.
+    Returns:
+        None. The line is drawn on the given axis.
+    """
+    ax.plot(
+        [-0.05, 1.0], [0.225, 0.225],
+        color='black', lw=0.6,
+        transform=ax.transAxes, clip_on=False,
+    )
+    return None
+
+
 def _plot_pp_grooming_comparison_with_models_2022(
     hists: Mapping[str, unfolding_analysis.SingleResult],
     grooming_methods: Sequence[str],
@@ -2624,16 +2726,8 @@ def _plot_pp_PbPb_comparison_only_ratios_for_letter(
     for i in range(len(grooming_methods)):
         axes[-1, i].xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
     # Add a line separating the header from the figure
-    # Strictly speaking, it would be better to constrain this w.r.t. the titles in
-    # the figures below. However, this isn't so trivial since it doesn't extend across
-    # the entire figure. Since both have downsides, we'll just use this approach.
-    ax_header.plot(
-        [-0.05, 1.0], [0.225, 0.225],
-        color='black', lw=0.6,
-        transform=ax_header.transAxes, clip_on=False,
-    )
+    _draw_line_separating_header_and_figure(ax=ax_header)
     # And remove the axis header
-    # NOTE: This needs to be before the adjustment. Otherwise, it will move the y-axis label
     ax_header.set_axis_off()
 
     filename = f"{plot_config.name}"
@@ -2687,81 +2781,17 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
 
     # Define panels
     panels = []
-    # Header ax, which only contains labels
-    if two_column_header:
-        text_left = fr"{_event_activity_short_label_map['central']}, {_event_activity_short_label_map['semi_central']} " + r"$\text{Pb--Pb},\:\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV"
-        text_left += "\n" + plot_style.label_to_display_string["jets"]["general"]
-        text_left += ", " + plot_style.label_to_display_string["jets"][jet_R_str]
-        text_left += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
-        text_right = ""
-        panels.append(
-            pb.Panel(
-                axes=[
-                    # NOTE: This is solely provided to avoid shifting the y-axis label.
-                    #       This happens because the default axis range label is larger than
-                    #       our usual range. In practice, this will be hidden and not used
-                    #       for anything.
-                    pb.AxisConfig(
-                        "y",
-                        range=(0, 1),
-                    ),
-                ],
-                text=[
-                    # NOTE: 0.04 shifted past the edge in each direction was the default, but I took a
-                    #       bit of a hit to enlarge the font size.
-                    pb.TextConfig(x=-0.11, y=1.0, text=text_left, font_size=text_font_size),
-                    #pb.TextConfig(x=1.04, y=1.0, text=text_right, font_size=text_font_size),
-                ],
-                # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
-                legend=pb.LegendConfig(
-                    location="upper right",
-                    font_size=round(text_font_size * 0.8),
-                    anchor=(1.04, 1.0),
-                    marker_label_spacing=0.05,
-                    label_spacing=0.1,
-                    handle_height=1.3,
-                    column_spacing=0.30,
-                )
-            )
+    # Header panel
+    panels.append(
+        _define_panel_config_for_letter_combined_plots(
+            two_column_header=two_column_header,
+            alice_status=alice_status,
+            jet_pt_bin=jet_pt_bin,
+            jet_R_str=jet_R_str,
+            n_model_calculations=len(models_calculation),
+            text_font_size=text_font_size,
         )
-    else:
-        text_left = fr"$\textbf{{{plot_style.label_to_display_string['ALICE'][alice_status]}}}$"
-        # NOTE: The raisebox height is just tuned by hand...
-        text_left += "\n" + r"\raisebox{-0.5ex}{" + fr"{_event_activity_short_label_map['central']}, {_event_activity_short_label_map['semi_central']} " + r"$\text{Pb--Pb},\:\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV" + "}"
-        text_right = plot_style.label_to_display_string["jets"]["general"]
-        text_right += ", " + plot_style.label_to_display_string["jets"][jet_R_str]
-        text_right += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
-        panels.append(
-            pb.Panel(
-                axes=[
-                    # NOTE: This is solely provided to avoid shifting the y-axis label.
-                    #       This happens because the default axis range label is larger than
-                    #       our usual range. In practice, this will be hidden and not used
-                    #       for anything.
-                    pb.AxisConfig(
-                        "y",
-                        range=(0, 1),
-                    ),
-                ],
-                text=[
-                    # NOTE: 0.04 shifted past the edge in each direction was the default, but I took a
-                    #       bit of a hit to enlarge the font size.
-                    pb.TextConfig(x=-0.11, y=1.0, text=text_left, font_size=text_font_size),
-                    pb.TextConfig(x=1.04, y=1.0, text=text_right, font_size=text_font_size),
-                ],
-                # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
-                legend=pb.LegendConfig(
-                    location="center",
-                    font_size=round(text_font_size * 0.8),
-                    anchor=(0.5, 0.35),
-                    ncol=len(models_calculation),
-                    marker_label_spacing=0.05,
-                    label_spacing=0.1,
-                    handle_height=1.3,
-                    column_spacing=0.30,
-                )
-            )
-        )
+    )
 
     # Now, the data panels
     for grooming_method in grooming_methods:
@@ -2816,7 +2846,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
                 axes=[
                     copy.deepcopy(standard_y_axis),
                     # NOTE: This needs to match with how we edit the y_axis range below
-                    pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
+                    pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size, use_major_axis_multiple_locator_with_base=True),
                 ],
                 text=[
                     # The collision system
@@ -3466,6 +3496,9 @@ def _plot_pp_PbPb_only_spectra_ratios_for_letter(
     # A few additional tweaks.
     for i in range(len(grooming_methods)):
         axes[-1, i].xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    # Add a line separating the header from the figure
+    _draw_line_separating_header_and_figure(ax=ax_header)
+    # And remove the axis header
     ax_header.set_axis_off()
 
     filename = f"{plot_config.name}"
@@ -3487,6 +3520,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
     logy: bool = False,
     fit_parameters: Mapping[str, Mapping[str, float | Mapping[str, float]]] = {},
     fit_QA_plot: bool = False,
+    two_column_header: bool = True,
 ) -> None:
     """Compare pp and PbPb spectra ratios.
 
@@ -3547,34 +3581,18 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
     # Define panels
     panels = []
     # Header ax, which only contains labels
-    text_left = fr"$\textbf{{{plot_style.label_to_display_string['ALICE'][alice_status]}}}$"
-    # NOTE: The raisebox height is just tuned by hand...
-    text_left += "\n" + r"\raisebox{-0.5ex}{" fr"{_event_activity_short_label_map['central']}, {_event_activity_short_label_map['semi_central']} " + r"$\text{Pb--Pb},\:\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV" + "}"
-    text_right = plot_style.label_to_display_string["jets"]["general"]
-    text_right += ", " + plot_style.label_to_display_string["jets"][jet_R_str]
-    text_right += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
+    # Header panel
     panels.append(
-        pb.Panel(
-            axes=[],
-            text=[
-                # NOTE: 0.04 shifted past the edge in each direction was the default, but I took a
-                #       bit of a hit to enlarge the font size.
-                pb.TextConfig(x=-0.125, y=1.0, text=text_left, font_size=text_font_size),
-                pb.TextConfig(x=1.04, y=1.0, text=text_right, font_size=text_font_size),
-            ],
-            # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
-            legend=pb.LegendConfig(
-                location="center",
-                font_size=round(text_font_size * 0.8),
-                anchor=(0.5, 0.35),
-                ncol=len(models_calculation),
-                marker_label_spacing=0.05,
-                label_spacing=0.1,
-                handle_height=1.3,
-                column_spacing=0.30,
-            )
+        _define_panel_config_for_letter_combined_plots(
+            two_column_header=two_column_header,
+            alice_status=alice_status,
+            jet_pt_bin=jet_pt_bin,
+            jet_R_str=jet_R_str,
+            n_model_calculations=len(models_calculation),
+            text_font_size=text_font_size,
         )
     )
+
     for grooming_method in grooming_methods:
         # Setup per column
         first_grooming_method = (grooming_method == grooming_methods[0])
