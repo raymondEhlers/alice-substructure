@@ -2733,7 +2733,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
                 ],
                 text=[
                     # The collision system
-                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
+                    pb.TextConfig(x=1.0575, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
                 ] if last_grooming_method else [],
                 title=pb.TitleConfig(grooming_styles[grooming_method].label, size=text_font_size),
             )
@@ -2749,7 +2749,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
                 ],
                 text=[
                     # The collision system
-                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
+                    pb.TextConfig(x=1.0575, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
                 ] if last_grooming_method else [],
                 # This serves to plot the ALICE data
                 legend=pb.LegendConfig(
@@ -3163,7 +3163,7 @@ def plot_pp_PbPb_only_spectra_ratios(
     fit_parameters: Mapping[str, Mapping[str, float | Mapping[str, float]]] = {},
     fit_QA_plot: bool = False,
 ) -> None:
-    """Compare pp and PbPb results with ratio."""
+    """Compare pp and PbPb spectra ratios."""
     # Validation
     for ev, kt_range in event_activity_to_kt_range.items():
         if isinstance(kt_range, helpers.KtRange):
@@ -3417,7 +3417,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
     fit_parameters: Mapping[str, Mapping[str, float | Mapping[str, float]]] = {},
     fit_QA_plot: bool = False,
 ) -> None:
-    """Compare pp and PbPb results with ratio.
+    """Compare pp and PbPb spectra ratios.
 
     Args:
         hists: Dict of {collision_system: {grooming_method: SingleResult}}
@@ -3442,9 +3442,9 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
     jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
     grooming_styles = plot_style.define_paper_grooming_styles()
     # Setup output name
-    name = "unfolded_kt_pp_PbPb"
+    name = "unfolded_kt_pp_PbPb_spectra"
     if fit_parameters:
-        name += "_spectra_fit"
+        name += "_fit"
     if additional_label:
         name += f"_{additional_label}"
     name += f"_model_data_ratios_{jet_R_str}"
@@ -3459,7 +3459,8 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
     _ratio_range = {
         "pp": (0.7, 1.3),
         "semi_central": (0.6, 1.35),
-        "central": (0.49, 1.39),
+        #"central": (0.49, 1.39),
+        "central": (0.51, 1.37),
     }
     #_ratio_range = (0.3, 1.7)
     #if "central" in hists and models_ratio:
@@ -3510,23 +3511,25 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
         last_grooming_method = (grooming_method == grooming_methods[-1])
         y_label = ""
         if (grooming_method == grooming_methods[0]):
-            y_label = r"$\frac{\text{Model}}{\text{Data}}$" if not fit_parameters else r"$\frac{\text{Spectra}}{\text{Parametrized data}}$"
+            #y_label = r"$\frac{\text{Model}}{\text{Data}}$" if not fit_parameters else r"$\frac{\text{Spectra}}{\text{Parametrized data}}$"
             # Simpler option, which I would just put in the middle.
-            #y_label = r"Model/Data" if not fit_parameters else r"Spectra/Parametrized data"
+            # NOTE: It's intentionally written as a flat fraction (rather than via latex) to save space.
+            y_label = r"Model/Data" if not fit_parameters else r"Spectra/Parametrized data"
         event_activity_order = iter(list(hists))
 
         standard_y_axis = pb.AxisConfig(
             "y",
             range=_ratio_range["pp"],
+            log=logy,
             # Make the label a bit bigger since it's stacked on top
             # When using an actual latex fraction
-            label=y_label,
-            font_size=text_font_size * 1.05,
+            #label=y_label,
+            #font_size=text_font_size * 1.05,
             # If using the simple option, probably better to make it bigger.
             # NOTE: Setting the tick font size is needed so that the tick labels don't grow too much.
-            #font_size=text_font_size * 1.2,
-            #tick_font_size=text_font_size * 1.05,
-            log=logy,
+            font_size=text_font_size * 1.2,
+            # The 1.05 here matches the increase in size that we usually use otherwise for the tick size.
+            tick_font_size=text_font_size * 1.05,
         )
         # pp - top panel
         panel_event_activity = next(event_activity_order)
@@ -3537,7 +3540,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
                 ],
                 text=[
                     # The collision system
-                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
+                    pb.TextConfig(x=1.0575, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
                 ] if last_grooming_method else [],
                 title=pb.TitleConfig(grooming_styles[grooming_method].label, size=text_font_size),
             )
@@ -3551,13 +3554,14 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
                 ],
                 text=[
                     # The collision system
-                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
+                    pb.TextConfig(x=1.0575, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
                 ] if last_grooming_method else [],
             )
         )
         # Update the ratio range for semi-central
         panels[-1].axes[0].range = _ratio_range[panel_event_activity]
-        #panels[-1].axes[0].label = y_label
+        # Add in the shared y-label here
+        panels[-1].axes[0].label = y_label
         # Bottom panel - central
         panel_event_activity = next(event_activity_order)
         panels.append(
@@ -3568,7 +3572,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
                 ],
                 text=[
                     # The collision system
-                    pb.TextConfig(x=1.05, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
+                    pb.TextConfig(x=1.0575, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
                 ] if last_grooming_method else [],
                 # This serves to plot the ALICE data
                 legend=pb.LegendConfig(
