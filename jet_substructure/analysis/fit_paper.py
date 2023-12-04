@@ -240,17 +240,6 @@ class FitFunction:
             metadata=self.metadata
         )
 
-# TODO: Implement this...
-
-#@attrs.define
-#class SpectrumFitFunction(FitFunction):
-#    using_power_law_only: bool
-#
-#    def fit_to_histogram(self, h: binned_data.BinnedData) -> FitResult:
-#        fit_result = super().fit_to_histogram(h=h)
-#        fit_result.metadata["using_power_law_only"] = self.using_power_law_only
-#        return fit_result
-
 
 def create_fit_function(
     x0: float,
