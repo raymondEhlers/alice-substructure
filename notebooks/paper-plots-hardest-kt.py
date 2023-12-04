@@ -59,7 +59,7 @@ output_dir.mkdir(parents=True, exist_ok=True)
 # # Load data
 
 # %%
-# Quick separate setup
+# Quick separate setup if I want interactive plots
 
 # #%matplotlib inline
 # #%config InlineBackend.figure_formats = ["png", "pdf"]
@@ -919,6 +919,8 @@ pythia_predictions_R04 = model_calculations.ModelCalculation(
 jetscape_R02 = model_calculations.Jetscape(
     base_dir=Path("output/comparison/models/jetscape/2023-10-yasuki"),
     needs_normalization=False,
+    # NOTE: This range is techincally incorrect, but the jet fiducial acceptance corrects for it,
+    #       so in the end, it doesn't matter.
     hadron_rapidity_range=2.0,
     metadata={"jet_R": 0.2},
 )
@@ -933,6 +935,8 @@ jetscape_predictions_R02 = jetscape_R02.load_predictions()
 jetscape_R04 = model_calculations.Jetscape(
     base_dir=Path("output/comparison/models/jetscape/2023-10-yasuki"),
     needs_normalization=False,
+    # NOTE: This range is techincally incorrect, but the jet fiducial acceptance corrects for it,
+    #       so in the end, it doesn't matter.
     hadron_rapidity_range=2.0,
     metadata={"jet_R": 0.4, "selected_collision_systems": ["pp"]},
 )
@@ -1066,6 +1070,19 @@ hybrid_model_with_wake_without_moliere_predictions_R02.semi_central_ratio["soft_
 alice_status = "final"
 plot_output_dir_tag = "2023-paper-plots"
 grooming_methods_for_letter = ["dynamical_kt", "soft_drop_z_cut_02"]
+
+def PbPb_kt_measured_range_by_grooming_method(event_activity: str) -> None:
+    return {
+        "dynamical_core": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
+        "dynamical_kt": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
+        "dynamical_time": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
+        "soft_drop_z_cut_02": helpers.KtRange(0.25, 6),
+        "dynamical_core_z_cut_02": helpers.KtRange(0.25, 6),
+        "dynamical_kt_z_cut_02": helpers.KtRange(0.25, 6),
+        "dynamical_time_z_cut_02": helpers.KtRange(0.25, 6),
+        "soft_drop_z_cut_04": helpers.KtRange(0.25, 6),
+    }
+
 
 # %% [markdown]
 # #### Temp testing code
@@ -1628,25 +1645,10 @@ for _collision_system, _hists in [
         alice_status=alice_status,
     )
 
-
 # %% [markdown]
 # ## PbPb-pp comparison by each grooming method
 #
 # ### R = 0.2, semi-central + central
-
-# %%
-def PbPb_kt_measured_range_by_grooming_method(event_activity: str) -> None:
-    return {
-        "dynamical_core": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
-        "dynamical_kt": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
-        "dynamical_time": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
-        "soft_drop_z_cut_02": helpers.KtRange(0.25, 6),
-        "dynamical_core_z_cut_02": helpers.KtRange(0.25, 6),
-        "dynamical_kt_z_cut_02": helpers.KtRange(0.25, 6),
-        "dynamical_time_z_cut_02": helpers.KtRange(0.25, 6),
-        "soft_drop_z_cut_04": helpers.KtRange(0.25, 6),
-    }
-
 
 # %%
 jet_R = 0.2
@@ -1717,6 +1719,7 @@ plot_paper.plot_spectra_only_for_letter(
         "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
         "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
     },
+    # 6.25 would be preferred, but I need space to avoid the 6 and the next 0 over from overlapping
     kt_display_range=(0.0, 6.35),
     jet_R_str=jet_R_str,
     alice_status=alice_status,
@@ -1810,7 +1813,8 @@ plot_paper.plot_pp_PbPb_only_spectra_ratios_for_letter(
         "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
         "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
     },
-    kt_display_range=(0.0, 6.25),
+    # 6.25 would be preferred, but I need space to avoid the 6 and the next 0 over from overlapping
+    kt_display_range=(0.0, 6.35),
     jet_R_str=jet_R_str,
     alice_status=alice_status,
     additional_label="_".join(grooming_methods_for_letter),
@@ -1948,6 +1952,9 @@ models_calculation = {
 #)
 
 for grooming_method in grooming_methods:
+    # TEMP
+    continue
+    # ENDTEMP
     plot_paper.plot_pp_PbPb_comparison_with_multiple_model_ratios(
         hists={
             "pp": pp_R02_unfolded_with_systematics,
@@ -1999,7 +2006,8 @@ plot_paper.plot_pp_PbPb_comparison_only_ratios_for_letter(
         "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
         "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
     },
-    kt_display_range=(0.0, 6.25),
+    # 6.25 would be preferred, but I need space to avoid the 6 and the next 0 over from overlapping
+    kt_display_range=(0.0, 6.35),
     jet_R_str=jet_R_str,
     alice_status=alice_status,
     additional_label="_".join(grooming_methods_for_letter),
@@ -2047,6 +2055,7 @@ import numpy as np
 fig, ax = plt.subplots(figsize=(8, 6))
 
 # %%
+# Trying to erase lines that are underneath open markers, since mpl can't do it itself...
 x = np.linspace(0, 10, 20)
 x2 = x + 0.01
 y = np.sin(x)
