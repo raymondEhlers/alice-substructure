@@ -2573,10 +2573,9 @@ def _plot_pp_PbPb_comparison_only_ratios_for_letter(
     # According to gpt, all the axes will return the same gridspec.
     gs = axes[0, 0].get_gridspec()
     # Remove the underlying axes
-    for ax in axes[0, :]:
-        ax.remove()
+    for _ax in axes[0, :]:
+        _ax.remove()
     ax_header = fig.add_subplot(gs[0, :])
-
     # Loop over grooming methods to plot
     for i_grooming_method, grooming_method in enumerate(grooming_methods):
         _plot_pp_PbPb_only_ratio_for_single_grooming_method(
@@ -2621,8 +2620,20 @@ def _plot_pp_PbPb_comparison_only_ratios_for_letter(
     # Labeling and presentation
     plot_config.apply(fig=fig, axes=[ax_header, *axes[1:, :].T.flatten()])
     # A few additional tweaks.
+    # Increase the number of major axis ticks + labels
     for i in range(len(grooming_methods)):
         axes[-1, i].xaxis.set_major_locator(mpl.ticker.MultipleLocator(base=1.0))
+    # Add a line separating the header from the figure
+    # Strictly speaking, it would be better to constrain this w.r.t. the titles in
+    # the figures below. However, this isn't so trivial since it doesn't extend across
+    # the entire figure. Since both have downsides, we'll just use this approach.
+    ax_header.plot(
+        [-0.05, 1.0], [0.225, 0.225],
+        color='black', lw=0.75,
+        transform=ax_header.transAxes, clip_on=False,
+    )
+    # And remove the axis header
+    # NOTE: This needs to be before the adjustment. Otherwise, it will move the y-axis label
     ax_header.set_axis_off()
 
     filename = f"{plot_config.name}"
@@ -2645,7 +2656,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
     additional_label: str = "",
     logy: bool = False,
 ) -> None:
-    """Compare pp and PbPb results with ratios only for Letter."""
+    """PbPb/ppp ratios only (+ models) for Letter."""
     # Validation
     event_activity_to_kt_range = validate_event_activity_to_kt_range(event_activity_to_kt_range, grooming_methods)
 
@@ -2684,7 +2695,16 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
     text_right += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     panels.append(
         pb.Panel(
-            axes=[],
+            axes=[
+                # NOTE: This is solely provided to avoid shifting the y-axis label.
+                #       This happens because the default axis range label is larger than
+                #       our usual range. In practice, this will be hidden and not used
+                #       for anything.
+                pb.AxisConfig(
+                    "y",
+                    range=(0, 1),
+                ),
+            ],
             text=[
                 # NOTE: 0.04 shifted past the edge in each direction was the default, but I took a
                 #       bit of a hit to enlarge the font size.
