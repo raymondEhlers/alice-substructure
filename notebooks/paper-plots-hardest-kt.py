@@ -1771,7 +1771,6 @@ fit_parameters = {
             "x0": 1.25,
         },
         "dynamical_kt": {
-            #"tanh_transition_scale": 0.25,
             "tanh_transition_scale": 0.2,
             "x0": 1.25,
         },

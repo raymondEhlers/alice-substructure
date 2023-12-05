@@ -87,7 +87,15 @@ def _define_panel_config_for_letter_combined_plots(
     jet_R_str: str,
     n_model_calculations: int,
     text_font_size: int,
+    left_edge_padding: float,
 ) -> pb.Panel:
+    # We're basically shifting this around based on what we already know works while accounting
+    # for the left edge padding. This could be simplified, but there's not point at the moment,
+    # as this works well enough
+    left_edge_x_loc = -0.11 + (0.105 - left_edge_padding)
+
+    # Two column header:
+    # <text> <legend>
     if two_column_header:
         text_left = fr"{_event_activity_short_label_map['central']}, {_event_activity_short_label_map['semi_central']} " + r"$\text{Pb--Pb},\:\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV"
         text_left += "\n" + plot_style.label_to_display_string["jets"]["general"]
@@ -108,7 +116,7 @@ def _define_panel_config_for_letter_combined_plots(
             text=[
                 # NOTE: 0.04 shifted past the edge in each direction was the default, but I took a
                 #       bit of a hit to enlarge the font size.
-                pb.TextConfig(x=-0.11, y=1.0, text=text_left, font_size=text_font_size),
+                pb.TextConfig(x=left_edge_x_loc, y=1.0, text=text_left, font_size=text_font_size),
                 #pb.TextConfig(x=1.04, y=1.0, text=text_right, font_size=text_font_size),
             ],
             # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
@@ -123,6 +131,9 @@ def _define_panel_config_for_letter_combined_plots(
             )
         )
     else:
+        # One column header:
+        # < ---- text ---- >
+        # < --- legend --- >
         text_left = fr"$\textbf{{{plot_style.label_to_display_string['ALICE'][alice_status]}}}$"
         # NOTE: The raisebox height is just tuned by hand...
         text_left += "\n" + r"\raisebox{-0.5ex}{" + fr"{_event_activity_short_label_map['central']}, {_event_activity_short_label_map['semi_central']} " + r"$\text{Pb--Pb},\:\text{pp}\;\sqrt{s_{\text{NN}}} = 5.02$ TeV" + "}"
@@ -143,7 +154,7 @@ def _define_panel_config_for_letter_combined_plots(
             text=[
                 # NOTE: 0.04 shifted past the edge in each direction was the default, but I took a
                 #       bit of a hit to enlarge the font size.
-                pb.TextConfig(x=-0.11, y=1.0, text=text_left, font_size=text_font_size),
+                pb.TextConfig(x=left_edge_x_loc, y=1.0, text=text_left, font_size=text_font_size),
                 pb.TextConfig(x=1.04, y=1.0, text=text_right, font_size=text_font_size),
             ],
             # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
@@ -2754,6 +2765,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
     """PbPb/ppp ratios only (+ models) for Letter."""
     # Validation
     event_activity_to_kt_range = validate_event_activity_to_kt_range(event_activity_to_kt_range, grooming_methods)
+    left_edge_padding = 0.095
 
     # Setup
     jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
@@ -2790,6 +2802,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
             jet_R_str=jet_R_str,
             n_model_calculations=len(models_calculation),
             text_font_size=text_font_size,
+            left_edge_padding=left_edge_padding,
         )
     )
 
@@ -2800,7 +2813,8 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
         last_grooming_method = (grooming_method == grooming_methods[-1])
         y_label = ""
         if (grooming_method == grooming_methods[0]):
-            y_label = r"$\frac{\text{Pb--Pb}}{\text{pp}}$"
+            #y_label = r"$\frac{\text{Pb--Pb}}{\text{pp}}$"
+            y_label = r"$\text{Pb--Pb}/\text{pp}$"
         event_activity_order = iter(list(hists))
         # Skip pp
         _ = next(event_activity_order)
@@ -2877,7 +2891,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
         plot_config=pb.PlotConfig(
             name=name,
             panels=panels,
-            figure=pb.Figure(edge_padding={"left": 0.105, "bottom": 0.085, "top": 0.995, "right": 0.96}),
+            figure=pb.Figure(edge_padding={"left": left_edge_padding, "bottom": 0.085, "top": 0.995, "right": 0.96}),
         ),
         output_dir=output_dir,
     )
@@ -3531,6 +3545,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
     for ev, kt_range in event_activity_to_kt_range.items():
         if isinstance(kt_range, helpers.KtRange):
             event_activity_to_kt_range[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
+
     # NOTE: Need the deep copy because we modify the dict in place
     fit_parameters = copy.deepcopy(fit_parameters)
     for ev, parameters in fit_parameters.items():
@@ -3546,6 +3561,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
     logger.info(f"Plotting all ratios for {grooming_methods}")
     jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
     grooming_styles = plot_style.define_paper_grooming_styles()
+    left_edge_padding = 0.115
     # Setup output name
     name = "unfolded_kt_pp_PbPb_spectra"
     if fit_parameters:
@@ -3590,6 +3606,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
             jet_R_str=jet_R_str,
             n_model_calculations=len(models_calculation),
             text_font_size=text_font_size,
+            left_edge_padding=left_edge_padding,
         )
     )
 
@@ -3690,7 +3707,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
             name=name,
             panels=panels,
             figure=pb.Figure(
-                edge_padding={"left": 0.115, "bottom": 0.085, "top": 0.995, "right": 0.96}
+                edge_padding={"left": left_edge_padding, "bottom": 0.085, "top": 0.995, "right": 0.96}
             ),
         ),
         output_dir=output_dir,
