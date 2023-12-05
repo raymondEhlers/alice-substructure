@@ -43,6 +43,7 @@ _event_activity_full_label_map = {
     "central": r"0-10\% $\text{Pb--Pb}$",
     "semi_central": r"30-50\% $\text{Pb--Pb}$",
 }
+FRACTION_OF_X_FOR_SYS_ERROR_BOX = 0.3
 
 
 def retrieve_model_styles(event_activity: str, model_name: str) -> dict[str, Any]:
@@ -1841,13 +1842,16 @@ def _plot_pp_PbPb_ratio_on_axis(
     y_systematic = ratio.metadata["y_systematic"]["quadrature"]
     kwargs_plot_error_boxes = grooming_styles[grooming_method].kwargs_for_plot_error_boxes()
     #kwargs_plot_error_boxes["color"] = "grey" if plot_ratio_black_and_white else p[0].get_color()
-    kwargs_plot_error_boxes["color"] = "grey" if data_point_color is not None else data_point_color
+    kwargs_plot_error_boxes["color"] = "black" if data_point_color is not None else data_point_color
     kwargs_plot_error_boxes["zorder"] = 2
+    # NOTE: This is a bit darker than usual because one of the uncertainties (3-4 central SD 0.2)
+    #       seems to be quite difficult to see. Slightly darker seems to help.
+    kwargs_plot_error_boxes["alpha"] = 0.4
     pachyderm.plot.error_boxes(
         ax=ax_ratio,
         x_data=ratio.axes[0].bin_centers,
         y_data=ratio.values,
-        x_errors=ratio.axes[0].bin_widths / 2,
+        x_errors=ratio.axes[0].bin_widths / 2 * FRACTION_OF_X_FOR_SYS_ERROR_BOX,
         y_errors=np.array([y_systematic.low, y_systematic.high]),
         **kwargs_plot_error_boxes,
     )
@@ -3013,8 +3017,7 @@ def _plot_pp_PbPb_only_spectra_ratios_on_axes(
         # Next, draw the data and uncertainties at one as black and grey boxes
         # Ratio + statistical error bars at one
         hist_values = h.values / reference_values if fit_parameters else np.ones_like(h.values)
-        # This is a fairly reasonable alternative value if I decide I prefer it.
-        #fraction_of_x_error = 0.6
+        # 0.6 is a fairly reasonable alternative value if I decide I prefer it.
         fraction_of_x_error = 1.0
         ax.errorbar(
             h.axes[0].bin_centers,
@@ -3029,12 +3032,11 @@ def _plot_pp_PbPb_only_spectra_ratios_on_axes(
             zorder=6,
             label="ALICE data",
         )
-        fraction_of_x_error = 0.3
         pachyderm.plot.error_boxes(
             ax=ax,
             x_data=h.axes[0].bin_centers,
             y_data=hist_values,
-            x_errors=h.axes[0].bin_widths / 2 * fraction_of_x_error,
+            x_errors=h.axes[0].bin_widths / 2 * FRACTION_OF_X_FOR_SYS_ERROR_BOX,
             y_errors=np.array(
                 [
                     h.metadata["y_systematic"]["quadrature"].low / h.values * hist_values,
