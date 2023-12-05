@@ -93,7 +93,7 @@ def _define_panel_config_for_letter_combined_plots(
     # We're basically shifting this around based on what we already know works while accounting
     # for the left edge padding. This could be simplified, but there's not point at the moment,
     # as this works well enough
-    left_edge_x_loc = -0.11 + (0.105 - left_edge_padding)
+    left_edge_x_loc = -0.12 + (0.105 - left_edge_padding)
 
     # Two column header:
     # <text> <legend>
@@ -123,9 +123,9 @@ def _define_panel_config_for_letter_combined_plots(
             # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
             legend=pb.LegendConfig(
                 location="upper right",
-                font_size=round(text_font_size * 0.8),
-                anchor=(1.03, 0.99),
-                marker_label_spacing=0.05,
+                font_size=round(text_font_size * 0.925),
+                anchor=(1.04, 0.99),
+                marker_label_spacing=0.1,
                 label_spacing=0.1,
                 handle_height=1.3,
                 column_spacing=0.30,
@@ -187,7 +187,7 @@ def _draw_line_separating_header_and_figure(ax: mpl.axes.Axes) -> None:
         None. The line is drawn on the given axis.
     """
     ax.plot(
-        [-0.05, 1.0], [0.225, 0.225],
+        [-0.05, 1.0], [0.235, 0.235],
         color='black', lw=0.6,
         transform=ax.transAxes, clip_on=False,
     )
@@ -2590,7 +2590,6 @@ def plot_pp_PbPb_comparison_with_multiple_model_ratios(
         )
 
 
-
 def _plot_pp_PbPb_only_ratio_for_single_grooming_method(
     axes_ratio: mpl.axes.Axes | list[mpl.axes.Axes],
     hists: Mapping[str, unfolding_analysis.SingleResult],
@@ -2599,6 +2598,7 @@ def _plot_pp_PbPb_only_ratio_for_single_grooming_method(
     all_methods_on_one_figure: bool,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
     models_calculation: Mapping[str, Mapping[str, model_calculations.ModelCalculation]] | None = None,
+    data_label: str | None = "ALICE data",
 ) -> None:
     # Validation
     if not isinstance(axes_ratio, collections.abc.Iterable):
@@ -2647,7 +2647,7 @@ def _plot_pp_PbPb_only_ratio_for_single_grooming_method(
             all_methods_on_one_figure=all_methods_on_one_figure,
             models_calculation=models_calculation,
             data_point_color=_event_activity_to_color[collision_system] if plot_ratio_black_and_white else None,
-            data_label="ALICE data",
+            data_label=data_label,
         )
 
         axis_ratio_counter += 1
@@ -2683,7 +2683,7 @@ def _plot_pp_PbPb_comparison_only_ratios_for_letter(
         1 + n_rows,
         len(grooming_methods),
         figsize=(10, 10),
-        gridspec_kw={"height_ratios": [2.5] + [6] * n_rows},
+        gridspec_kw={"height_ratios": [2.6] + [6] * n_rows},
         sharex="col",
         sharey="row",
     )
@@ -2709,6 +2709,7 @@ def _plot_pp_PbPb_comparison_only_ratios_for_letter(
                 for k, v in event_activity_to_kt_range.items()
             },
             models_calculation=models_calculation,
+            data_label="Data",
         )
 
     # Legend
@@ -2806,7 +2807,10 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
             jet_R_str=jet_R_str,
             n_model_calculations=len(models_calculation),
             text_font_size=text_font_size,
-            left_edge_padding=left_edge_padding,
+            # NOTE: Needs a slight reduction to move away from the left edge.
+            #       This basically indicates that the parametrization isn't quite right, but this
+            #       hack is good enough for this purpose.
+            left_edge_padding=left_edge_padding - 0.005,
         )
     )
 
@@ -2855,6 +2859,16 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
                 ],
                 text=panel_text_entries,
                 title=pb.TitleConfig(grooming_styles[grooming_method].label, size=text_font_size),
+                # This serves to plot the ALICE data
+                legend=pb.LegendConfig(
+                    location="upper left",
+                    font_size=round(text_font_size * 0.8),
+                    anchor=(0.025, 0.855),
+                    marker_label_spacing=0.05,
+                    label_spacing=0.1,
+                    handle_height=1.3,
+                    column_spacing=0.30,
+                ) if first_grooming_method else None,
             )
         )
         # Central - lower panel
@@ -2870,16 +2884,6 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
                     # The collision system
                     pb.TextConfig(x=1.0575, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
                 ] if last_grooming_method else [],
-                # This serves to plot the ALICE data
-                legend=pb.LegendConfig(
-                    location="lower left",
-                    font_size=round(text_font_size * 0.8),
-                    anchor=(0.025, 0.025),
-                    marker_label_spacing=0.05,
-                    label_spacing=0.1,
-                    handle_height=1.3,
-                    column_spacing=0.30,
-                ) if first_grooming_method else None
             )
         )
         # Update the ratio range for semi-central
@@ -3452,7 +3456,7 @@ def _plot_pp_PbPb_only_spectra_ratios_for_letter(
         1 + n_rows,
         len(grooming_methods),
         figsize=(10, 10),
-        gridspec_kw={"height_ratios": [2.5] + [4] * n_rows},
+        gridspec_kw={"height_ratios": [2.6] + [4] * n_rows},
         sharex="col",
         sharey="row",
     )
@@ -3640,15 +3644,28 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
         )
         # pp - top panel
         panel_event_activity = next(event_activity_order)
+        panel_text_entries = []
+        if first_grooming_method and two_column_header:
+            panel_text_entries = [
+                # ALICE label
+                # Header ax, which only contains labels
+                pb.TextConfig(
+                    x=0.05, y=0.95,
+                    text=fr"$\textbf{{{plot_style.label_to_display_string['ALICE'][alice_status]}}}$",
+                    font_size=text_font_size,
+                ),
+            ]
+        elif last_grooming_method:
+            panel_text_entries = [
+                # The collision system
+                pb.TextConfig(x=1.0575, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
+            ]
         panels.append(
             pb.Panel(
                 axes=[
                     copy.deepcopy(standard_y_axis)
                 ],
-                text=[
-                    # The collision system
-                    pb.TextConfig(x=1.0575, y=0.5, text=_event_activity_full_label_map[panel_event_activity], font_size=text_font_size, text_kwargs=rotation_kwargs),
-                ] if last_grooming_method else [],
+                text=panel_text_entries,
                 title=pb.TitleConfig(grooming_styles[grooming_method].label, size=text_font_size),
             )
         )
@@ -3690,7 +3707,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
                     label_spacing=0.1,
                     handle_height=1.3,
                     column_spacing=0.30,
-                ) if first_grooming_method else None
+                ) if first_grooming_method else None,
             )
         )
         # Update the ratio range for central
