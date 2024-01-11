@@ -1057,12 +1057,12 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
 
         ## Red, green from generation where the first two values are fixed
         #"#ca5c61",
-        ## TEMP: Teal
+        ## Teal:
         ##"#59c28c",
-        ## ENDTEMP
-        ## TEMP: Blue
+        ##
+        ## Blue:
         #"#b1c2de",
-        ## ENDTEMP
+        ##
         #"#7ca153",
 
         # Option #2
@@ -2318,6 +2318,15 @@ def load_unfolded_outputs(
 ) -> tuple[
     dict[str, dict[str, unfolding_analysis.UnfoldingOutput]], dict[str, dict[str, unfolding_analysis.UnfoldingOutput]], dict[str, dict[str, unfolding_analysis.UnfoldingOutput]]
 ]:
+    """Load the unfolding results for the provided configuration.
+
+    This is a giant steering function. It's flexible, but complicated as a consequence.
+    See the notebook(s) for how to call it.
+
+    Returns:
+        (unfolding_closure_outputs, unfolding_closure_pure_matches_outputs, unfolding_systematics_outputs) where each output includes
+        a dict of grooming methods, and each grooming method includes a dict of unfolding outputs.
+    """
     # Validation
     # Copy for every grooming method
     if isinstance(smeared_var_range, helpers.RangeSelector):
@@ -2385,13 +2394,18 @@ def _unfolded_outputs_with_systematics(
     non_closure_configuration: unfolding_analysis.NonClosureConfiguration | None = None,
     background_subtraction_configuration: unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
 ) -> tuple[unfolding_analysis.SingleResult, binned_data.BinnedData]:
+    """Steers the actual calculation of the systematic uncertainties.
+
+    """
     logger.info(f"Calculating systematics for {grooming_method}")
+    # First, we need the nominal result.
     unfolded = unfolded_substructure_results(
         unfolding_outputs=unfolding_systematics_outputs[grooming_method],
         true_jet_pt_range=true_jet_pt_range,
         model_dependence_configuration=model_dependence_configuration,
     )
 
+    # Then, we calculate the systematics based on the provided parameters.
     unfolded_with_systematics = calculate_systematics(
         unfolded=unfolded,
         unfolding_outputs=unfolding_systematics_outputs[grooming_method],
@@ -2401,6 +2415,8 @@ def _unfolded_outputs_with_systematics(
         background_subtraction_configuration=background_subtraction_configuration,
     )
 
+    # And we include the true reference (ie. generally pythia true level). We could derive this elsewhere,
+    # but it's extraordinarily useful to have it available, so we just dive in here.
     true_reference = unfolding_systematics_outputs[grooming_method]["default"].true_substructure(
         unfolding_systematics_outputs[grooming_method]["default"].true_hist_name, true_jet_pt_range=true_jet_pt_range
     )
@@ -2417,6 +2433,15 @@ def unfolded_outputs_with_systematics(
     non_closure_configuration: dict[str, unfolding_analysis.NonClosureConfiguration | None] | unfolding_analysis.NonClosureConfiguration | None = None,
     background_subtraction_configuration: dict[str, unfolding_analysis.BackgroundSubtractionConfiguration | None] | unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
 ) -> tuple[dict[str, unfolding_analysis.SingleResult], dict[str, binned_data.BinnedData]]:
+    """Calculates the unfolded results with systematic uncertainties.
+
+    The values returned here are much more convenient to work with, but inherently are more limited since
+    we've reduced the available information.
+
+    Returns:
+        (unfolded_with_systematics, true_reference) where each is a dict of grooming methods,
+            and each grooming method includes an unfolding SingleResult
+    """
     # Validation
     if isinstance(model_dependence_configuration, unfolding_analysis.ModelDependenceConfiguration) or model_dependence_configuration is None:
         model_dependence_configuration = {grooming_method: model_dependence_configuration for grooming_method in grooming_methods}
