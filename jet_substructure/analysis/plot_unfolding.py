@@ -4480,10 +4480,10 @@ def plot_delta_R_unfolding(
     unfolding_output: unfolding_analysis.UnfoldingOutput,
     plot_png: bool = False,
     prior_variation_output: unfolding_analysis.UnfoldingOutput | None = None,
-    unfolding_Rg_display_range: tuple[float, float] | None = None,
+    unfolding_var_display_range: tuple[float, float] | None = None,
 ) -> Path:
-    if unfolding_Rg_display_range is None:
-        unfolding_Rg_display_range = (-0.5, unfolding_output.smeared_var_range.max)
+    if unfolding_var_display_range is None:
+        unfolding_var_display_range = (-0.5, unfolding_output.smeared_var_range.max)
     logger.info(f"Plotting {unfolding_output.identifier}")
 
     true_jet_pt_range = helpers.JetPtRange(60, 80)
@@ -4530,7 +4530,7 @@ def plot_delta_R_unfolding(
                         pb.AxisConfig(
                             "x",
                             label=r"$R_{\text{g}}$",
-                            range=unfolding_Rg_display_range,
+                            range=unfolding_var_display_range,
                         ),
                         pb.AxisConfig(
                             "y",
@@ -4588,7 +4588,7 @@ def plot_delta_R_unfolding(
                         pb.AxisConfig(
                             "x",
                             label=r"$R_{\text{g}}$",
-                            range=unfolding_Rg_display_range
+                            range=unfolding_var_display_range
                         ),
                         pb.AxisConfig(
                             "y",
@@ -4646,7 +4646,7 @@ def plot_delta_R_unfolding(
                         pb.AxisConfig(
                             "x",
                             label=r"$R_{\text{g}}$",
-                            range=unfolding_Rg_display_range
+                            range=unfolding_var_display_range
                         ),
                         pb.AxisConfig(
                             "y",
@@ -4982,7 +4982,7 @@ def plot_delta_R_unfolding(
             name=f"efficiency_{unfolding_output.substructure_variable}_true_pt_60_80",
             panels=pb.Panel(
                 axes=[
-                    pb.AxisConfig("x", label=r"$R_{\text{g}}$", range=unfolding_Rg_display_range),
+                    pb.AxisConfig("x", label=r"$R_{\text{g}}$", range=unfolding_var_display_range),
                     pb.AxisConfig("y", label="Efficiency"),
                 ],
                 legend=pb.LegendConfig(location="lower left"),
@@ -5053,10 +5053,10 @@ def plot_z_unfolding(
     unfolding_output: unfolding_analysis.UnfoldingOutput,
     plot_png: bool = False,
     prior_variation_output: unfolding_analysis.UnfoldingOutput | None = None,
-    unfolding_display_range: tuple[float, float] | None = None,
+    unfolding_var_display_range: tuple[float, float] | None = None,
 ) -> Path:
-    if unfolding_display_range is None:
-        unfolding_display_range = (-0.5, unfolding_output.smeared_var_range.max)
+    if unfolding_var_display_range is None:
+        unfolding_var_display_range = (-0.5, unfolding_output.smeared_var_range.max)
     logger.info(f"Plotting {unfolding_output.identifier}")
 
     true_jet_pt_range = helpers.JetPtRange(60, 80)
@@ -5103,7 +5103,7 @@ def plot_z_unfolding(
                         pb.AxisConfig(
                             "x",
                             label=r"$z_{\text{g}}$",
-                            range=unfolding_display_range,
+                            range=unfolding_var_display_range,
                         ),
                         pb.AxisConfig(
                             "y",
@@ -5161,7 +5161,7 @@ def plot_z_unfolding(
                         pb.AxisConfig(
                             "x",
                             label=r"$z_{\text{g}}$",
-                            range=unfolding_display_range
+                            range=unfolding_var_display_range
                         ),
                         pb.AxisConfig(
                             "y",
@@ -5219,7 +5219,7 @@ def plot_z_unfolding(
                         pb.AxisConfig(
                             "x",
                             label=r"$z_{\text{g}}$",
-                            range=unfolding_display_range
+                            range=unfolding_var_display_range
                         ),
                         pb.AxisConfig(
                             "y",
@@ -5555,7 +5555,7 @@ def plot_z_unfolding(
             name=f"efficiency_{unfolding_output.substructure_variable}_true_pt_60_80",
             panels=pb.Panel(
                 axes=[
-                    pb.AxisConfig("x", label=r"$z_{\text{g}}$", range=unfolding_display_range),
+                    pb.AxisConfig("x", label=r"$z_{\text{g}}$", range=unfolding_var_display_range),
                     pb.AxisConfig("y", label="Efficiency"),
                 ],
                 legend=pb.LegendConfig(location="lower left"),
@@ -5675,14 +5675,14 @@ def steer_plotting_of_substructure_var_unfolding_outputs(  # noqa: C901
                 unfolding_output=unfolding_systematics_outputs[grooming_method]["default"],
                 plot_png=plot_png,
                 prior_variation_output=_prior_variation_output,
-                unfolding_Rg_display_range=unfolding_display_range[grooming_method],
+                unfolding_var_display_range=unfolding_display_range[grooming_method],
             )
         elif substructure_variable == "z":
             plot_z_unfolding(
                 unfolding_output=unfolding_systematics_outputs[grooming_method]["default"],
                 plot_png=plot_png,
                 prior_variation_output=_prior_variation_output,
-                unfolding_display_range=unfolding_display_range[grooming_method],
+                unfolding_var_display_range=unfolding_display_range[grooming_method],
             )
 
         _unfolding_func = plot_delta_R_unfolding
@@ -5699,7 +5699,7 @@ def steer_plotting_of_substructure_var_unfolding_outputs(  # noqa: C901
                 _unfolding_func(
                     unfolding_output=_unfolding_output,
                     plot_png=plot_png,
-                    unfolding_display_range=unfolding_display_range[grooming_method],
+                    unfolding_var_display_range=unfolding_display_range[grooming_method],
                 )
 
 
