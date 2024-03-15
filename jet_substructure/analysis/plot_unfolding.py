@@ -37,7 +37,7 @@ def hist_stat_tests_KS_chi2(
 ) -> tuple[float, float]:
     if use_ROOT:
         # Create ROOT hist (:-()
-        import ROOT  # # pyright: ignore [reportMissingImports] noqa: F401
+        import ROOT  # pyright: ignore [reportMissingImports] # noqa: F401
 
         #data_hist = ROOT.TH1D("data", "data", len(hist.axes[0].bin_edges) - 1, hist.axes[0].bin_edges)
 
@@ -551,7 +551,7 @@ def plot_grooming_model_comparisons_for_single_system(
     text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     _plot_data_model_comparison_for_single_system(
         hists=hists,
         models=models,
@@ -897,7 +897,7 @@ def plot_grooming_comparisons_for_single_system(
     text += "\n" + event_activity + pb.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     _plot_single_system_comparison(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -971,7 +971,7 @@ def plot_Rg_grooming_comparisons_for_single_system(
     text += "\n" + pb.label_to_display_string["collision_system"][collision_system_key]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     _plot_single_system_comparison(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -1371,7 +1371,7 @@ def plot_pp_PbPb_comparison(
     text += "\n" + pb.label_to_display_string["collision_system"]["pp_PbPb_5TeV"]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R_str]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
 
     name = "unfolded_kt_pp_PbPb"
     if additional_label:
@@ -1556,7 +1556,7 @@ def plot_PbPb_systematics_simple(
         text += "\n" + pb.label_to_display_string["collision_system"]["pp_5TeV"]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     _plot_simple_kt_with_systematics(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -1734,7 +1734,7 @@ def plot_PbPb_systematics(
         text += "\n" + pb.label_to_display_string["collision_system"]["pp_5TeV"]
     text += "\n" + pb.label_to_display_string["jets"]["general"]
     text += "\n" + pb.label_to_display_string["jets"][jet_R]
-    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"  # noqa: ISC003
+    text += "\n" + fr"${jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$"
     _plot_compare_kt_with_systematics(
         hists=hists,
         grooming_methods=grooming_methods,
@@ -2585,6 +2585,7 @@ def calculate_systematics(  # noqa: C901
     except KeyError as e:
         logger.debug(f"Skipping tracking efficiency because of {e}")
 
+    # TODO: Take the unfolding uncertainty as a max
     # Everything else is treated asymmetrically, potentially one-sided.
     # Truncation
     try:
@@ -3464,7 +3465,7 @@ def plot_kt_unfolding(
             # for n_iter in range(1, unfolding_output.n_iter_compare + 5)
         },
         plot_config=pb.PlotConfig(
-            name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+            name=f"unfolded_{unfolding_output.substructure_variable}_true_{true_jet_pt_range!s}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -3527,7 +3528,7 @@ def plot_kt_unfolding(
             for n_iter in range(1, unfolding_output.n_iter_compare + 5)
         },
         plot_config=pb.PlotConfig(
-            name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+            name=f"unfolded_{unfolding_output.substructure_variable}_true_{true_jet_pt_range!s}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -3589,7 +3590,7 @@ def plot_kt_unfolding(
             # for n_iter in range(1, unfolding_output.n_iter_compare + 5)
         },
         plot_config=pb.PlotConfig(
-            name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+            name=f"unfolded_{unfolding_output.substructure_variable}_true_{true_jet_pt_range!s}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -3710,7 +3711,7 @@ def plot_kt_unfolding(
         },
         plot_config=pb.PlotConfig(
             # Display with f"unfolded_pt_true_{unfolding_output.smeared_var_range}"
-            name=f"unfolded_pt_true_{str(true_substructure_variable_range)}",
+            name=f"unfolded_pt_true_{true_substructure_variable_range!s}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -3959,7 +3960,7 @@ def plot_kt_unfolding(
             max_iter=unfolding_output.max_n_iter,
             true_bin=true_jet_pt_range,
             plot_config=pb.PlotConfig(
-                name=f"select_iteration_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+                name=f"select_iteration_{unfolding_output.substructure_variable}_true_{true_jet_pt_range!s}",
                 panels=pb.Panel(
                     axes=[
                         pb.AxisConfig("x", label="Iteration"),
@@ -4500,7 +4501,7 @@ def plot_delta_R_unfolding(
             for n_iter in unfolding_output.n_iter_range_to_plot()
         },
         plot_config=pb.PlotConfig(
-            name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+            name=f"unfolded_{unfolding_output.substructure_variable}_true_{true_jet_pt_range!s}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -4559,7 +4560,7 @@ def plot_delta_R_unfolding(
             for n_iter in unfolding_output.n_iter_range_to_plot()
         },
         plot_config=pb.PlotConfig(
-            name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+            name=f"unfolded_{unfolding_output.substructure_variable}_true_{true_jet_pt_range!s}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -4617,7 +4618,7 @@ def plot_delta_R_unfolding(
             for n_iter in unfolding_output.n_iter_range_to_plot()
         },
         plot_config=pb.PlotConfig(
-            name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+            name=f"unfolded_{unfolding_output.substructure_variable}_true_{true_jet_pt_range!s}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -4734,7 +4735,7 @@ def plot_delta_R_unfolding(
         },
         plot_config=pb.PlotConfig(
             # Display with f"unfolded_pt_true_{unfolding_output.smeared_var_range}"
-            name=f"unfolded_pt_true_{str(true_substructure_variable_range)}",
+            name=f"unfolded_pt_true_{true_substructure_variable_range!s}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -4928,7 +4929,7 @@ def plot_delta_R_unfolding(
             max_iter=unfolding_output.max_n_iter,
             true_bin=true_jet_pt_range,
             plot_config=pb.PlotConfig(
-                name=f"select_iteration_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+                name=f"select_iteration_{unfolding_output.substructure_variable}_true_{true_jet_pt_range!s}",
                 panels=pb.Panel(
                     axes=[
                         pb.AxisConfig("x", label="Iteration"),
@@ -5073,7 +5074,7 @@ def plot_z_unfolding(
             for n_iter in unfolding_output.n_iter_range_to_plot()
         },
         plot_config=pb.PlotConfig(
-            name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+            name=f"unfolded_{unfolding_output.substructure_variable}_true_{true_jet_pt_range!s}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -5132,7 +5133,7 @@ def plot_z_unfolding(
             for n_iter in unfolding_output.n_iter_range_to_plot()
         },
         plot_config=pb.PlotConfig(
-            name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+            name=f"unfolded_{unfolding_output.substructure_variable}_true_{true_jet_pt_range!s}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -5190,7 +5191,7 @@ def plot_z_unfolding(
             for n_iter in unfolding_output.n_iter_range_to_plot()
         },
         plot_config=pb.PlotConfig(
-            name=f"unfolded_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+            name=f"unfolded_{unfolding_output.substructure_variable}_true_{true_jet_pt_range!s}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -5307,7 +5308,7 @@ def plot_z_unfolding(
         },
         plot_config=pb.PlotConfig(
             # Display with f"unfolded_pt_true_{unfolding_output.smeared_var_range}"
-            name=f"unfolded_pt_true_{str(true_substructure_variable_range)}",
+            name=f"unfolded_pt_true_{true_substructure_variable_range!s}",
             panels=[
                 # Main panel
                 pb.Panel(
@@ -5501,7 +5502,7 @@ def plot_z_unfolding(
             max_iter=unfolding_output.max_n_iter,
             true_bin=true_jet_pt_range,
             plot_config=pb.PlotConfig(
-                name=f"select_iteration_{unfolding_output.substructure_variable}_true_{str(true_jet_pt_range)}",
+                name=f"select_iteration_{unfolding_output.substructure_variable}_true_{true_jet_pt_range!s}",
                 panels=pb.Panel(
                     axes=[
                         pb.AxisConfig("x", label="Iteration"),
@@ -5592,7 +5593,7 @@ def plot_z_unfolding(
 
     return unfolding_output.output_dir
 
-def steer_plotting_of_substructure_var_unfolding_outputs(
+def steer_plotting_of_substructure_var_unfolding_outputs(  # noqa: C901
     substructure_variable: str,
     grooming_methods: list[str],
     unfolded_with_systematics: dict[str, unfolding_analysis.SingleResult],
