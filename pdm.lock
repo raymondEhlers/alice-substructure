@@ -4,8 +4,8 @@
 [metadata]
 groups = ["default", "dev"]
 strategy = ["cross_platform"]
-lock_version = "4.4"
-content_hash = "sha256:5acc6513877bb327e5338de7a5d46281816f07d1fc74b9457bead9fb078ec22c"
+lock_version = "4.4.1"
+content_hash = "sha256:ff8eafb1818b984d12279d1f06ea4a36af079dfc8fcf170fdfeb66a298592248"
 
 [[package]]
 name = "ansicon"
@@ -970,7 +970,6 @@ dependencies = [
     "cryptography!=3.4.0,>=3.3.1",
     "pyjwt[crypto]<3.0.0,>=2.0.0",
     "requests<3.0.0,>=2.19.1",
-    "typing-extensions>=4.0; python_version < \"3.10\"",
 ]
 files = [
     {file = "globus-sdk-3.14.0.tar.gz", hash = "sha256:ea168a8f08fc2f2039141cab0b6ac3d79738b194eced0c7bf16fbaa39b807b95"},
@@ -1222,19 +1221,6 @@ files = [
 ]
 
 [[package]]
-name = "importlib-resources"
-version = "5.10.0"
-requires_python = ">=3.7"
-summary = "Read resources from Python packages"
-dependencies = [
-    "zipp>=3.1.0; python_version < \"3.10\"",
-]
-files = [
-    {file = "importlib_resources-5.10.0-py3-none-any.whl", hash = "sha256:ee17ec648f85480d523596ce49eae8ead87d5631ae1551f913c0100b5edd3437"},
-    {file = "importlib_resources-5.10.0.tar.gz", hash = "sha256:c01b1b94210d9849f286b86bb51bcea7cd56dde0600d8db721d7b81330711668"},
-]
-
-[[package]]
 name = "iniconfig"
 version = "1.1.1"
 summary = "iniconfig: brain-dead simple config-ini parsing"
@@ -1285,7 +1271,6 @@ dependencies = [
     "pygments>=2.4.0",
     "stack-data",
     "traitlets>=5",
-    "typing-extensions; python_version < \"3.10\"",
 ]
 files = [
     {file = "ipython-8.17.2-py3-none-any.whl", hash = "sha256:1e4d1d666a023e3c93585ba0d8e962867f7a111af322efff6b9c58062b3e5444"},
@@ -1496,7 +1481,6 @@ version = "2.2.0"
 requires_python = ">=3.8"
 summary = "Multi-Language Server WebSocket proxy for Jupyter Notebook/Lab server"
 dependencies = [
-    "importlib-metadata>=4.8.3; python_version < \"3.10\"",
     "jupyter-server>=1.1.2",
 ]
 files = [
@@ -1572,7 +1556,6 @@ requires_python = ">=3.8"
 summary = "JupyterLab computational environment"
 dependencies = [
     "async-lru>=1.0.0",
-    "importlib-metadata>=4.8.3; python_version < \"3.10\"",
     "ipykernel",
     "jinja2>=3.0.3",
     "jupyter-core",
@@ -1607,7 +1590,6 @@ requires_python = ">=3.7"
 summary = "A set of server components for JupyterLab and JupyterLab like applications."
 dependencies = [
     "babel>=2.10",
-    "importlib-metadata>=4.8.3; python_version < \"3.10\"",
     "jinja2>=3.0.3",
     "json5>=0.9.0",
     "jsonschema>=4.17.3",
@@ -1744,8 +1726,8 @@ files = [
 
 [[package]]
 name = "mammoth"
-version = "0.3.0+editable"
-requires_python = ">=3.9"
+version = "0.4.dev334"
+requires_python = ">=3.10"
 editable = true
 path = "./external/mammoth"
 summary = "Mostly columnar based physics analyses"
@@ -1848,7 +1830,6 @@ dependencies = [
     "contourpy>=1.0.1",
     "cycler>=0.10",
     "fonttools>=4.22.0",
-    "importlib-resources>=3.2.0; python_version < \"3.10\"",
     "kiwisolver>=1.3.1",
     "numpy<2,>=1.21",
     "packaging>=20.0",
@@ -2139,7 +2120,6 @@ dependencies = [
     "beautifulsoup4",
     "bleach",
     "defusedxml",
-    "importlib-metadata>=3.6; python_version < \"3.10\"",
     "jinja2>=3.0",
     "jupyter-core>=4.7",
     "jupyterlab-pygments",
@@ -2345,8 +2325,8 @@ files = [
 
 [[package]]
 name = "pachyderm"
-version = "3.0"
-requires_python = ">=3.8"
+version = "3.2.3.dev2"
+requires_python = ">=3.10"
 editable = true
 path = "./external/pachyderm"
 summary = "Physics Analysis Core for Heavy-Ions"
@@ -3606,7 +3586,7 @@ version = "1.4.48"
 requires_python = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7"
 summary = "Database Abstraction Library"
 dependencies = [
-    "greenlet!=0.4.17; python_version >= \"3\" and (platform_machine == \"aarch64\" or (platform_machine == \"ppc64le\" or (platform_machine == \"x86_64\" or (platform_machine == \"amd64\" or (platform_machine == \"AMD64\" or (platform_machine == \"win32\" or platform_machine == \"WIN32\"))))))",
+    "greenlet!=0.4.17; (platform_machine == \"win32\" or platform_machine == \"WIN32\" or platform_machine == \"AMD64\" or platform_machine == \"amd64\" or platform_machine == \"x86_64\" or platform_machine == \"ppc64le\" or platform_machine == \"aarch64\") and python_version >= \"3\"",
 ]
 files = [
     {file = "SQLAlchemy-1.4.48-cp27-cp27m-macosx_10_14_x86_64.whl", hash = "sha256:4bac3aa3c3d8bc7408097e6fe8bf983caa6e9491c5d2e2488cfcfd8106f13b6a"},
@@ -3808,18 +3788,19 @@ files = [
 
 [[package]]
 name = "uproot"
-version = "5.1.2"
+version = "5.2.2"
 requires_python = ">=3.8"
 summary = "ROOT I/O in pure Python and NumPy."
 dependencies = [
     "awkward>=2.4.6",
+    "fsspec",
     "numpy",
     "packaging",
     "typing-extensions>=4.1.0; python_version < \"3.11\"",
 ]
 files = [
-    {file = "uproot-5.1.2-py3-none-any.whl", hash = "sha256:99d0896ee83f2bed0e7112e8abccf22e7b749c63cf8785ac65a81b7e4d913d68"},
-    {file = "uproot-5.1.2.tar.gz", hash = "sha256:f69ee9381243cb0fea58c01a94a8a7abee29de3b67cdb9c9c9cccdd2caccd934"},
+    {file = "uproot-5.2.2-py3-none-any.whl", hash = "sha256:df67149509f89ee0ac38e33238d5f36f342a14e3bcf9d46fe6ec1248bf4825eb"},
+    {file = "uproot-5.2.2.tar.gz", hash = "sha256:ce6abba7efaae35d891f15ad1757ece63620f0db12260403fbd0339e41951fc1"},
 ]
 
 [[package]]

@@ -10,7 +10,7 @@ build-backend = "pdm.backend"
 name = "jet_substructure"
 description = "Jet substructure analysis code"
 license = {text = "BSD-3-Clause"}
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
   { name = "Raymond Ehlers", email = "raymond.ehlers@cern.ch" },
 ]
@@ -110,7 +110,7 @@ processEmbeddingSkimCpp = { call = "jet_substructure.cpp.data_frame:embed_pythia
 
 [tool.mypy]
 files = "src"
-python_version = "3.9"
+python_version = "3.10"
 warn_unused_configs = true
 strict = true
 ignore_missing_imports = true
@@ -181,7 +181,7 @@ max-complexity = 12
 known-first-party = ["jet_substructure"]
 
 [tool.pylint]
-master.py-version = "3.9"
+master.py-version = "3.10"
 master.ignore-paths= ["src/substructure/_version.py"]
 reports.output-format = "colorized"
 similarities.ignore-imports = "yes"
