@@ -11,8 +11,9 @@ import logging
 from typing import Any
 
 import attrs
-import pachyderm.plot
 import seaborn as sns
+
+import pachyderm.plot
 from pachyderm.plot import AxisConfig, Figure, LegendConfig, Panel, PlotConfig, TextConfig  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ label_to_display_string: dict[str, dict[str, str]] = {
         embedPythia=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
         embed_pythia=r"$\text{{PYTHIA8}} \bigotimes \text{{{main_system}}}\;\text{{Pb--Pb}}\;\sqrt{{s_{{\text{{NN}}}}}} = 5.02$ TeV",
     ),
-    "jets": {f"R0{i}": (f"$R=0.{i}," + fr"\:|\eta_{{\text{{jet}}}}| < 0.{9-i}$") for i in range(1, 7)},  # noqa: ISC003
+    "jets": {f"R0{i}": (f"$R=0.{i}," + fr"\:|\eta_{{\text{{jet}}}}| < 0.{9-i}$") for i in range(1, 7)},
 }
 label_to_display_string["jets"]["general"] = r"$\text{Anti-}k_{\text{T}}\:\text{ch-particle jets}$"
 
@@ -60,18 +61,18 @@ class GroomingMethodStyle:
 
         This can always be customized for individual plots, but this provides a good starting point.
         """
-        d = dict(
-            color=self.color,
-            marker=self.marker,
-            markersize=11,
+        d: dict[str, str | int | float] = {
+            "color": self.color,
+            "marker": self.marker,
+            "markersize": 11,
             # Configure rest of marker presentation
-            markeredgecolor=self.color,
-            linestyle="",
-            linewidth=3,
-        )
+            "markeredgecolor": self.color,
+            "linestyle": "",
+            "linewidth": 3,
+        }
         # This marker is a bit small, so try to boost it up
         if self.marker in ["P", "d", "D"]:
-            d["markersize"] += 2
+            d["markersize"] += 2  # type: ignore[operator]
         if self.fillstyle == "none":
             # Update the fillstyle to be solid white. Transparent would be better, but it doesn't work because
             # it shows the errorbar lines going through the point :-(
@@ -90,14 +91,13 @@ class GroomingMethodStyle:
         return d
 
     def kwargs_for_plot_error_boxes(self) -> dict[str, Any]:
-        d = dict(
-            color=self.color,
-            linewidth=0,
-            alpha=0.3,
+        return {
+            "color": self.color,
+            "linewidth": 0,
+            "alpha": 0.3,
             # This is common, but does need to be overridden sometimes!
-            zorder=2,
-        )
-        return d
+            "zorder": 2,
+        }
 
 
 def define_grooming_styles() -> dict[str, GroomingMethodStyle]:
@@ -248,7 +248,7 @@ def adjust_lightness(color: str | tuple[float, float, float], amount: float = 0.
 
     import matplotlib.colors as mc
     try:
-        c = mc.cnames[color]
+        c = mc.cnames[color]  # type: ignore[index]
     except:
         c = color
     #c = colorsys.rgb_to_hls(*mc.to_rgb(c))
@@ -504,7 +504,7 @@ def define_paper_model_styles() -> dict[str, dict[str, Any]]:
         },
     }
 
-    return paper_model_styles
+    return paper_model_styles  # noqa: RET504
 
 
 def define_paper_event_activity_comparison_styles() -> dict[str, str]:
@@ -513,4 +513,4 @@ def define_paper_event_activity_comparison_styles() -> dict[str, str]:
         "semi_central": "#FF8301",
         "central": "#4bafd0",
     }
-    return event_activity_to_color
+    return event_activity_to_color  # noqa: RET504
