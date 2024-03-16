@@ -123,6 +123,8 @@ no_implicit_reexport = false
 line-length = 120
 
 [tool.ruff]
+src = ["jet_substructure"]
+line-length = 120
 exclude = [
     '.git',
     '.env',
@@ -138,7 +140,6 @@ exclude = [
     "exploration_scripts",
     "external",
 ]
-line-length = 120
 select = [
     "E", "F", "W", # flake8
     "C901",        # mccabe
@@ -178,7 +179,7 @@ target-version = 'py38'
 max-complexity = 12
 
 [tool.ruff.isort]
-known-first-party = ["jet_substructure"]
+known-first-party = ["jet_substructure", "mammoth", "pachyderm"]
 
 [tool.pylint]
 master.py-version = "3.10"
