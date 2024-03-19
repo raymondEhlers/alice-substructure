@@ -175,6 +175,14 @@ unfixable = [
 ]
 target-version = 'py38'
 
+[tool.ruff.lint.per-file-ignores]
+"notebooks/**" = [
+  "T20",      # Print statements are fairly common in jupyter notebooks
+  "E402",     # Module level import not at top of file are fairly common in notebooks
+  "F841",     # Again, unused variables are common in notebooks
+  "B018",     # For useless variables. Sometimes we have useless statements to print them
+]
+
 [tool.ruff.mccabe]
 max-complexity = 12
 

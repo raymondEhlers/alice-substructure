@@ -12,9 +12,9 @@ from typing import Any, TypeVar
 import attrs
 import numpy as np
 import numpy.typing as npt
-from pachyderm import binned_data
 
 from jet_substructure.base import helpers
+from pachyderm import binned_data
 
 logger = logging.getLogger(__name__)
 
