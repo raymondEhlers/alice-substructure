@@ -18,13 +18,13 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-import pachyderm.plot
 import seaborn as sns
-from pachyderm import binned_data
 
+import pachyderm.plot
 from jet_substructure.analysis import full_results_helpers, unfolding_analysis
 from jet_substructure.analysis import plot_style as pb
 from jet_substructure.base import helpers
+from pachyderm import binned_data
 
 logger = logging.getLogger(__name__)
 
@@ -436,7 +436,7 @@ def _plot_data_model_comparison_for_single_system(
                 model_style = grooming_styling[f"{grooming_method}_compare"]
                 # Get the model for the reference.
                 model = binned_data.BinnedData.from_existing_data(model)
-                # TODO: Careful, pythia is already normalized, but jetscape wasn't. So we need to resolve this...
+                # NOTE: Careful, pythia is already normalized, but jetscape wasn't. So we need to resolve this...
                 #       Probably best to have some kind of "prepare model" function, which we can decide to use or not.
                 # Then normalize
                 #####model /= np.sum(model.values)
@@ -455,7 +455,7 @@ def _plot_data_model_comparison_for_single_system(
                     model.values,
                     # yerr=model.errors,
                     # xerr=model.axes[0].bin_widths / 2,
-                    # TODO: This isn't right if there are multiple models, but let's me get through the previews
+                    # NOTE: This isn't right if there are multiple models, but it got me through the previews
                     color=p[0].get_color(),
                     #color=grooming_styling[grooming_method].color,
                     # marker=style.marker,
@@ -2390,6 +2390,7 @@ def _unfolded_outputs_with_systematics(
     grooming_method: str,
     unfolding_systematics_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
+    unfolding_related_systematic_treatment: str,
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: unfolding_analysis.NonClosureConfiguration | None = None,
     background_subtraction_configuration: unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
@@ -2410,6 +2411,7 @@ def _unfolded_outputs_with_systematics(
         unfolded=unfolded,
         unfolding_outputs=unfolding_systematics_outputs[grooming_method],
         true_jet_pt_range=true_jet_pt_range,
+        unfolding_related_systematic_treatment=unfolding_related_systematic_treatment,
         model_dependence_configuration=model_dependence_configuration,
         non_closure_configuration=non_closure_configuration,
         background_subtraction_configuration=background_subtraction_configuration,
@@ -2429,6 +2431,7 @@ def unfolded_outputs_with_systematics(
     unfolding_systematics_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
     unfolding_closure_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
+    unfolding_related_systematic_treatment: str,
     model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration | None] | unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: dict[str, unfolding_analysis.NonClosureConfiguration | None] | unfolding_analysis.NonClosureConfiguration | None = None,
     background_subtraction_configuration: dict[str, unfolding_analysis.BackgroundSubtractionConfiguration | None] | unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
@@ -2465,6 +2468,7 @@ def unfolded_outputs_with_systematics(
             grooming_method=grooming_method,
             unfolding_systematics_outputs=unfolding_systematics_outputs,
             true_jet_pt_range=true_jet_pt_range,
+            unfolding_related_systematic_treatment=unfolding_related_systematic_treatment,
             model_dependence_configuration=model_dependence_configuration[grooming_method],
             non_closure_configuration=non_closure_configuration[grooming_method],
             background_subtraction_configuration=background_subtraction_configuration[grooming_method],
@@ -2559,6 +2563,7 @@ def calculate_systematics(  # noqa: C901
     unfolded: Mapping[str, unfolding_analysis.SingleResult],
     unfolding_outputs: Mapping[str, unfolding_analysis.UnfoldingOutput],
     true_jet_pt_range: helpers.JetPtRange,
+    unfolding_related_systematic_treatment: str = "all",
     truncation_iter: helpers.RangeSelector | None = None,
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: unfolding_analysis.NonClosureConfiguration | None = None,
@@ -2569,6 +2574,9 @@ def calculate_systematics(  # noqa: C901
         truncation_iter = helpers.RangeSelector(1, 1)
     if truncation_iter.min < 0:
         truncation_iter = helpers.RangeSelector(-1 * truncation_iter.min, truncation_iter.max)
+    if unfolding_related_systematic_treatment not in ["all", "max", "std_dev"]:
+        _msg = f"Unrecognized treatment of unfolding systematics: {unfolding_related_systematic_treatment}"
+        raise ValueError(_msg)
     # Setup
     unfolded["default"].data.metadata["y_systematic"] = {}
 
@@ -2585,11 +2593,17 @@ def calculate_systematics(  # noqa: C901
     except KeyError as e:
         logger.debug(f"Skipping tracking efficiency because of {e}")
 
-    # TODO: Take the unfolding uncertainty as a max
     # Everything else is treated asymmetrically, potentially one-sided.
-    # Truncation
+    unfolding_related_uncertainties = {}
+    # Per Rey, he has truncation, binning, prior, and regularization. I include:
+    # "truncation"
+    # "regularization"
+    # "random_binning"
+    # "untagged_bin"
+    # "reweight_prior"
+    ## Truncation
     try:
-        unfolded["default"].data.metadata["y_systematic"][
+        unfolding_related_uncertainties[
             "truncation"
         ] = full_results_helpers.AsymmetricErrors.calculate_errors(
             unfolded["truncation_low"].data.values - unfolded["default"].data.values,
@@ -2600,7 +2614,7 @@ def calculate_systematics(  # noqa: C901
 
     # Regularization
     # +/- iterations
-    unfolded["default"].data.metadata["y_systematic"][
+    unfolding_related_uncertainties[
         "regularization"
     ] = full_results_helpers.AsymmetricErrors.calculate_errors(
         unfolded["default"].data.values
@@ -2624,7 +2638,7 @@ def calculate_systematics(  # noqa: C901
     # we're taking only one variation.
     try:
         random_binning_sym = unfolded["random_binning"].data.values - unfolded["default"].data.values
-        unfolded["default"].data.metadata["y_systematic"][
+        unfolding_related_uncertainties[
             "random_binning"
         ] = full_results_helpers.AsymmetricErrors(
             random_binning_sym, random_binning_sym,
@@ -2635,7 +2649,7 @@ def calculate_systematics(  # noqa: C901
 
     # Untagged bin location
     try:
-        unfolded["default"].data.metadata["y_systematic"][
+        unfolding_related_uncertainties[
             "untagged_bin"
         ] = full_results_helpers.AsymmetricErrors.calculate_errors(
             unfolded["untagged_bin"].data.values - unfolded["default"].data.values
@@ -2646,7 +2660,7 @@ def calculate_systematics(  # noqa: C901
 
     # Reweight prior
     try:
-        unfolded["default"].data.metadata["y_systematic"][
+        unfolding_related_uncertainties[
             "reweight_prior"
         ] = full_results_helpers.AsymmetricErrors.calculate_errors(
             unfolded["reweight_prior"].data.values - unfolded["default"].data.values
@@ -2654,6 +2668,43 @@ def calculate_systematics(  # noqa: C901
     except KeyError as e:
         _msg = f"Skipping reweighting prior because of KeyError {e}"
         logger.debug(_msg)
+
+    # Now include the unfolding related contributions as appropriate
+    if unfolding_related_systematic_treatment == "all":
+        unfolded["default"].data.metadata["y_systematic"].update(unfolding_related_uncertainties)
+    elif unfolding_related_systematic_treatment == "max":
+        # Calculate as max_i=1^N (sigma_i)
+        low_max_values = np.zeros_like(unfolded["default"].data.values)
+        high_max_values = np.zeros_like(unfolded["default"].data.values)
+        for _error_values in unfolding_related_uncertainties.values():
+            low_max_values = np.maximum(
+                low_max_values,
+                np.abs(_error_values.low),
+            )
+            high_max_values = np.maximum(
+                high_max_values,
+                np.abs(_error_values.high),
+            )
+        unfolded["default"].data.metadata["y_systematic"]["unfolding"] = full_results_helpers.AsymmetricErrors.calculate_errors(
+            low_max_values,
+            high_max_values,
+        )
+    elif unfolding_related_systematic_treatment == "std_dev":
+        # Calculate asymmetrically as sqrt(1/N * sum_i=1^N (sigma_i)^2)
+        low_std_dev_values = np.zeros_like(unfolded["default"].data.values)
+        high_std_dev_values = np.zeros_like(unfolded["default"].data.values)
+        for _error_values in unfolding_related_uncertainties.values():
+            low_std_dev_values += _error_values.low ** 2
+            high_std_dev_values += _error_values.high ** 2
+        low_std_dev_values = np.sqrt(1./len(unfolding_related_uncertainties) * low_std_dev_values)
+        high_std_dev_values = np.sqrt(1./len(unfolding_related_uncertainties) * high_std_dev_values)
+        unfolded["default"].data.metadata["y_systematic"]["unfolding"] = full_results_helpers.AsymmetricErrors.calculate_errors(
+            low_std_dev_values,
+            high_std_dev_values,
+        )
+    else:
+        _msg = f"Unrecognized treatment of unfolding-related systematics: {unfolding_related_systematic_treatment}"
+        raise ValueError(_msg)
 
     # Background subtraction systematics.
     background_systematics = {}
