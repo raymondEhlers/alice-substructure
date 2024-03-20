@@ -3891,7 +3891,8 @@ def plot_kt_unfolding(
 
     # Slice the refolded in jet pt just to get a sense of what they look like.
     # pp
-    _small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 30, 40, 50, 60, 85])
+    # Apparently I need to go to 90 to avoid slicing issues. I thought it would peak at 85...?
+    _small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 30, 40, 50, 60, 90])
     if unfolding_output.collision_system != "pp":
         # PbPb needs somewhat different binning
         _small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 60, 80, 100, 120])
