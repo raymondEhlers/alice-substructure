@@ -15,11 +15,10 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
+import seaborn as sns
+
 import pachyderm.plot
 import pachyderm.plot as pb
-import seaborn as sns
-from pachyderm import binned_data
-
 from jet_substructure.analysis import (
     full_results_helpers,
     model_calculations,
@@ -28,6 +27,7 @@ from jet_substructure.analysis import (
     unfolding_analysis,
 )
 from jet_substructure.base import helpers
+from pachyderm import binned_data
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +191,6 @@ def _draw_line_separating_header_and_figure(ax: mpl.axes.Axes) -> None:
         color='black', lw=0.6,
         transform=ax.transAxes, clip_on=False,
     )
-    return None
 
 
 def _plot_pp_grooming_comparison_with_models_2022(
@@ -1547,7 +1546,7 @@ def _plot_spectra_only(
     event_activity_to_kt_range: Mapping[str, Mapping[str, helpers.KtRange]],
     plot_config: pb.PlotConfig,
     output_dir: Path,
-) -> tuple[dict[str, float], dict[str, float]]:
+) -> None:
     """Plot PbPb with systematics compared to pp with systematics for a set of grooming methods."""
     # Validations
     logger.info(f"Plotting pp, PbPb spectra comparison for {grooming_methods}")
@@ -1791,10 +1790,11 @@ def _plot_pp_PbPb_ratio_on_axis(
     ax_ratio: mpl.axes.Axes,
     data_zorder_modifier: int,
     all_methods_on_one_figure: bool,
+    calculate_n_sigma_stat_from_unity: bool,
     models_calculation: Mapping[str, model_calculations.ModelCalculation] | None = None,
     data_point_color: str | None = None,
     data_label: str | None = None,
-):
+) -> None:
     grooming_styles = plot_style.define_paper_grooming_styles()
     # Ensure the ratio is defined over the same range.
     ratio_reference_hist = full_results_helpers.select_hist_range(
@@ -1856,6 +1856,18 @@ def _plot_pp_PbPb_ratio_on_axis(
         **kwargs_plot_error_boxes,
     )
 
+    if calculate_n_sigma_stat_from_unity:
+        # Calculate n-sigma from unity
+        # NOTE: This is only calculated for the PbPb/pp ratio, not for the models
+        n_sigma_stat = full_results_helpers.n_sigma_stat_from_unity(
+            values=ratio.values, stat_uncertainty=ratio.errors
+        )
+        logger.info(f"n_sigma_stat: {n_sigma_stat}")
+        output_str = f"{grooming_method}, {collision_system}: "
+        for bc, val in zip(ratio.axes[0].bin_centers, n_sigma_stat):
+            output_str += f"{bc:.2f}: {val:.2f}, "
+        logger.warning(output_str)
+
     # Plot model comparison if available
     for model_name, model_calculation in models_calculation.items():
         model = model_calculation.ratio(event_activity=collision_system).get(grooming_method, None)
@@ -1897,6 +1909,7 @@ def _plot_pp_PbPb_comparison_single_grooming_method(
     set_zero_to_nan: bool,
     all_methods_on_one_figure: bool,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
+    calculate_n_sigma_stat_from_unity: bool,
     models_ratio: Mapping[str, Mapping[str, model_calculations.ModelCalculation]] | None = None,
 ) -> None:
     # Validation
@@ -1978,6 +1991,7 @@ def _plot_pp_PbPb_comparison_single_grooming_method(
             ax_ratio=axes_ratio[axis_ratio_counter],
             data_zorder_modifier=_plot_counter,
             all_methods_on_one_figure=all_methods_on_one_figure,
+            calculate_n_sigma_stat_from_unity=calculate_n_sigma_stat_from_unity,
             models_calculation=models_ratio,
             data_point_color=p[0].get_color() if plot_ratio_black_and_white else None,
         )
@@ -2142,6 +2156,7 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
                 k: v[grooming_method]
                 for k, v in event_activity_to_kt_range.items()
             },
+            calculate_n_sigma_stat_from_unity=False,
             models_ratio=models_ratio,
         )
 
@@ -2597,6 +2612,7 @@ def _plot_pp_PbPb_only_ratio_for_single_grooming_method(
     set_zero_to_nan: bool,
     all_methods_on_one_figure: bool,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
+    calculate_n_sigma_stat_from_unity: bool,
     models_calculation: Mapping[str, Mapping[str, model_calculations.ModelCalculation]] | None = None,
     data_label: str | None = "ALICE data",
 ) -> None:
@@ -2645,6 +2661,7 @@ def _plot_pp_PbPb_only_ratio_for_single_grooming_method(
             ax_ratio=axes_ratio[axis_ratio_counter],
             data_zorder_modifier=_plot_counter,
             all_methods_on_one_figure=all_methods_on_one_figure,
+            calculate_n_sigma_stat_from_unity=calculate_n_sigma_stat_from_unity,
             models_calculation=models_calculation,
             data_point_color=_event_activity_to_color[collision_system] if plot_ratio_black_and_white else None,
             data_label=data_label,
@@ -2663,6 +2680,7 @@ def _plot_pp_PbPb_comparison_only_ratios_for_letter(
     set_zero_to_nan: bool,
     all_methods_on_one_figure: bool,
     event_activity_to_kt_range: Mapping[str, Mapping[str, helpers.KtRange]],
+    calculate_n_sigma_stat_from_unity: bool,
     plot_config: pb.PlotConfig,
     output_dir: Path,
     models_calculation: Mapping[str, Mapping[str, model_calculations.ModelCalculation]] | None = None,
@@ -2708,6 +2726,7 @@ def _plot_pp_PbPb_comparison_only_ratios_for_letter(
                 k: v[grooming_method]
                 for k, v in event_activity_to_kt_range.items()
             },
+            calculate_n_sigma_stat_from_unity=calculate_n_sigma_stat_from_unity,
             models_calculation=models_calculation,
             data_label="Data",
         )
@@ -2763,6 +2782,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
     models_calculation: Mapping[str, Mapping[str, binned_data.BinnedData]] | None = None,
+    calculate_n_sigma_stat_from_unity: bool = False,
     additional_label: str = "",
     logy: bool = False,
     two_column_header: bool = True,
@@ -2783,11 +2803,11 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
     name += f"_ratios_only_{jet_R_str}"
     if additional_label:
         name += f"_{additional_label}"
-    rotation_kwargs = dict(
-        rotation=90,
-        horizontalalignment="center",
-        verticalalignment="center",
-    )
+    rotation_kwargs = {
+        "rotation": 90,
+        "horizontalalignment": "center",
+        "verticalalignment": "center",
+    }
 
     # Consistent ratio ranges
     # NOTE: These are specialized to the letter. I haven't checked for the other methods.
@@ -2896,6 +2916,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
         set_zero_to_nan=False,
         all_methods_on_one_figure=True,
         event_activity_to_kt_range=event_activity_to_kt_range,
+        calculate_n_sigma_stat_from_unity=calculate_n_sigma_stat_from_unity,
         plot_config=pb.PlotConfig(
             name=name,
             panels=panels,
@@ -3575,11 +3596,11 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
     if additional_label:
         name += f"_{additional_label}"
     name += f"_model_data_ratios_{jet_R_str}"
-    rotation_kwargs = dict(
-        rotation=90,
-        horizontalalignment="center",
-        verticalalignment="center",
-    )
+    rotation_kwargs = {
+        "rotation": 90,
+        "horizontalalignment": "center",
+        "verticalalignment": "center",
+    }
 
     # Consistent ratio ranges
     # NOTE: These are specialized to the letter. I haven't checked for the other methods.

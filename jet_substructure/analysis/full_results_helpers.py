@@ -299,3 +299,18 @@ def rebin_bin_width_scaled_hist(h_to_rebin: binned_data.BinnedData, h_target_axi
         }
 
     return h_to_rebin
+
+def n_sigma_stat_from_unity(
+    values: npt.NDArray[np.float64],
+    stat_uncertainty: npt.NDArray[np.float64],
+) -> npt.NDArray[np.float64]:
+    """Calculate the number of sigma from unity for a given value and its statistical uncertainty.
+
+    Args:
+        values: The values for which to calculate the number of sigma from unity.
+        stat_uncertainty: The statistical uncertainty on the values.
+
+    Returns:
+        The number of sigma from unity for each value.
+    """
+    return np.abs(values - 1) / stat_uncertainty  # type: ignore[no-any-return]
