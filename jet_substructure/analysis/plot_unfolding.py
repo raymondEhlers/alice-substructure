@@ -2391,6 +2391,7 @@ def _unfolded_outputs_with_systematics(
     unfolding_systematics_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
     unfolding_related_systematic_treatment: str,
+    smooth_systematic_uncertainty_contributions: list[str],
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: unfolding_analysis.NonClosureConfiguration | None = None,
     background_subtraction_configuration: unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
@@ -2412,6 +2413,7 @@ def _unfolded_outputs_with_systematics(
         unfolding_outputs=unfolding_systematics_outputs[grooming_method],
         true_jet_pt_range=true_jet_pt_range,
         unfolding_related_systematic_treatment=unfolding_related_systematic_treatment,
+        smooth_systematic_uncertainty_contributions=smooth_systematic_uncertainty_contributions,
         model_dependence_configuration=model_dependence_configuration,
         non_closure_configuration=non_closure_configuration,
         background_subtraction_configuration=background_subtraction_configuration,
@@ -2432,6 +2434,7 @@ def unfolded_outputs_with_systematics(
     unfolding_closure_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
     unfolding_related_systematic_treatment: str,
+    smooth_systematic_uncertainty_contributions: dict[str, list[str]] | None = None,
     model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration | None] | unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: dict[str, unfolding_analysis.NonClosureConfiguration | None] | unfolding_analysis.NonClosureConfiguration | None = None,
     background_subtraction_configuration: dict[str, unfolding_analysis.BackgroundSubtractionConfiguration | None] | unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
@@ -2446,6 +2449,8 @@ def unfolded_outputs_with_systematics(
             and each grooming method includes an unfolding SingleResult
     """
     # Validation
+    if smooth_systematic_uncertainty_contributions is None:
+        smooth_systematic_uncertainty_contributions = {grooming_method: [] for grooming_method in grooming_methods}
     if isinstance(model_dependence_configuration, unfolding_analysis.ModelDependenceConfiguration) or model_dependence_configuration is None:
         model_dependence_configuration = {grooming_method: model_dependence_configuration for grooming_method in grooming_methods}
     if isinstance(non_closure_configuration, unfolding_analysis.NonClosureConfiguration) or non_closure_configuration is None:
@@ -2469,6 +2474,7 @@ def unfolded_outputs_with_systematics(
             unfolding_systematics_outputs=unfolding_systematics_outputs,
             true_jet_pt_range=true_jet_pt_range,
             unfolding_related_systematic_treatment=unfolding_related_systematic_treatment,
+            smooth_systematic_uncertainty_contributions=smooth_systematic_uncertainty_contributions[grooming_method],
             model_dependence_configuration=model_dependence_configuration[grooming_method],
             non_closure_configuration=non_closure_configuration[grooming_method],
             background_subtraction_configuration=background_subtraction_configuration[grooming_method],
@@ -2878,6 +2884,17 @@ def calculate_systematics(  # noqa: C901
             #logger.debug(
             #    f'\n\tmodel_dependence errors: {unfolded["default"].data.metadata["y_systematic"]["model_dependence"]}'
             #)
+
+    # Smooth selected systematic uncertainties
+    # First, a cross check:
+    for _smoothed_uncertainty_name in smooth_systematic_uncertainty_contributions:
+        if _smoothed_uncertainty_name not in unfolded["default"].data.metadata["y_systematic"]:
+            msg = f"Requested to smooth {_smoothed_uncertainty_name}, but it's not available! Cross check this"
+            logger.warning(msg)
+    # Then, do the actual smoothing
+    for _name, _error_values in unfolded["default"].data.metadata["y_systematic"].items():
+        if _name in smooth_systematic_uncertainty_contributions:
+            _error_values.smooth()
 
     # Cross check to make sure that I haven't copied and pasted incorrectly.
     assert not any(

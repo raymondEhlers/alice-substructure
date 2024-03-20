@@ -14,6 +14,7 @@ import numpy as np
 import numpy.typing as npt
 
 from jet_substructure.base import helpers
+from mammoth.framework.analysis import array_helpers
 from pachyderm import binned_data
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,30 @@ class AsymmetricErrors:
         if other.__class__ is not self.__class__:
             return NotImplemented
         return np.allclose(self.low, other.low) and np.allclose(self.high, other.high)
+
+    def smooth(self, n_times: int = 1) -> None:
+        """Smooth the uncertainties.
+
+        Args:
+            n_times: Number of iterations to use to smooth the uncertainties.
+        """
+        # Setup
+        # We'll have to treat it differently for one-sided and two-sided
+        one_sided = False
+        low_is_zero_array = np.isclose(self.low, np.zeros_like(self.low), atol=1e-17)
+        high_is_zero_array = np.isclose(self.high, np.zeros_like(self.high), atol=1e-17)
+        if np.all(low_is_zero_array or high_is_zero_array):
+            one_sided = True
+
+        if one_sided:
+            values = np.where(low_is_zero_array, self.high, self.low)
+            smoothed_values = array_helpers.smooth_array(values, n_times=n_times)
+            self.low[~low_is_zero_array] = smoothed_values[~low_is_zero_array]
+            self.high[low_is_zero_array] = smoothed_values[low_is_zero_array]
+        else:
+            # Smooth the uncertainties
+            self.low = array_helpers.smooth_array(self.low, n_times=n_times)
+            self.high = array_helpers.smooth_array(self.high, n_times=n_times)
 
     @classmethod
     def calculate_errors(
