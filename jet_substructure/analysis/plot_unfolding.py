@@ -2398,7 +2398,7 @@ def _unfolded_outputs_with_systematics(
     """Steers the actual calculation of the systematic uncertainties.
 
     """
-    logger.info(f"Calculating systematics for {grooming_method}")
+    logger.info(f"Calculating systematics for {grooming_method} with unfolding related sys. treatment of \"{unfolding_related_systematic_treatment}\".")
     # First, we need the nominal result.
     unfolded = unfolded_substructure_results(
         unfolding_outputs=unfolding_systematics_outputs[grooming_method],
@@ -2563,7 +2563,8 @@ def calculate_systematics(  # noqa: C901
     unfolded: Mapping[str, unfolding_analysis.SingleResult],
     unfolding_outputs: Mapping[str, unfolding_analysis.UnfoldingOutput],
     true_jet_pt_range: helpers.JetPtRange,
-    unfolding_related_systematic_treatment: str = "all",
+    unfolding_related_systematic_treatment: str,
+    smooth_systematic_uncertainty_contributions: list[str],
     truncation_iter: helpers.RangeSelector | None = None,
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: unfolding_analysis.NonClosureConfiguration | None = None,
@@ -2685,7 +2686,7 @@ def calculate_systematics(  # noqa: C901
                 high_max_values,
                 np.abs(_error_values.high),
             )
-        unfolded["default"].data.metadata["y_systematic"]["unfolding"] = full_results_helpers.AsymmetricErrors.calculate_errors(
+        unfolded["default"].data.metadata["y_systematic"]["unfolding_max"] = full_results_helpers.AsymmetricErrors(
             low_max_values,
             high_max_values,
         )
@@ -2698,7 +2699,7 @@ def calculate_systematics(  # noqa: C901
             high_std_dev_values += _error_values.high ** 2
         low_std_dev_values = np.sqrt(1./len(unfolding_related_uncertainties) * low_std_dev_values)
         high_std_dev_values = np.sqrt(1./len(unfolding_related_uncertainties) * high_std_dev_values)
-        unfolded["default"].data.metadata["y_systematic"]["unfolding"] = full_results_helpers.AsymmetricErrors.calculate_errors(
+        unfolded["default"].data.metadata["y_systematic"]["unfolding_std_dev"] = full_results_helpers.AsymmetricErrors(
             low_std_dev_values,
             high_std_dev_values,
         )
@@ -5766,6 +5767,7 @@ def steer_plotting_of_kt_unfolding_outputs(
     plot_systematics: bool,
     plot_closures: bool,
     unfolding_kt_display_range: dict[str, tuple[float, float]] | tuple[float, float],
+    unfolding_related_systematic_treatment: str,
     prior_variation_output_name: dict[str, str | None] | str | None = None,
     relative_individual_systematic_ratio_range: dict[str, tuple[float, float]] | tuple[float, float] | None = None,
 ) -> None:
@@ -5791,7 +5793,7 @@ def steer_plotting_of_kt_unfolding_outputs(
             plot_relative_individual_systematics(
                 unfolded=unfolded_with_systematics[grooming_method],
                 plot_config=pb.PlotConfig(
-                    name="unfolded_systematic_relative",
+                    name=f"unfolded_systematic_relative__unfolding_treatment_{unfolding_related_systematic_treatment}",
                     panels=[
                         pb.Panel(
                             axes=[
