@@ -2640,6 +2640,21 @@ def calculate_systematics(  # noqa: C901
         .values,
     )
 
+    # An aside from systematics, but useful: determine how much we change when we go to the next iteration.
+    # This is useful for a line in the paper, and it's really easy to calculate here, so just go for it and print it.
+    log_change_from_next_iteration = True
+    if log_change_from_next_iteration:
+        difference_n_iter = (
+            unfolded["default"].data.values
+            - unfolding_outputs["default"]
+            .unfolded_substructure(
+                n_iter=unfolding_outputs["default"].n_iter_compare + truncation_iter.max,  # type: ignore[arg-type]
+                true_jet_pt_range=true_jet_pt_range,
+            )
+            .values
+        ) / unfolded["default"].data.values
+        logger.warning(f"Max difference from n_iter: {np.max(difference_n_iter)}")
+
     # Random binning
     # Take as a symmetric uncertainty because it's not clear why it should be one sided given that
     # we're taking only one variation.
