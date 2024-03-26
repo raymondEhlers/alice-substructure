@@ -13,10 +13,10 @@ import attrs
 import numpy as np
 import numpy.typing as npt
 import uproot
-from pachyderm import binned_data
 
 from jet_substructure.analysis import full_results_helpers
 from jet_substructure.base import helpers
+from pachyderm import binned_data
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +158,6 @@ class Jetscape:
                     values[grooming_method][_cent_bin] = data
                 except FileNotFoundError:
                     logger.debug(f"Skipping {grooming_method}, {_cent_bin} due to missing file (probably expected). {filename=}")
-                    pass
 
         # Merge relevant hists to extract the predictions
         predictions: dict[str, dict[str, binned_data.BinnedData]] = {}
@@ -460,7 +459,7 @@ class Caucal2020AnalyticalCalculations:
             predictions[collision_system] = {}
             for grooming_method in grooming_methods:
                 _grooming_label = _grooming_methods_to_files.get(grooming_method, "")
-                try:  # noqa: SIM105
+                try:
                     predictions[collision_system][grooming_method] = _load_caucal_analytical_calculations(
                         filename=self.base_dir / jet_R_str / f"ktg_a{_grooming_label}.dat", bin_edges=bin_edges
                     )
