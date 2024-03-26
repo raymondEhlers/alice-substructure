@@ -1883,6 +1883,22 @@ def _plot_pp_PbPb_ratio_on_axis(
             model, event_activity_to_kt_range[collision_system]
         )
 
+        # We want the model ratio binning to match the data ratio binning, so we rebin here as necessary,
+        # making a note that this is what we've done. This predominately applies to the hybrid model, which
+        # is binned more finely. Since I said I would rebin, and it's not especially fair to compare models
+        # with different binning, it's better to just normalize it here.
+        if (
+            len(ratio.axes[0].bin_edges) != len(model.axes[0].bin_edges) or
+            not np.allclose(ratio.axes[0].bin_centers, model.axes[0].bin_centers)
+        ):
+            logger.info(f"Rebinned model '{model_name}' to match data binning for {grooming_method}, {collision_system}")
+            model = full_results_helpers.rebin_bin_width_scaled_hist(
+                h_to_rebin=model,
+                h_target_axis=ratio.axes[0],
+                # This is okay since the data is explicitly constructed without systematic uncertainties.
+                okay_for_systematic_not_to_exist=True,
+            )
+
         # Fill between
         # NOTE: This is assuming we'll only plot PbPb model colors here, but I think that's a reasonable assumption,
         #       since that's the only models that could compare to the PbPb/pp ratio
@@ -2683,7 +2699,7 @@ def _plot_pp_PbPb_comparison_only_ratios_for_letter(
     calculate_n_sigma_stat_from_unity: bool,
     plot_config: pb.PlotConfig,
     output_dir: Path,
-    models_calculation: Mapping[str, Mapping[str, model_calculations.ModelCalculation]] | None = None,
+    models_calculation: dict[str, dict[str, model_calculations.ModelCalculation]] | None = None,
 ) -> None:
     """Plot PbPb/pp ratios only."""
     # Validations
@@ -2781,7 +2797,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
     jet_R_str: str = "R02",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
-    models_calculation: Mapping[str, Mapping[str, binned_data.BinnedData]] | None = None,
+    models_calculation: dict[str, dict[str, binned_data.BinnedData]] | None = None,
     calculate_n_sigma_stat_from_unity: bool = False,
     additional_label: str = "",
     logy: bool = False,
@@ -3117,7 +3133,7 @@ def _plot_pp_PbPb_only_spectra_ratios_on_axes(
                     h_without_uncertainties = full_results_helpers.rebin_bin_width_scaled_hist(
                         h_to_rebin=h_without_uncertainties,
                         h_target_axis=model.axes[0],
-                        # This is okay since the data is explicitly constructed without systematic systematic uncertainties.
+                        # This is okay since the data is explicitly constructed without systematic uncertainties.
                         okay_for_systematic_not_to_exist=True,
                     )
                 else:
