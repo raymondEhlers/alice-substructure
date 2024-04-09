@@ -150,7 +150,7 @@ def relative_error(*inputs: ErrorInput) -> npt.NDArray[np.float64]:
         _msg = "Must pass at least one ErrorInput"
         raise ValueError(_msg)
     if len(inputs) > 1:
-        relative_error_squared: npt.NDArray[np.float64] = reduce(lambda x, y: ((x.error / x.value) ** 2) + ((y.error / y.value) ** 2), inputs)  # type: ignore[arg-type, no-any-return, attr-defined]
+        relative_error_squared: npt.NDArray[np.float64] = reduce(lambda x, y: ((x.error / x.value) ** 2) + ((y.error / y.value) ** 2), inputs)  # type: ignore[arg-type, attr-defined]
     else:
         relative_error_squared = (inputs[0].error / inputs[0].value) ** 2
     return np.sqrt(relative_error_squared)

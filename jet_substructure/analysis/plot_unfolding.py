@@ -1383,7 +1383,7 @@ def plot_pp_PbPb_comparison(
     # from: https://stackoverflow.com/a/42170161
     # doesn't seem to work...
     from matplotlib.legend_handler import HandlerLine2D
-    class SymHandler2(HandlerLine2D):  # type: ignore[misc]
+    class SymHandler2(HandlerLine2D):
         def create_artists(self, legend, orig_handle, xdescent, ydescent, width, height, fontsize, trans):  # type: ignore[no-untyped-def] # noqa: ARG002
             xx= 2.3*height
             return super().create_artists(legend, orig_handle, xdescent, xx, width, height, fontsize, trans)
