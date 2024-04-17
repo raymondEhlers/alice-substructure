@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 
 @attrs.define(eq=False)
 class AsymmetricErrors:
+    """Asymmetric uncertainties
+
+    Note:
+        The uncertainties are assumed to be absolute and positive definite values.
+    """
     low: npt.NDArray[np.float64]
     high: npt.NDArray[np.float64]
 
@@ -33,24 +38,50 @@ class AsymmetricErrors:
     def smooth(self, n_times: int = 1) -> None:
         """Smooth the uncertainties.
 
+        They are smoothed using the smoothing algorithm implemented in ROOT. It can be
+        pretty aggressive, so it's best to keep the number of iterations low.
+
+        Note:
+            Beware! The values are smoothed in place!
+
         Args:
-            n_times: Number of iterations to use to smooth the uncertainties.
+            n_times: Number of iterations to use to smooth the uncertainties. Default: 1.
+        Returns:
+            None. The uncertainties are smoothed in place.
         """
         # Setup
         # We'll have to treat it differently for one-sided and two-sided
         one_sided = False
-        low_is_zero_array = np.isclose(self.low, np.zeros_like(self.low), atol=1e-17)
-        high_is_zero_array = np.isclose(self.high, np.zeros_like(self.high), atol=1e-17)
-        if np.all(low_is_zero_array or high_is_zero_array):
+        low_is_zero = np.isclose(self.low, np.zeros_like(self.low))
+        high_is_zero = np.isclose(self.high, np.zeros_like(self.high))
+        # If one of them is zero at each value in the array, then we know the
+        # array is one sided
+        if np.all(np.logical_or(low_is_zero, high_is_zero)):
             one_sided = True
+        # Also check if they're identical
+        values_are_symmetric = np.allclose(self.low, self.high)
 
         if one_sided:
-            values = np.where(low_is_zero_array, self.high, self.low)
+            # We want the non-zero values, so low is zero, then we take the high,
+            # and when low is non-zero, we take the low.
+            values = np.where(low_is_zero, self.high, self.low)
+            # Now we smooth those values
             smoothed_values = array_helpers.smooth_array(values, n_times=n_times)
-            self.low[~low_is_zero_array] = smoothed_values[~low_is_zero_array]
-            self.high[low_is_zero_array] = smoothed_values[low_is_zero_array]
+            # And then assign them back to the correct array
+            self.low[~low_is_zero] = smoothed_values[~low_is_zero]
+            self.high[low_is_zero] = smoothed_values[low_is_zero]
+        elif values_are_symmetric:
+            # If the values are symmetric, we'll just smooth once and assign.
+            # This should be a subset of the final case, but I want to calculate
+            # it only once to ensure there aren't any numerical instabilities
+            # NOTE: We choose low arbitrarily. We know they're the same, so it doesn't matter.
+            smoothed_values = array_helpers.smooth_array(self.low, n_times=n_times)
+            self.low = smoothed_values
+            self.high = smoothed_values
         else:
             # Smooth the uncertainties
+            # Here, we don't need to do the same gymnastics as above because we
+            # each side has independent values.
             self.low = array_helpers.smooth_array(self.low, n_times=n_times)
             self.high = array_helpers.smooth_array(self.high, n_times=n_times)
 
