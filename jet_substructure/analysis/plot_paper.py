@@ -74,7 +74,7 @@ def validate_event_activity_to_kt_range(
     Returns:
         Mapping from event activity to kt range for each grooming method.
     """
-    output = copy.deepcopy(event_activity_to_kt_range)
+    output: dict[str, dict[str, helpers.KtRange]] = copy.deepcopy(event_activity_to_kt_range)  # type: ignore[arg-type]
     for ev, kt_range in event_activity_to_kt_range.items():
         if isinstance(kt_range, helpers.KtRange):
             output[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
