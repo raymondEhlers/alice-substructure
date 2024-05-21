@@ -1413,26 +1413,9 @@ available_datasets:
         entries_per_job: 1.5e5
         files:
             - "trains/embed_pythia/0069/production.yaml"
-    # Systematic: Tracking efficiency without pt dependence (4%)
-    LHC20g4_embedded_into_LHC18qr_semi_central_R02_tracking_efficiency_0070: &LHC18qr_semi_central_R02_mammoth_embedded_tracking_efficiency
-        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_tracking_efficiency_0070"
-        tree_name: "tree"
-        # Map for the uniform prefix name to the analysis task prefix.
-        prefixes:
-            hybrid: "hybrid"
-            "true": "true"
-            det_level: "det_level"
-        # Branches which don't exist for all prefixes
-        branches: ["data_leading_track_pt"]
-        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
-        prefix_branches: *prefix_branches
-        jet_R: 0.2
-        entries_per_job: 1.5e5
-        files:
-            - "trains/embed_pythia/0070/production.yaml"
-    # # Systematic: Tracking efficiency with pt dependence
-    # LHC20g4_embedded_into_LHC18qr_semi_central_R02_tracking_efficiency_pt_dep_0075: &LHC18qr_semi_central_R02_mammoth_embedded_tracking_efficiency_pt_dep
-    #     name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_tracking_efficiency_pt_dep_0075"
+    # # Systematic: Tracking efficiency without pt dependence (4%)
+    # LHC20g4_embedded_into_LHC18qr_semi_central_R02_tracking_efficiency_0070: &LHC18qr_semi_central_R02_mammoth_embedded_tracking_efficiency
+    #     name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_tracking_efficiency_0070"
     #     tree_name: "tree"
     #     # Map for the uniform prefix name to the analysis task prefix.
     #     prefixes:
@@ -1446,7 +1429,24 @@ available_datasets:
     #     jet_R: 0.2
     #     entries_per_job: 1.5e5
     #     files:
-    #         - "trains/embed_pythia/0075/production.yaml"
+    #         - "trains/embed_pythia/0070/production.yaml"
+    # Systematic: Tracking efficiency with pt dependence
+    LHC20g4_embedded_into_LHC18qr_semi_central_R02_tracking_efficiency_pt_dep_0077: &LHC18qr_semi_central_R02_mammoth_embedded_tracking_efficiency_pt_dep
+        name: "LHC20g4_embedded_into_LHC18qr_semi_central_R02_tracking_efficiency_pt_dep_0077"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            hybrid: "hybrid"
+            "true": "true"
+            det_level: "det_level"
+        # Branches which don't exist for all prefixes
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/embed_pythia/0077/production.yaml"
     #---------------------------------------------------------
     # Pythia embedded into semi-central thermal model, R = 0.2
     #---------------------------------------------------------
@@ -1576,10 +1576,9 @@ available_datasets:
         files:
             - "trains/embed_pythia/0073/production.yaml"
     # Systematic: Tracking efficiency with pt dependence
-    # NOTE: We don't have one without because the central haven't been approved before, so there's no
-    #       point in running without it now
-    LHC20g4_embedded_into_LHC18qr_central_R02_tracking_efficiency_pt_dep_0074: &LHC18qr_central_R02_mammoth_embedded_tracking_efficiency_pt_dep
-        name: "LHC20g4_embedded_into_LHC18qr_central_R02_tracking_efficiency_pt_dep_0074"
+    # Switched to 0078 due to a bug in 0074
+    LHC20g4_embedded_into_LHC18qr_central_R02_tracking_efficiency_pt_dep_0078: &LHC18qr_central_R02_mammoth_embedded_tracking_efficiency_pt_dep
+        name: "LHC20g4_embedded_into_LHC18qr_central_R02_tracking_efficiency_pt_dep_0078"
         tree_name: "tree"
         # Map for the uniform prefix name to the analysis task prefix.
         prefixes:
@@ -1593,7 +1592,7 @@ available_datasets:
         jet_R: 0.2
         entries_per_job: 1.5e5
         files:
-            - "trains/embed_pythia/0074/production.yaml"
+            - "trains/embed_pythia/0078/production.yaml"
     #----------------------------------------------------
     # Pythia embedded into central thermal model, R = 0.2
     #----------------------------------------------------
@@ -1906,7 +1905,7 @@ analysis_configurations:
                 embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded
             tracking_efficiency:
                 PbPb: *LHC18qr_semi_central_R02_mammoth
-                embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_tracking_efficiency
+                embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_tracking_efficiency_pt_dep
             rmax_005:
                 PbPb: *LHC18qr_semi_central_R02_mammoth_Rmax005
                 embed_pythia: *LHC18qr_semi_central_R02_mammoth_embedded_Rmax005
