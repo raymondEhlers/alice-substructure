@@ -946,7 +946,7 @@ def run_response(  # noqa: C901
 
     # Now, determine the variable and the appropriate cuts
     for substructure_var in ["kt", "delta_R", "z"]:
-        min_kt_requirement = []
+        min_kt_requirement: list[float | None] = []
         if substructure_var == "kt":
             min_kt_requirement = [None]
         else:
