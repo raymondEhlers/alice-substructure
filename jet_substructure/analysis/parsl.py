@@ -2030,7 +2030,7 @@ def setup_job_framework(
     target_n_tasks_to_run_simultaneously: int,
     log_level: int,
     conda_environment_name: Optional[str] = None,
-) -> Tuple[parsl.DataFlowKernel, parsl.Config] | Tuple[dask.distributed.Client, dask.distributed.SpecCluster]:
+) -> Tuple[parsl.DataFlowKernel, parsl.Config, job_utils.ExecutionSettings] | Tuple[dask.distributed.Client, dask.distributed.SpecCluster, job_utils.ExecutionSettings]:
     # First, need to figure out if we need additional environments such as ROOT
     _additional_worker_init_script = alice_job_utils.determine_additional_worker_init(
         conda_environment_name=conda_environment_name,
@@ -2439,7 +2439,7 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
     #facility="ORNL_b587_long" if job_utils.hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
 
     # Keep the job executor just to keep it alive
-    job_executor, _job_framework_config = setup_job_framework(
+    job_executor, _job_framework_config, exeuction_settings = setup_job_framework(
         job_framework=job_framework,
         jobs_to_execute=jobs_to_execute,
         task_config=task_config,
