@@ -20,12 +20,12 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 import numpy as np
 import numpy.typing as npt
 import uproot
-from mammoth.framework.analysis import jet_substructure as analysis_jet_substructure
-from mammoth.framework import root_utils
-from pachyderm import binned_data
 
 from jet_substructure.base import helpers, skim_analysis_objects
 from jet_substructure.base import unfolding as unfolding_base
+from mammoth.framework import root_utils
+from mammoth.framework.analysis import jet_substructure as analysis_jet_substructure
+from pachyderm import binned_data
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +83,8 @@ def correlation_hist_substructure_var(cov: TMatrixD, name: str, title: str, na: 
 
     h = ROOT.TH2D(name, title, nb, 0, nb, nb, 0, nb)
 
-    for i in range(0, nb):
-        for n in range(0, nb):
+    for i in range(0, nb):  # noqa: PIE808
+        for n in range(0, nb):  # noqa: PIE808
             index1 = kbin + na * i
             index2 = kbin + na * n
             Vv = cov(index1, index1) * cov(index2, index2)
@@ -112,8 +112,8 @@ def correlation_hist_pt(cov: TMatrixD, name: str, title: str, na: int, nb: int, 
 
     h = ROOT.TH2D(name, title, na, 0, na, na, 0, na)
 
-    for i in range(0, na):
-        for n in range(0, na):
+    for i in range(0, na):  # noqa: PIE808
+        for n in range(0, na):  # noqa: PIE808
             index1 = i + na * kbin
             index2 = n + na * kbin
             Vv = cov(index1, index1) * cov(index2, index2)
@@ -192,7 +192,7 @@ def unfolding_2D(
         if n_iter == n_iter_for_covariance:
             covariance_matrix = unfold.Ereco(ROOT.RooUnfold.kCovariance)
             # Substructure variable.
-            for k in range(0, true_spectra.GetNbinsX()):
+            for k in range(0, true_spectra.GetNbinsX()):  # noqa: PIE808
                 h_corr = correlation_hist_substructure_var(
                     covariance_matrix,
                     f"{tag}corr{k}",
@@ -208,7 +208,7 @@ def unfolding_2D(
                 output_hists[name] = cov_substructure_var
 
             # Jet pt.
-            for k in range(0, true_spectra.GetNbinsY()):
+            for k in range(0, true_spectra.GetNbinsY()):  # noqa: PIE808
                 h_corr = correlation_hist_pt(
                     covariance_matrix,
                     f"{tag}corr{k}pt",
@@ -247,7 +247,7 @@ def _setup_unfolding() -> None:
     # as a proxy for this. Loading it twice appears to cause segfaults in some cases.
     if not hasattr(ROOT, "unfolding"):
         # ROOT.gInterpreter.ProcessLine(f"""#include "{str(unfolding_cxx)}" """)
-        ROOT.gInterpreter.ProcessLine(f""".L {str(unfolding_cxx)} """)
+        ROOT.gInterpreter.ProcessLine(f""".L {unfolding_cxx!s} """)
 
 
 def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path, additional_tag: str = "") -> None:
