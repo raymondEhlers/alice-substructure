@@ -13,7 +13,7 @@ import logging
 import re
 from concurrent.futures import Future
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, MutableSequence, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Mapping, MutableSequence, Optional, Sequence, Union
 
 import attrs
 import dask.distributed
@@ -21,25 +21,22 @@ import IPython
 import numpy as np
 import parsl
 import uproot
-from mammoth.framework.analysis import objects as analysis_objects
-from mammoth.framework.analysis import jet_substructure as analysis_jet_substructure
-from mammoth.framework import utils as mammoth_utils
-from mammoth import helpers
-from pachyderm import yaml
 from parsl.data_provider.files import File
-
-from mammoth import job_utils
-from mammoth.job_utils import python_app
-from mammoth.alice import job_utils as alice_job_utils
 
 from jet_substructure.base import helpers as jsub_helpers
 from jet_substructure.base import unfolding as unfolding_base
-
+from mammoth import helpers, job_utils
+from mammoth.alice import job_utils as alice_job_utils
+from mammoth.framework import utils as mammoth_utils
+from mammoth.framework.analysis import jet_substructure as analysis_jet_substructure
+from mammoth.framework.analysis import objects as analysis_objects
+from mammoth.job_utils import python_app
+from pachyderm import yaml
 
 logger = logging.getLogger(__name__)
 
 
-def read_full_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
+def read_full_config(config_path: Optional[Path] = None) -> dict[str, Any]:
     """Read full YAML configuration file.
 
     Args:
@@ -51,13 +48,13 @@ def read_full_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
         config_path = Path("config/new_config.yaml")
 
     y = yaml.yaml()
-    with open(config_path, "r") as f:
-        full_config: Dict[str, Any] = y.load(f)
+    with config_path.open() as f:
+        full_config: dict[str, Any] = y.load(f)
 
     return full_config
 
 
-def read_dataset_config(base_dataset_name: str, config_path: Optional[Path] = None) -> Dict[str, Any]:
+def read_dataset_config(base_dataset_name: str, config_path: Optional[Path] = None) -> dict[str, Any]:
     """Read collision system configuration from YAML file.
 
     The collision system specification is defined in the YAML file.
@@ -70,7 +67,7 @@ def read_dataset_config(base_dataset_name: str, config_path: Optional[Path] = No
         The collision system configuration.
     """
     full_config = read_full_config(config_path=config_path)
-    config: Dict[str, Any] = full_config["analysis_configurations"][base_dataset_name]
+    config: dict[str, Any] = full_config["analysis_configurations"][base_dataset_name]
 
     return config
 
@@ -78,7 +75,7 @@ def read_dataset_config(base_dataset_name: str, config_path: Optional[Path] = No
 def read_extracted_scale_factors(
     collision_system: str,
     dataset_name: str,
-) -> Dict[int, float]:
+) -> dict[int, float]:
     """Read extracted scale factors.
 
     Args:
@@ -96,7 +93,7 @@ def read_extracted_scale_factors(
 @python_app
 def _repair_root_files(
     tree_name: str, n_cores: int, inputs: Sequence[File] = [], outputs: Sequence[File] = []
-) -> Dict[Path, List[Path]]:
+) -> dict[Path, list[Path]]:
     """ Repair ROOT files app. """
     from pathlib import Path
 
@@ -120,7 +117,7 @@ def setup_repair_root_files(
     n_cores_per_job: int,
     dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> List[Future[Dict[Path, List[Path]]]]:
+) -> list[Future[dict[Path, list[Path]]]]:
     """Repair ROOT files.
 
     Settings will be taken out of the configuration file.
@@ -178,7 +175,7 @@ def setup_repair_root_files(
     return results
 
 
-def _determine_number_of_entries_per_file(filenames: Sequence[Path], tree_name: str) -> Dict[Path, int]:
+def _determine_number_of_entries_per_file(filenames: Sequence[Path], tree_name: str) -> dict[Path, int]:
     """Retrieve the number of tree entries per ROOT file.
 
     Args:
@@ -187,7 +184,7 @@ def _determine_number_of_entries_per_file(filenames: Sequence[Path], tree_name: 
     Returns:
         Map from the filename to the number of entries.
     """
-    number_of_entries_per_file: Dict[Path, int] = {}
+    number_of_entries_per_file: dict[Path, int] = {}
 
     for filename in filenames:
         with uproot.open(filename) as f:
@@ -203,7 +200,7 @@ def _number_of_entries_per_file(
     collision_system: str,
     dataset_name: str,
     recreate: bool = False,
-) -> Dict[Path, int]:
+) -> dict[Path, int]:
     """Determine number of entries per file.
 
     Args:
@@ -234,16 +231,16 @@ def _number_of_entries_per_file(
             y.dump({str(k): v for k, v in number_of_entries_per_file.items()}, f)
 
     # Now we know that it exists, we can grab it.
-    with open(number_of_entries_file, "r") as f:
+    with open(number_of_entries_file) as f:
         res = y.load(f)
         number_of_entries_per_file = {Path(k): v for k, v in res.items()}
 
-    return number_of_entries_per_file
+    return number_of_entries_per_file  # noqa: RET504
 
 
 def _distribute_entries_to_jobs(
     number_of_entries_per_file: Mapping[Path, int], entries_per_job: int
-) -> Dict[Path, List[Tuple[int, int]]]:
+) -> dict[Path, list[tuple[int, int]]]:
     """Distribute a specific number of entries to each job.
 
     We distribute based on the number of entries in a given file, so if a file doesn't contain enough for a full job,
@@ -292,12 +289,12 @@ def _number_of_entries_per_file_app(
         logger.debug(filename)
         number_of_entries = f[tree_name].num_entries
 
-    return number_of_entries  # type: ignore[no-any-return]
+    return number_of_entries  # type: ignore[no-any-return]  # noqa: RET504
 
 
 @python_app
 def _write_number_of_entries_per_file_cache(
-    number_of_entries_per_file: Dict[str, int],
+    number_of_entries_per_file: dict[str, int],
     job_framework: job_utils.JobFramework,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
@@ -334,7 +331,7 @@ def _entries_to_ranges_for_jobs(
     number_of_entries: int,
     entries_per_job: int,
     job_framework: job_utils.JobFramework,
-) -> List[Tuple[int, int]]:
+) -> list[tuple[int, int]]:
     """Determine the event range for a job given a total number of entries.
 
     Args:
@@ -368,10 +365,10 @@ def _convert_to_parquet(
     branches: Sequence[str],
     prefix_branches: Sequence[str],
     job_framework: job_utils.JobFramework,
-    event_range: Optional[Tuple[Optional[int], Optional[int]]] = None,
+    event_range: Optional[tuple[Optional[int], Optional[int]]] = None,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
-) -> Tuple[bool, Path]:
+) -> tuple[bool, Path]:
     """ Convert to parquet app. """
     from pathlib import Path
 
@@ -396,7 +393,7 @@ def setup_convert_to_parquet(
     dataset_config: Mapping[str, Any],
     job_framework: job_utils.JobFramework,
     input_results: Optional[MutableSequence[Future[Any]]] = None,
-) -> Tuple[List[Future[Any]], List[Future[Any]]]:
+) -> tuple[list[Future[Any]], list[Future[Any]]]:
     """Setup convert_to_parquet app for execution with parsl.
 
     This is a bit more involved than many of the other tasks because it requires some
@@ -412,7 +409,7 @@ def setup_convert_to_parquet(
         List of `AppFuture` created when defining the jobs.
     """
     # Setup
-    results: List[Future[Any]] = []
+    results: list[Future[Any]] = []
 
     # Determine filenames
     if input_results is None or job_framework != job_utils.JobFramework.parsl:
@@ -429,7 +426,7 @@ def setup_convert_to_parquet(
         logger.info("Loading number of entries per file cache")
         # Now we know that it exists, we can grab it.
         y = yaml.yaml()
-        with open(number_of_entries_filename, "r") as f:
+        with open(number_of_entries_filename) as f:
             res = y.load(f)
             # number_of_entries_per_file = {Path(k): v for k, v in res.items()}
             number_of_entries_per_file = {k: v for k, v in res.items()}
@@ -541,16 +538,15 @@ def setup_convert_to_parquet(
 
 def _determine_pythia_input_files_per_pt_hard_bin(
     dataset_config: Mapping[str, Any],
-) -> Dict[int, List[Path]]:
-    input_files_per_pt_hard_bin: Dict[int, List[Path]] = {}
+) -> dict[int, list[Path]]:
+    input_files_per_pt_hard_bin: dict[int, list[Path]] = {}
     all_filenames = []
     for filename_base in dataset_config["files"]:
-        filename_base = Path(filename_base)
+        filename_base = Path(filename_base)  # noqa: PLW2901
         all_filenames.extend([Path(f) for f in mammoth_utils.expand_wildcards_in_filenames([filename_base])])
 
     # Sort by pt hard bins
     # We're in Run 2, so pretty safe to assume 20 pt hard bins
-    input_files_per_pt_hard_bin
     for pt_hard_bin in range(1, 21):
         input_files_per_pt_hard_bin[pt_hard_bin] = [f for f in all_filenames if f"{pt_hard_bin:02g}" in str(f.name)]
 
@@ -562,14 +558,14 @@ def _determine_pythia_input_files_per_pt_hard_bin(
 def _determine_embedding_input_files_per_pt_hard_bin(
     dataset_config: Mapping[str, Any],
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> Dict[int, List[Path]]:
+) -> dict[int, list[Path]]:
     input_files_per_pt_hard_bin = {}
     for filename_base in dataset_config["files"]:
-        filename_base = Path(filename_base)
+        filename_base = Path(filename_base)  # noqa: PLW2901
 
         # Grab the pt hard bin to use as the key.
         y = yaml.yaml()
-        with open(filename_base.parent / "config.yaml", "r") as f:
+        with (filename_base.parent / "config.yaml").open() as f:
             train_config = y.load(f)
         train_number = train_config["number"]
         pt_hard_bin = train_config["pt_hard_bin"]
@@ -598,14 +594,13 @@ def _extract_scale_factors_from_hists(
 ) -> analysis_objects.ScaleFactor:
     from pathlib import Path
 
-    from mammoth.framework.analysis.objects import ScaleFactor
-
     from jet_substructure.cpp import scale_factors as sf
+    from mammoth.framework.analysis.objects import ScaleFactor
 
     res = ScaleFactor.from_hists(
         *sf.scale_factor_ROOT(filenames=[Path(i.filepath) for i in inputs])
     )
-    return res
+    return res  # noqa: RET504
 
 
 def setup_extract_scale_factors(
@@ -613,7 +608,7 @@ def setup_extract_scale_factors(
     dataset_config: Mapping[str, Any],
     job_framework: job_utils.JobFramework,
     selected_train_numbers: Optional[Sequence[int]] = None,
-) -> Dict[int, Future[analysis_objects.ScaleFactor]]:
+) -> dict[int, Future[analysis_objects.ScaleFactor]]:
     """Extract scale factors from embedding or pythia hists.
 
     Note:
@@ -657,9 +652,8 @@ def _write_scale_factors_to_yaml(
 ) -> bool:
     from pathlib import Path
 
-    from pachyderm import yaml
-
     from mammoth.framework.analysis import objects as analysis_objects
+    from pachyderm import yaml
 
     # Write them to YAML for later.
     y = yaml.yaml(classes_to_register=[analysis_objects.ScaleFactor])
@@ -687,7 +681,7 @@ def _write_cross_check_task_scale_factor_trees(
         filename=Path(inputs[0].filepath),
         scale_factor=scale_factor,
     )
-    return res
+    return res  # noqa: RET504
 
 
 def setup_write_scale_factors(
@@ -741,7 +735,7 @@ def _extract_pt_hard_spectra(
     offsets_values = list(offsets.values())
     filenames = {
         pt_hard_bin: [
-            Path(f.filepath) for f in inputs[sum(offsets_values[:i]) : sum(offsets_values[: i + 1])]  # noqa: E203
+            Path(f.filepath) for f in inputs[sum(offsets_values[:i]) : sum(offsets_values[: i + 1])]
         ]
         for i, pt_hard_bin in enumerate(offsets)
     }
@@ -749,12 +743,12 @@ def _extract_pt_hard_spectra(
     #    pt_hard_bin: {Path(f.filepath) for pt_hard_bin, f in enumerate(inputs, start=1)}
     # }
 
-    res = sf.pt_hard_spectra_from_hists(
+    res = sf.pt_hat_spectra_from_hists(
         filenames=filenames,
         scale_factors=scale_factors,
         output_filename=Path(outputs[0].filepath),
     )
-    return res
+    return res  # noqa: RET504
 
 
 def setup_extract_embedding_pt_hard_spectra(
@@ -811,7 +805,7 @@ def setup_extract_embedding_pt_hard_spectra(
         outputs=[File(str(output_filename))],
     )
 
-    return results
+    return results  # noqa: RET504
 
 
 @python_app
@@ -825,7 +819,7 @@ def _calculate_embedding_skim(
     outputs: Sequence[File] = [],
     stdout: Optional[str] = None,
     stderr: Optional[str] = None,
-) -> Tuple[bool, Path, str]:
+) -> tuple[bool, Path, str]:
     """ Calculate embedding skim app. """
     import traceback
     from pathlib import Path
@@ -860,7 +854,7 @@ def setup_calculate_embedding_skim(
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[Future[Any]]] = None,
-) -> List[Future[Tuple[bool, Path, str]]]:
+) -> list[Future[tuple[bool, Path, str]]]:
     """Setup to calculate embedding skim.
 
     Args:
@@ -943,7 +937,7 @@ def _calculate_data_skim(
     job_framework: job_utils.JobFramework,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
-) -> Tuple[bool, Path, str]:
+) -> tuple[bool, Path, str]:
     """ Calculate data skim app. """
     import traceback
     from pathlib import Path
@@ -978,7 +972,7 @@ def setup_calculate_data_skim(
     iterative_splittings: bool = True,
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[Future[Any]]] = None,
-) -> List[Future[Tuple[bool, Path, str]]]:
+) -> list[Future[tuple[bool, Path, str]]]:
     """Setup to calculate data skim.
 
     Args:
@@ -1089,7 +1083,7 @@ def setup_calculate_cross_check_task_skim(
     selected_train_numbers: Optional[Sequence[int]] = None,
     input_results: Optional[MutableSequence[Future[Any]]] = None,
     iterative_splittings: bool = True,
-) -> List[Future[bool]]:
+) -> list[Future[bool]]:
     # Validation
     if selected_train_numbers is None:
         selected_train_numbers = []
@@ -1113,7 +1107,7 @@ def setup_calculate_cross_check_task_skim(
     train_number_to_pt_hard_bin = {}
     for train_directory in train_directories:
         y = yaml.yaml()
-        with open(train_directory / "config.yaml", "r") as f:
+        with open(train_directory / "config.yaml") as f:
             train_config = y.load(f)
         # Validation
         if train_config["number"] != int(train_directory.name):
@@ -1176,9 +1170,9 @@ def _root_data_frame(
     cross_check_task: bool,
     double_counting_cut_name: str,
     job_framework: job_utils.JobFramework,
-    inputs: MutableSequence[File] = [],
-    outputs: MutableSequence[File] = [],
-) -> Tuple[bool, str]:
+    inputs: MutableSequence[File] = [],  # noqa: B006
+    outputs: MutableSequence[File] = [],  # noqa: B006
+) -> tuple[bool, str]:
     """ROOT data frame app.
 
     We keep them separate even though they are quite similar so their app names will be different.
@@ -1209,7 +1203,7 @@ def _root_data_frame(
         double_counting_cut_name=double_counting_cut_name,
     )
 
-    return res
+    return res  # noqa: RET504
 
 
 @python_app
@@ -1224,9 +1218,9 @@ def _root_data_frame_response(
     cross_check_task: bool,
     double_counting_cut_name: str,
     job_framework: job_utils.JobFramework,
-    inputs: MutableSequence[File] = [],
-    outputs: MutableSequence[File] = [],
-) -> Tuple[bool, str]:
+    inputs: MutableSequence[File] = [],  # noqa: B006
+    outputs: MutableSequence[File] = [],  # noqa: B006
+) -> tuple[bool, str]:
     """ROOT data frame response app.
 
     We keep them separate even though they are quite similar so their app names will be different.
@@ -1257,7 +1251,7 @@ def _root_data_frame_response(
         double_counting_cut_name=double_counting_cut_name,
     )
 
-    return res
+    return res  # noqa: RET504
 
 
 @python_app
@@ -1276,9 +1270,9 @@ def _root_data_frame_closure(
     double_counting_cut_name: str,
     additional_substructure_variable_cut: unfolding_base.AdditionalVariableCut,
     job_framework: job_utils.JobFramework,
-    inputs: MutableSequence[File] = [],
-    outputs: MutableSequence[File] = [],
-) -> Tuple[bool, str]:
+    inputs: MutableSequence[File] = [],  # noqa: B006
+    outputs: MutableSequence[File] = [],  # noqa: B006
+) -> tuple[bool, str]:
     """ROOT data frame closure app.
 
     We keep them separate even though they are quite similar so their app names will be different.
@@ -1307,7 +1301,7 @@ def _root_data_frame_closure(
         additional_substructure_variable_cut=additional_substructure_variable_cut,
     )
 
-    return res
+    return res  # noqa: RET504
 
 
 @python_app
@@ -1322,9 +1316,9 @@ def _root_data_frame_embedded_pt_hard_scaling(
     cross_check_task: bool,
     double_counting_cut_name: str,
     job_framework: job_utils.JobFramework,
-    inputs: MutableSequence[File] = [],
-    outputs: MutableSequence[File] = [],
-) -> Tuple[bool, str]:
+    inputs: MutableSequence[File] = [],  # noqa: B006
+    outputs: MutableSequence[File] = [],  # noqa: B006
+) -> tuple[bool, str]:
     """ROOT data frame pt hard scaling app.
 
     We keep them separate even though they are quite similar so their app names will be different.
@@ -1357,14 +1351,14 @@ def _root_data_frame_embedded_pt_hard_scaling(
         double_counting_cut_name=double_counting_cut_name,
     )
 
-    return res
+    return res  # noqa: RET504
 
 
 @attrs.define
 class RootDataFrameProcessingMode:
     name: str
     tag: str
-    func: Callable[..., Future[Tuple[bool, str]]]
+    func: Callable[..., Future[tuple[bool, str]]]
 
 
 def setup_root_data_frame(
@@ -1380,7 +1374,7 @@ def setup_root_data_frame(
     unfolding_settings: Optional[Mapping[str, Any]] = None,
     substructure_variable_name: str | None = None,
     unfolding_additional_substructure_variable_cut: unfolding_base.AdditionalVariableCut | None = None
-) -> List[Future[Tuple[bool, str]]]:
+) -> list[Future[tuple[bool, str]]]:
     # Validation
     # NOTE: I only compromised on specifying the function here because it loses the typing
     #       information from the `python_app` wrapper anyway.
@@ -1535,7 +1529,7 @@ def embedded_pt_hard_scaling_cross_check(
     base_unfolding_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
     job_framework: job_utils.JobFramework,
-) -> List[Future[Tuple[bool, str]]]:
+) -> list[Future[tuple[bool, str]]]:
     results = []
 
     # Assume that we have on train per line. That's usually a pretty good assumption.
@@ -1585,7 +1579,7 @@ def _unfolding_standard(
     response_tree_name: str,
     debug_cpp_code: bool,
     job_framework: job_utils.JobFramework,
-    inputs: Tuple[Sequence[File], Sequence[File]] = ([], []),
+    inputs: tuple[Sequence[File], Sequence[File]] = ([], []),
     outputs: Sequence[File] = [],
 ) -> bool:
     import random
@@ -1627,7 +1621,7 @@ def _unfolding_closure(
     response_tree_name: str,
     debug_cpp_code: bool,
     job_framework: job_utils.JobFramework,
-    inputs: Tuple[Sequence[File], Sequence[File]] = ([], []),
+    inputs: tuple[Sequence[File], Sequence[File]] = ([], []),
     outputs: Sequence[File] = [],
 ) -> bool:
     import random
@@ -1659,7 +1653,7 @@ def _unfolding_closure(
 class UnfoldingRuntimeSettings:
     variable_to_unfold: str = attrs.field(default="kt")
     normalize_variable_by_jet_pt: bool = attrs.field(default=False)
-    selected_settings: List[str] = attrs.field(factory=lambda: ["default"])
+    selected_settings: list[str] = attrs.field(factory=lambda: ["default"])
     _output_dir_tag: str = attrs.field(default="")
 
     def output_dir(self, data_collision_system: str) -> Path:
@@ -1677,7 +1671,7 @@ def setup_all_unfolding(  # noqa: C901
     n_cores_per_job: int,
     job_framework: job_utils.JobFramework,
     debug_cpp_code: bool = False,
-) -> List[Future[Any]]:
+) -> list[Future[Any]]:
     """Setup unfolding jobs.
 
     Args:
@@ -1708,7 +1702,7 @@ def setup_all_unfolding(  # noqa: C901
     }
     response_collision_system = data_to_response_collision_system_name[data_collision_system]
 
-    results: List[Future[Any]] = []
+    results: list[Future[Any]] = []
     # Maps from the reweight hist name to the task.
     _reweight_prior_results = {}
     for unfolding_settings_name in selected_unfolding_settings:
@@ -1739,8 +1733,8 @@ def setup_all_unfolding(  # noqa: C901
         response_train_directories = set([Path(filename).parent for filename in response_dataset_config["files"]])
 
         # Determine filenames first since they don't depend on grooming methods
-        data_files: List[File] = []
-        response_files: List[File] = []
+        data_files: list[File] = []
+        response_files: list[File] = []
         for label, train_directories, files in [
             (data_collision_system, data_train_directories, data_files),
             (response_collision_system, response_train_directories, response_files),
@@ -1783,7 +1777,7 @@ def setup_all_unfolding(  # noqa: C901
                 must_find_parameter=False
             )
             # If None, any possible additional cut will not be enabled
-            if _additional_variable_cut is None:
+            if _additional_variable_cut is None:  # noqa: SIM108
                 _additional_variable_cut = {}
             else:
                 # Convert from yaml type to standard dict for convenience
@@ -1808,13 +1802,13 @@ def setup_all_unfolding(  # noqa: C901
                         binning_type="true",
                         grooming_method=grooming_method,
                         substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
-                        nested_variable_name=f"var_over_pt" if unfolding_runtime_settings.normalize_variable_by_jet_pt else None,
+                        nested_variable_name="var_over_pt" if unfolding_runtime_settings.normalize_variable_by_jet_pt else None,
                     ),
                     smeared_bins=_get_bins(
                         binning_type="smeared",
                         grooming_method=grooming_method,
                         substructure_variable_to_analyze=unfolding_runtime_settings.variable_to_unfold,
-                        nested_variable_name=f"var_over_pt" if unfolding_runtime_settings.normalize_variable_by_jet_pt else None,
+                        nested_variable_name="var_over_pt" if unfolding_runtime_settings.normalize_variable_by_jet_pt else None,
                     ),
                     name=unfolding_runtime_settings.variable_to_unfold,
                     variable_name=unfolding_runtime_settings.variable_to_unfold,
@@ -1997,21 +1991,21 @@ def _trivial_ROOT_test_app(job_framework: job_utils.JobFramework) -> bool:
     # NOTE: We're using print here to avoid any possible issues with logs not being passed on correctly, etc.
     #       We have a pretty good handle of that now, but it's just not worth the risk.
     from jet_substructure.cpp import utils
-    print("Pre ROOT")
+    print("Pre ROOT")  # noqa: T201
     # If there's a ROOT issue (deadlock or otherwise), we will see it here. The next message won't be printed.
     ROOT = utils.import_ROOT()
-    print("Post ROOT / Pre MT")
+    print("Post ROOT / Pre MT")  # noqa: T201
     h = ROOT.TH1D("test", "test", 10, 0, 1)
     h.GetEntries()
-    print("Post MT")
-    print("About to do second import")
+    print("Post MT")  # noqa: T201
+    print("About to do second import")  # noqa: T201
     # Perform it a second time so we can confirm that
-    ROOT2 = utils.import_ROOT()
-    print("Done with second import")
+    ROOT2 = utils.import_ROOT()  # noqa: F841
+    print("Done with second import")  # noqa: T201
     return True
 
 
-def setup_trivial_ROOT_test(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
+def setup_trivial_ROOT_test(job_framework: job_utils.JobFramework) -> list[Future[Any]]:
     """Setup for trivial ROOT import test app.
 
     For when there are issues with ROOT (especially new ROOT versions).
@@ -2030,7 +2024,7 @@ def setup_job_framework(
     target_n_tasks_to_run_simultaneously: int,
     log_level: int,
     conda_environment_name: Optional[str] = None,
-) -> Tuple[parsl.DataFlowKernel, parsl.Config, job_utils.ExecutionSettings] | Tuple[dask.distributed.Client, dask.distributed.SpecCluster, job_utils.ExecutionSettings]:
+) -> tuple[parsl.DataFlowKernel, parsl.Config, job_utils.ExecutionSettings] | tuple[dask.distributed.Client, dask.distributed.SpecCluster, job_utils.ExecutionSettings]:
     # First, need to figure out if we need additional environments such as ROOT
     _additional_worker_init_script = alice_job_utils.determine_additional_worker_init(
         conda_environment_name=conda_environment_name,
@@ -2066,12 +2060,14 @@ def setup_and_submit_tasks(  # noqa: C901
     collision_system: str,
     jobs_to_execute: Sequence[str],
     input_grooming_methods: Optional[Sequence[str]] = None,
-    unfolding_runtime_settings: UnfoldingRuntimeSettings = UnfoldingRuntimeSettings(),
+    unfolding_runtime_settings: UnfoldingRuntimeSettings | None = None,
     dask_client: Optional[dask.distributed.Client] = None,
-) -> List[Future[Any]]:
+) -> list[Future[Any]]:
     # Validation
     if dask_client is None and job_framework == job_utils.JobFramework.dask_delayed:
         raise ValueError("Must provide dask client if running with dask_delayed job framework!")
+    if unfolding_runtime_settings is None:
+        unfolding_runtime_settings = UnfoldingRuntimeSettings()
 
     #nodes_to_allocate = 8
     #nodes_to_allocate = 1
@@ -2128,8 +2124,8 @@ def setup_and_submit_tasks(  # noqa: C901
     if cross_check_task:
         grooming_methods = dataset_config["grooming_methods"]
 
-    results: List[Future[Any]] = []
-    all_results: List[Future[Any]] = []
+    results: list[Future[Any]] = []
+    all_results: list[Future[Any]] = []
     logger.info(f"Jobs to execute: {jobs_to_execute}")
     if "repair_root_files" in jobs_to_execute:
         # NOTE: No input_results here because it's the first step.
@@ -2300,7 +2296,7 @@ def setup_and_submit_tasks(  # noqa: C901
     return all_results
 
 
-def follow_progress_of_futures(futures: List[Future[Any]]) -> None:
+def follow_progress_of_futures(futures: list[Future[Any]]) -> None:
     # Process the futures, showing processing progress
     # Since it returns the results, we can actually use this to accumulate results.
     gen_results = job_utils.provide_results_as_completed(futures, running_with_parsl=True)
@@ -2332,7 +2328,7 @@ def follow_progress_of_futures(futures: List[Future[Any]]) -> None:
     logger.info("Done")
 
 
-def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
+def run(job_framework: job_utils.JobFramework) -> list[Future[Any]]:
     # Settings
     # Base settings
     facility: job_utils.FACILITIES = "rehlers_mbp_m1pro"
@@ -2439,7 +2435,7 @@ def run(job_framework: job_utils.JobFramework) -> List[Future[Any]]:
     #facility="ORNL_b587_long" if job_utils.hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
 
     # Keep the job executor just to keep it alive
-    job_executor, _job_framework_config, exeuction_settings = setup_job_framework(
+    job_executor, _job_framework_config, execution_settings = setup_job_framework(
         job_framework=job_framework,
         jobs_to_execute=jobs_to_execute,
         task_config=task_config,
