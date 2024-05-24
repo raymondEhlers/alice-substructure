@@ -14,14 +14,14 @@ import attr
 import numpy as np
 import numpy.typing as npt
 import uproot
-from mammoth import helpers as mammoth_helpers
-from mammoth.framework import utils
-from mammoth.framework.analysis import jet_substructure as jet_substructure_analysis
-from pachyderm import binned_data
 
 from jet_substructure.base import helpers, skim_analysis_objects
 from jet_substructure.base import unfolding as unfolding_base
 from jet_substructure.cpp import utils as root_utils
+from mammoth import helpers as mammoth_helpers
+from mammoth.framework import utils
+from mammoth.framework.analysis import jet_substructure as jet_substructure_analysis
+from pachyderm import binned_data
 
 logger = logging.getLogger(__name__)
 
@@ -49,17 +49,16 @@ def _standard_substructure_axis(substructure_var: str, jet_R: float) -> npt.NDAr
             # NOTE: Lower edge varies to ensure that we only have below 0.
             kt_axis = np.linspace(-0.5, 12, 25 + 1, dtype=np.float64)
         return kt_axis
-    elif substructure_var == "delta_R":
+    if substructure_var == "delta_R":
         n_bins_delta_R = round((jet_R + 0.02) / 0.02)
         delta_R_axis = np.linspace(-0.02, jet_R, n_bins_delta_R + 1, dtype=np.float64)
-        return delta_R_axis
-    elif substructure_var == "z":
+        return delta_R_axis  # noqa: RET504
+    if substructure_var == "z":
         n_bins_z = 21
         z_axis = np.linspace(-0.025, 0.5, n_bins_z + 1, dtype=np.float64)
-        return z_axis
-    else:
-        msg = f"Invalid substructure variable {substructure_var}"
-        raise ValueError(msg)
+        return z_axis  # noqa: RET504
+    msg = f"Invalid substructure variable {substructure_var}"
+    raise ValueError(msg)
 
 
 def new_matching_hists(
@@ -946,11 +945,9 @@ def run_response(  # noqa: C901
 
     # Now, determine the variable and the appropriate cuts
     for substructure_var in ["kt", "delta_R", "z"]:
-        min_kt_requirement: list[float | None] = []
-        if substructure_var == "kt":
-            min_kt_requirement = [None]
-        else:
-            min_kt_requirement = [None, 1.0, 1.5, 2.0]
+        min_kt_requirement: list[float | None] = [None]
+        if substructure_var != "kt":
+            min_kt_requirement.extend([1.0, 1.5, 2.0])
 
         for min_kt in min_kt_requirement:
             tag = ""
