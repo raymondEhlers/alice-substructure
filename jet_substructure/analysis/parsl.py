@@ -1594,6 +1594,7 @@ def _filter_files_for_parsl_if_needed_based_on_double_counting_cut(
     """
     files = []
     # Then iterate over the directories.
+    first_round = True
     for filename in Path(f"{train_directory}/skim/").glob("*.root"):
         # Filter out pt hat bins based on the double counting cut settings
         # We enable this when:
@@ -1601,9 +1602,15 @@ def _filter_files_for_parsl_if_needed_based_on_double_counting_cut(
         # - We're looking at embed_pythia or jewel is somehow involved, per the unfolding configuration provided
         # NOTE: This won't work if not produced by mammoth...
         if double_counting_cut_settings.min_pt_hat_bin > 0 and (collision_system == "embed_pythia" or collision_system_check_override):
+            # Make some note when this happens...
+            if first_round:
+                logger.info("Filtering pt hat bins based on double counting cut settings.")
+                first_round = False
+
+            # Apply the filtering
             _extracted_pt_hat_bin = _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filename=filename)
             if _extracted_pt_hat_bin <= double_counting_cut_settings.min_pt_hat_bin:
-                logger.info(f"Due to double counting cut of min pt hat bin of {double_counting_cut_settings.min_pt_hat_bin}, skipping pt hat bin {_extracted_pt_hat_bin} file {filename}")
+                logger.debug(f"Due to double counting cut of min pt hat bin of {double_counting_cut_settings.min_pt_hat_bin}, skipping pt hat bin {_extracted_pt_hat_bin} file {filename}")
                 continue
         files.append(File(str(filename)))
 
