@@ -699,7 +699,7 @@ def setup_write_scale_factors(
     logger.info("Writing scale factors to YAML. Jobs are executing, so this will take a minute...")
     output_filename = Path(f"trains/{collision_system}/{dataset_config['name']}/scale_factors.yaml")
     parsl_output_file = File(str(output_filename))
-    # TODO: I'm guessing passing this is a problem because it's a class that's imported in an app, and then
+    # NOTE: I'm guessing passing this is a problem because it's a class that's imported in an app, and then
     #       we're trying to pass the result into another app. I think we can go one direction or the other,
     #       but not both. So we just take the result.
     yaml_result = _write_scale_factors_to_yaml(
@@ -1366,7 +1366,7 @@ class RootDataFrameProcessingMode:
     func: Callable[..., Future[tuple[bool, str]]]
 
 
-def setup_root_data_frame(  # noqa: C901
+def setup_root_data_frame(
     processing_mode: str,
     collision_system: str,
     n_cores_per_job: int,
@@ -1424,6 +1424,7 @@ def setup_root_data_frame(  # noqa: C901
     #       passing some selected unfolding_settings. We should still be a bit careful with this!
     _config_for_double_counting_cut = unfolding_settings if unfolding_settings is not None else base_unfolding_config["settings"]["default"]
     _double_counting_cut_name = _config_for_double_counting_cut.get("double_counting_cut", "")
+    logger.info(f"{_double_counting_cut_name=}")
     # Things are treated so different that it's better to be direct about the data collision system.
     _analyzing_pp = (collision_system == "pp" or collision_system == "pythia")
     if not _analyzing_pp and _double_counting_cut_name == "":
@@ -1446,18 +1447,16 @@ def setup_root_data_frame(  # noqa: C901
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
                 logger.debug(f"Skipping train number {train_directory.name}")
                 continue
-            logger.info(f"{processing_mode=}, {collision_system=}: Processing train number {train_directory.name}")
+            logger.info(f"{processing_mode=}, (provided) {collision_system=}: Processing train number {train_directory.name}")
 
-            # Then iterate over the directories.
-            for filename in Path(f"{train_directory}/skim/").glob("*.root"):
-                # Filter out pt hat bins based on the double counting cut settings
-                # NOTE: This won't work if not produced by mammoth...
-                if _double_counting_cut_settings.min_pt_hat_bin > 0 and collision_system == "embed_pythia":
-                    _extracted_pt_hat_bin = _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filename=filename)
-                    if _extracted_pt_hat_bin <= _double_counting_cut_settings.min_pt_hat_bin:
-                        logger.debug(f"Due to double counting cut of min pt hat bin of {_double_counting_cut_settings.min_pt_hat_bin}, skipping pt hat bin {_extracted_pt_hat_bin} file {filename}")
-                        continue
-                input_files.append(File(str(filename)))
+            input_files.extend(
+                _filter_files_for_parsl_if_needed_based_on_double_counting_cut(
+                    train_directory=train_directory,
+                    collision_system=collision_system,
+                    collision_system_check_override="jewel" in _config_for_double_counting_cut.get("datasets", ""),
+                    double_counting_cut_settings=_double_counting_cut_settings,
+                )
+            )
 
     # logger.info(f"Input files (len: {len(input_files)}: {input_files}")
     logger.info(f"{processing_mode} RDF, with N cores per job: {n_cores_per_job}")
@@ -1568,6 +1567,7 @@ _match_pt_hat_bin_from_embed_pythia_mammoth_production = re.compile("__(0?[1-9]|
 
 def _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filename: Path) -> int:
     # Example: `pythia__2640__run_by_run__LHC20g4__295612__1__AnalysisResults_20g4_007`
+    # Example 2: `851894__1__100__jewel__iterative_splittings.empty`
     possible_pt_hat_bins = _match_pt_hat_bin_from_embed_pythia_mammoth_production.findall(str(filename))
     if len(possible_pt_hat_bins) == 0:
         msg = f"Extracted no pt hat bins from filename {filename}"
@@ -1576,6 +1576,38 @@ def _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filena
         msg = f"Extracted multiple pt hat bins: ({possible_pt_hat_bins}) bin from filename {filename}"
         raise ValueError(msg)
     return int(possible_pt_hat_bins[0])
+
+
+def _filter_files_for_parsl_if_needed_based_on_double_counting_cut(
+    train_directory: Path,
+    collision_system: str,
+    collision_system_check_override: bool,
+    double_counting_cut_settings: analysis_jet_substructure.DoubleCountingCutParameters,
+) -> list[File]:
+    """Filter out pt hat bin files based on the double counting cut settings.
+
+    We enable this when:
+    - It's relevant for the provided double counting cut
+    - We're looking at embed_pythia or or we provide an override (e.g. if JEWEL is involved)
+
+    NOTE: This depends on being produced by mammoth. Otherwise, it just take all files.
+    """
+    files = []
+    # Then iterate over the directories.
+    for filename in Path(f"{train_directory}/skim/").glob("*.root"):
+        # Filter out pt hat bins based on the double counting cut settings
+        # We enable this when:
+        # - It's relevant for the selected double counting cut
+        # - We're looking at embed_pythia or jewel is somehow involved, per the unfolding configuration provided
+        # NOTE: This won't work if not produced by mammoth...
+        if double_counting_cut_settings.min_pt_hat_bin > 0 and (collision_system == "embed_pythia" or collision_system_check_override):
+            _extracted_pt_hat_bin = _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filename=filename)
+            if _extracted_pt_hat_bin <= double_counting_cut_settings.min_pt_hat_bin:
+                logger.info(f"Due to double counting cut of min pt hat bin of {double_counting_cut_settings.min_pt_hat_bin}, skipping pt hat bin {_extracted_pt_hat_bin} file {filename}")
+                continue
+        files.append(File(str(filename)))
+
+    return files
 
 
 @python_app
@@ -1753,17 +1785,26 @@ def setup_all_unfolding(  # noqa: C901
         ]:
             for train_directory in sorted(train_directories):
                 logger.info(f"Processing {label} train number {train_directory.name}")
+                files.extend(
+                    _filter_files_for_parsl_if_needed_based_on_double_counting_cut(
+                        train_directory=train_directory,
+                        collision_system=label,
+                        # TODO: Figure out how to determine this... Is this the right check??
+                        collision_system_check_override="jewel" in datasets_name,
+                        double_counting_cut_settings=_double_counting_cut_settings,
+                    )
+                )
 
-                # Then iterate over the directories.
-                for filename in Path(f"{train_directory}/skim/").glob("*.root"):
-                    # Filter out pt hat bins based on the double counting cut settings
-                    # NOTE: This won't work if not produced by mammoth...
-                    if _double_counting_cut_settings.min_pt_hat_bin > 0 and label == "embed_pythia":
-                        _extracted_pt_hat_bin = _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filename=filename)
-                        if _extracted_pt_hat_bin <= _double_counting_cut_settings.min_pt_hat_bin:
-                            logger.debug(f"Due to double counting cut of min pt hat bin of {_double_counting_cut_settings.min_pt_hat_bin}, skipping pt hat bin {_extracted_pt_hat_bin} file {filename}")
-                            continue
-                    files.append(File(str(filename)))
+                ## Then iterate over the directories.
+                #for filename in Path(f"{train_directory}/skim/").glob("*.root"):
+                #    # Filter out pt hat bins based on the double counting cut settings
+                #    # NOTE: This won't work if not produced by mammoth...
+                #    if _double_counting_cut_settings.min_pt_hat_bin > 0 and label == "embed_pythia":
+                #        _extracted_pt_hat_bin = _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filename=filename)
+                #        if _extracted_pt_hat_bin <= _double_counting_cut_settings.min_pt_hat_bin:
+                #            logger.debug(f"Due to double counting cut of min pt hat bin of {_double_counting_cut_settings.min_pt_hat_bin}, skipping pt hat bin {_extracted_pt_hat_bin} file {filename}")
+                #            continue
+                #    files.append(File(str(filename)))
 
         # For parsl to keep track of the data and response files
         input_files = [data_files, response_files]
@@ -2191,7 +2232,7 @@ def setup_and_submit_tasks(  # noqa: C901
         )
         all_results.append(single_results)
     if "calculate_embedding_skim" in jobs_to_execute:
-        # TODO: Devise an approach to retry.
+        # NOTE: Consider devising an approach to retry.
         if not cross_check_task:
             results = setup_calculate_embedding_skim(
                 collision_system=collision_system,
@@ -2212,7 +2253,7 @@ def setup_and_submit_tasks(  # noqa: C901
             )
         all_results.extend(results)
     if "calculate_data_skim" in jobs_to_execute:
-        # TODO: Devise an approach to retry.
+        # NOTE: Consider devising an approach to retry.
         results = setup_calculate_data_skim(
             collision_system=collision_system,
             entries_per_job=entries_per_job,
@@ -2236,6 +2277,13 @@ def setup_and_submit_tasks(  # noqa: C901
             job_framework=job_framework,
             # selected_train_numbers=list(range(5977, 5978)),
             input_results=results if results else None,
+            # We need additional settings for JEWEL (e.g. to override the double counting cut,
+            # which could still apply for PbPb "data" - i.e. JEWEL PbPb_MC), so we pass the
+            # settings here if available. Definitely a bit hacky, but good enough.
+            unfolding_settings=(
+                base_dataset_config["unfolding"]["settings"][dataset_type]
+                if "jewel" in dataset_type else None
+            ),
         )
         all_results.extend(rdf_results)
     if "root_data_frame_response" in jobs_to_execute:
