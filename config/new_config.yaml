@@ -3324,13 +3324,15 @@ analysis_configurations:
                 jewel_recoils_part_level:
                     label: "jewel_recoils_part_level"
                     closures: false
-                    closure_settings:
-                        use_data_stat_precision_for_smeared: true
-                        split_MC_fraction_for_response: 0.75
-                        max_untagged_bin: 10
                     reweight_prior: false
-                    double_counting_cut: "min_true_10_pt_hat_3"
+                    double_counting_cut: "disabled"
                     datasets: "jewel_recoils_part_level"
+                jewel_no_recoils_part_level:
+                    label: "jewel_no_recoils_part_level"
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "disabled"
+                    datasets: "jewel_no_recoils_part_level"
                 # JEWEL, for unfolding
                 # TODO: ...
 
