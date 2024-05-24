@@ -13,7 +13,7 @@ import logging
 import re
 from concurrent.futures import Future
 from pathlib import Path
-from typing import Any, Callable, Mapping, MutableSequence, Optional, Sequence, Union
+from typing import Any, Callable, Mapping, MutableSequence, Sequence
 
 import attrs
 import dask.distributed
@@ -36,7 +36,7 @@ from pachyderm import yaml
 logger = logging.getLogger(__name__)
 
 
-def read_full_config(config_path: Optional[Path] = None) -> dict[str, Any]:
+def read_full_config(config_path: Path | None = None) -> dict[str, Any]:
     """Read full YAML configuration file.
 
     Args:
@@ -54,7 +54,7 @@ def read_full_config(config_path: Optional[Path] = None) -> dict[str, Any]:
     return full_config
 
 
-def read_dataset_config(base_dataset_name: str, config_path: Optional[Path] = None) -> dict[str, Any]:
+def read_dataset_config(base_dataset_name: str, config_path: Path | None = None) -> dict[str, Any]:
     """Read collision system configuration from YAML file.
 
     The collision system specification is defined in the YAML file.
@@ -92,7 +92,7 @@ def read_extracted_scale_factors(
 
 @python_app
 def _repair_root_files(
-    tree_name: str, n_cores: int, inputs: Sequence[File] = [], outputs: Sequence[File] = []
+    tree_name: str, n_cores: int, inputs: Sequence[File] = [], outputs: Sequence[File] = []  # noqa: ARG001
 ) -> dict[Path, list[Path]]:
     """ Repair ROOT files app. """
     from pathlib import Path
@@ -116,7 +116,7 @@ def _repair_root_files(
 def setup_repair_root_files(
     n_cores_per_job: int,
     dataset_config: Mapping[str, Any],
-    selected_train_numbers: Optional[Sequence[int]] = None,
+    selected_train_numbers: Sequence[int] | None = None,
 ) -> list[Future[dict[Path, list[Path]]]]:
     """Repair ROOT files.
 
@@ -150,7 +150,7 @@ def setup_repair_root_files(
     # NOTE: It's important that we take a set because if the dir already has both, we don't
     #       want to try to add files twice.
     # NOTE: This is susceptible to issues if "repaired." is in the path, but I think that's unlikely.
-    filenames = sorted(set([Path(str(f).replace("repaired.", "")) for f in filenames]))
+    filenames = sorted({Path(str(f).replace("repaired.", "")) for f in filenames})
     # And then filter by selected trains if necessary
     if selected_train_numbers:
         filenames = [f for f in filenames if int(f.parent.name) in selected_train_numbers]
@@ -195,7 +195,7 @@ def _determine_number_of_entries_per_file(filenames: Sequence[Path], tree_name: 
 
 
 def _number_of_entries_per_file(
-    input_filenames: Sequence[Union[Path, str]],
+    input_filenames: Sequence[Path | str],
     tree_name: str,
     collision_system: str,
     dataset_name: str,
@@ -226,12 +226,12 @@ def _number_of_entries_per_file(
     if not number_of_entries_file.exists() or recreate:
         logger.info("Need to get entries from the input files.")
         number_of_entries_per_file = _determine_number_of_entries_per_file(filenames=filenames, tree_name=tree_name)
-        with open(number_of_entries_file, "w") as f:
+        with number_of_entries_file.open("w") as f:
             # Explicit iteration because we need to convert from Path to str.
             y.dump({str(k): v for k, v in number_of_entries_per_file.items()}, f)
 
     # Now we know that it exists, we can grab it.
-    with open(number_of_entries_file) as f:
+    with number_of_entries_file.open() as f:
         res = y.load(f)
         number_of_entries_per_file = {Path(k): v for k, v in res.items()}
 
@@ -278,7 +278,7 @@ def _distribute_entries_to_jobs(
 def _number_of_entries_per_file_app(
     tree_name: str,
     inputs: Sequence[File] = [],
-    outputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],  # noqa: ARG001
 ) -> int:
     from pathlib import Path
 
@@ -295,8 +295,8 @@ def _number_of_entries_per_file_app(
 @python_app
 def _write_number_of_entries_per_file_cache(
     number_of_entries_per_file: dict[str, int],
-    job_framework: job_utils.JobFramework,
-    inputs: Sequence[File] = [],
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
+    inputs: Sequence[File] = [],  # noqa: ARG001
     outputs: Sequence[File] = [],
 ) -> bool:
     """Write the number of entries per file to a cache.
@@ -317,7 +317,7 @@ def _write_number_of_entries_per_file_cache(
     y = yaml.yaml()
 
     # And then actually write the cache.
-    with open(output_filename, "w") as f:
+    with output_filename.open("w") as f:
         # Explicit iteration because we need to ask for results.
         # y.dump({k: v for k, v in number_of_entries_per_file.items()}, f)
         # y.dump({k: v.result() for k, v in number_of_entries_per_file.items()}, f)
@@ -330,7 +330,7 @@ def _write_number_of_entries_per_file_cache(
 def _entries_to_ranges_for_jobs(
     number_of_entries: int,
     entries_per_job: int,
-    job_framework: job_utils.JobFramework,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
 ) -> list[tuple[int, int]]:
     """Determine the event range for a job given a total number of entries.
 
@@ -364,8 +364,8 @@ def _convert_to_parquet(
     prefixes: Sequence[str],
     branches: Sequence[str],
     prefix_branches: Sequence[str],
-    job_framework: job_utils.JobFramework,
-    event_range: Optional[tuple[Optional[int], Optional[int]]] = None,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
+    event_range: tuple[int | None, int | None] | None = None,
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> tuple[bool, Path]:
@@ -392,7 +392,7 @@ def setup_convert_to_parquet(
     entries_per_job: int,
     dataset_config: Mapping[str, Any],
     job_framework: job_utils.JobFramework,
-    input_results: Optional[MutableSequence[Future[Any]]] = None,
+    input_results: MutableSequence[Future[Any]] | None = None,
 ) -> tuple[list[Future[Any]], list[Future[Any]]]:
     """Setup convert_to_parquet app for execution with parsl.
 
@@ -426,10 +426,10 @@ def setup_convert_to_parquet(
         logger.info("Loading number of entries per file cache")
         # Now we know that it exists, we can grab it.
         y = yaml.yaml()
-        with open(number_of_entries_filename) as f:
+        with number_of_entries_filename.open() as f:
             res = y.load(f)
             # number_of_entries_per_file = {Path(k): v for k, v in res.items()}
-            number_of_entries_per_file = {k: v for k, v in res.items()}
+            number_of_entries_per_file = dict(res.items())
 
     # logger.info(f"Input files: {input_files}")
     # logger.info(f"number_of_entries_per_file: {number_of_entries_per_file}")
@@ -557,7 +557,7 @@ def _determine_pythia_input_files_per_pt_hard_bin(
 
 def _determine_embedding_input_files_per_pt_hard_bin(
     dataset_config: Mapping[str, Any],
-    selected_train_numbers: Optional[Sequence[int]] = None,
+    selected_train_numbers: Sequence[int] | None = None,
 ) -> dict[int, list[Path]]:
     input_files_per_pt_hard_bin = {}
     for filename_base in dataset_config["files"]:
@@ -586,11 +586,11 @@ def _determine_embedding_input_files_per_pt_hard_bin(
 
 @python_app
 def _extract_scale_factors_from_hists(
-    job_framework: job_utils.JobFramework,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
     inputs: Sequence[File] = [],
-    outputs: Sequence[File] = [],
-    stdout: Optional[str] = None,
-    stderr: Optional[str] = None,
+    outputs: Sequence[File] = [],  # noqa: ARG001
+    stdout: str | None = None,  # noqa: ARG001
+    stderr: str | None = None,  # noqa: ARG001
 ) -> analysis_objects.ScaleFactor:
     from pathlib import Path
 
@@ -607,7 +607,7 @@ def setup_extract_scale_factors(
     collision_system: str,
     dataset_config: Mapping[str, Any],
     job_framework: job_utils.JobFramework,
-    selected_train_numbers: Optional[Sequence[int]] = None,
+    selected_train_numbers: Sequence[int] | None = None,
 ) -> dict[int, Future[analysis_objects.ScaleFactor]]:
     """Extract scale factors from embedding or pythia hists.
 
@@ -616,7 +616,8 @@ def setup_extract_scale_factors(
     """
     # Validation
     if collision_system not in ["pythia", "embedPythia", "embed_pythia", "embed_thermal_model"]:
-        raise ValueError(f"Invalid collision system for extracting scale factors: {collision_system}")
+        msg = f"Invalid collision system for extracting scale factors: {collision_system}"
+        raise ValueError(msg)
 
     # Setup
     scale_factors = {}
@@ -630,7 +631,8 @@ def setup_extract_scale_factors(
             dataset_config=dataset_config,
         )
     else:
-        raise ValueError(f"Invalid collision system for extracting scale factors: {collision_system}")
+        msg = f"Invalid collision system for extracting scale factors: {collision_system}"
+        raise ValueError(msg)
 
     for pt_hard_bin, input_files in input_files_per_pt_hard_bin.items():
         logger.debug(f"pt_hard_bin: {pt_hard_bin}, filenames: {input_files}")
@@ -646,8 +648,8 @@ def setup_extract_scale_factors(
 @python_app
 def _write_scale_factors_to_yaml(
     scale_factors: Mapping[int, analysis_objects.ScaleFactor],
-    job_framework: job_utils.JobFramework,
-    inputs: Sequence[File] = [],
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
+    inputs: Sequence[File] = [],  # noqa: ARG001
     outputs: Sequence[File] = [],
 ) -> bool:
     from pathlib import Path
@@ -659,7 +661,7 @@ def _write_scale_factors_to_yaml(
     y = yaml.yaml(classes_to_register=[analysis_objects.ScaleFactor])
     output_dir = Path(outputs[0].filepath)
     output_dir.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_dir, "w") as f:
+    with output_dir.open("w") as f:
         y.dump(scale_factors, f)
 
     return True
@@ -669,9 +671,9 @@ def _write_scale_factors_to_yaml(
 def _write_cross_check_task_scale_factor_trees(
     scale_factor: float,
     inputs: Sequence[File] = [],
-    outputs: Sequence[File] = [],
-    stdout: Optional[str] = None,
-    stderr: Optional[str] = None,
+    outputs: Sequence[File] = [],  # noqa: ARG001
+    stdout: str | None = None,  # noqa: ARG001
+    stderr: str | None = None,  # noqa: ARG001
 ) -> bool:
     from pathlib import Path
 
@@ -689,7 +691,7 @@ def setup_write_scale_factors(
     dataset_config: Mapping[str, Any],
     scale_factors: Mapping[int, Future[analysis_objects.ScaleFactor]],
     job_framework: job_utils.JobFramework,
-    selected_train_numbers: Optional[Sequence[int]] = None,
+    selected_train_numbers: Sequence[int] | None = None,  # noqa: ARG001
 ) -> Future[bool]:
     """Write scale factors to YAML and to trees if necessary."""
     # First, we write to YAML.
@@ -721,11 +723,11 @@ def setup_write_scale_factors(
 def _extract_pt_hard_spectra(
     scale_factors: Mapping[int, float],
     offsets: Mapping[int, int],
-    job_framework: job_utils.JobFramework,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
-    stdout: Optional[str] = None,
-    stderr: Optional[str] = None,
+    stdout: str | None = None,  # noqa: ARG001
+    stderr: str | None = None,  # noqa: ARG001
 ) -> bool:
     from pathlib import Path
 
@@ -756,11 +758,12 @@ def setup_extract_embedding_pt_hard_spectra(
     dataset_config: Mapping[str, Any],
     job_framework: job_utils.JobFramework,
     input_results: MutableSequence[Future[bool]],
-    selected_train_numbers: Optional[Sequence[int]] = None,
+    selected_train_numbers: Sequence[int] | None = None,
 ) -> Future[bool]:
     # Validation
     if collision_system not in ["pythia", "embedPythia", "embed_pythia", "embed_thermal_model"]:
-        raise ValueError(f"Invalid collision system for extracting scale factors: {collision_system}")
+        msg = f"Invalid collision system for extracting scale factors: {collision_system}"
+        raise ValueError(msg)
 
     # Input files
     logger.info("Determining input files")
@@ -773,7 +776,8 @@ def setup_extract_embedding_pt_hard_spectra(
             dataset_config=dataset_config,
         )
     else:
-        raise ValueError(f"Invalid collision system for extracting scale factors: {collision_system}")
+        msg = f"Invalid collision system for extracting scale factors: {collision_system}"
+        raise ValueError(msg)
 
     # Need a hard dependency on the writing of the yaml output, so we ask for the result here.
     # We don't actually care about the result, but it avoids a race condition.
@@ -814,11 +818,11 @@ def _calculate_embedding_skim(
     train_directory: Path,
     iterative_splittings: bool,
     scale_factors: Mapping[int, float],
-    job_framework: job_utils.JobFramework,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
-    stdout: Optional[str] = None,
-    stderr: Optional[str] = None,
+    stdout: str | None = None,  # noqa: ARG001
+    stderr: str | None = None,  # noqa: ARG001
 ) -> tuple[bool, Path, str]:
     """ Calculate embedding skim app. """
     import traceback
@@ -852,8 +856,8 @@ def setup_calculate_embedding_skim(
     dataset_config: Mapping[str, Any],
     job_framework: job_utils.JobFramework,
     iterative_splittings: bool = True,
-    selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[Future[Any]]] = None,
+    selected_train_numbers: Sequence[int] | None = None,
+    input_results: MutableSequence[Future[Any]] | None = None,
 ) -> list[Future[tuple[bool, Path, str]]]:
     """Setup to calculate embedding skim.
 
@@ -880,7 +884,7 @@ def setup_calculate_embedding_skim(
     if input_results is None or job_framework != job_utils.JobFramework.parsl:
         logger.info("Determining input files independently.")
         # First, determine the train directories so we can skip over some of them if requested.
-        train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
+        train_directories = {Path(filename).parent for filename in dataset_config["files"]}
         for train_directory in sorted(train_directories):
             # Select train numbers.
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
@@ -934,7 +938,7 @@ def _calculate_data_skim(
     dataset_config: Mapping[str, Any],
     iterative_splittings: bool,
     scale_factors: Mapping[int, float],
-    job_framework: job_utils.JobFramework,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
     inputs: Sequence[File] = [],
     outputs: Sequence[File] = [],
 ) -> tuple[bool, Path, str]:
@@ -970,8 +974,8 @@ def setup_calculate_data_skim(
     dataset_config: Mapping[str, Any],
     job_framework: job_utils.JobFramework,
     iterative_splittings: bool = True,
-    selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[Future[Any]]] = None,
+    selected_train_numbers: Sequence[int] | None = None,
+    input_results: MutableSequence[Future[Any]] | None = None,
 ) -> list[Future[tuple[bool, Path, str]]]:
     """Setup to calculate data skim.
 
@@ -1003,7 +1007,7 @@ def setup_calculate_data_skim(
     if input_results is None or job_framework != job_utils.JobFramework.parsl:
         logger.info("Determining input files independently.")
         # First, determine the train directories so we can skip over some of them if requested.
-        train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
+        train_directories = {Path(filename).parent for filename in dataset_config["files"]}
         for train_directory in sorted(train_directories):
             # Select train numbers.
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
@@ -1079,9 +1083,9 @@ def setup_calculate_cross_check_task_skim(
     collision_system: str,
     dataset_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
-    job_framework: job_utils.JobFramework,
-    selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[Future[Any]]] = None,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
+    selected_train_numbers: Sequence[int] | None = None,
+    input_results: MutableSequence[Future[Any]] | None = None,
     iterative_splittings: bool = True,
 ) -> list[Future[bool]]:
     # Validation
@@ -1101,18 +1105,19 @@ def setup_calculate_cross_check_task_skim(
     # We'll always have to determine the input files ourselves.
     input_filenames = mammoth_utils.expand_wildcards_in_filenames([Path(f) for f in dataset_config["files"]])
     # Determine the train directories so we can skip over some of them if requested and map the scale factors.
-    train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
+    train_directories = {Path(filename).parent for filename in dataset_config["files"]}
 
     # Create map from train directories to scale factors.
     train_number_to_pt_hard_bin = {}
     for train_directory in train_directories:
         y = yaml.yaml()
-        with open(train_directory / "config.yaml") as f:
+        with (train_directory / "config.yaml").open() as f:
             train_config = y.load(f)
         # Validation
         if train_config["number"] != int(train_directory.name):
+            msg = f"Mismatch between train number in config ({train_config['number']}) and directory ({train_directory.name})."
             raise ValueError(
-                f"Mismatch between train number in config ({train_config['number']}) and directory ({train_directory.name})."
+                msg
             )
         train_number_to_pt_hard_bin[train_directory.name] = train_config["pt_hard_bin"]
 
@@ -1169,7 +1174,7 @@ def _root_data_frame(
     n_cores: int,
     cross_check_task: bool,
     double_counting_cut_name: str,
-    job_framework: job_utils.JobFramework,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
     inputs: MutableSequence[File] = [],  # noqa: B006
     outputs: MutableSequence[File] = [],  # noqa: B006
 ) -> tuple[bool, str]:
@@ -1217,7 +1222,7 @@ def _root_data_frame_response(
     n_cores: int,
     cross_check_task: bool,
     double_counting_cut_name: str,
-    job_framework: job_utils.JobFramework,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
     inputs: MutableSequence[File] = [],  # noqa: B006
     outputs: MutableSequence[File] = [],  # noqa: B006
 ) -> tuple[bool, str]:
@@ -1269,7 +1274,7 @@ def _root_data_frame_closure(
     substructure_variable_name: str,
     double_counting_cut_name: str,
     additional_substructure_variable_cut: unfolding_base.AdditionalVariableCut,
-    job_framework: job_utils.JobFramework,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
     inputs: MutableSequence[File] = [],  # noqa: B006
     outputs: MutableSequence[File] = [],  # noqa: B006
 ) -> tuple[bool, str]:
@@ -1315,7 +1320,7 @@ def _root_data_frame_embedded_pt_hard_scaling(
     n_cores: int,
     cross_check_task: bool,
     double_counting_cut_name: str,
-    job_framework: job_utils.JobFramework,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
     inputs: MutableSequence[File] = [],  # noqa: B006
     outputs: MutableSequence[File] = [],  # noqa: B006
 ) -> tuple[bool, str]:
@@ -1361,7 +1366,7 @@ class RootDataFrameProcessingMode:
     func: Callable[..., Future[tuple[bool, str]]]
 
 
-def setup_root_data_frame(
+def setup_root_data_frame(  # noqa: C901
     processing_mode: str,
     collision_system: str,
     n_cores_per_job: int,
@@ -1369,9 +1374,9 @@ def setup_root_data_frame(
     base_unfolding_config: Mapping[str, Any],
     grooming_methods: Sequence[str],
     job_framework: job_utils.JobFramework,
-    selected_train_numbers: Optional[Sequence[int]] = None,
-    input_results: Optional[MutableSequence[Future[Any]]] = None,
-    unfolding_settings: Optional[Mapping[str, Any]] = None,
+    selected_train_numbers: Sequence[int] | None = None,
+    input_results: MutableSequence[Future[Any]] | None = None,
+    unfolding_settings: Mapping[str, Any] | None = None,
     substructure_variable_name: str | None = None,
     unfolding_additional_substructure_variable_cut: unfolding_base.AdditionalVariableCut | None = None
 ) -> list[Future[tuple[bool, str]]]:
@@ -1401,12 +1406,14 @@ def setup_root_data_frame(
         ),
     ]
     if processing_mode not in [p.name for p in _processing_modes]:
-        raise ValueError(f'Invalid processing mode "{processing_mode}"')
+        msg = f'Invalid processing mode "{processing_mode}"'
+        raise ValueError(msg)
     if processing_mode == "closure" and not unfolding_settings:
-        raise ValueError("Must pass unfolding setting with closure")
+        msg = "Must pass unfolding setting with closure"
+        raise ValueError(msg)
 
     # Setup
-    mode = [p for p in _processing_modes if processing_mode == p.name][0]
+    mode = next(p for p in _processing_modes if processing_mode == p.name)
     output_dir = Path("output") / collision_system / "RDF"
     output_dir.mkdir(parents=True, exist_ok=True)
     prefixes = dataset_config["prefixes"]
@@ -1420,7 +1427,8 @@ def setup_root_data_frame(
     # Things are treated so different that it's better to be direct about the data collision system.
     _analyzing_pp = (collision_system == "pp" or collision_system == "pythia")
     if not _analyzing_pp and _double_counting_cut_name == "":
-        raise ValueError("Must specify a double counting cut setting in PbPb! You can disable it with 'disabled'.")
+        msg = "Must specify a double counting cut setting in PbPb! You can disable it with 'disabled'."
+        raise ValueError(msg)
     # We want this to be disabled in pp. To ensure that's the case, let's set it explicitly here!
     if _analyzing_pp:
         _double_counting_cut_name = "disabled"
@@ -1432,7 +1440,7 @@ def setup_root_data_frame(
     if input_results is None:
         logger.info("Determining input files independently.")
         # First, determine the train directories so we can skip over some of them if requested.
-        train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
+        train_directories = {Path(filename).parent for filename in dataset_config["files"]}
         for train_directory in sorted(train_directories):
             # Select train numbers.
             if selected_train_numbers and int(train_directory.name) not in selected_train_numbers:
@@ -1534,7 +1542,7 @@ def embedded_pt_hard_scaling_cross_check(
 
     # Assume that we have on train per line. That's usually a pretty good assumption.
     # Each one will be written to separate files.
-    train_directories = set([Path(filename).parent for filename in dataset_config["files"]])
+    train_directories = {Path(filename).parent for filename in dataset_config["files"]}
     for train_directory in sorted(train_directories):
         results.extend(
             setup_root_data_frame(
@@ -1562,9 +1570,11 @@ def _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filena
     # Example: `pythia__2640__run_by_run__LHC20g4__295612__1__AnalysisResults_20g4_007`
     possible_pt_hat_bins = _match_pt_hat_bin_from_embed_pythia_mammoth_production.findall(str(filename))
     if len(possible_pt_hat_bins) == 0:
-        raise ValueError(f"Extracted no pt hat bins from filename {filename}")
+        msg = f"Extracted no pt hat bins from filename {filename}"
+        raise ValueError(msg)
     if len(possible_pt_hat_bins) > 1:
-        raise ValueError(f"Extracted multiple pt hat bins: ({possible_pt_hat_bins}) bin from filename {filename}")
+        msg = f"Extracted multiple pt hat bins: ({possible_pt_hat_bins}) bin from filename {filename}"
+        raise ValueError(msg)
     return int(possible_pt_hat_bins[0])
 
 
@@ -1578,9 +1588,9 @@ def _unfolding_standard(
     data_tree_name: str,
     response_tree_name: str,
     debug_cpp_code: bool,
-    job_framework: job_utils.JobFramework,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
     inputs: tuple[Sequence[File], Sequence[File]] = ([], []),
-    outputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],  # noqa: ARG001
 ) -> bool:
     import random
     from pathlib import Path
@@ -1620,9 +1630,9 @@ def _unfolding_closure(
     reweight_response_dataset_name: str,
     response_tree_name: str,
     debug_cpp_code: bool,
-    job_framework: job_utils.JobFramework,
+    job_framework: job_utils.JobFramework,  # noqa: ARG001
     inputs: tuple[Sequence[File], Sequence[File]] = ([], []),
-    outputs: Sequence[File] = [],
+    outputs: Sequence[File] = [],  # noqa: ARG001
 ) -> bool:
     import random
     from pathlib import Path
@@ -1685,7 +1695,8 @@ def setup_all_unfolding(  # noqa: C901
     """
     # Validation
     if data_collision_system not in ["pp", "PbPb"]:
-        raise ValueError(f"Collision must be either pp or PbPb for unfolding. Passed: {data_collision_system}")
+        msg = f"Collision must be either pp or PbPb for unfolding. Passed: {data_collision_system}"
+        raise ValueError(msg)
     selected_unfolding_settings = unfolding_runtime_settings.selected_settings
     logger.info(f"Unfolding settings: {selected_unfolding_settings}")
     # Setup
@@ -1719,7 +1730,8 @@ def setup_all_unfolding(  # noqa: C901
         # We want to protect against accidentally forgetting this in PbPb!
         _double_counting_cut_name = unfolding_settings.get("double_counting_cut", "")
         if not unfolding_for_pp and _double_counting_cut_name == "":
-            raise ValueError("Must specify a double counting cut setting in PbPb! You can disable it with 'disabled'.")
+            msg = "Must specify a double counting cut setting in PbPb! You can disable it with 'disabled'."
+            raise ValueError(msg)
         # We want this to be disabled in pp. To ensure that's the case, let's set it explicitly here!
         if unfolding_for_pp:
             _double_counting_cut_name = "disabled"
@@ -1728,9 +1740,9 @@ def setup_all_unfolding(  # noqa: C901
 
         # Datasets config and input files.
         data_dataset_config = base_dataset_config["datasets"][datasets_name][data_collision_system]
-        data_train_directories = set([Path(filename).parent for filename in data_dataset_config["files"]])
+        data_train_directories = {Path(filename).parent for filename in data_dataset_config["files"]}
         response_dataset_config = base_dataset_config["datasets"][datasets_name][response_collision_system]
-        response_train_directories = set([Path(filename).parent for filename in response_dataset_config["files"]])
+        response_train_directories = {Path(filename).parent for filename in response_dataset_config["files"]}
 
         # Determine filenames first since they don't depend on grooming methods
         data_files: list[File] = []
@@ -1915,7 +1927,7 @@ def setup_all_unfolding(  # noqa: C901
             # That means our typing information is a little fudged, but it works fine anyway since we don't
             # actually care about the value of the result - just that the file was created.
             # Note that we have to lie with the typing here...
-            job_input_files.extend([r for r in reweight_prior_results])  # type: ignore[misc]
+            job_input_files.extend(list(reweight_prior_results))  # type: ignore[arg-type]
 
             # Standard unfolding
             for s in settings.values():
@@ -1983,7 +1995,7 @@ def setup_all_unfolding(  # noqa: C901
 
 
 @python_app
-def _trivial_ROOT_test_app(job_framework: job_utils.JobFramework) -> bool:
+def _trivial_ROOT_test_app(job_framework: job_utils.JobFramework) -> bool:  # noqa: ARG001
     """Trivial ROOT import test app.
 
     For when there are issues with ROOT (especially new ROOT versions).
@@ -2023,7 +2035,7 @@ def setup_job_framework(
     walltime: str,
     target_n_tasks_to_run_simultaneously: int,
     log_level: int,
-    conda_environment_name: Optional[str] = None,
+    conda_environment_name: str | None = None,
 ) -> tuple[parsl.DataFlowKernel, parsl.Config, job_utils.ExecutionSettings] | tuple[dask.distributed.Client, dask.distributed.SpecCluster, job_utils.ExecutionSettings]:
     # First, need to figure out if we need additional environments such as ROOT
     _additional_worker_init_script = alice_job_utils.determine_additional_worker_init(
@@ -2059,13 +2071,14 @@ def setup_and_submit_tasks(  # noqa: C901
     dataset_type: str,
     collision_system: str,
     jobs_to_execute: Sequence[str],
-    input_grooming_methods: Optional[Sequence[str]] = None,
+    input_grooming_methods: Sequence[str] | None = None,
     unfolding_runtime_settings: UnfoldingRuntimeSettings | None = None,
-    dask_client: Optional[dask.distributed.Client] = None,
+    dask_client: dask.distributed.Client | None = None,
 ) -> list[Future[Any]]:
     # Validation
     if dask_client is None and job_framework == job_utils.JobFramework.dask_delayed:
-        raise ValueError("Must provide dask client if running with dask_delayed job framework!")
+        msg = "Must provide dask client if running with dask_delayed job framework!"
+        raise ValueError(msg)
     if unfolding_runtime_settings is None:
         unfolding_runtime_settings = UnfoldingRuntimeSettings()
 
@@ -2074,7 +2087,7 @@ def setup_and_submit_tasks(  # noqa: C901
     #jobs_per_node = 8
 
     # Default to all methods. We can restrict if the particular tasks if we see the cross check task.
-    if input_grooming_methods is None:
+    if input_grooming_methods is None:  # noqa: SIM108
         grooming_methods = [
             # "leading_kt",
             # "leading_kt_z_cut_02",
@@ -2105,8 +2118,9 @@ def setup_and_submit_tasks(  # noqa: C901
     # Validation
     for job_name in jobs_to_execute:
         if job_name not in _possible_jobs:
+            msg = f"Requested to run job {job_name}, but the name is invalid." f" Possible jobs: {_possible_jobs}"
             raise RuntimeError(
-                f"Requested to run job {job_name}, but the name is invalid." f" Possible jobs: {_possible_jobs}"
+                msg
             )
 
     # Helpers
@@ -2145,7 +2159,7 @@ def setup_and_submit_tasks(  # noqa: C901
             input_results=results if results else None,
         )
         all_results.extend(_all_results)
-    yaml_result: Optional[Future[bool]] = None
+    yaml_result: Future[bool] | None = None
     if "extract_scale_factors" in jobs_to_execute:
         # NOTE: We don't take any input_results because we're super dependent on knowing the
         #       pt hard bins. We would have to reorganize the outputs heavily, so it's
@@ -2429,7 +2443,7 @@ def run(job_framework: job_utils.JobFramework) -> list[Future[Any]]:
 
     if debug_mode:
         # Usually, we want to run in the short queue
-        n_cores_to_allocate = 2
+        target_n_tasks_to_run_simultaneously = 2
         walltime = "1:59:00"
 
     #facility="ORNL_b587_long" if job_utils.hours_in_walltime(walltime) >= 2 else "ORNL_b587_short",
