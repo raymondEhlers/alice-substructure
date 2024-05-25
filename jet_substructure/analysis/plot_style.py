@@ -502,6 +502,38 @@ def define_paper_model_styles() -> dict[str, dict[str, Any]]:
             "marker": "D",
             "color": "#7e459e",
         },
+        "pp_jewel": {
+            # Taken from Caucal
+            "linewidth": 3,
+            "linestyle": "-.",
+            "marker": "P",
+            # Purple color copied from pp event-activity
+            "color": "#845cba",
+        },
+        "PbPb_jewel_recoils": {
+            # Taken from Sherpa lund
+            "linewidth": 3,
+            "linestyle": "--",
+            "marker": "*",
+            # Yellow-orange
+            #"color": "#f39c12",
+            # Violet
+            #"color": "#2c4875",
+            # Taken from central event-activity
+            "color": "#4bafd0",
+        },
+        "PbPb_jewel_no_recoils": {
+            # Take from Sherpa Ahadic
+            "linewidth": 3,
+            "linestyle": ":",
+            "marker": "X",
+            # Orange
+            #"color": "#d35400",
+            # Take from semi-central event-activity
+            "color": "#FF8301",
+            # Violet-ish
+            #"color": "#8a508f",
+        },
     }
 
     return paper_model_styles  # noqa: RET504
