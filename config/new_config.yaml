@@ -3111,20 +3111,19 @@ analysis_configurations:
             jewel_recoils_part_level:
                 PbPb: *JEWEL_recoils_central_part_level
                 # The response isn't really meaningful here, so we don't define it for this dataset...
-            jewel_recoils_fastsim_response:
-                PbPb: *LHC18qr_central_R02_mammoth
-                embed_pythia: *JEWEL_recoils_central_fastsim
+            jewel_recoils_fastsim:
+                pp: *LHC18qr_central_R02_mammoth
+                pythia: *JEWEL_recoils_central_fastsim
             jewel_no_recoils_part_level:
                 PbPb: *JEWEL_no_recoils_central_part_level
                 # The response isn't really meaningful here, so we don't define it for this dataset...
-            jewel_no_recoils_fastsim_response:
-                PbPb: *LHC18qr_central_R02_mammoth
-                embed_pythia: *JEWEL_no_recoils_central_fastsim
-            pythia_fastsim_response:
+            jewel_no_recoils_fastsim:
+                pp: *LHC18qr_central_R02_mammoth
+                pythia: *JEWEL_no_recoils_central_fastsim
+            pythia_fastsim:
                 # This is needed as a comparison for the JEWEL results
                 # Basically, this will be the baseline, with both not containing any background...
-                PbPb: *LHC18qr_central_R02_mammoth
-                # TODO: Do I want to label this as pythia or embed_pythia?
+                pp: *LHC18qr_central_R02_mammoth
                 pythia: *LHC18b8_pythia_R04_mammoth_fastsim
 
         unfolding:
@@ -3349,7 +3348,27 @@ analysis_configurations:
                     double_counting_cut: "disabled"
                     datasets: "jewel_no_recoils_part_level"
                 # JEWEL, for unfolding
-                # TODO: ...
+                jewel_recoils_fastsim:
+                    label: "model_dependence_jewel_recoils_fastsim"
+                    closures: false
+                    reweight_prior: false
+                    # Disabled because this isn't embedded, so we don't need to worry about overlaps
+                    double_counting_cut: "disabled"
+                    datasets: "jewel_recoils_fastsim"
+                jewel_no_recoils_fastsim:
+                    label: "model_dependence_jewel_no_recoils_fastsim"
+                    closures: false
+                    reweight_prior: false
+                    # Disabled because this isn't embedded, so we don't need to worry about overlaps
+                    double_counting_cut: "disabled"
+                    datasets: "jewel_no_recoils_fastsim"
+                pythia_fastsim:
+                    label: "model_dependence_PbPb_pythia_fastsim"
+                    closures: false
+                    reweight_prior: false
+                    # Disabled because this isn't embedded, so we don't need to worry about overlaps
+                    double_counting_cut: "disabled"
+                    datasets: "pythia_fastsim"
 
 
                 ####################
@@ -3933,6 +3952,8 @@ analysis_configurations:
                     reweight_prior: false
                     datasets: "pythia_fastsim"
                 jewel:
+                    # NOTE: This isn't used for unfolding - I just leverage this in PbPb to pass
+                    #       some configuration options, and so I need to match it in pp.
                     label: "model_dependence_jewel"
                     closures: false
                     reweight_prior: false

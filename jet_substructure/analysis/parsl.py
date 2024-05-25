@@ -1428,7 +1428,7 @@ def setup_root_data_frame(
     _double_counting_cut_name = _config_for_double_counting_cut.get("double_counting_cut", "")
     logger.info(f"{_double_counting_cut_name=}")
     # Things are treated so different that it's better to be direct about the data collision system.
-    _analyzing_pp = (collision_system == "pp" or collision_system == "pythia")
+    _analyzing_pp = (collision_system in ["pp", "pythia", "pp_MC"])
     if not _analyzing_pp and _double_counting_cut_name == "":
         msg = "Must specify a double counting cut setting in PbPb! You can disable it with 'disabled'."
         raise ValueError(msg)
@@ -1714,6 +1714,7 @@ class UnfoldingRuntimeSettings:
     variable_to_unfold: str = attrs.field(default="kt")
     normalize_variable_by_jet_pt: bool = attrs.field(default=False)
     selected_settings: list[str] = attrs.field(factory=lambda: ["default"])
+    fastsim_closure_dataset_override: bool = attrs.field(default=False)
     _output_dir_tag: str = attrs.field(default="")
 
     def output_dir(self, data_collision_system: str) -> Path:
@@ -2001,11 +2002,16 @@ def setup_all_unfolding(  # noqa: C901
                         unfolding_for_pp=unfolding_for_pp,
                         reweight_prior=unfolding_settings["reweight_prior"],
                         # We always want to reweight with the nominal datasets.
-                        reweight_data_dataset_name=base_dataset_config["datasets"]["nominal"][data_collision_system][
+                        # NOTE: We need to do some special handling for the JEWEL case because we're treating
+                        #       it like pp (because the prefix names align to that), but we want to align
+                        #       with the PbPb in general
+                        reweight_data_dataset_name=base_dataset_config["datasets"]["nominal"][
+                            "PbPb" if unfolding_runtime_settings.fastsim_closure_dataset_override else data_collision_system
+                        ][
                             "name"
                         ],
                         reweight_response_dataset_name=base_dataset_config["datasets"]["nominal"][
-                            response_collision_system
+                            "embed_pythia" if unfolding_runtime_settings.fastsim_closure_dataset_override else response_collision_system
                         ]["name"],
                         data_tree_name="tree",
                         # Since we skim everything now, we should have uniform input names here.
