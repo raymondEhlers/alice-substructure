@@ -1174,6 +1174,7 @@ def _root_data_frame(
     n_cores: int,
     cross_check_task: bool,
     double_counting_cut_name: str,
+    fine_kt_binning: bool,
     job_framework: job_utils.JobFramework,  # noqa: ARG001
     inputs: MutableSequence[File] = [],  # noqa: B006
     outputs: MutableSequence[File] = [],  # noqa: B006
@@ -1206,6 +1207,7 @@ def _root_data_frame(
         n_cores=n_cores,
         cross_check_task=cross_check_task,
         double_counting_cut_name=double_counting_cut_name,
+        fine_kt_binning=fine_kt_binning,
     )
 
     return res  # noqa: RET504
@@ -1468,7 +1470,16 @@ def setup_root_data_frame(
     # logger.info(f"Cross check task: {cross_check_task}")
 
     # Setup optional args
-    optional_kwargs = {}
+    optional_kwargs: dict[str, Any] = {}
+    if processing_mode == "standard":
+        # Need finer binning for model comparisons so that we can rebin to the final binning
+        # for comparisons.
+        models_used_for_predictions = ["jewel"]
+        datasets_name = _config_for_double_counting_cut.get("datasets", "")
+        optional_kwargs = {
+            "fine_kt_binning": any(model_name in datasets_name for model_name in models_used_for_predictions),
+        }
+        logger.info(f"{optional_kwargs=}")
     # We only want to pass the entire configuration for the closure.
     if processing_mode == "closure":
         optional_kwargs = {

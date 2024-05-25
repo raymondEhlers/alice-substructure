@@ -306,6 +306,7 @@ def _substructure_hists(
     tag: str,
     jet_pt_prefix: str | None = None,
     include_stats_hist: bool | None = False,
+    fine_kt_binning: bool = False,
 ) -> list[RootHist]:
     # Validation
     if jet_pt_prefix is None:
@@ -318,10 +319,17 @@ def _substructure_hists(
     jet_pt_column = jet_pt_column_format.format(prefix=jet_pt_prefix)
 
     # kt binning should vary with jet R because the kt kinematic limits vary with jet_R
-    kt_axis = np.linspace(-1, 25, 26 + 1, dtype=np.float64)
-    if jet_R == 0.2:
-        # NOTE: Lower edge varies to ensure that we only have below 0.
-        kt_axis = np.linspace(-0.5, 12, 25 + 1, dtype=np.float64)
+    if not fine_kt_binning:
+        kt_axis = np.linspace(-1, 25, 26 + 1, dtype=np.float64)
+        if jet_R == 0.2:
+            # NOTE: Lower edge varies to ensure that we only have below 0.
+            kt_axis = np.linspace(-0.5, 12, 25 + 1, dtype=np.float64)
+    else:
+        # Need bins of 0.25 (or smaller multiples). Designed so we can rebin and match the data.
+        kt_axis = np.linspace(-1, 25, (26 * 4) + 1, dtype=np.float64)
+        if jet_R == 0.2:
+            # NOTE: Lower edge varies to ensure that we only have below 0.
+            kt_axis = np.linspace(-0.5, 12, (25 * 2) + 1, dtype=np.float64)
 
     kt = df.Histo2D(
         (
@@ -1251,6 +1259,7 @@ def run(  # noqa: C901
     n_cores: int = 8,
     cross_check_task: bool = False,
     double_counting_cut_name: str | None = None,
+    fine_kt_binning: bool = False,
 ) -> tuple[bool, str]:
     # Delay ROOT import so we don't explicitly rely on it.
     ROOT = root_utils.import_ROOT(n_cores=n_cores)
@@ -1353,6 +1362,7 @@ def run(  # noqa: C901
                     tag=tag,
                     jet_pt_prefix=prefix,
                     include_stats_hist=True,
+                    fine_kt_binning=fine_kt_binning,
                 )
             )
 
