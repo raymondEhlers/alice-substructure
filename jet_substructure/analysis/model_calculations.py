@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Protocol, Sequence
 
 import attrs
+import hist
 import numpy as np
 import numpy.typing as npt
 import uproot
@@ -776,4 +777,78 @@ class SherpaFromLeticia:
             grooming_methods=loaded_grooming_methods,
             metadata=dict(self.metadata),
             pp=predictions["pp"],
+        )
+
+@attrs.define
+class JEWEL:
+    base_dir: Path
+    needs_normalization: bool = attrs.field(default=False)
+    metadata: dict[str, Any] = attrs.field(factory=dict)
+
+    def load_predictions(self, grooming_methods: list[str] | None = None) -> ModelCalculation:
+        if grooming_methods is None:
+            grooming_methods = list(_full_grooming_methods_list)
+
+        # Settings
+        _jet_R = self.metadata["jet_R"]
+        with_recoils = self.metadata["recoils"]
+        recoils_label = "recoils" if with_recoils else "no_recoils"
+        # We can hardcode these values because they are unlikely to change frequently
+        # Only central is available due to the productions we have available in May 2024
+        _centrality_bin_to_train_number = {
+            "central": 60 if with_recoils else 61,
+            "pp": 77,
+        }
+
+        # After setup, grab the predictions
+        input_dir = self.base_dir
+        values: dict[str, dict[str, binned_data.BinnedData]] = {}
+        for _cent_bin_label, train_number in _centrality_bin_to_train_number.items():
+            values[_cent_bin_label] = {}
+            for grooming_method in grooming_methods:
+                # Example: "jewel_no_recoils_central_part_level_R02_0061_dynamical_core_prefixes_data.root"
+                system_label = f"{recoils_label}_{_cent_bin_label}" if _cent_bin_label != "pp" else _cent_bin_label
+                filename = f"jewel_{system_label}_part_level_R{_jet_R * 10:02g}_{train_number:04}_{grooming_method}_prefixes_data.root"
+                try:
+                    with uproot.open(input_dir / filename) as f:
+                        # Retrieve the data and project
+                        jet_pt_range = "40_120" if _cent_bin_label != "pp" else "20_85"
+                        h = f[f"{grooming_method}_data_kt_jet_pt_data_{jet_pt_range}"].to_hist()
+                        h = h[60j:80j:hist.sum, :]  # type: ignore[misc]
+                        data = binned_data.BinnedData.from_existing_data(h)
+
+                        # Normalize, if needed
+                        if self.needs_normalization:
+                            # Bin width normalization
+                            data /= data.axes[0].bin_widths
+                            # And overall normalization
+                            data /= np.sum(data.values)
+
+                        values[_cent_bin_label][grooming_method] = data
+                except FileNotFoundError:
+                    logger.debug(f"Skipping {grooming_method}, {_cent_bin_label}, {with_recoils=} due to missing file (probably expected). {filename=}")
+
+        # Now, calculate the ratios based on the predictions
+        # NOTE: We can only calculate the ratio if the have the necessary collision systems
+        #       selected and available.
+        ratios = {
+            _system: {
+                _method: values[_system][_method] / values["pp"][_method]
+                for _method in grooming_methods
+            }
+            for _system in values if _system != "pp"
+        }
+
+        recoils_display_label = "recoils" if with_recoils else "no recoils"
+        return ModelCalculation(
+            name=f"jewel_{recoils_label}",
+            label_pp="JEWEL",
+            label_AA=f"JEWEL ({recoils_display_label})",
+            normalized=self.needs_normalization,
+            grooming_methods=grooming_methods,
+            pp=values.get("pp", {}),
+            semi_central=values.get("semi_central", {}),
+            semi_central_ratio=ratios.get("semi_central", {}),
+            central=values.get("central", {}),
+            central_ratio=ratios.get("central", {}),
         )
