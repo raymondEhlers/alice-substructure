@@ -3634,10 +3634,10 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(  # noqa: C901
     # Consistent ratio ranges
     # NOTE: These are specialized to the letter. I haven't checked for the other methods.
     _ratio_range = {
-        "pp": (0.7, 1.3),
+        "pp": (0.6, 1.42),
         "semi_central": (0.6, 1.35),
         #"central": (0.49, 1.39),
-        "central": (0.51, 1.37),
+        "central": (0.45, 1.37),
     }
     if logy:
         _ratio_range = {
