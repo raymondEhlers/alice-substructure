@@ -812,17 +812,27 @@ class JEWEL:
                 try:
                     with uproot.open(input_dir / filename) as f:
                         # Retrieve the data and project
+                        # These jet_pt ranges are derived from the data_frame functionality, which selected
+                        # ranges at detector level. Fortunately, they also include the particle level ranges
+                        # that we want, so we can just take the hists and then project them as appropriate.
                         jet_pt_range = "40_120" if _cent_bin_label != "pp" else "20_85"
                         h = f[f"{grooming_method}_data_kt_jet_pt_data_{jet_pt_range}"].to_hist()
-                        h = h[60j:80j:hist.sum, :]  # type: ignore[misc]
+                        # Since we want to normalize over the number of jets in the pt range, we don't want
+                        # to restrict the kt range by default. Note that if the range was narrowed, it would
+                        # change the overall normalization (although we're most likely to change it in the tales,
+                        # so it's pretty unlikely to be so significant). I used this capability to test, but
+                        # comparing a restricted range to the full one (e.g. for soft drop z_cut=0.4 in pp)
+                        # shows that the restricted range can be very far off. So best to stick to the full range!
+                        kt_selection = self.metadata.get("kt_selection", slice(None, None))
+                        h = h[60j:80j:hist.sum, kt_selection]  # type: ignore[misc]
                         data = binned_data.BinnedData.from_existing_data(h)
 
                         # Normalize, if needed
                         if self.needs_normalization:
-                            # Bin width normalization
-                            data /= data.axes[0].bin_widths
                             # And overall normalization
                             data /= np.sum(data.values)
+                            # Bin width normalization
+                            data /= data.axes[0].bin_widths
 
                         values[_cent_bin_label][grooming_method] = data
                 except FileNotFoundError:
