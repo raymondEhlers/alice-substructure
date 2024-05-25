@@ -27,7 +27,6 @@ import uproot3
 
 from jet_substructure.base import analysis_objects, helpers, skim_analysis_objects
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -133,7 +132,7 @@ def dask_df_from_file() -> None:
         branches=["scale_factor", "*det_level*", "*hybrid*"],
     )
 
-    IPython.start_ipython(user_ns=locals())
+    IPython.start_ipython(user_ns=locals())  # type: ignore[no-untyped-call]
 
 
 def dask_df_from_delayed() -> None:
@@ -156,7 +155,7 @@ def dask_df_from_delayed() -> None:
     dfs = [get_df(path, "tree", branches=["scale_factor", "*det_level*", "*hybrid*"]) for path in path_list]
     daskframe = dd.from_delayed(dfs)
 
-    IPython.start_ipython(user_ns=locals())
+    IPython.start_ipython(user_ns=locals())  # type: ignore[no-untyped-call]
 
 
 # def df_from_file(filenames: Sequence[Path], branches: Sequence[str]):
@@ -539,7 +538,7 @@ def map_reduce_pandas_concat() -> None:
     # logger.debug("Starting concat")
     # df = pd.concat(data_frames, copy=False)
 
-    IPython.start_ipython(user_ns=locals())
+    IPython.start_ipython(user_ns=locals())  # type: ignore[no-untyped-call]
 
 
 def _fill_grooming_hists(
@@ -938,7 +937,7 @@ def plot_all() -> None:
 
     user_ns = locals()
     user_ns.update({"output_dir_f": output_dir_f, "Path": Path})
-    IPython.start_ipython(user_ns=user_ns)
+    IPython.start_ipython(user_ns=user_ns)  # type: ignore[no-untyped-call]
 
 
 def run_plot(datasets: Mapping[str, SkimDataset], remerge: bool = False) -> None:
@@ -981,7 +980,7 @@ def run_plot(datasets: Mapping[str, SkimDataset], remerge: bool = False) -> None
 
     user_ns = locals()
     user_ns.update({"output_dir_f": output_dir_f})
-    IPython.start_ipython(user_ns=user_ns)
+    IPython.start_ipython(user_ns=user_ns)  # type: ignore[no-untyped-call]
 
     # Plotting
     # plot_from_skim.plot_residuals_by_matching_type(
