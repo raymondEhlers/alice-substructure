@@ -123,7 +123,10 @@ def _define_panel_config_for_letter_combined_plots(
             # NOTE: This won't actually be used directly, but we'll use the parameters here to draw the legend by hand.
             legend=pb.LegendConfig(
                 location="upper right",
-                font_size=round(text_font_size * 0.925),
+                # Pre adding JEWEL
+                #font_size=round(text_font_size * 0.925),
+                # Post adding JEWEL
+                font_size=round(text_font_size * 0.8),
                 anchor=(1.04, 0.99),
                 marker_label_spacing=0.1,
                 label_spacing=0.1,
@@ -2720,7 +2723,10 @@ def _plot_pp_PbPb_comparison_only_ratios_for_letter(
         1 + n_rows,
         len(grooming_methods),
         figsize=(10, 10),
-        gridspec_kw={"height_ratios": [2.6] + [6] * n_rows},
+        # Pre adding JEWEL
+        #gridspec_kw={"height_ratios": [2.6] + [6] * n_rows},
+        # Post adding JEWEL
+        gridspec_kw={"height_ratios": [3.7] + [6] * n_rows},
         sharex="col",
         sharey="row",
     )
@@ -2809,7 +2815,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
     """PbPb/ppp ratios only (+ models) for Letter."""
     # Validation
     event_activity_to_kt_range = validate_event_activity_to_kt_range(event_activity_to_kt_range, grooming_methods)
-    left_edge_padding = 0.095
+    left_edge_padding = 0.105
 
     # Setup
     jet_pt_bin = next(iter(next(iter(hists.values())).values())).ranges[0]
@@ -2832,7 +2838,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
     # NOTE: These are specialized to the letter. I haven't checked for the other methods.
     _ratio_range = {
         "semi_central": (0.55, 1.55),
-        "central": (0.425, 1.75),
+        "central": (0.34, 1.75),
     }
 
     # Define panels
@@ -2945,7 +2951,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
     )
 
 
-def _plot_pp_PbPb_only_spectra_ratios_on_axes(
+def _plot_pp_PbPb_only_spectra_ratios_on_axes(  # noqa: C901
     axes: list[mpl.axes.Axes],
     hists: dict[str, dict[str, unfolding_analysis.SingleResult]],
     grooming_method: str,
@@ -3503,7 +3509,10 @@ def _plot_pp_PbPb_only_spectra_ratios_for_letter(
         1 + n_rows,
         len(grooming_methods),
         figsize=(10, 10),
-        gridspec_kw={"height_ratios": [2.6] + [4] * n_rows},
+        # Pre adding JEWEL
+        #gridspec_kw={"height_ratios": [2.6] + [6] * n_rows},
+        # Post adding JEWEL
+        gridspec_kw={"height_ratios": [3.7] + [4] * n_rows},
         sharex="col",
         sharey="row",
     )
