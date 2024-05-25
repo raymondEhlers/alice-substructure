@@ -2189,7 +2189,10 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
             legend_models.location = "upper right"
             legend_models.anchor= (0.98, 0.98)
             # Make smaller to try to fit...
-            legend_models.font_size = round(legend_models.font_size * 0.8)
+            _fs = legend_models.font_size
+            # Help out mypy...
+            assert _fs is not None
+            legend_models.font_size = round(_fs * 0.8)
             legend_models.marker_label_spacing = 0.
             legend_models.label_spacing = 0.1
 
