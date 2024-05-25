@@ -2947,15 +2947,16 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
 
 def _plot_pp_PbPb_only_spectra_ratios_on_axes(
     axes: list[mpl.axes.Axes],
-    hists: Mapping[str, unfolding_analysis.SingleResult],
+    hists: dict[str, dict[str, unfolding_analysis.SingleResult]],
     grooming_method: str,
     set_zero_to_nan: bool,
     all_methods_on_one_figure: bool,
-    event_activity_to_kt_range: Mapping[str, helpers.KtRange],
+    event_activity_to_kt_range: dict[str, dict[str, helpers.KtRange]],
     fit_parameters: Mapping[str, Mapping[str, Mapping[str, float]]],
     fit_QA_plot: bool,
     output_dir: Path,
-    models_calculation: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
+    models_calculation: Mapping[str, model_calculations.ModelCalculation],
+    model_names_to_skip_in_pp_to_avoid_redundancy: list[str],
 ) -> None:
     # Setup
     grooming_styles = plot_style.define_paper_grooming_styles()
@@ -3104,6 +3105,10 @@ def _plot_pp_PbPb_only_spectra_ratios_on_axes(
                     f"Skipping model {model_name}, grooming method: {grooming_method}, {collision_system} because predictions aren't available"
                 )
                 continue
+            if collision_system == "pp" and model_name in model_names_to_skip_in_pp_to_avoid_redundancy:
+                msg = f"Skipping model {model_name}, grooming method: {grooming_method}, {collision_system} because it's redundant (i.e. another model covers this pp already)"
+                logger.info(msg)
+                continue
 
             # Select the relevant kt range
             model = full_results_helpers.select_hist_range(
@@ -3224,6 +3229,7 @@ def _plot_pp_PbPb_only_spectra_ratios_single_column(
         fit_parameters=fit_parameters,
         fit_QA_plot=fit_QA_plot,
         models_calculation=models_calculation,
+        model_names_to_skip_in_pp_to_avoid_redundancy=[],
         output_dir=output_dir,
     )
 
@@ -3476,16 +3482,17 @@ def plot_pp_PbPb_only_spectra_ratios(
 
 
 def _plot_pp_PbPb_only_spectra_ratios_for_letter(
-    hists: Mapping[str, unfolding_analysis.SingleResult],
+    hists: dict[str, dict[str, unfolding_analysis.SingleResult]],
     grooming_methods: list[str],
     set_zero_to_nan: bool,
     all_methods_on_one_figure: bool,
-    event_activity_to_kt_range: Mapping[str, helpers.KtRange],
-    fit_parameters: Mapping[str, Mapping[str, Mapping[str, float]]],
+    event_activity_to_kt_range: dict[str, dict[str, helpers.KtRange]],
+    fit_parameters: dict[str, dict[str, dict[str, float]]],
     fit_QA_plot: bool,
     plot_config: pb.PlotConfig,
     output_dir: Path,
-    models_calculation: Mapping[str, Mapping[str, model_calculations.ModelCalculation]],
+    models_calculation: dict[str, model_calculations.ModelCalculation],
+    model_names_to_skip_in_pp_to_avoid_redundancy: list[str],
 ) -> None:
     """Plot model/data ratios for all provided collision systems."""
     # We start with a standard grid, and then we'll modify it to define a header.
@@ -3520,6 +3527,7 @@ def _plot_pp_PbPb_only_spectra_ratios_for_letter(
             fit_parameters=fit_parameters,
             fit_QA_plot=fit_QA_plot,
             models_calculation=models_calculation,
+            model_names_to_skip_in_pp_to_avoid_redundancy=model_names_to_skip_in_pp_to_avoid_redundancy,
             output_dir=output_dir,
         )
 
@@ -3566,19 +3574,19 @@ def _plot_pp_PbPb_only_spectra_ratios_for_letter(
     plt.close(fig)
 
 
-def plot_pp_PbPb_only_spectra_ratios_for_letter(
-    hists: Mapping[str, Mapping[str, unfolding_analysis.SingleResult]],
+def plot_pp_PbPb_only_spectra_ratios_for_letter(  # noqa: C901
+    hists: dict[str, dict[str, unfolding_analysis.SingleResult]],
     grooming_methods: list[str],
     output_dir: Path,
-    event_activity_to_kt_range: Mapping[str, helpers.KtRange | Mapping[str, helpers.KtRange]],
-    models_calculation: Mapping[str, Mapping[str, binned_data.BinnedData]],
+    event_activity_to_kt_range: dict[str, helpers.KtRange | dict[str, helpers.KtRange]],
+    models_calculation: dict[str, model_calculations.ModelCalculation],
     kt_display_range: tuple[float, float] = (1.5, 15),
     jet_R_str: str = "R02",
     alice_status: str = "work_in_progress",
     text_font_size: int = 31,
     additional_label: str = "",
     logy: bool = False,
-    fit_parameters: Mapping[str, Mapping[str, float | Mapping[str, float]]] = {},
+    fit_parameters: dict[str, dict[str, float | dict[str, float]]] | None = None,
     fit_QA_plot: bool = False,
     two_column_header: bool = True,
 ) -> None:
@@ -3592,12 +3600,14 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
         if isinstance(kt_range, helpers.KtRange):
             event_activity_to_kt_range[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
 
-    # NOTE: Need the deep copy because we modify the dict in place
+    # NOTE: Need the deep copy because we then go on to modify the dict in place
+    if fit_parameters is None:
+        fit_parameters = {}
     fit_parameters = copy.deepcopy(fit_parameters)
     for ev, parameters in fit_parameters.items():
-        # Proxy for whether just the values are provided.
+        # Proxy for whether just the values are provided (i.e. not as a function of the grooming method)
         if "x0" in parameters:
-            fit_parameters[ev] = {grooming_method: parameters for grooming_method in grooming_methods}
+            fit_parameters[ev] = {grooming_method: parameters for grooming_method in grooming_methods}  # type: ignore[misc]
 
     # NOTE: This ordering is important to get the panels right!
     #       We want pp first, and then the order for the rest is determined by the order in which the hists are passed
@@ -3648,7 +3658,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
         _define_panel_config_for_letter_combined_plots(
             two_column_header=two_column_header,
             alice_status=alice_status,
-            jet_pt_bin=jet_pt_bin,
+            jet_pt_bin=jet_pt_bin,  # type: ignore[arg-type]
             jet_R_str=jet_R_str,
             n_model_calculations=len(models_calculation),
             text_font_size=text_font_size,
@@ -3753,14 +3763,17 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(
         # Update the ratio range for central
         panels[-1].axes[0].range = _ratio_range[panel_event_activity]
 
+    # NOTE: mypy can't narrow the typing here because it doesn't understand how I've modified
+    #       the passed types to ensure they are the appropriate types.
     _plot_pp_PbPb_only_spectra_ratios_for_letter(
         hists=hists,
         models_calculation=models_calculation,
+        model_names_to_skip_in_pp_to_avoid_redundancy=[model_name for model_name in models_calculation if model_name in ["jewel_no_recoils", "hybrid_model"]],
         grooming_methods=grooming_methods,
         set_zero_to_nan=False,
         all_methods_on_one_figure=True,
-        event_activity_to_kt_range=event_activity_to_kt_range,
-        fit_parameters=fit_parameters,
+        event_activity_to_kt_range=event_activity_to_kt_range,  # type: ignore[arg-type]
+        fit_parameters=fit_parameters,  # type: ignore[arg-type]
         fit_QA_plot=fit_QA_plot,
         plot_config=pb.PlotConfig(
             name=name,
