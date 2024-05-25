@@ -46,7 +46,7 @@ class AdditionalVariableCut:
 
     @property
     def enabled(self) -> bool:
-        return self.name != ""  # noqa: PLC1901
+        return self.name != ""
 
     @property
     def encode(self) -> str:
