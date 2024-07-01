@@ -15,8 +15,9 @@ import attrs
 import matplotlib as mpl
 import numpy as np
 import numpy.typing as npt
-from pachyderm import binned_data
 from scipy import optimize
+
+from pachyderm import binned_data
 
 logger = logging.getLogger(__name__)
 

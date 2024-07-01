@@ -13,12 +13,11 @@ from typing import List, Mapping, Optional, Sequence, Tuple
 
 import attr
 import boost_histogram as bh
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import pachyderm.plot
-from pachyderm import binned_data
 
+import pachyderm.plot
 from jet_substructure.analysis.plot_style import (
     AxisConfig,
     Figure,
@@ -29,7 +28,7 @@ from jet_substructure.analysis.plot_style import (
     define_grooming_styles,
 )
 from jet_substructure.base import analysis_objects, helpers, skim_analysis_objects
-
+from pachyderm import binned_data
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +36,10 @@ pachyderm.plot.configure()
 # Enable ticks on all sides
 # Unfortunately, some of this is overriding the pachyderm plotting style.
 # That will have to be updated eventually...
-matplotlib.rcParams["xtick.top"] = True
-matplotlib.rcParams["xtick.minor.top"] = True
-matplotlib.rcParams["ytick.right"] = True
-matplotlib.rcParams["ytick.minor.right"] = True
+mpl.rcParams["xtick.top"] = True
+mpl.rcParams["xtick.minor.top"] = True
+mpl.rcParams["ytick.right"] = True
+mpl.rcParams["ytick.minor.right"] = True
 
 
 @attr.s
@@ -61,7 +60,7 @@ def _project_matching(bh_hist: bh.Histogram, axis_to_keep: int) -> binned_data.B
     ]
     selections[axis_to_keep] = slice(None)
 
-    bh_hist = bh_hist[tuple(selections)]
+    bh_hist = bh_hist[tuple(selections)]  # type: ignore[assignment]
 
     return binned_data.BinnedData.from_existing_data(bh_hist)
 
@@ -251,7 +250,7 @@ def plot_prong_matching(
                 # ENDTEMP
 
                 # n_to_split < 3
-                text_n_to_split_less_than_3 = text
+                text_n_to_split_less_than_3 = text  # type: ignore[unreachable]
                 text_n_to_split_less_than_3 += "\n" + fr"$n_{{\text{{split}}}}^{{\text{{{n_split_label}}}}} < 3$"
                 _plot_subjet_matching(
                     hists=hists,
@@ -519,9 +518,10 @@ def _plot_fraction_of_subjet_pt_in_hybrid(
             #)
             if hist_suffix:
                 hist_name += f"_{hist_suffix}"
-            h = binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(2)])
+            h = binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(2)])  # type: ignore[misc]
         else:
-            raise NotImplementedError("Not yet ready for non-RDF skim.")
+            msg = "Not yet ready for non-RDF skim."  # type: ignore[unreachable]
+            raise NotImplementedError(msg)
 
         # Normalization
         h /= np.sum(h.values)
@@ -655,7 +655,7 @@ def _plot_residual_by_matching_type(
             )
         else:
             # Let's rebin otherwise to reduce error bar size for some other the other methods.
-            h_residual = binned_data.BinnedData.from_existing_data(h_residual.to_boost_histogram()[:: bh.rebin(4)])
+            h_residual = binned_data.BinnedData.from_existing_data(h_residual.to_boost_histogram()[:: bh.rebin(4)])  # type: ignore[misc]
             # Normalize again
             h_residual /= np.sum(h_residual.values)
 
@@ -675,7 +675,7 @@ def _plot_residual_by_matching_type(
         if min_hybrid_kt:
             # Help out mypy...
             assert plot_config.panels[0].text is not None
-            plot_config.panels[0].text.text += (
+            plot_config.panels[0].text[0].text += (
                 "\n" + fr"$k_{{\text{{T}}}}^{{\text{{hybrid}}}} > {min_hybrid_kt}\:\text{{GeV}}/c$"
             )
         plot_config.apply(fig=f, axes=[a])
@@ -842,6 +842,7 @@ def _plot_jet_pt_residual_distribution(
     true_jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
     output_dir: Path,
+    plot_png: bool = False,
 ) -> None:
     """Plot the full jet pt residual for a pt true selection.
 
@@ -882,8 +883,12 @@ def _plot_jet_pt_residual_distribution(
     plot_config.apply(fig=fig, ax=ax)
 
     # Store and cleanup
-    filename = f"{plot_config.name}_true_{str(true_jet_pt_bin)}_iterative_splittings_{grooming_method}"
+    filename = f"{plot_config.name}_true_{true_jet_pt_bin!s}_iterative_splittings_{grooming_method}"
     fig.savefig(output_dir / f"{filename}.pdf")
+    if plot_png:
+        output_dir_png = output_dir / "png"
+        output_dir_png.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_dir_png / f"{filename}.png")
     plt.close(fig)
 
 
@@ -967,7 +972,7 @@ def plot_residuals(
                 figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
             ),
             output_dir=output_dir,
-            rdf_plots=rdf_plots,
+            # rdf_plots=rdf_plots,
             plot_png=plot_png,
         )
 
@@ -1043,7 +1048,7 @@ def _plot_response_without_matching_type(
         h.axes[0].bin_edges.T,
         h.axes[1].bin_edges.T,
         h.values.T,
-        norm=matplotlib.colors.LogNorm(**z_axis_range),
+        norm=mpl.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -1203,7 +1208,7 @@ def _plot_response_by_matching_type(
             h.axes[0].bin_edges.T,
             h.axes[1].bin_edges.T,
             h.values.T,
-            norm=matplotlib.colors.LogNorm(**z_axis_range),
+            norm=mpl.colors.LogNorm(**z_axis_range),
         )
         fig.colorbar(mesh, pad=0.02)
 
@@ -1292,7 +1297,7 @@ def plot_response_by_matching_type(
 
                 continue
 
-                if matching_level == "hybrid_det_level" and response_type.generator_like == "det_level":
+                if matching_level == "hybrid_det_level" and response_type.generator_like == "det_level":  # type: ignore[unreachable]
                     for subjet_name in ["leading", "subleading"]:
                         logger.debug(f"Plotting for {subjet_name} subjet")
                         for subjet_pt_fraction_range in zip(
@@ -1475,7 +1480,7 @@ def _plot_kt_comparison(
     # bh_data = bh_data[:: bh.rebin(rebin_factor)]
     # NOTE: We already applied the 40 < hybrid jet pt < 120 cut, so it doesn't need an additional selection.
     bh_data = data_hist
-    bh_data = bh_data[:: bh.sum, :]
+    bh_data = bh_data[:: bh.sum, :]  # type: ignore[assignment,misc]
     h_data = binned_data.BinnedData.from_existing_data(bh_data)
     h_data /= rebin_factor
 
@@ -1728,7 +1733,7 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     #       this shouldn't be an issue. Just something to keep an eye out for.
     jet_pt_max = _round_value_to_next_ten(jet_pt_bin.max)
     h = binned_data.BinnedData.from_existing_data(
-        bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_max) : bh.rebin(2), :]  # noqa: E203
+        bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_max) : bh.rebin(2), :]  # type: ignore[misc]
     )
 
     # Plot
@@ -1740,7 +1745,7 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
         h.axes[0].bin_edges.T,
         np.zeros_like(h.values),
         cmap="bwr",
-        norm=matplotlib.colors.Normalize(vmin=-1, vmax=1),
+        norm=mpl.colors.Normalize(vmin=-1, vmax=1),
     )
 
     # Plot values labels. These will be the only things that show up.
@@ -2001,7 +2006,7 @@ def _plot_distance_comparison(
 
         if matching_type not in ["all", "pure", "swap", "leading_correct_subleading_untagged"]:
             # Let's rebin otherwise to reduce error bar size for some other the other methods.
-            h = binned_data.BinnedData.from_existing_data(h.to_boost_histogram()[:: bh.rebin(2)])
+            h = binned_data.BinnedData.from_existing_data(h.to_boost_histogram()[:: bh.rebin(2)])  # type: ignore[misc]
 
         # Normalize
         h /= np.sum(h.values)
@@ -2068,7 +2073,7 @@ def _plot_leading_matched_subleading_unmatched_short_distance_response(
         h.axes[0].bin_edges.T,
         h.axes[1].bin_edges.T,
         h.values.T,
-        norm=matplotlib.colors.LogNorm(**z_axis_range),
+        norm=mpl.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -2140,7 +2145,7 @@ def _project_and_prepare_grooming_variable_hist(
 ) -> binned_data.BinnedData:
     # Need to project to just the attr of interest.
     h = binned_data.BinnedData.from_existing_data(
-        bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :]  # noqa: E203
+        bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :]  # type: ignore[misc]
     )
 
     # Normalize
@@ -2160,7 +2165,7 @@ def _project_and_prepare_grooming_variable_hist(
 
 def _project_and_prepare_jet_pt_hist(bh_hist: bh.Histogram, set_zero_to_nan: bool) -> binned_data.BinnedData:
     # Need to project to just the attr of interest.
-    h = binned_data.BinnedData.from_existing_data(bh_hist[:, :: bh.sum])  # noqa: E203
+    h = binned_data.BinnedData.from_existing_data(bh_hist[:, :: bh.sum])  # type: ignore[misc]
 
     # Normalize
     # Normalize by the sum of the values to get the n_jets values.
@@ -2201,7 +2206,7 @@ def _plot_compare_grooming_methods_for_attribute(
         bh_hist = hists[f"{grooming_method}_{prefix}_{attr_name}"]
         # Need to project to just the attr of interest.
         h = binned_data.BinnedData.from_existing_data(
-            bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :]  # noqa: E203
+            bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :]  # type: ignore[misc]
         )
 
         # Normalize
@@ -2544,7 +2549,7 @@ def plot_compare_grooming_methods_for_jet_pt_embed(
             # First, we determine the style
             style = grooming_styling[grooming_method]
             if main_hist is not None:
-                style = grooming_styling[f"{grooming_method}_compare"]
+                style = grooming_styling[f"{grooming_method}_compare"]  # type: ignore[unreachable]
             # And then the label
             label = f"{hists_obj.display_label}, {style.label}"
 
@@ -2575,7 +2580,7 @@ def plot_compare_grooming_methods_for_jet_pt_embed(
             if main_hist is None:
                 main_hist = h
             else:
-                ratio = main_hist / h
+                ratio = main_hist / h  # type: ignore[unreachable]
                 ax_ratio.errorbar(
                     ratio.axes[0].bin_centers,
                     ratio.values,
@@ -2649,7 +2654,7 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
             # First, we determine the style
             style = grooming_styling[grooming_method]
             if main_hist is not None:
-                style = grooming_styling[f"{grooming_method}_compare"]
+                style = grooming_styling[f"{grooming_method}_compare"]  # type: ignore[unreachable]
             # And then the label
             label = f"{hists_obj.display_label}, {style.label}"
 
@@ -2680,7 +2685,7 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
             if main_hist is None:
                 main_hist = h
             else:
-                ratio = main_hist / h
+                ratio = main_hist / h  # type: ignore[unreachable]
                 ax_ratio.errorbar(
                     ratio.axes[0].bin_centers,
                     ratio.values,
@@ -2721,13 +2726,15 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
     plt.close(fig)
 
 
+_default_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
+
 def compare_grooming_methods_for_substructure_data_embed_prod(
     hists: Tuple[PlotHists, PlotHists],
     grooming_methods: Sequence[str],
     output_dir: Path,
     rdf_plots: bool = False,
     plot_png: bool = False,
-    jet_pt_bin: helpers.RangeSelector = helpers.RangeSelector(min=40, max=120),
+    jet_pt_bin: helpers.RangeSelector = _default_jet_pt_bin,
 ) -> None:
     """Compare grooming methods for PbPb vs embedded.
 
@@ -3080,7 +3087,7 @@ def _plot_lund_plane(
         h = binned_data.BinnedData.from_existing_data(hists[hist_name])
     else:
         bh_hist = hists[f"{grooming_method}_{prefix}_lund_plane"]
-        h = binned_data.BinnedData.from_existing_data(bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :, :])  # noqa: E203
+        h = binned_data.BinnedData.from_existing_data(bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :, :])  # type: ignore[no-redef,misc]
 
     # Scale by bin width
     x_bin_widths, y_bin_widths = np.meshgrid(*h.axes.bin_widths)
@@ -3103,7 +3110,7 @@ def _plot_lund_plane(
         h.axes[0].bin_edges.T,
         h.axes[1].bin_edges.T,
         h.values.T,
-        norm=matplotlib.colors.LogNorm(**z_axis_range),
+        norm=mpl.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -3127,7 +3134,7 @@ def lund_plane(
     prefix: str,
     rdf_plots: bool = True,
     plot_png: bool = True,
-    jet_pt_bin: helpers.JetPtRange = helpers.JetPtRange(min=40, max=120)
+    jet_pt_bin: helpers.JetPtRange = _default_jet_pt_bin,  # type: ignore[assignment]
 ) -> None:
     for grooming_method in grooming_methods:
         text = "Iterative splittings"
