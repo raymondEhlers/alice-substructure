@@ -2170,7 +2170,7 @@ def setup_unfolding_outputs(  # noqa: C901
                     suffix=suffix,
                     input_dir_tag=input_dir_tag,
                     output_dir_tag=output_dir_tag,
-                    double_counting_cut=double_counting_cut,
+                    double_counting_cut="" if model_dependence_configuration.skip_double_counting_label else double_counting_cut,
                     label=f"model_dependence{label}",
                 )
             except FileNotFoundError:
@@ -2587,28 +2587,21 @@ def calculate_systematics(  # noqa: C901
     # Setup
     unfolded["default"].data.metadata["y_systematic"] = {}
 
-    # Tracking efficiency
-    # This is treated as a symmetric uncertainty.
-    # However, we store it as asymmetric errors objects for consistency with everything else.
-    try:
-        # NOTE: Unlike the others, we take the abs and set the values here directly because
-        #       we want them to be symmetric.
-        tracking_efficiency_sym = np.abs(unfolded["tracking_efficiency"].data.values - unfolded["default"].data.values)
-        unfolded["default"].data.metadata["y_systematic"]["tracking_efficiency"] = full_results_helpers.AsymmetricErrors(
-            tracking_efficiency_sym, tracking_efficiency_sym
-        )
-    except KeyError as e:
-        logger.debug(f"Skipping tracking efficiency because of {e}")
-
+    ############
+    # Unfolding
+    ############
     # Everything else is treated asymmetrically, potentially one-sided.
     unfolding_related_uncertainties = {}
-    # Per Rey, he has truncation, binning, prior, and regularization. I include:
+    # Per Rey, he has truncation, regularization, binning, and prior. I include:
     # "truncation"
     # "regularization"
     # "random_binning"
-    # "untagged_bin"
     # "reweight_prior"
-    ## Truncation
+    # "untagged_bin" (this is the only difference from the jet-axis, and we know it's a negligible effect).
+
+    ############
+    # Truncation
+    ############
     try:
         unfolding_related_uncertainties[
             "truncation"
@@ -2619,7 +2612,9 @@ def calculate_systematics(  # noqa: C901
     except KeyError as e:
         logger.debug(f"Skipping truncation because of {e}")
 
+    ################
     # Regularization
+    ################
     # +/- iterations
     unfolding_related_uncertainties[
         "regularization"
@@ -2648,14 +2643,16 @@ def calculate_systematics(  # noqa: C901
             unfolded["default"].data.values
             - unfolding_outputs["default"]
             .unfolded_substructure(
-                n_iter=unfolding_outputs["default"].n_iter_compare + truncation_iter.max,  # type: ignore[arg-type]
+                n_iter=unfolding_outputs["default"].n_iter_compare - 1,  # type: ignore[arg-type]
                 true_jet_pt_range=true_jet_pt_range,
             )
             .values
         ) / unfolded["default"].data.values
         logger.warning(f"Max difference from n_iter: {np.max(difference_n_iter)}")
 
+    ################
     # Random binning
+    ################
     # Take as a symmetric uncertainty because it's not clear why it should be one sided given that
     # we're taking only one variation.
     try:
@@ -2669,7 +2666,9 @@ def calculate_systematics(  # noqa: C901
         _msg = f"Skipping random binning because of KeyError {e}"
         logger.debug(_msg)
 
+    #######################
     # Untagged bin location
+    #######################
     try:
         unfolding_related_uncertainties[
             "untagged_bin"
@@ -2680,7 +2679,9 @@ def calculate_systematics(  # noqa: C901
         _msg = f"Skipping untagged bin location because of KeyError {e}"
         logger.debug(_msg)
 
+    ################
     # Reweight prior
+    ################
     try:
         unfolding_related_uncertainties[
             "reweight_prior"
@@ -2728,7 +2729,24 @@ def calculate_systematics(  # noqa: C901
         _msg = f"Unrecognized treatment of unfolding-related systematics: {unfolding_related_systematic_treatment}"
         raise ValueError(_msg)
 
-    # Background subtraction systematics.
+    #####################
+    # Tracking efficiency
+    #####################
+    # This is treated as a symmetric uncertainty.
+    # However, we store it as asymmetric errors objects for consistency with everything else.
+    try:
+        # NOTE: Unlike the others, we take the abs and set the values here directly because
+        #       we want them to be symmetric.
+        tracking_efficiency_sym = np.abs(unfolded["tracking_efficiency"].data.values - unfolded["default"].data.values)
+        unfolded["default"].data.metadata["y_systematic"]["tracking_efficiency"] = full_results_helpers.AsymmetricErrors(
+            tracking_efficiency_sym, tracking_efficiency_sym
+        )
+    except KeyError as e:
+        logger.debug(f"Skipping tracking efficiency because of {e}")
+
+    ########################
+    # Background subtraction
+    ########################
     background_systematics = {}
     if background_subtraction_configuration is not None:
         # (Usual) possible values: ["Rmax070", "Rmax050", "Rmax005"]:
