@@ -388,6 +388,9 @@ class ModelDependenceConfiguration:
     variations: list[str]
     approach_to_combining: str = attrs.field(default="max")
     legacy_production: bool = attrs.field(default=False)
+    # Used for PbPb fastsim, where they are pp like, and therefore turn off the DCC
+    # since they don't have a background
+    skip_double_counting_label: bool = attrs.field(default=False)
 
     @property
     def all_models(self) -> list[str]:

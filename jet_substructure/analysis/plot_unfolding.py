@@ -3946,7 +3946,9 @@ def plot_kt_unfolding(
     _small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 30, 40, 50, 60, 90])
     if unfolding_output.collision_system != "pp":
         # PbPb needs somewhat different binning
-        _small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 60, 80, 100, 120])
+        # TODO: 120 should work... For some reason, it doesn't seem to work when I try with the model dependence...
+        #_small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 60, 80, 100, 120])
+        _small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 60, 80, 100])
     for _low, _high in zip(_small_jet_pt_bins[:-1], _small_jet_pt_bins[1:]):
         _small_jet_pt_range = helpers.JetPtRange(_low, _high)
         text = f"${_small_jet_pt_range.display_str(label='data')}$"
@@ -5883,6 +5885,10 @@ def steer_plotting_of_kt_unfolding_outputs(
             unfolding_systematics_outputs if plot_systematics else {grooming_method: {}},
         ]:
             for name, _unfolding_output in _outputs[grooming_method].items():
+                # TEMP: Skip not fast sim for expediency
+                if "fastsim" not in name:
+                    continue
+                # ENDTEMP
                 # Skip, since we already plotted above.
                 if name == "default":
                     continue
