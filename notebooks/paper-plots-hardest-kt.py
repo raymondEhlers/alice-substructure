@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.15.2
+#       jupytext_version: 1.16.2
 #   kernelspec:
 #     display_name: .venv-3.11
 #     language: python
@@ -26,9 +26,8 @@ from pathlib import Path
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import pachyderm.plot as pb
-from mammoth import helpers as mammoth_helpers
 
+import pachyderm.plot as pb
 from jet_substructure.analysis import (
     model_calculations,
     plot_paper,
@@ -36,17 +35,21 @@ from jet_substructure.analysis import (
     unfolding_analysis,
 )
 from jet_substructure.base import helpers
+from mammoth import helpers as mammoth_helpers
 
 # %load_ext autoreload
 # %autoreload 2
 
 mammoth_helpers.setup_logging(level=logging.DEBUG)
-# Quiet down the matplotlib logging
+# Quiet down loud logging from other libraries
 logging.getLogger("matplotlib").setLevel(logging.INFO)
 logging.getLogger("PIL").setLevel(logging.INFO)
-logging.getLogger("pachyderm.histogram").setLevel(logging.INFO)
 logging.getLogger("boost_histogram").setLevel(logging.INFO)
 logging.getLogger("numba").setLevel(logging.INFO)
+logging.getLogger("fsspec").setLevel(logging.INFO)
+
+logging.getLogger("pachyderm.histogram").setLevel(logging.INFO)
+logging.getLogger("pachyderm.binned_data").setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +82,9 @@ substructure_variable = "kt"
 true_jet_pt_range = helpers.JetPtRange(60, 80)
 jet_R = 0.2
 jet_R_str = f"R{int(jet_R*10):02}"
+#_unfolding_related_systematic_treatment = "max"
+#_unfolding_related_systematic_treatment = "std_dev"
+_unfolding_related_systematic_treatment = "all"
 grooming_methods = [
     "dynamical_core",
     "dynamical_kt",
@@ -217,6 +223,12 @@ non_closure_configuration.update({
     _method: None
     for _method in _grooming_methods_using_new_conventions
 })
+# Smoothing for systematic uncertainty contributions
+smooth_systematic_uncertainty_contributions = {
+    #grooming_method: ["model_dependence"]
+    grooming_method: []
+    for grooming_method in _grooming_methods_using_new_conventions
+}
 
 # Either take model dependence or reweighted prior
 # Model dependence is always preferred, but it may not have been analyzed yet for the a particular configuration
@@ -252,6 +264,8 @@ pp_R02_unfolded_with_systematics, pp_R02_true_reference = plot_unfolding.unfolde
     unfolding_systematics_outputs=pp_R02_unfolding_systematics_outputs,
     unfolding_closure_outputs=pp_R02_unfolding_closure_outputs,
     true_jet_pt_range=true_jet_pt_range,
+    unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
+    smooth_systematic_uncertainty_contributions=smooth_systematic_uncertainty_contributions,
     model_dependence_configuration=_model_dependence_configuration,
     non_closure_configuration=non_closure_configuration,
     background_subtraction_configuration=None,
@@ -272,6 +286,7 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     plot_systematic_breakdown=True,
     plot_systematics=False,
     plot_closures=False,
+    unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
     # NOTE: All of the commentary below is **only** related to plotting of the prior for selecting the
     #       number of iterations. The actual prior systematic is evaluated properly!
     # NOTE: For the prior variation, passing the HERWIG model dependence includes both:
@@ -455,6 +470,7 @@ semi_central_R02_unfolded_with_systematics, semi_central_R02_true_reference = pl
     unfolding_systematics_outputs=semi_central_R02_unfolding_systematics_outputs,
     unfolding_closure_outputs=semi_central_R02_unfolding_closure_outputs,
     true_jet_pt_range=true_jet_pt_range,
+    unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
     model_dependence_configuration=_model_dependence_configuration,
     non_closure_configuration=_non_closure_configuration,
     background_subtraction_configuration=_background_subtraction_configuration,
@@ -475,6 +491,7 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     plot_systematic_breakdown=True,
     plot_systematics=False,
     plot_closures=False,
+    unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
     prior_variation_output_name="reweight_prior",
     unfolding_kt_display_range={
         grooming_method: (0.25, 6) if "z_cut" in grooming_method else (1, 6)
@@ -610,6 +627,7 @@ central_R02_unfolded_with_systematics, central_R02_true_reference = plot_unfoldi
     unfolding_systematics_outputs=central_R02_unfolding_systematics_outputs,
     unfolding_closure_outputs=central_R02_unfolding_closure_outputs,
     true_jet_pt_range=true_jet_pt_range,
+    unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
     model_dependence_configuration=_model_dependence_configuration,
     non_closure_configuration=_non_closure_configuration,
     background_subtraction_configuration=_background_subtraction_configuration,
@@ -626,6 +644,7 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     plot_systematic_breakdown=True,
     plot_systematics=False,
     plot_closures=False,
+    unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
     prior_variation_output_name="reweight_prior",
     unfolding_kt_display_range={
         grooming_method: (0.25, 6) if "z_cut" in grooming_method else (1.5, 6)
@@ -826,6 +845,7 @@ pp_R04_unfolded_with_systematics, pp_R04_true_reference = plot_unfolding.unfolde
     unfolding_systematics_outputs=pp_R04_unfolding_systematics_outputs,
     unfolding_closure_outputs=pp_R04_unfolding_closure_outputs,
     true_jet_pt_range=true_jet_pt_range,
+    unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
     model_dependence_configuration=_model_dependence_configuration,
     non_closure_configuration=non_closure_configuration,
     background_subtraction_configuration=None,
@@ -941,6 +961,35 @@ jetscape_R04 = model_calculations.Jetscape(
     metadata={"jet_R": 0.4, "selected_collision_systems": ["pp"]},
 )
 jetscape_predictions_R04 = jetscape_R04.load_predictions()
+
+# %% [markdown]
+# ### JEWEL
+
+# %% [markdown]
+# #### R = 0.2
+
+# %%
+jewel_recoils_R02 = model_calculations.JEWEL(
+    base_dir=Path("output/comparison/models/jewel"),
+    needs_normalization=True,
+    metadata={
+        "recoils": True,
+        "jet_R": 0.2,
+    },
+)
+jewel_recoils_predictions_R02 = jewel_recoils_R02.load_predictions()
+jewel_no_recoils_R02 = model_calculations.JEWEL(
+    base_dir=Path("output/comparison/models/jewel"),
+    needs_normalization=True,
+    metadata={
+        "recoils": False,
+        "jet_R": 0.2,
+    },
+)
+jewel_no_recoils_predictions_R02 = jewel_no_recoils_R02.load_predictions()
+
+# %%
+jewel_no_recoils_predictions_R02.spectra("central")["dynamical_core"].axes[0].bin_edges
 
 # %% [markdown]
 # ### Sherpa
@@ -1092,6 +1141,7 @@ def PbPb_kt_measured_range_by_grooming_method(event_activity: str) -> None:
 
 # %%
 import seaborn as sns
+
 sns.color_palette(
   [
     # Dark Green
@@ -1301,6 +1351,8 @@ for _grooming_method in grooming_methods:
             "pythia": pythia_predictions_R02,
             # All of the hybrid loaded predictions have the same pp, so picking any one is fine!
             "hybrid": hybrid_model_with_wake_with_moliere_predictions_R02,
+            # All of the JEWEL loaded predictions have the same pp, so picking any one is fine!
+            "jewel": jewel_no_recoils_predictions_R02,
         },
         grooming_methods=[_grooming_method],
         collision_system="pp",
@@ -1558,6 +1610,8 @@ models = {
     "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
     "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
     "jetscape": jetscape_predictions_R02,
+    "jewel_recoils": jewel_recoils_predictions_R02,
+    "jewel_no_recoils": jewel_no_recoils_predictions_R02,
 }
 for _collision_system, _hists in [
     ("semi_central", semi_central_R02_unfolded_with_systematics),
@@ -1762,6 +1816,8 @@ models_calculation = {
     "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
     "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
     "jetscape": jetscape_predictions_R02,
+    "jewel_recoils": jewel_recoils_predictions_R02,
+    "jewel_no_recoils": jewel_no_recoils_predictions_R02,
 }
 # For the smoothed spectra
 fit_parameters = {
@@ -1868,6 +1924,8 @@ models_calculation = {
     "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
     "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
     "jetscape": jetscape_predictions_R02,
+    "jewel_recoils": jewel_recoils_predictions_R02,
+    "jewel_no_recoils": jewel_no_recoils_predictions_R02,
 }
 
 for event_activity in ["semi_central", "central"]:
@@ -1929,6 +1987,8 @@ models_calculation = {
     "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
     "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
     "jetscape": jetscape_predictions_R02,
+    "jewel_recoils": jewel_recoils_predictions_R02,
+    "jewel_no_recoils": jewel_no_recoils_predictions_R02,
 }
 
 #plot_paper.plot_pp_PbPb_comparison_single_figure(
@@ -1989,6 +2049,8 @@ models_calculation = {
     "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
     "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
     "jetscape": jetscape_predictions_R02,
+    "jewel_recoils": jewel_recoils_predictions_R02,
+    "jewel_no_recoils": jewel_no_recoils_predictions_R02,
 }
 
 plot_paper.plot_pp_PbPb_comparison_only_ratios_for_letter(
@@ -2009,6 +2071,7 @@ plot_paper.plot_pp_PbPb_comparison_only_ratios_for_letter(
     kt_display_range=(0.0, 6.35),
     jet_R_str=jet_R_str,
     alice_status=alice_status,
+    calculate_n_sigma_stat_from_unity=True,
     additional_label="_".join(grooming_methods_for_letter),
     # NOTE: This seems to need to be smaller to fit the header. Still could be tuned...
     text_font_size=24,
@@ -2116,17 +2179,7 @@ def test_axis(output_dir: Path) -> None:
 
     fig.tight_layout()
     fig.subplots_adjust(
-        **{
-            # Reduce spacing between subplots
-            "hspace": 0,
-            "wspace": 0,
-            # Reduce external spacing
-            "left": 0.10,
-            "bottom": 0.105,
-            "right": 0.98,
-            #"top": 0.98,
-            "top": 0.7,
-        }
+        hspace=0, wspace=0, left=0.10, bottom=0.105, right=0.98, top=0.7
     )
     fig.savefig(output_dir / "test.pdf")
     plt.close(fig)
