@@ -208,6 +208,7 @@ _model_dependence_configuration.update({
     _method: unfolding_analysis.ModelDependenceConfiguration(
         nominal="pythia_fastsim",
         variations=["herwig_fastsim"],
+        approach_to_combining="max",
     ) for _method in _grooming_methods_using_new_conventions
 })
 # Non-closure
@@ -582,6 +583,15 @@ _double_counting_cut = {
 }
 # Model dependence.
 _model_dependence_configuration = None
+#_model_dependence_configuration = {}
+#_model_dependence_configuration.update({
+#    _method: unfolding_analysis.ModelDependenceConfiguration(
+#        nominal="PbPb_pythia_fastsim",
+#        variations=["jewel_no_recoils_fastsim", "jewel_recoils_fastsim"],
+#        approach_to_combining="max",
+#        skip_double_counting_label=True,
+#    ) for _method in _grooming_methods_using_new_conventions
+#})
 # Background subtraction configurations
 _background_subtraction_configuration = {
     _method: unfolding_analysis.BackgroundSubtractionConfiguration(
@@ -642,7 +652,7 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     plot=True,
     plot_png=False,
     plot_systematic_breakdown=True,
-    plot_systematics=False,
+    plot_systematics=True,
     plot_closures=False,
     unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
     prior_variation_output_name="reweight_prior",
@@ -2101,9 +2111,156 @@ for grooming_method in grooming_methods:
         additional_label="multiple_ratios",
     )
 
-# %%
+# %% [markdown]
+# # Tables
 
 # %%
+import pandas as pd
+
+# %%
+central_R02_unfolded_with_systematics["dynamical_kt"].data.metadata["y_systematic"]["background_sub"]
+
+# %%
+#_current_grooming_method = "dynamical_kt"
+#df_absolute = pd.DataFrame(
+#    {
+#        f"{k}_{direction}": getattr(v, direction)
+#        for i, (k, v) in enumerate(central_R02_unfolded_with_systematics[_current_grooming_method].data.metadata["y_systematic"].items())
+#        for direction in ["low", "high"]
+#    }
+#)
+#df_absolute["stat"] = (
+#    central_R02_unfolded_with_systematics[_current_grooming_method].data.errors
+#)
+#
+#df_relative = df_absolute.divide(central_R02_unfolded_with_systematics[_current_grooming_method].data.values, axis=0)
+
+import numpy as np
+
+from jet_substructure.analysis import full_results_helpers
+
+
+def define_paper_table_dfs(
+    hists: dict[str, dict[str, unfolding_analysis.SingleResult]],
+    collision_system: str,
+    grooming_methods: list[str],
+    event_activity_to_kt_range: dict[str, helpers.KtRange] | dict[str, dict[str, helpers.KtRange]],
+) -> dict[str, tuple[list[str], pd.DataFrame, pd.DataFrame]]:
+    """ Going source-by-source of the uncertainties, we want to extract the minimum and maximum over the measured range.
+
+    """
+    # Validation
+    for ev, kt_range in event_activity_to_kt_range.items():
+        if isinstance(kt_range, helpers.KtRange):
+            event_activity_to_kt_range[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
+
+    tables = {}
+    for grooming_method in grooming_methods:
+        uncertainties = {}
+        # Retrive hist and select range to consider based on collision system and grooming method.
+        h = hists[collision_system][grooming_method].data
+        h = full_results_helpers.select_hist_range(h, event_activity_to_kt_range[collision_system][grooming_method])
+
+        # Create dataframes for absolute and relative uncertainties.
+        # We want to keep the maximum uncertainties regardless of the low or high direction
+        sources = list(h.metadata["y_systematic"].keys())
+        uncertainties = {
+            f"{k}_{r}": getattr(np, r)(np.abs(v.low), np.abs(v.high))
+            for k, v in h.metadata["y_systematic"].items()
+            for r in ["minimum", "maximum"]
+        }
+        df_absolute = pd.DataFrame(uncertainties)
+        # It's nice to keep track of this as well..
+        df_absolute["stat"] = (
+            h.errors
+        )
+
+        #df_absolute = pd.DataFrame(
+        #    {
+        #        f"{k}_{direction}": getattr(v, direction)
+        #        for i, (k, v) in enumerate(hists[_current_grooming_method].data.metadata["y_systematic"].items())
+        #        for direction in ["low", "high"]
+        #    }
+        #)
+
+        df_relative = df_absolute.divide(h.values, axis=0)
+
+        tables[grooming_method] = (sources, df_absolute, df_relative)
+
+    return tables
+
+
+
+# %%
+tables = {}
+for collision_system in ["pp", "semi_central", "central"]:
+    tables[collision_system] = define_paper_table_dfs(
+        hists={
+            "pp": pp_R02_unfolded_with_systematics,
+            "semi_central": semi_central_R02_unfolded_with_systematics,
+            "central": central_R02_unfolded_with_systematics,
+        },
+        collision_system=collision_system,
+        grooming_methods=grooming_methods_for_letter,
+        event_activity_to_kt_range={
+            "pp": helpers.KtRange(0.25, 6),
+            "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+            "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+        },
+    )
+tables
+
+# %%
+uncertainties_display_tables = {}
+for collision_system in tables:
+    uncertainties_display_tables[collision_system] = None
+    min_max_values_per_grooming_method = {}
+    for grooming_method in grooming_methods_for_letter:
+        sources, _, df_relative = tables[collision_system][grooming_method]
+        min_max_values = {}
+        for source in sources:
+            min_max_values[f"{source}_minimum"] = df_relative[f"{source}_maximum"].min()
+            min_max_values[f"{source}_maximum"] = df_relative[f"{source}_maximum"].max()
+        min_max_values_per_grooming_method[grooming_method] = min_max_values
+    # NOTE: The transpose ensures that the sources columns, while each grooming method is a new row
+    uncertainties_display_tables[collision_system] = pd.DataFrame(min_max_values_per_grooming_method).transpose()
+
+# %%
+uncertainties_display_tables
+
+# %%
+a = "a_bb_ccc"
+"_".join(a.split("_")[:-1])
+
+
+# %%
+def format_range(min_val: float, max_val: float, sig_digits: int):
+    #return fr"{min_val * 100:.{sig_digits}g} -- {max_val * 100:.{sig_digits}g}\%"
+    min_value = f"{round(min_val * 100):g}" if not np.isnan(min_val) else "NaN"
+    max_value = f"{round(max_val * 100):g}" if not np.isnan(max_val) else "NaN"
+    return fr"{min_value} -- {max_value}\%"
+
+output_display_tables = {}
+for collision_system, df in uncertainties_display_tables.items():
+    #for source in df.columns:  # noqa: C401
+    columns = set("_".join(k.split("_")[:-1]) for k in df.columns)  # noqa: C401
+    # Remove the "stat" category, which ends up empty
+    columns.discard("")
+    print(f"{columns}")
+    output_display_values = {}
+    for source in columns:
+        print(f"handling source: {source}")
+        #df[source] = df.apply(lambda row: format_range(row[f"{source}_minimum"], row[f"{source}_maximum"], 2), axis=1)
+        # Add a column for each source, set to the formatted range
+        output_display_values[source] = df.apply(lambda row: format_range(row[f"{source}_minimum"], row[f"{source}_maximum"], 1), axis=1)
+    output_display_tables[collision_system] = pd.DataFrame(output_display_values)
+
+# %%
+# I think this is all reasonably okay now, up to the NaN. Now I need to smooth the uncertainties and put them all in groups...
+output_display_tables["pp"]
+
+# %%
+central_R02_unfolded_with_systematics["dynamical_kt"].data.axes[0].bin_centers
 
 # %% [markdown]
 # # Debug area
