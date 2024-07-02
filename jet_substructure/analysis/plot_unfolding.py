@@ -5,9 +5,11 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from pathlib import Path
 from typing import (
+    Any,
     Callable,
     Mapping,
     Sequence,
@@ -140,17 +142,17 @@ def plot_relative_individual_systematics(
 
     for name, systematic in unfolded.data.metadata["y_systematic"].items():
         # Upper values
-        extra_args = {}
+        extra_args: dict[str, Any] = {"alpha": 0.8}
         if name == "quadrature":
             extra_args = {
                 "color": "black",
                 "linewidth": 2,
+                "alpha": 0.5,
             }
         p = hep.histplot(
             H=np.ones_like(unfolded.data.values) + (systematic.high / unfolded.data.values),
             bins=unfolded.data.axes[0].bin_edges,
             label=name.replace("_", " "),
-            alpha=0.8,
             **extra_args,
         )
         # Lower values
@@ -161,7 +163,6 @@ def plot_relative_individual_systematics(
             H=np.ones_like(unfolded.data.values) - (systematic.low / unfolded.data.values),
             bins=unfolded.data.axes[0].bin_edges,
             color=p[0].stairs.get_edgecolor(),
-            alpha=0.8,
             **extra_args,
         )
 
@@ -2395,6 +2396,7 @@ def _unfolded_outputs_with_systematics(
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: unfolding_analysis.NonClosureConfiguration | None = None,
     background_subtraction_configuration: unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
+    calculate_quadrature_assuming_all_are_symmetric: bool = False,
 ) -> tuple[unfolding_analysis.SingleResult, binned_data.BinnedData]:
     """Steers the actual calculation of the systematic uncertainties.
 
@@ -2417,6 +2419,7 @@ def _unfolded_outputs_with_systematics(
         model_dependence_configuration=model_dependence_configuration,
         non_closure_configuration=non_closure_configuration,
         background_subtraction_configuration=background_subtraction_configuration,
+        calculate_quadrature_assuming_all_are_symmetric=calculate_quadrature_assuming_all_are_symmetric,
     )
 
     # And we include the true reference (ie. generally pythia true level). We could derive this elsewhere,
@@ -2438,6 +2441,7 @@ def unfolded_outputs_with_systematics(
     model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration | None] | unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: dict[str, unfolding_analysis.NonClosureConfiguration | None] | unfolding_analysis.NonClosureConfiguration | None = None,
     background_subtraction_configuration: dict[str, unfolding_analysis.BackgroundSubtractionConfiguration | None] | unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
+    calculate_quadrature_assuming_all_are_symmetric: bool = False,
 ) -> tuple[dict[str, unfolding_analysis.SingleResult], dict[str, binned_data.BinnedData]]:
     """Calculates the unfolded results with systematic uncertainties.
 
@@ -2478,6 +2482,7 @@ def unfolded_outputs_with_systematics(
             model_dependence_configuration=model_dependence_configuration[grooming_method],
             non_closure_configuration=non_closure_configuration[grooming_method],
             background_subtraction_configuration=background_subtraction_configuration[grooming_method],
+            calculate_quadrature_assuming_all_are_symmetric=calculate_quadrature_assuming_all_are_symmetric,
         )
 
     return unfolded_with_systematics, true_reference
@@ -2575,6 +2580,7 @@ def calculate_systematics(  # noqa: C901
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: unfolding_analysis.NonClosureConfiguration | None = None,
     background_subtraction_configuration: unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
+    calculate_quadrature_assuming_all_are_symmetric: bool = False,
 ) -> unfolding_analysis.SingleResult:
     # Validation
     if truncation_iter is None:
@@ -2603,11 +2609,18 @@ def calculate_systematics(  # noqa: C901
     # Truncation
     ############
     try:
+        # Treat as a symmetric, unsigned uncertainty:
+        # Take the max deviation of the two values to be conservative
+        # NOTE: Rey took the average, `value = (upper + lower)/2`, but I think this is
+        #       unlikely to matter, and the maximum seems easier to defend as conservative.
+        lower = np.abs(unfolded["truncation_low"].data.values - unfolded["default"].data.values)
+        upper = np.abs(unfolded["truncation_high"].data.values - unfolded["default"].data.values)
+        # NOTE: We can apply maximum without further thought
+        value = np.maximum(lower, upper)
         unfolding_related_uncertainties[
             "truncation"
-        ] = full_results_helpers.AsymmetricErrors.calculate_errors(
-            unfolded["truncation_low"].data.values - unfolded["default"].data.values,
-            unfolded["truncation_high"].data.values - unfolded["default"].data.values,
+        ] = full_results_helpers.AsymmetricErrors(
+            value, value,
         )
     except KeyError as e:
         logger.debug(f"Skipping truncation because of {e}")
@@ -2616,24 +2629,37 @@ def calculate_systematics(  # noqa: C901
     # Regularization
     ################
     # +/- iterations
-    unfolding_related_uncertainties[
-        "regularization"
-    ] = full_results_helpers.AsymmetricErrors.calculate_errors(
-        unfolded["default"].data.values
-        - unfolding_outputs["default"]
-        .unfolded_substructure(
-            n_iter=unfolding_outputs["default"].n_iter_compare - truncation_iter.min,  # type: ignore[arg-type]
-            true_jet_pt_range=true_jet_pt_range,
+    try:
+        # Treat as a symmetric, unsigned uncertainty:
+        # Take the max deviation of the two values to be conservative
+        # NOTE: Rey took the average, `value = (upper + lower)/2`, but I think this is
+        #       unlikely to matter, and the maximum seems easier to defend as conservative.
+        lower = (
+            unfolded["default"].data.values
+            - unfolding_outputs["default"]
+            .unfolded_substructure(
+                n_iter=unfolding_outputs["default"].n_iter_compare - truncation_iter.min,  # type: ignore[arg-type]
+                true_jet_pt_range=true_jet_pt_range,
+            )
+            .values
         )
-        .values,
-        unfolded["default"].data.values
-        - unfolding_outputs["default"]
-        .unfolded_substructure(
-            n_iter=unfolding_outputs["default"].n_iter_compare + truncation_iter.max,  # type: ignore[arg-type]
-            true_jet_pt_range=true_jet_pt_range,
+        upper = (
+            unfolded["default"].data.values
+            - unfolding_outputs["default"]
+            .unfolded_substructure(
+                n_iter=unfolding_outputs["default"].n_iter_compare + truncation_iter.max,  # type: ignore[arg-type]
+                true_jet_pt_range=true_jet_pt_range,
+            )
+            .values
         )
-        .values,
-    )
+        value = np.maximum(lower, upper)
+        unfolding_related_uncertainties[
+            "regularization"
+        ] = full_results_helpers.AsymmetricErrors(
+            value, value
+        )
+    except KeyError as e:
+        logger.debug(f"Skipping regularization because of {e}")
 
     # An aside from systematics, but useful: determine how much we change when we go to the next iteration.
     # This is useful for a line in the paper, and it's really easy to calculate here, so just go for it and print it.
@@ -2648,15 +2674,16 @@ def calculate_systematics(  # noqa: C901
             )
             .values
         ) / unfolded["default"].data.values
-        logger.warning(f"Max difference from n_iter: {np.max(difference_n_iter)}")
+        logger.warning(f"Max relative difference from n_iter: {np.max(difference_n_iter)}")
 
     ################
     # Random binning
     ################
-    # Take as a symmetric uncertainty because it's not clear why it should be one sided given that
-    # we're taking only one variation.
     try:
-        random_binning_sym = unfolded["random_binning"].data.values - unfolded["default"].data.values
+        # Treat as a symmetric, unsigned uncertainty:
+        # We choose this since we take one variation, but it's not clear why the values should
+        # vary in a particular direction.
+        random_binning_sym = np.abs(unfolded["random_binning"].data.values - unfolded["default"].data.values)
         unfolding_related_uncertainties[
             "random_binning"
         ] = full_results_helpers.AsymmetricErrors(
@@ -2670,10 +2697,14 @@ def calculate_systematics(  # noqa: C901
     # Untagged bin location
     #######################
     try:
+        # Treat as a symmetric, unsigned uncertainty:
+        # We choose this since we take one variation, but it's not clear why the values should
+        # vary in a particular direction.
+        value = np.abs(unfolded["untagged_bin"].data.values - unfolded["default"].data.values)
         unfolding_related_uncertainties[
             "untagged_bin"
-        ] = full_results_helpers.AsymmetricErrors.calculate_errors(
-            unfolded["untagged_bin"].data.values - unfolded["default"].data.values
+        ] = full_results_helpers.AsymmetricErrors(
+            value, value
         )
     except KeyError as e:
         _msg = f"Skipping untagged bin location because of KeyError {e}"
@@ -2683,10 +2714,14 @@ def calculate_systematics(  # noqa: C901
     # Reweight prior
     ################
     try:
+        # Treat as a symmetric, unsigned uncertainty:
+        # We choose this since we take one variation, but it's not clear why the values should
+        # vary in a particular direction.
+        value = np.abs(unfolded["reweight_prior"].data.values - unfolded["default"].data.values)
         unfolding_related_uncertainties[
             "reweight_prior"
-        ] = full_results_helpers.AsymmetricErrors.calculate_errors(
-            unfolded["reweight_prior"].data.values - unfolded["default"].data.values
+        ] = full_results_helpers.AsymmetricErrors(
+            value, value
         )
     except KeyError as e:
         _msg = f"Skipping reweighting prior because of KeyError {e}"
@@ -2708,7 +2743,7 @@ def calculate_systematics(  # noqa: C901
                 high_max_values,
                 np.abs(_error_values.high),
             )
-        unfolded["default"].data.metadata["y_systematic"]["unfolding_max"] = full_results_helpers.AsymmetricErrors(
+        unfolded["default"].data.metadata["y_systematic"]["unfolding"] = full_results_helpers.AsymmetricErrors(
             low_max_values,
             high_max_values,
         )
@@ -2721,7 +2756,7 @@ def calculate_systematics(  # noqa: C901
             high_std_dev_values += _error_values.high ** 2
         low_std_dev_values = np.sqrt(1./len(unfolding_related_uncertainties) * low_std_dev_values)
         high_std_dev_values = np.sqrt(1./len(unfolding_related_uncertainties) * high_std_dev_values)
-        unfolded["default"].data.metadata["y_systematic"]["unfolding_std_dev"] = full_results_helpers.AsymmetricErrors(
+        unfolded["default"].data.metadata["y_systematic"]["unfolding"] = full_results_helpers.AsymmetricErrors(
             low_std_dev_values,
             high_std_dev_values,
         )
@@ -2732,14 +2767,13 @@ def calculate_systematics(  # noqa: C901
     #####################
     # Tracking efficiency
     #####################
-    # This is treated as a symmetric uncertainty.
-    # However, we store it as asymmetric errors objects for consistency with everything else.
     try:
-        # NOTE: Unlike the others, we take the abs and set the values here directly because
-        #       we want them to be symmetric.
-        tracking_efficiency_sym = np.abs(unfolded["tracking_efficiency"].data.values - unfolded["default"].data.values)
-        unfolded["default"].data.metadata["y_systematic"]["tracking_efficiency"] = full_results_helpers.AsymmetricErrors(
-            tracking_efficiency_sym, tracking_efficiency_sym
+        # NOTE: Treat as a symmetric, signed uncertainty, since we're only calculating from one source
+        #       that should go in one direction
+        # TODO: Fully implement this approach.
+        tracking_efficiency_sym = unfolded["tracking_efficiency"].data.values - unfolded["default"].data.values
+        unfolded["default"].data.metadata["y_systematic"]["tracking_efficiency"] = full_results_helpers.AsymmetricErrors.calculate_errors(
+            tracking_efficiency_sym
         )
     except KeyError as e:
         logger.debug(f"Skipping tracking efficiency because of {e}")
@@ -2747,9 +2781,12 @@ def calculate_systematics(  # noqa: C901
     ########################
     # Background subtraction
     ########################
+    # Treat as a symmetric, unsigned uncertainty:
+    # Take the max deviation of the background sub values to be conservative
+    # (same as James and Rey)
     background_systematics = {}
     if background_subtraction_configuration is not None:
-        # (Usual) possible values: ["Rmax070", "Rmax050", "Rmax005"]:
+        # (Usual) possible values: ["Rmax070", "Rmax050", "Rmax005"]
         for background_setting in background_subtraction_configuration.contributors:
             # Since we're explicitly passing the configuration, we should expect that the outputs are there!
             background_systematics[background_setting] = (
@@ -2759,16 +2796,19 @@ def calculate_systematics(  # noqa: C901
         if len(background_systematics) >= 3:
             _msg = f"Found too many background sub systematics - it's ambiguous. Please check! {list(background_systematics.keys())=}"
             raise ValueError(_msg)
-        _background_subtraction_values = list(background_systematics.values())
+        _background_subtraction_values = [
+            np.abs(v) for v in background_systematics.values()
+        ]
         # NOTE: This is important to append for there to be two values! Otherwise, the uncertainties will
         #       be treated as one sided! If we for some reason only had one side, we would want to duplicate
         #       them since the background can be asymmetric, but they should always be treated as two sided.
         if len(_background_subtraction_values) == 1:
             _background_subtraction_values.append(*_background_subtraction_values)
+        values = np.maximum(*_background_subtraction_values)
         unfolded["default"].data.metadata["y_systematic"][
             "background_sub"
-        ] = full_results_helpers.AsymmetricErrors.calculate_errors(
-            *_background_subtraction_values
+        ] = full_results_helpers.AsymmetricErrors(
+            values, values
         )
         #logger.info(f"Bin edges: {unfolded['default'].data.axes[0].bin_edges}")
         #for _bkg_label, _bkg_value in background_systematics.items():
@@ -2780,9 +2820,10 @@ def calculate_systematics(  # noqa: C901
     else:
         logger.info("Skipping background subtraction because background sub config was not passed.")
 
+    #############
     # Non-closure
-    # This is treated as a symmetric uncertainty.
-    # However, we store it as asymmetric errors objects for consistency with everything else.
+    #############
+    # This is treated as a symmetric, unsigned uncertainty.
     if non_closure_configuration is not None:
         # We loop here since we could there could be multiple contributors to the non-closure.
         non_closure_relative_errors_by_contribution = {}
@@ -2829,8 +2870,11 @@ def calculate_systematics(  # noqa: C901
     else:
         logger.info("Skipping non closure systematic because no configuration was provided.")
 
-    # Model dependence.
-    # The output should include _either_ the model dependence or the prior
+    ##################################
+    # Model (or generator) dependence.
+    ##################################
+    # This describes the model dependence in the response matrix, which is distinct from the
+    # prior dependence that is included in the unfolding!
     if model_dependence_configuration is not None:
         _entry_for_model_dependence = np.array(["model_dependence" in k for k in unfolding_outputs])
         if model_dependence_configuration.legacy_production:
@@ -2944,14 +2988,31 @@ def calculate_systematics(  # noqa: C901
     )
 
     # Sum in quadrature
+    # Allow for the symmetrization of the signed uncertainties when calculating the quadrature sum.
+    y_systematic_dict = unfolded["default"].data.metadata["y_systematic"]
+    logger.info(f"Setting up... {list(y_systematic_dict.keys())}")
+    if calculate_quadrature_assuming_all_are_symmetric:
+        y_systematic_dict = copy.deepcopy(y_systematic_dict)
+        logger.info(f"Copying... {list(y_systematic_dict.keys())}")
+        # These are the only ones that we treat asymmetrically as of 2024 July 1
+        for k in ["tracking_efficiency", "model_dependence"]:
+            if k in y_systematic_dict:
+                # These will be one sided uncertainties, so in practice, taking the maximum will effectively
+                # just symmetric them.
+                values = np.maximum(y_systematic_dict[k].low, y_systematic_dict[k].high)
+                y_systematic_dict[k].low = values
+                y_systematic_dict[k].high = values
+        logger.info(f"Post symmetrizing... {list(y_systematic_dict.keys())}")
+
     # We protect against including quadrature in case we already calculated the systematics.
+    keys_to_skip = ["quadrature"]
     unfolded["default"].data.metadata["y_systematic"]["quadrature"] = full_results_helpers.AsymmetricErrors(
         low=np.sqrt(
             np.sum(
                 [
                     v.low ** 2
-                    for k, v in unfolded["default"].data.metadata["y_systematic"].items()
-                    if k != "quadrature"
+                    for k, v in y_systematic_dict.items()
+                    if k not in keys_to_skip
                 ],
                 axis=0,
             )
@@ -2960,8 +3021,8 @@ def calculate_systematics(  # noqa: C901
             np.sum(
                 [
                     v.high ** 2
-                    for k, v in unfolded["default"].data.metadata["y_systematic"].items()
-                    if k != "quadrature"
+                    for k, v in y_systematic_dict.items()
+                    if k not in keys_to_skip
                 ],
                 axis=0,
             )
