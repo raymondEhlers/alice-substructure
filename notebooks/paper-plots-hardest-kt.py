@@ -82,18 +82,21 @@ substructure_variable = "kt"
 true_jet_pt_range = helpers.JetPtRange(60, 80)
 jet_R = 0.2
 jet_R_str = f"R{int(jet_R*10):02}"
+# Uncertainty options
 #_unfolding_related_systematic_treatment = "max"
-#_unfolding_related_systematic_treatment = "std_dev"
-_unfolding_related_systematic_treatment = "all"
+_unfolding_related_systematic_treatment = "std_dev"
+#_unfolding_related_systematic_treatment = "all"
+calculate_quadrature_assuming_all_are_symmetric = True
+
 grooming_methods = [
-    "dynamical_core",
+    #"dynamical_core",
     "dynamical_kt",
-    "dynamical_time",
+    #"dynamical_time",
     "soft_drop_z_cut_02",
-    "dynamical_core_z_cut_02",
-    "dynamical_kt_z_cut_02",
-    "dynamical_time_z_cut_02",
-    "soft_drop_z_cut_04",
+    #"dynamical_core_z_cut_02",
+    #"dynamical_kt_z_cut_02",
+    #"dynamical_time_z_cut_02",
+    #"soft_drop_z_cut_04",
 ]
 _OG_grooming_methods = [
     "dynamical_core",
@@ -116,7 +119,7 @@ _grooming_methods_using_qm_result_conventions = _OG_grooming_methods if _use_qm2
 _grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inputs else grooming_methods
 
 _output_dir = output_dir / "comparison" / "unfolding" / "2023-paper-plots" / jet_R_str
-_output_dir.mkdir(parents=True, exist_ok=True)
+#_output_dir.mkdir(parents=True, exist_ok=True)
 
 # %% [markdown]
 # ### pp
@@ -227,14 +230,16 @@ non_closure_configuration.update({
 # Smoothing for systematic uncertainty contributions
 smooth_systematic_uncertainty_contributions = {
     #grooming_method: ["model_dependence"]
-    grooming_method: []
+    # Reasoning:
+    # - The random bin fluctuates way up at 3-4, so we need to smooth it out.
+    # - Model dependence fluctuates down at high kt, which seems unphysical.
+    grooming_method: {"unfolding": 1, "model_dependence": 1}
     for grooming_method in _grooming_methods_using_new_conventions
 }
 
-# Either take model dependence or reweighted prior
-# Model dependence is always preferred, but it may not have been analyzed yet for the a particular configuration
-# (or in PbPb, it likely isn't possible since we don't have a reliable MC)
-skip_reweighted_prior_in_systematics = True
+# We include the prior in the unfolding uncertaintiy.
+# The model (generator) dependence is via the modification of the model used for the response matrix.
+skip_reweighted_prior_in_systematics = False
 
 # %% tags=["remove_cell"]
 # Initially load data
@@ -265,6 +270,7 @@ pp_R02_unfolded_with_systematics, pp_R02_true_reference = plot_unfolding.unfolde
     unfolding_systematics_outputs=pp_R02_unfolding_systematics_outputs,
     unfolding_closure_outputs=pp_R02_unfolding_closure_outputs,
     true_jet_pt_range=true_jet_pt_range,
+    calculate_quadrature_assuming_all_are_symmetric=calculate_quadrature_assuming_all_are_symmetric,
     unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
     smooth_systematic_uncertainty_contributions=smooth_systematic_uncertainty_contributions,
     model_dependence_configuration=_model_dependence_configuration,
@@ -273,12 +279,14 @@ pp_R02_unfolded_with_systematics, pp_R02_true_reference = plot_unfolding.unfolde
 )
 
 # %%
-print(pp_R02_unfolding_systematics_outputs["dynamical_core"].keys())
-print(pp_R02_unfolded_with_systematics["dynamical_core"].data.metadata["y_systematic"].keys())
+print(pp_R02_unfolding_systematics_outputs["dynamical_kt"].keys())
+print(pp_R02_unfolded_with_systematics["dynamical_kt"].data.metadata["y_systematic"].keys())
+print(pp_R02_unfolded_with_systematics["dynamical_kt"].data.metadata["y_systematic"]["quadrature"])
 
 # %%
 plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     grooming_methods=grooming_methods,
+    #grooming_methods=grooming_methods_for_letter,
     unfolded_with_systematics=pp_R02_unfolded_with_systematics,
     unfolding_systematics_outputs=pp_R02_unfolding_systematics_outputs,
     unfolding_closure_outputs=pp_R02_unfolding_closure_outputs,
@@ -442,6 +450,16 @@ _non_closure_configuration.update({
     for grooming_method in _grooming_methods_using_new_conventions
 })
 
+# Smoothing for systematic uncertainty contributions
+smooth_systematic_uncertainty_contributions = {
+    # Reasoning:
+    # - The random bin fluctuates way up at 3-4, so we need to smooth it out.
+    # - Model dependence fluctuates down at high kt, which seems unphysical.
+    #grooming_method: {"unfolding": 1, "model_dependence": 1}
+    grooming_method: {}
+    for grooming_method in _grooming_methods_using_new_conventions
+}
+
 # %% tags=["remove_cell"]
 # Initially load data
 semi_central_R02_unfolding_closure_outputs, semi_central_R02_unfolding_closure_pure_matches_outputs, semi_central_R02_unfolding_systematics_outputs = plot_unfolding.load_unfolded_outputs(
@@ -471,7 +489,9 @@ semi_central_R02_unfolded_with_systematics, semi_central_R02_true_reference = pl
     unfolding_systematics_outputs=semi_central_R02_unfolding_systematics_outputs,
     unfolding_closure_outputs=semi_central_R02_unfolding_closure_outputs,
     true_jet_pt_range=true_jet_pt_range,
+    calculate_quadrature_assuming_all_are_symmetric=calculate_quadrature_assuming_all_are_symmetric,
     unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
+    smooth_systematic_uncertainty_contributions=smooth_systematic_uncertainty_contributions,
     model_dependence_configuration=_model_dependence_configuration,
     non_closure_configuration=_non_closure_configuration,
     background_subtraction_configuration=_background_subtraction_configuration,
@@ -571,9 +591,11 @@ _n_iter_compare = {
 _max_n_iter = {
     # Need +1 for convenience with range iteration
     "soft_drop_z_cut_04": 30,
+    "soft_drop_z_cut_02": 30,
+    "dynamical_kt": 30,
 }
 _max_n_iter.update({
-    grooming_method: 20 for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
+    grooming_method: 20 for grooming_method in grooming_methods if grooming_method not in ["dynamical_kt", "soft_drop_z_cut_02","soft_drop_z_cut_04"]
 })
 
 # Double counting cut
@@ -582,16 +604,16 @@ _double_counting_cut = {
     for _method in grooming_methods
 }
 # Model dependence.
-_model_dependence_configuration = None
-#_model_dependence_configuration = {}
-#_model_dependence_configuration.update({
-#    _method: unfolding_analysis.ModelDependenceConfiguration(
-#        nominal="PbPb_pythia_fastsim",
-#        variations=["jewel_no_recoils_fastsim", "jewel_recoils_fastsim"],
-#        approach_to_combining="max",
-#        skip_double_counting_label=True,
-#    ) for _method in _grooming_methods_using_new_conventions
-#})
+#_model_dependence_configuration = None
+_model_dependence_configuration = {}
+_model_dependence_configuration.update({
+    _method: unfolding_analysis.ModelDependenceConfiguration(
+        nominal="embed_pythia_fastsim",
+        variations=["embed_jewel_no_recoils_fastsim"],
+        approach_to_combining="max",
+        skip_double_counting_label=False,
+    ) for _method in _grooming_methods_using_new_conventions
+})
 # Background subtraction configurations
 _background_subtraction_configuration = {
     _method: unfolding_analysis.BackgroundSubtractionConfiguration(
@@ -602,10 +624,20 @@ _background_subtraction_configuration = {
 # Add in the closure test to provide the non-closure uncertainty
 _non_closure_configuration = {
     grooming_method: unfolding_analysis.NonClosureConfiguration(
+        #contributors=["reweight_pseudo_data", "reweight_response", "thermal_model"],
         contributors=["reweight_pseudo_data", "reweight_response", "thermal_model"],
         approach_to_combining="max",
     )
     for grooming_method in grooming_methods
+}
+
+# Smoothing for systematic uncertainty contributions
+smooth_systematic_uncertainty_contributions = {
+    # Reasoning:
+    # TODO: Update for central!
+    #grooming_method: {"unfolding": 1, "model_dependence": 1}
+    grooming_method: {}
+    for grooming_method in _grooming_methods_using_new_conventions
 }
 
 # %% tags=["remove_cell"]
@@ -637,7 +669,9 @@ central_R02_unfolded_with_systematics, central_R02_true_reference = plot_unfoldi
     unfolding_systematics_outputs=central_R02_unfolding_systematics_outputs,
     unfolding_closure_outputs=central_R02_unfolding_closure_outputs,
     true_jet_pt_range=true_jet_pt_range,
+    calculate_quadrature_assuming_all_are_symmetric=calculate_quadrature_assuming_all_are_symmetric,
     unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
+    smooth_systematic_uncertainty_contributions=smooth_systematic_uncertainty_contributions,
     model_dependence_configuration=_model_dependence_configuration,
     non_closure_configuration=_non_closure_configuration,
     background_subtraction_configuration=_background_subtraction_configuration,
@@ -652,7 +686,7 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     plot=True,
     plot_png=False,
     plot_systematic_breakdown=True,
-    plot_systematics=True,
+    plot_systematics=False,
     plot_closures=False,
     unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
     prior_variation_output_name="reweight_prior",
@@ -668,8 +702,8 @@ plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
 
 # %%
 print(list(central_R02_unfolded_with_systematics.keys()))
-print(list(central_R02_unfolding_closure_outputs["dynamical_core"].keys()))
-print(list(central_R02_unfolding_systematics_outputs["dynamical_core"].keys()))
+print(list(central_R02_unfolding_closure_outputs["dynamical_kt"].keys()))
+print(list(central_R02_unfolding_systematics_outputs["dynamical_kt"].keys()))
 
 # %% [markdown]
 # ## R = 0.4
@@ -1127,7 +1161,7 @@ hybrid_model_with_wake_without_moliere_predictions_R02.semi_central_ratio["soft_
 
 # %%
 alice_status = "final"
-plot_output_dir_tag = "2023-paper-plots"
+plot_output_dir_tag = "2024-paper-plots"
 grooming_methods_for_letter = ["dynamical_kt", "soft_drop_z_cut_02"]
 
 def PbPb_kt_measured_range_by_grooming_method(event_activity: str) -> None:
@@ -2193,12 +2227,13 @@ def define_paper_table_dfs(
 
 # %%
 tables = {}
-for collision_system in ["pp", "semi_central", "central"]:
+#for collision_system in ["pp", "semi_central", "central"]:
+for collision_system in ["pp"]:
     tables[collision_system] = define_paper_table_dfs(
         hists={
             "pp": pp_R02_unfolded_with_systematics,
-            "semi_central": semi_central_R02_unfolded_with_systematics,
-            "central": central_R02_unfolded_with_systematics,
+            #"semi_central": semi_central_R02_unfolded_with_systematics,
+            #"central": central_R02_unfolded_with_systematics,
         },
         collision_system=collision_system,
         grooming_methods=grooming_methods_for_letter,
@@ -2211,6 +2246,10 @@ for collision_system in ["pp", "semi_central", "central"]:
 tables
 
 # %%
+grooming_method_to_display_name = {
+    "dynamical_kt": r"DyG. $a$ = 1.0",
+    "soft_drop_z_cut_02": r"SD $z_{\mathrm{cut}}$ = 0.2",
+}
 uncertainties_display_tables = {}
 for collision_system in tables:
     uncertainties_display_tables[collision_system] = None
@@ -2221,16 +2260,12 @@ for collision_system in tables:
         for source in sources:
             min_max_values[f"{source}_minimum"] = df_relative[f"{source}_maximum"].min()
             min_max_values[f"{source}_maximum"] = df_relative[f"{source}_maximum"].max()
-        min_max_values_per_grooming_method[grooming_method] = min_max_values
+        min_max_values_per_grooming_method[grooming_method_to_display_name[grooming_method]] = min_max_values
     # NOTE: The transpose ensures that the sources columns, while each grooming method is a new row
     uncertainties_display_tables[collision_system] = pd.DataFrame(min_max_values_per_grooming_method).transpose()
 
 # %%
 uncertainties_display_tables
-
-# %%
-a = "a_bb_ccc"
-"_".join(a.split("_")[:-1])
 
 
 # %%
@@ -2256,8 +2291,35 @@ for collision_system, df in uncertainties_display_tables.items():
     output_display_tables[collision_system] = pd.DataFrame(output_display_values)
 
 # %%
-# I think this is all reasonably okay now, up to the NaN. Now I need to smooth the uncertainties and put them all in groups...
-output_display_tables["pp"]
+# How to order and rename the columns for putting into the supplement text
+order_and_rename_columns = {
+    "tracking_efficiency": "Trk. Eff.",
+    "model_dependence": "Generator",
+    "unfolding": "Unfolding",
+    "background_sub": "Bkgd. Sub.",
+    "non_closure": "Non-closure",
+    "quadrature": "Total",
+}
+
+# %%
+# Check how we're doing...
+output_display_tables["pp"][["tracking_efficiency", "model_dependence", "unfolding", "quadrature"]]
+
+# %%
+latex_tables = {}
+for collision_system in output_display_tables:
+    selected_order_and_rename_columns = {k: v for k, v in order_and_rename_columns.items() if k in output_display_tables[collision_system].columns}
+    print(selected_order_and_rename_columns)
+    latex_tables[collision_system] = (
+        output_display_tables[collision_system][
+            list(selected_order_and_rename_columns.keys())
+        ].rename(columns=selected_order_and_rename_columns)
+        .to_latex(escape=False)
+    )
+
+# %%
+print(latex_tables["pp"])
+output_display_tables["pp"][list(selected_order_and_rename_columns.keys())].rename(columns=selected_order_and_rename_columns)
 
 # %%
 central_R02_unfolded_with_systematics["dynamical_kt"].data.axes[0].bin_centers
