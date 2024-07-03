@@ -1451,11 +1451,12 @@ def setup_root_data_frame(
                 continue
             logger.info(f"{processing_mode=}, (provided) {collision_system=}: Processing train number {train_directory.name}")
 
+            name_to_check_for_collision_system_override = _config_for_double_counting_cut.get("datasets", "")
             input_files.extend(
                 _filter_files_for_parsl_if_needed_based_on_double_counting_cut(
                     train_directory=train_directory,
                     collision_system=collision_system,
-                    collision_system_check_override="jewel" in _config_for_double_counting_cut.get("datasets", ""),
+                    collision_system_check_override="jewel" in name_to_check_for_collision_system_override and "embed" not in name_to_check_for_collision_system_override,
                     double_counting_cut_settings=_double_counting_cut_settings,
                 )
             )
@@ -1577,8 +1578,9 @@ def embedded_pt_hard_scaling_cross_check(
 _match_pt_hat_bin_from_embed_pythia_mammoth_production = re.compile("__(0?[1-9]|1[0-9]|20)__")
 
 def _extract_pt_hat_bin_from_filename_for_embed_pythia_mammoth_production(filename: Path) -> int:
-    # Example: `pythia__2640__run_by_run__LHC20g4__295612__1__AnalysisResults_20g4_007`
+    # Example 1: `pythia__2640__run_by_run__LHC20g4__295612__1__AnalysisResults_20g4_007`
     # Example 2: `851894__1__100__jewel__iterative_splittings.empty`
+    # Example 3: `child_1__TrainOutput__13__282031__0005__AnalysisResultsFastSim__embedded_into__LHC18qr__570__LHC18q__000296433__0583__AnalysisResults__iterative_splittings.root`
     possible_pt_hat_bins = _match_pt_hat_bin_from_embed_pythia_mammoth_production.findall(str(filename))
     if len(possible_pt_hat_bins) == 0:
         msg = f"Extracted no pt hat bins from filename {filename}"
@@ -1714,7 +1716,9 @@ class UnfoldingRuntimeSettings:
     variable_to_unfold: str = attrs.field(default="kt")
     normalize_variable_by_jet_pt: bool = attrs.field(default=False)
     selected_settings: list[str] = attrs.field(factory=lambda: ["default"])
-    fastsim_closure_dataset_override: bool = attrs.field(default=False)
+    # This option is effectively obsolete. It doesn't make sense to do the PbPb model dependence without embedding,
+    # which is what this option was developed for.
+    fastsim_with_embedding_model_dependence_closure_dataset_override: bool = attrs.field(default=False)
     _output_dir_tag: str = attrs.field(default="")
 
     def output_dir(self, data_collision_system: str) -> Path:
@@ -1808,8 +1812,7 @@ def setup_all_unfolding(  # noqa: C901
                     _filter_files_for_parsl_if_needed_based_on_double_counting_cut(
                         train_directory=train_directory,
                         collision_system=label,
-                        # TODO: Figure out how to determine this... Is this the right check??
-                        collision_system_check_override="jewel" in datasets_name,
+                        collision_system_check_override="jewel" in datasets_name and "embed" not in datasets_name,
                         double_counting_cut_settings=_double_counting_cut_settings,
                     )
                 )
@@ -2006,12 +2009,12 @@ def setup_all_unfolding(  # noqa: C901
                         #       it like pp (because the prefix names align to that), but we want to align
                         #       with the PbPb in general
                         reweight_data_dataset_name=base_dataset_config["datasets"]["nominal"][
-                            "PbPb" if unfolding_runtime_settings.fastsim_closure_dataset_override else data_collision_system
+                            "PbPb" if unfolding_runtime_settings.fastsim_with_embedding_model_dependence_closure_dataset_override else data_collision_system
                         ][
                             "name"
                         ],
                         reweight_response_dataset_name=base_dataset_config["datasets"]["nominal"][
-                            "embed_pythia" if unfolding_runtime_settings.fastsim_closure_dataset_override else response_collision_system
+                            "embed_pythia" if unfolding_runtime_settings.fastsim_with_embedding_model_dependence_closure_dataset_override else response_collision_system
                         ]["name"],
                         data_tree_name="tree",
                         # Since we skim everything now, we should have uniform input names here.
@@ -2306,7 +2309,7 @@ def setup_and_submit_tasks(  # noqa: C901
             # settings here if available. Definitely a bit hacky, but good enough.
             unfolding_settings=(
                 base_dataset_config["unfolding"]["settings"][dataset_type]
-                if "jewel" in dataset_type else None
+                if ("jewel" in dataset_type and "embed" not in dataset_type) else None
             ),
         )
         all_results.extend(rdf_results)
