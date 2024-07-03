@@ -2924,35 +2924,19 @@ def calculate_systematics(  # noqa: C901
             assert np.count_nonzero(_entry_for_model_dependence) >= 1
 
             # Retrieve common values and calculate relative uncertainties
-            _nominal_name_label, _nominal_selected_n_iter = model_dependence_configuration.nominal
+            _nominal_name_label = model_dependence_configuration.nominal
             if _nominal_name_label:
                 _nominal_name_label = f"_{_nominal_name_label}"
 
             nominal_values = unfolded[f"model_dependence{_nominal_name_label}"].data.values
-            # Allow for the selection of a different iteration if necessary
-            if _nominal_selected_n_iter is not None:
-                nominal_values = unfolding_outputs[f"model_dependence{_nominal_name_label}"].unfolded_substructure(
-                    n_iter=_nominal_selected_n_iter,
-                    true_jet_pt_range=true_jet_pt_range,
-                ).values
             relative_errors_by_model = {}
             # We loop here since we could imagine multiple possible model dependence contributions.
-            for (model_name, model_selected_n_iter) in model_dependence_configuration.variations:
+            for model_name in model_dependence_configuration.variations:
                 # Intermediate step: Find the asymmetric relative errors of each model variation
                 _model_name_label = f"_{model_name}" if model_name else ""
                 relative_errors_by_model[model_name] = (
                     unfolded[f"model_dependence{_model_name_label}"].data.values - nominal_values
                 ) / nominal_values
-                # Allow for the selection of a different iteration if necessary
-                if model_selected_n_iter is not None:
-                    relative_errors_by_model[model_name] = (
-                        unfolding_outputs[f"model_dependence{_model_name_label}"]
-                        .unfolded_substructure(
-                            n_iter=model_selected_n_iter,
-                            true_jet_pt_range=true_jet_pt_range,
-                        )
-                        .values - nominal_values
-                    ) / nominal_values
 
             if model_dependence_configuration.approach_to_combining == "max":
                 model_dependence_relative = _calculate_max_relative_error_from_contributions(

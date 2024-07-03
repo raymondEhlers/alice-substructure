@@ -384,8 +384,8 @@ class SingleResult:
 
 @attrs.define
 class ModelDependenceConfiguration:
-    nominal: tuple[str, int | None]
-    variations: list[tuple[str, int | None]]
+    nominal: str
+    variations: list[str]
     approach_to_combining: str = attrs.field(default="max")
     legacy_production: bool = attrs.field(default=False)
     # Used for PbPb fastsim, where they are pp like, and therefore turn off the DCC
@@ -394,7 +394,7 @@ class ModelDependenceConfiguration:
 
     @property
     def all_models(self) -> list[str]:
-        return [self.nominal[0], *[v[0] for v in self.variations]]
+        return [self.nominal, *self.variations]
 
 
 @attrs.define
