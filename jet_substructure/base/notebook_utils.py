@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 
 import uproot
+
 from pachyderm import binned_data
 
 logger = logging.getLogger(__name__)
