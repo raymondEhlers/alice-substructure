@@ -2526,14 +2526,22 @@ def unfolded_substructure_results(
             # We have to handle this manually. See the systematics calculation.
             continue
 
+        # This is a cross check that I haven't screwed anything up around 2024 July 2. Only the model dependence
+        # should be able to have different values (which is why we ignore that case). If it becomes an issue in
+        # the future because we need to start changing more n_iter, then these can probably be ignored.
+        if "model_dependence" not in k:  # noqa: SIM102
+            if v.n_iter_compare != unfolding_outputs["default"].n_iter_compare:
+                msg = f"Mismatch in n_iter_compare between the nominal and the variation {k}. {v.n_iter_compare=} vs. {unfolding_outputs['default'].n_iter_compare=}"
+                raise ValueError(msg)
+
         #logger.debug(f"Converted to single result for {k=}, {true_jet_pt_range=}")
         unfolded[k] = unfolding_analysis.SingleResult(
             # NOTE: We want to match the iter of the default case.
             data=v.unfolded_substructure(
-                n_iter=unfolding_outputs["default"].n_iter_compare,
+                n_iter=unfolding_outputs[k].n_iter_compare,
                 true_jet_pt_range=true_jet_pt_range,
             ),
-            n_iter=unfolding_outputs["default"].n_iter_compare,
+            n_iter=unfolding_outputs[k].n_iter_compare,
             ranges=[true_jet_pt_range],
         )
     return unfolded
