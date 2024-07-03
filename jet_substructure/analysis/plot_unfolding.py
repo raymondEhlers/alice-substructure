@@ -2174,8 +2174,8 @@ def setup_unfolding_outputs(  # noqa: C901
                     double_counting_cut="" if model_dependence_configuration.skip_double_counting_label else double_counting_cut,
                     label=f"model_dependence{label}",
                 )
-            except FileNotFoundError:
-                logger.debug(f"Skipping model dependence '{model_name}' because the output file doesn't exist.")
+            except FileNotFoundError as e:
+                logger.debug(f"Skipping model dependence '{model_name}' because the output file doesn't exist {e}.")
 
     # Background subtraction
     # NOTE: We don't make this directly configurable because we just want it to grab all possible values.
@@ -2960,6 +2960,28 @@ def calculate_systematics(  # noqa: C901
                 raise NotImplementedError(_msg)
 
             # Treat asymmetrically since the model goes in a particular direction
+            # logger.info(f'{unfolded[f"model_dependence{_nominal_name_label}"].data.axes[0].bin_edges=}')
+            # logger.info(f'{unfolded["default"].data.axes[0].bin_edges=}')
+            # Sometimes there are fewer model dependence bins than nominal bins
+            # (e.g. because we use the central model dependence in semi-central).
+            # In that case, we want to match the length of the nominal bins. To do so,
+            # we'll pad zeros to the left, since those are the bins that we're missing
+            # and won't be interested in them.
+            # NOTE: This case only comes up for DyG with some kinematic requirement. For e.g. SD 0.2,
+            #       it aligns just fine.
+            # NOTE: Strictly speaking, this messes up everything that's been displaced because the binning
+            #       may not align (e.g. central: 0, 1.5, 2, 3, ...) vs semi-central: (0, 1, 1.5, 2, 3...),
+            #       which would mean that the 0-1.5 bin in central would be the 1-1.5 bin in semi-central.
+            #       However, the note above about the DyG means that this will be an issue for where we actually report.
+            model_dependence_n_bins = len(unfolded[f"model_dependence{_nominal_name_label}"].data.values)
+            nominal_data_n_bins = len(unfolded["default"].data.values)
+            if model_dependence_n_bins < nominal_data_n_bins:
+                additional_bins_to_bad_with_zero = nominal_data_n_bins - model_dependence_n_bins
+                # logger.info(f"Before: {model_dependence_relative=} {model_dependence_n_bins=} {nominal_data_n_bins=} {additional_bins_to_bad_with_zero=}")
+                model_dependence_relative = np.pad(model_dependence_relative, (additional_bins_to_bad_with_zero, 0))
+                # logger.info(f"After:: {model_dependence_relative=} {nominal_data_n_bins=} {additional_bins_to_bad_with_zero=}")
+
+            logger.info(f"{model_dependence_relative=}")
             unfolded["default"].data.metadata["y_systematic"][
                 "model_dependence"
             ] = full_results_helpers.AsymmetricErrors.calculate_errors(
