@@ -2557,7 +2557,7 @@ def _calculate_max_relative_error_from_contributions(
 def _calculate_quadrature_relative_error_from_contributions(
     relative_uncertainty_by_contribution: dict[str, npt.NDArray[np.float64]],
 ) -> npt.NDArray[np.float64]:
-    """Simple helper for calculating the maximum contribution bin-by-bin"""
+    """Simple helper for calculating the quadrature difference bin-by-bin"""
     final_relative_uncertainty: npt.NDArray[np.float64] = np.sqrt(
         np.sum(
             [
@@ -2665,16 +2665,20 @@ def calculate_systematics(  # noqa: C901
     # This is useful for a line in the paper, and it's really easy to calculate here, so just go for it and print it.
     log_change_from_next_iteration = True
     if log_change_from_next_iteration:
+        # NOTE: We compare to the next step, because the point is that we want to stop when the variation to the next iteration
+        #       is less than 1%. So if we chose our stop at n and the difference to n+1 is <1%, then we're happy.
+        #       If it's still >1% for n-1, it means that we couldn't yet stop at n-1, and thus need to go to step n.
+        #       Consequently, our more useful comparison here is n+1.
         difference_n_iter = (
             unfolded["default"].data.values
             - unfolding_outputs["default"]
             .unfolded_substructure(
-                n_iter=unfolding_outputs["default"].n_iter_compare - 1,  # type: ignore[arg-type]
+                n_iter=unfolding_outputs["default"].n_iter_compare + 1,  # type: ignore[arg-type]
                 true_jet_pt_range=true_jet_pt_range,
             )
             .values
         ) / unfolded["default"].data.values
-        logger.warning(f"Max relative difference from n_iter: {np.max(difference_n_iter)}")
+        logger.warning(f"Max relative difference from n_iter + 1: {np.max(difference_n_iter)}")
 
     ################
     # Random binning
@@ -2834,7 +2838,7 @@ def calculate_systematics(  # noqa: C901
             # NOTE: Since the non-closure is generated via a closure (by definition), the reference
             #       needs to be to the PseudoTrue, so we need to retrieve it here.
             # NOTE: We calculate this as a relative error because the scales could be (quite) different.
-            #       We then scale the default values by this relative error to determine the non-closure.
+            #       We then scale the default (nominal) values by this relative error to determine the absolute non-closure.
             _pseudo_true = unfolding_outputs[_name].true_substructure(
                 unfolding_outputs[_name].true_hist_name, true_jet_pt_range=true_jet_pt_range
             )
@@ -2990,10 +2994,10 @@ def calculate_systematics(  # noqa: C901
     # Sum in quadrature
     # Allow for the symmetrization of the signed uncertainties when calculating the quadrature sum.
     y_systematic_dict = unfolded["default"].data.metadata["y_systematic"]
-    logger.info(f"Setting up... {list(y_systematic_dict.keys())}")
+    # logger.info(f"Setting up... {list(y_systematic_dict.keys())}")
     if calculate_quadrature_assuming_all_are_symmetric:
         y_systematic_dict = copy.deepcopy(y_systematic_dict)
-        logger.info(f"Copying... {list(y_systematic_dict.keys())}")
+        # logger.info(f"Copying... {list(y_systematic_dict.keys())}")
         # These are the only ones that we treat asymmetrically as of 2024 July 1
         for k in ["tracking_efficiency", "model_dependence"]:
             if k in y_systematic_dict:
@@ -3002,7 +3006,7 @@ def calculate_systematics(  # noqa: C901
                 values = np.maximum(y_systematic_dict[k].low, y_systematic_dict[k].high)
                 y_systematic_dict[k].low = values
                 y_systematic_dict[k].high = values
-        logger.info(f"Post symmetrizing... {list(y_systematic_dict.keys())}")
+        # logger.info(f"Post symmetrizing... {list(y_systematic_dict.keys())}")
 
     # We protect against including quadrature in case we already calculated the systematics.
     keys_to_skip = ["quadrature"]
