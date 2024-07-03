@@ -2392,7 +2392,7 @@ def _unfolded_outputs_with_systematics(
     unfolding_systematics_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
     unfolding_related_systematic_treatment: str,
-    smooth_systematic_uncertainty_contributions: dict[str, int],
+    smooth_systematic_uncertainty_contributions: unfolding_analysis.UncertaintySmoothingConfiguration | None = None,
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: unfolding_analysis.NonClosureConfiguration | None = None,
     background_subtraction_configuration: unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
@@ -2437,7 +2437,7 @@ def unfolded_outputs_with_systematics(
     unfolding_closure_outputs: dict[str, dict[str, unfolding_analysis.UnfoldingOutput]],
     true_jet_pt_range: helpers.JetPtRange,
     unfolding_related_systematic_treatment: str,
-    smooth_systematic_uncertainty_contributions: dict[str, dict[str, int]] | None = None,
+    smooth_systematic_uncertainty_contributions: dict[str, unfolding_analysis.UncertaintySmoothingConfiguration | None] | unfolding_analysis.UncertaintySmoothingConfiguration | None = None,
     model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration | None] | unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: dict[str, unfolding_analysis.NonClosureConfiguration | None] | unfolding_analysis.NonClosureConfiguration | None = None,
     background_subtraction_configuration: dict[str, unfolding_analysis.BackgroundSubtractionConfiguration | None] | unfolding_analysis.BackgroundSubtractionConfiguration | None = None,
@@ -2453,8 +2453,8 @@ def unfolded_outputs_with_systematics(
             and each grooming method includes an unfolding SingleResult
     """
     # Validation
-    if smooth_systematic_uncertainty_contributions is None:
-        smooth_systematic_uncertainty_contributions = {grooming_method: {} for grooming_method in grooming_methods}
+    if isinstance(smooth_systematic_uncertainty_contributions, unfolding_analysis.UncertaintySmoothingConfiguration) or smooth_systematic_uncertainty_contributions is None:
+        smooth_systematic_uncertainty_contributions = {grooming_method: smooth_systematic_uncertainty_contributions for grooming_method in grooming_methods}
     if isinstance(model_dependence_configuration, unfolding_analysis.ModelDependenceConfiguration) or model_dependence_configuration is None:
         model_dependence_configuration = {grooming_method: model_dependence_configuration for grooming_method in grooming_methods}
     if isinstance(non_closure_configuration, unfolding_analysis.NonClosureConfiguration) or non_closure_configuration is None:
@@ -2575,7 +2575,7 @@ def calculate_systematics(  # noqa: C901
     unfolding_outputs: Mapping[str, unfolding_analysis.UnfoldingOutput],
     true_jet_pt_range: helpers.JetPtRange,
     unfolding_related_systematic_treatment: str,
-    smooth_systematic_uncertainty_contributions: dict[str, int],
+    smooth_systematic_uncertainty_contributions: unfolding_analysis.UncertaintySmoothingConfiguration | None = None,
     truncation_iter: helpers.RangeSelector | None = None,
     model_dependence_configuration: unfolding_analysis.ModelDependenceConfiguration | None = None,
     non_closure_configuration: unfolding_analysis.NonClosureConfiguration | None = None,
@@ -2678,7 +2678,7 @@ def calculate_systematics(  # noqa: C901
             )
             .values
         ) / unfolded["default"].data.values
-        logger.warning(f"Max relative difference from n_iter + 1: {np.max(difference_n_iter)}")
+        logger.info(f"Max relative difference from n_iter + 1: {np.max(difference_n_iter)}")
 
     ################
     # Random binning
@@ -2968,14 +2968,66 @@ def calculate_systematics(  # noqa: C901
 
     # Smooth selected systematic uncertainties
     # First, a cross check:
-    for _smoothed_uncertainty_name in smooth_systematic_uncertainty_contributions:
-        if _smoothed_uncertainty_name not in unfolded["default"].data.metadata["y_systematic"]:
-            msg = f"Requested to smooth {_smoothed_uncertainty_name}, but it's not available! Cross check this"
-            logger.warning(msg)
-    # Then, do the actual smoothing
-    for _name, _error_values in unfolded["default"].data.metadata["y_systematic"].items():
-        if _name in smooth_systematic_uncertainty_contributions:
-            _error_values.smooth(smooth_systematic_uncertainty_contributions[_name])
+    if smooth_systematic_uncertainty_contributions is not None:
+        for _smoothed_uncertainty_name in smooth_systematic_uncertainty_contributions.contributors:
+            if _smoothed_uncertainty_name not in unfolded["default"].data.metadata["y_systematic"]:
+                msg = f"Requested to smooth {_smoothed_uncertainty_name}, but it's not available! Cross check this"
+                logger.warning(msg)
+        # Then, do the actual smoothing
+        # We'll mocked up BinnedData to handle the selections for me, so define the constant terms here.
+        _axis = unfolded["default"].data.axes[0].copy()
+        _empty_variances = np.zeros(len(unfolded["default"].data.values))
+        # NOTE: We only want to do smoothing in the actual measured range. Otherwise, unphysical behavior
+        #       outside of the measured range could impact the measurement. So we want to extract only the
+        #       relevant values, smooth those, and then put them back into the original AsymmetricErrors object.
+        #       (so can consistently do the selections later).
+        kt_range_to_smooth = list(smooth_systematic_uncertainty_contributions.kt_range_to_smooth)
+        # NOTE: We need at least 3 points to smooth. For DyG in central, we only have two: 3-4, 4-6.
+        #       For this case, we want to take the minimum of the lower value and 2 to ensure there are at
+        #       least there points. We'll only do it if the lower value is 3, just to be safe (but by using the minium),
+        #       it will be exactly the same).
+        if np.isclose(kt_range_to_smooth[0], 3.0):
+            logger.info("Adjusting minimum smoothing range to 2.0 to ensure we have enough points for smoothing.")
+            kt_range_to_smooth[0] = 2.0
+
+        # Now, construct the slices
+        # First, the slice for input errors
+        selected_range = slice(
+            *(v * 1j for v in kt_range_to_smooth),
+        )
+        # And second, the slice for where we'll insert the smoothed data.
+        selected_range_to_insert = slice(_axis.find_bin(kt_range_to_smooth[0]), _axis.find_bin(kt_range_to_smooth[1]))
+
+        # And finally onto the (potential) smoothing
+        for _name, _error_values in unfolded["default"].data.metadata["y_systematic"].items():
+            # logger.info(f"{_name=}, {selected_range=}")
+            if _name in smooth_systematic_uncertainty_contributions.contributors:
+                logger.info(f"Smoothing {_name}")
+                errors_to_operate_on = full_results_helpers.AsymmetricErrors(
+                    low=binned_data.BinnedData(
+                        axes=_axis,
+                        values=_error_values.low,
+                        variances=_empty_variances,
+                    )[selected_range].values,
+                    high=binned_data.BinnedData(
+                        axes=_axis,
+                        values=_error_values.high,
+                        variances=_empty_variances,
+                    )[selected_range].values,
+                )
+                try:
+                    errors_to_operate_on.smooth(smooth_systematic_uncertainty_contributions.contributors[_name])
+                except IndexError as e:
+                    logger.warning(f"Skipping smoothing for {_name} because of '{e}'")
+                # Cross check
+                # NOTE: If we actually apply smoothing, this cross check will fail. But it allows us to cross check
+                #       that we're inserting at the right place.
+                #logger.info(f"{selected_range_to_insert=}")
+                #np.testing.assert_allclose(_error_values.low[selected_range_to_insert], errors_to_operate_on.low)
+                #np.testing.assert_allclose(_error_values.high[selected_range_to_insert], errors_to_operate_on.high)
+                # Add back into the original AsymmetricErrors object
+                _error_values.low[selected_range_to_insert] = errors_to_operate_on.low
+                _error_values.high[selected_range_to_insert] = errors_to_operate_on.high
 
     # Cross check to make sure that I haven't copied and pasted incorrectly.
     assert not any(

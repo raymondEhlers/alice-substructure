@@ -408,3 +408,18 @@ class BackgroundSubtractionConfiguration:
     """Define how to handle the background subtraction """
     contributors: list[str]
 
+@attrs.define
+class UncertaintySmoothingConfiguration:
+    """Define how to handle the uncertainty smoothing.
+
+    Attributes:
+        contributors: Dict of contributors to the uncertainty smoothing,
+            with the key corresponding to the uncertainty and the value
+            the number smoothing iterations.
+        kt_range_to_smooth: The measured kt range to smooth over. i.e.
+            don't let the smoothing be impact by values outside of the
+            reported range.
+    """
+    contributors: dict[str, int]
+    kt_range_to_smooth: helpers.RangeSelector
+
