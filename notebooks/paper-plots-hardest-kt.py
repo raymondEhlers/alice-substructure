@@ -2146,6 +2146,79 @@ for grooming_method in grooming_methods:
     )
 
 # %% [markdown]
+# ## Subleading subjet purity (supplement)
+#
+# ### R = 0.2
+
+# %%
+jet_R = 0.2
+jet_R_str = f"R{int(jet_R*10):02}"
+_input_dir = output_dir / "embed_pythia" / "RDF"
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
+_output_dir.mkdir(parents=True, exist_ok=True)
+
+
+# %%
+from jet_substructure.base import notebook_utils as nb_utils
+
+# Load relevant data, which is the output from the ROOT data frames...
+collision_system_to_production_number = {
+    "semi_central": "0067",
+    "central": "0071",
+}
+# Example: output/embed_pythia/RDF/LHC20g4_embedded_into_LHC18qr_central_R02_0071_dynamical_kt_prefixes_hybrid_true_det_level_response.root
+base_name = "LHC20g4_embedded_into_LHC18qr_{collision_system}_{jet_R_str}_{production_number}_{grooming_method}_prefixes_hybrid_true_det_level_response.root"
+
+# Load the data
+rdf_hists = {}
+_successfully_loaded_grooming_methods = []
+for collision_system, production_number in collision_system_to_production_number.items():
+    rdf_hists[collision_system] = {}
+    for grooming_method in grooming_methods:
+        try:
+            rdf_hists[collision_system][grooming_method] = nb_utils.load_histograms(
+                filename=base_name.format(
+                    collision_system=collision_system,
+                    jet_R_str=jet_R_str,
+                    production_number=production_number,
+                    grooming_method=grooming_method,
+                ),
+                # This will always be embed pythia. We will determine which PbPb
+                # collision system we want via the file that we select
+                collision_system="embed_pythia",
+                tag="RDF",
+                base_path=output_dir,
+            )
+            _successfully_loaded_grooming_methods.append(grooming_method)
+        except FileNotFoundError as e:
+            logger.info(f"Skipping grooming method {grooming_method} because the output file isn't available ({e})")
+
+    logger.info(f"{collision_system}: Successfully loaded grooming methods: {_successfully_loaded_grooming_methods}")
+
+# %%
+hybrid_min_kt_values = {
+    "semi_central": [0, 1.0],
+    "central": [0, 1.5],
+}
+plot_paper.plot_PbPb_subjet_purity_for_letter(
+    collision_systems=list(hybrid_min_kt_values.keys()),
+    hists=rdf_hists,
+    grooming_methods=grooming_methods_for_letter,
+    hybrid_min_kt_values=hybrid_min_kt_values,
+    output_dir=_output_dir,
+    subjet_for_purity="subleading",
+    jet_R_str=jet_R_str,
+    alice_status="simulation",
+    #additional_label="_".join(grooming_methods_for_letter),
+    # NOTE: This seems to need to be smaller to fit the header. Still could be tuned...
+    #text_font_size=31,
+    text_font_size=30,
+)
+
+# %%
+plt.close("all")
+
+# %% [markdown]
 # # Tables
 
 # %%
@@ -2227,13 +2300,12 @@ def define_paper_table_dfs(
 
 # %%
 tables = {}
-#for collision_system in ["pp", "semi_central", "central"]:
-for collision_system in ["pp"]:
+for collision_system in ["pp", "semi_central", "central"]:
     tables[collision_system] = define_paper_table_dfs(
         hists={
             "pp": pp_R02_unfolded_with_systematics,
-            #"semi_central": semi_central_R02_unfolded_with_systematics,
-            #"central": central_R02_unfolded_with_systematics,
+            "semi_central": semi_central_R02_unfolded_with_systematics,
+            "central": central_R02_unfolded_with_systematics,
         },
         collision_system=collision_system,
         grooming_methods=grooming_methods_for_letter,
@@ -2318,8 +2390,12 @@ for collision_system in output_display_tables:
     )
 
 # %%
-print(latex_tables["pp"])
-output_display_tables["pp"][list(selected_order_and_rename_columns.keys())].rename(columns=selected_order_and_rename_columns)
+for collision_system in latex_tables:
+    print(f"{collision_system=}")
+    print(latex_tables[collision_system])
+    print()
+#print(latex_tables["pp"])
+#output_display_tables["pp"][list(selected_order_and_rename_columns.keys())].rename(columns=selected_order_and_rename_columns)
 
 # %%
 central_R02_unfolded_with_systematics["dynamical_kt"].data.axes[0].bin_centers
