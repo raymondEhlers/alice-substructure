@@ -118,8 +118,27 @@ _use_qm22_inputs = False
 _grooming_methods_using_qm_result_conventions = _OG_grooming_methods if _use_qm22_inputs else []
 _grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inputs else grooming_methods
 
-_output_dir = output_dir / "comparison" / "unfolding" / "2023-paper-plots" / jet_R_str
+# Unused...
+#_output_dir = output_dir / "comparison" / "unfolding" / "2024-paper-plots" / jet_R_str
 #_output_dir.mkdir(parents=True, exist_ok=True)
+
+# %%
+# NOTE: This is copied from the "Plots" section. I just need it all over, and easier to put it here.
+plot_output_dir_tag = "2024-paper-plots"
+grooming_methods_for_letter = ["dynamical_kt", "soft_drop_z_cut_02"]
+
+def PbPb_kt_measured_range_by_grooming_method(event_activity: str) -> dict[str, helpers.KtRange]:
+    return {
+        "dynamical_core": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
+        "dynamical_kt": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
+        "dynamical_time": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
+        "soft_drop_z_cut_02": helpers.KtRange(0.25, 6),
+        "dynamical_core_z_cut_02": helpers.KtRange(0.25, 6),
+        "dynamical_kt_z_cut_02": helpers.KtRange(0.25, 6),
+        "dynamical_time_z_cut_02": helpers.KtRange(0.25, 6),
+        "soft_drop_z_cut_04": helpers.KtRange(0.25, 6),
+    }
+
 
 # %% [markdown]
 # ### pp
@@ -198,42 +217,42 @@ _max_n_iter.update({
 })
 # Model dependence.
 # Varies here by grooming method because we need to be able to support the QM preliminaries (for now).
-_model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration | None] = {
-    _method: unfolding_analysis.ModelDependenceConfiguration(
-        # We want to load without a suffix, so the nominal needs to be empty. The actual name only
-        # matters for loading the data. Everything else for the legacy production is handled manually.
-        nominal="",
-        variations=[],
-        legacy_production=True,
-    ) for _method in _grooming_methods_using_qm_result_conventions
-}
-_model_dependence_configuration.update({
+#_model_dependence_configuration: dict[str, unfolding_analysis.ModelDependenceConfiguration | None] = {
+#    _method: unfolding_analysis.ModelDependenceConfiguration(
+#        # We want to load without a suffix, so the nominal needs to be empty. The actual name only
+#        # matters for loading the data. Everything else for the legacy production is handled manually.
+#        nominal="",
+#        variations=[],
+#        legacy_production=True,
+#    ) for _method in _grooming_methods_using_qm_result_conventions
+#}
+_model_dependence_configuration = {
     _method: unfolding_analysis.ModelDependenceConfiguration(
         nominal="pythia_fastsim",
         variations=["herwig_fastsim"],
         approach_to_combining="max",
     ) for _method in _grooming_methods_using_new_conventions
-})
+}
 # Non-closure
 # Apparently I used this non-closure for QM. I don't think it's necessary now since I better understand
 # the uncertainties. Also, the stat clearly covers it.
-non_closure_configuration: dict[str, unfolding_analysis.NonClosureConfiguration | None] = {
-    _method: unfolding_analysis.NonClosureConfiguration(
-        contributors=["reweight_pseudo_data"],
-        approach_to_combining="max",
-    ) for _method in _grooming_methods_using_qm_result_conventions
-}
-non_closure_configuration.update({
+#non_closure_configuration: dict[str, unfolding_analysis.NonClosureConfiguration | None] = {
+#    _method: unfolding_analysis.NonClosureConfiguration(
+#        contributors=["reweight_pseudo_data"],
+#        approach_to_combining="max",
+#    ) for _method in _grooming_methods_using_qm_result_conventions
+#}
+non_closure_configuration = {
     _method: None
     for _method in _grooming_methods_using_new_conventions
-})
+}
 # Smoothing for systematic uncertainty contributions
 smooth_systematic_uncertainty_contributions = {
     #grooming_method: ["model_dependence"]
     # Reasoning:
     # - The random bin fluctuates way up at 3-4, so we need to smooth it out.
     # - Model dependence fluctuates down at high kt, which seems unphysical.
-    grooming_method: {"unfolding": 1, "model_dependence": 1}
+    #grooming_method: {"unfolding": 1, "model_dependence": 1}
     for grooming_method in _grooming_methods_using_new_conventions
 }
 
@@ -404,9 +423,12 @@ if _use_qm22_inputs:
 _max_n_iter = {
     # Need +1 for convenience with range iteration
     "soft_drop_z_cut_04": 30,
+    # Needed for model dependence
+    "soft_drop_z_cut_02": 30,
+    "dynamical_kt": 30,
 }
 _max_n_iter.update({
-    grooming_method: 20 for grooming_method in grooming_methods if grooming_method != "soft_drop_z_cut_04"
+    grooming_method: 20 for grooming_method in grooming_methods if grooming_method not in ["dynamical_kt", "soft_drop_z_cut_02","soft_drop_z_cut_04"]
 })
 
 # Double counting cut
@@ -420,7 +442,30 @@ _double_counting_cut.update({
     for _method in _grooming_methods_using_new_conventions
 })
 # Model dependence.
-_model_dependence_configuration = None
+# Copied over from central
+_model_dependence_configuration = {}
+_model_dependence_configuration.update({
+    _method: unfolding_analysis.ModelDependenceConfiguration(
+        # Use the default n_iter for all grooming methods, but optimize below as necessary.
+        nominal="embed_pythia_fastsim",
+        variations=["embed_jewel_no_recoils_fastsim"],
+        approach_to_combining="max",
+        skip_double_counting_label=False,
+    ) for _method in _grooming_methods_using_new_conventions
+})
+_model_dependence_update_n_iter = {
+    # Selected based on usual convergence criteria...
+    "dynamical_kt": {
+        "embed_pythia_fastsim": 17,
+        # The usual n_iter seems to be reasonable for JEWEL
+        # NOTE: We still set it manually for semi-central because it needs to match the **central** n_iter value instead...
+        "embed_jewel_no_recoils_fastsim": 9,
+    },
+    "soft_drop_z_cut_02": {
+        "embed_pythia_fastsim": 17,
+        "embed_jewel_no_recoils_fastsim": 17,
+    }
+}
 # Background subtraction configurations
 _background_subtraction_configuration = {
     _method: unfolding_analysis.BackgroundSubtractionConfiguration(
@@ -444,21 +489,32 @@ _non_closure_configuration = {
 }
 _non_closure_configuration.update({
     grooming_method: unfolding_analysis.NonClosureConfiguration(
-        contributors=["reweight_response", "reweight_pseudo_data", "thermal_model"],
+        # NOTE: I exclude the reweight_response because I think it's overlapping with the model dependence
+        contributors=["reweight_pseudo_data", "thermal_model"],
+        #contributors=["reweight_response", "reweight_pseudo_data", "thermal_model"],
         approach_to_combining="max",
     )
     for grooming_method in _grooming_methods_using_new_conventions
 })
 
 # Smoothing for systematic uncertainty contributions
-smooth_systematic_uncertainty_contributions = {
+_uncertainty_smoothing_configuration = {
     # Reasoning:
-    # - The random bin fluctuates way up at 3-4, so we need to smooth it out.
-    # - Model dependence fluctuates down at high kt, which seems unphysical.
-    #grooming_method: {"unfolding": 1, "model_dependence": 1}
-    grooming_method: {}
+    grooming_method: unfolding_analysis.UncertaintySmoothingConfiguration(
+        # We skip the background subtraction because we don't have the pathalogical bin that we had in central.
+        #contributors={"tracking_efficiency": 1, "model_dependence": 1, "background_sub": 1, "non_closure": 1},
+        contributors={"tracking_efficiency": 1, "model_dependence": 1, "non_closure": 1},
+        kt_range_to_smooth=PbPb_kt_measured_range_by_grooming_method(event_activity="central")[grooming_method],
+    )
     for grooming_method in _grooming_methods_using_new_conventions
 }
+_uncertainty_smoothing_configuration.update({
+    "dynamical_kt": unfolding_analysis.UncertaintySmoothingConfiguration(
+        # Nothing seems to be fluctuating so much, so seems to be okay.
+        contributors={},
+        kt_range_to_smooth=PbPb_kt_measured_range_by_grooming_method(event_activity="central")["dynamical_kt"],
+    ),
+})
 
 # %% tags=["remove_cell"]
 # Initially load data
@@ -483,6 +539,13 @@ semi_central_R02_unfolding_closure_outputs, semi_central_R02_unfolding_closure_p
     model_dependence_configuration=_model_dependence_configuration,
 )
 
+# Update n_iter for model dependence
+for grooming_method, model_dependence_n_iter_values in _model_dependence_update_n_iter.items():
+    for model_dependence_label, n_iter in model_dependence_n_iter_values.items():
+        if n_iter is not None:
+            logger.info(f"Changing n_iter for {grooming_method}, model_dependnece_{model_dependence_label}: {semi_central_R02_unfolding_systematics_outputs[grooming_method][f'model_dependence_{model_dependence_label}'].n_iter_compare}->{n_iter}")
+            semi_central_R02_unfolding_systematics_outputs[grooming_method][f"model_dependence_{model_dependence_label}"].n_iter_compare = n_iter
+
 # Focus down onto just the unfolded distributions
 semi_central_R02_unfolded_with_systematics, semi_central_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
     grooming_methods=grooming_methods,
@@ -491,7 +554,7 @@ semi_central_R02_unfolded_with_systematics, semi_central_R02_true_reference = pl
     true_jet_pt_range=true_jet_pt_range,
     calculate_quadrature_assuming_all_are_symmetric=calculate_quadrature_assuming_all_are_symmetric,
     unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
-    smooth_systematic_uncertainty_contributions=smooth_systematic_uncertainty_contributions,
+    smooth_systematic_uncertainty_contributions=_uncertainty_smoothing_configuration,
     model_dependence_configuration=_model_dependence_configuration,
     non_closure_configuration=_non_closure_configuration,
     background_subtraction_configuration=_background_subtraction_configuration,
@@ -591,6 +654,7 @@ _n_iter_compare = {
 _max_n_iter = {
     # Need +1 for convenience with range iteration
     "soft_drop_z_cut_04": 30,
+    # Needed for model dependence
     "soft_drop_z_cut_02": 30,
     "dynamical_kt": 30,
 }
@@ -608,12 +672,25 @@ _double_counting_cut = {
 _model_dependence_configuration = {}
 _model_dependence_configuration.update({
     _method: unfolding_analysis.ModelDependenceConfiguration(
+        # Use the default n_iter for all grooming methods, but optimize below as necessary.
         nominal="embed_pythia_fastsim",
         variations=["embed_jewel_no_recoils_fastsim"],
         approach_to_combining="max",
         skip_double_counting_label=False,
     ) for _method in _grooming_methods_using_new_conventions
 })
+_model_dependence_update_n_iter = {
+    # Selected based on usual convergence criteria...
+    "dynamical_kt": {
+        "embed_pythia_fastsim": 17,
+        # The usual n_iter seems to be reasonable for JEWEL
+        "embed_jewel_no_recoils_fastsim": None,
+    },
+    "soft_drop_z_cut_02": {
+        "embed_pythia_fastsim": 17,
+        "embed_jewel_no_recoils_fastsim": 17,
+    }
+}
 # Background subtraction configurations
 _background_subtraction_configuration = {
     _method: unfolding_analysis.BackgroundSubtractionConfiguration(
@@ -624,21 +701,32 @@ _background_subtraction_configuration = {
 # Add in the closure test to provide the non-closure uncertainty
 _non_closure_configuration = {
     grooming_method: unfolding_analysis.NonClosureConfiguration(
+        # NOTE: I exclude the reweight_response because I think it's overlapping with the model dependence
+        contributors=["reweight_pseudo_data", "thermal_model"],
         #contributors=["reweight_pseudo_data", "reweight_response", "thermal_model"],
-        contributors=["reweight_pseudo_data", "reweight_response", "thermal_model"],
         approach_to_combining="max",
     )
     for grooming_method in grooming_methods
 }
 
 # Smoothing for systematic uncertainty contributions
-smooth_systematic_uncertainty_contributions = {
+_uncertainty_smoothing_configuration = {
     # Reasoning:
-    # TODO: Update for central!
-    #grooming_method: {"unfolding": 1, "model_dependence": 1}
-    grooming_method: {}
+    # The 3-4 bin flutuates down a lot in a way that doesn't seem super physical.
+    # So, this suggests smoothing for all uncertainties (unfolding is soo small that doesn't matter)
+    grooming_method: unfolding_analysis.UncertaintySmoothingConfiguration(
+        contributors={"tracking_efficiency": 1, "model_dependence": 1, "background_sub": 1, "non_closure": 1},
+        kt_range_to_smooth=PbPb_kt_measured_range_by_grooming_method(event_activity="central")[grooming_method],
+    )
     for grooming_method in _grooming_methods_using_new_conventions
 }
+_uncertainty_smoothing_configuration.update({
+    "dynamical_kt": unfolding_analysis.UncertaintySmoothingConfiguration(
+        # Nothing seems to be fluctuating so much, so seems to be okay.
+        contributors={},
+        kt_range_to_smooth=PbPb_kt_measured_range_by_grooming_method(event_activity="central")["dynamical_kt"],
+    ),
+})
 
 # %% tags=["remove_cell"]
 # Initially load data
@@ -663,6 +751,13 @@ central_R02_unfolding_closure_outputs, central_R02_unfolding_closure_pure_matche
     model_dependence_configuration=_model_dependence_configuration,
 )
 
+# Update n_iter for model dependence
+for grooming_method, model_dependence_n_iter_values in _model_dependence_update_n_iter.items():
+    for model_dependence_label, n_iter in model_dependence_n_iter_values.items():
+        if n_iter is not None:
+            logger.info(f"Changing n_iter for {grooming_method}, model_dependnece_{model_dependence_label}: {central_R02_unfolding_systematics_outputs[grooming_method][f'model_dependence_{model_dependence_label}'].n_iter_compare}->{n_iter}")
+            central_R02_unfolding_systematics_outputs[grooming_method][f"model_dependence_{model_dependence_label}"].n_iter_compare = n_iter
+
 # Focus down onto just the unfolded distributions
 central_R02_unfolded_with_systematics, central_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
     grooming_methods=grooming_methods,
@@ -671,7 +766,7 @@ central_R02_unfolded_with_systematics, central_R02_true_reference = plot_unfoldi
     true_jet_pt_range=true_jet_pt_range,
     calculate_quadrature_assuming_all_are_symmetric=calculate_quadrature_assuming_all_are_symmetric,
     unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
-    smooth_systematic_uncertainty_contributions=smooth_systematic_uncertainty_contributions,
+    smooth_systematic_uncertainty_contributions=_uncertainty_smoothing_configuration,
     model_dependence_configuration=_model_dependence_configuration,
     non_closure_configuration=_non_closure_configuration,
     background_subtraction_configuration=_background_subtraction_configuration,
@@ -1164,7 +1259,7 @@ alice_status = "final"
 plot_output_dir_tag = "2024-paper-plots"
 grooming_methods_for_letter = ["dynamical_kt", "soft_drop_z_cut_02"]
 
-def PbPb_kt_measured_range_by_grooming_method(event_activity: str) -> None:
+def PbPb_kt_measured_range_by_grooming_method(event_activity: str) -> dict[str, helpers.KtRange]:
     return {
         "dynamical_core": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
         "dynamical_kt": helpers.KtRange(2, 6) if event_activity == "semi_central" else helpers.KtRange(3, 6),
