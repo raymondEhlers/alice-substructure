@@ -3794,3 +3794,311 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(  # noqa: C901
         output_dir=output_dir,
     )
 
+
+
+def _project_matching_RDF(hist: binned_data.BinnedData, hybrid_min_kt: float) -> binned_data.BinnedData:
+    import boost_histogram as bh
+    bh_hist = hist.to_boost_histogram()
+    res = bh_hist[
+        slice(None, None, bh.rebin(5)),
+        slice(bh.loc(hybrid_min_kt) if hybrid_min_kt > 0 else None, None, bh.sum),
+    ]
+
+    return binned_data.BinnedData.from_existing_data(res)
+
+
+# Mapping between the subjet matching type encoded in the histogram and the meaning of the name.
+# We don't actually use the labels for the paper plots, but I keep copying this map because it's
+# often very convenient to have around, so I'll just keep doing it.
+MATCHING_TYPE_LABEL_MAP = {
+    "pure": "Pure matches",
+    "leading_untagged_subleading_correct": "Leading unmatched, subleading matched",
+    "leading_correct_subleading_untagged": "Leading matched, subleading unmatched",
+    "leading_correct_subleading_mistag": "Leading matched, subleading in leading",
+    "leading_mistag_subleading_correct": "Leading in subleading, subleading matched",
+    "leading_untagged_subleading_mistag": "Leading unmatched, subleading in leading",
+    "leading_mistag_subleading_untagged": "Leading in subleading, subleading unmatched",
+    "swap": "Swaps",
+    "both_untagged": "Leading, subleading unmatched",
+}
+
+def _construct_subjet_matching_purity_hist(
+    hists: dict[str, binned_data.BinnedData],
+    grooming_method: str,
+    subjet_for_purity: str,
+    matching_level: str,
+    matching_jet_pt_level: str,
+    hist_suffix: str,
+    hybrid_min_kt: float = 0,
+) -> binned_data.BinnedData:
+    """ Retrieve and construct subjet matching purity hist.
+
+    Refactored out for convenience in constructing the paper plots, since
+    we need to call it a few times.
+    """
+    # hist_name = f"{grooming_method}_{matching_level}_matching_all"
+    hist_name = f"{grooming_method}_matching_{matching_level}_type_all_jet_pt_axis_{matching_jet_pt_level}"
+    if hist_suffix:
+        hist_name += f"_{hist_suffix}"
+    # logger.debug(hist_name)
+    try:
+        normalization = _project_matching_RDF(hists[hist_name], hybrid_min_kt=hybrid_min_kt)
+    except KeyError as e:
+        msg = f"Skipping grooming method {grooming_method} since the hist doesn't appear to be available"
+        logger.info(msg)
+        raise
+    # binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5), :: bh.sum])
+
+    matching_type = "pure"
+    hist_name = (
+        f"{grooming_method}_matching_{matching_level}_type_{matching_type}_jet_pt_axis_{matching_jet_pt_level}"
+    )
+    if hist_suffix:
+        hist_name += f"_{hist_suffix}"
+    # First, we take the pure manually
+    purity_hist = _project_matching_RDF(hists[hist_name], hybrid_min_kt=hybrid_min_kt)
+
+    # NOTE: We won't actually use the display labels in the MATCHING_TYPE_LABEL_MAP
+    #       We just need the keys to keep track of all of the different possible matching combinations,
+    #       and this map is convenient.
+    for matching_type in MATCHING_TYPE_LABEL_MAP:
+        # leading can end up matching to subleading, so we have to be a bit more careful for it.
+        if (subjet_for_purity == "leading" and matching_type.startswith(f"{subjet_for_purity}_correct")) or (
+            subjet_for_purity == "subleading" and f"{subjet_for_purity}_correct" in matching_type
+        ):
+            logger.debug(f"{grooming_method}: Adding matching {matching_type}")
+            hist_name = f"{grooming_method}_matching_{matching_level}_type_{matching_type}_jet_pt_axis_{matching_jet_pt_level}"
+            if hist_suffix:
+                hist_name += f"_{hist_suffix}"
+            temp_hist = _project_matching_RDF(hists[hist_name], hybrid_min_kt=hybrid_min_kt)
+            purity_hist += temp_hist
+
+    # Normalize
+    purity_hist /= normalization
+    return purity_hist
+
+
+def _plot_subjet_matching_purity(  # noqa: C901
+    hists: dict[str, dict[str, dict[str, binned_data.BinnedData]]],
+    collision_systems: list[str],
+    grooming_methods: list[str],
+    subjet_for_purity: str,
+    matching_level: str,
+    matching_jet_pt_level: str,
+    hybrid_min_kt_values: dict[str, list[float]],
+    hist_suffix: str,
+    configurations_to_skip_for_plotting: dict[str, list[tuple[str, float]]],
+    all_methods_on_one_figure: bool,
+    plot_config: pb.PlotConfig,
+    output_dir: Path,
+) -> None:
+    """Implementation of the subjet matching purity plot.
+
+    Derived from `plot_from_skim._plot_subjet_matching_purity`.
+    """
+    # Two possible approaches:
+    # 1. Having one figure with both collision systems (labeled as all_methods_on_one_figure since that's
+    #    the equivalent option elsewhere, even though in this case it's both collision systems)
+    # 2. Having two separate figures..
+
+    # Setup
+    if all_methods_on_one_figure:
+        n_horizontal_panels = len(grooming_methods)
+        fig, all_axes = plt.subplots(
+            1,
+            n_horizontal_panels,
+            # NOTE: Optimized for the consolidated figure (eg. 2 grooming methods)
+            #figsize=(6.75 * n_horizontal_panels, 10),
+            figsize=(7.5 * n_horizontal_panels, 10),
+            sharey="row",
+        )
+        axes = all_axes if n_horizontal_panels > 1 else [all_axes]
+    else:
+        fig, all_axes = plt.subplots(
+            1,
+            1,
+            figsize=(10, 10),
+            sharex=True,
+        )
+        axes = [all_axes]
+
+    grooming_styles = plot_style.define_paper_grooming_styles()
+
+    for (ax, collision_system) in zip(axes, collision_systems):
+        _plot_counter = 0
+        # Reversed because we want soft drop to be on the bottom
+        for grooming_method in grooming_methods:
+            for hybrid_min_kt in hybrid_min_kt_values[collision_system]:
+                configuration = (grooming_method, hybrid_min_kt)
+                purity_hist = _construct_subjet_matching_purity_hist(
+                    hists=hists[collision_system][grooming_method],
+                    grooming_method=grooming_method,
+                    subjet_for_purity=subjet_for_purity,
+                    matching_level=matching_level,
+                    matching_jet_pt_level=matching_jet_pt_level,
+                    hist_suffix=hist_suffix,
+                    hybrid_min_kt=hybrid_min_kt,
+                )
+
+                if configuration in configurations_to_skip_for_plotting[collision_system]:
+                    msg = f"Skipping grooming method {grooming_method} with hybrid_min_kt {hybrid_min_kt} since it's in the skip list"
+                    logger.info(msg)
+                    continue
+
+                # Presentation
+                # Plot options
+                kwargs_plot_errorbar = grooming_styles[grooming_method].kwargs_for_plot_errorbar()
+                if hybrid_min_kt > 0:
+                    kwargs_plot_errorbar["marker"] = "d"
+                    kwargs_plot_errorbar["markersize"] += 2
+                    kwargs_plot_errorbar["markerfacecolor"] = "white"
+                #kwargs_plot_errorbar["markeredgecolor"] = kwargs_plot_errorbar["color"]
+                kwargs_plot_errorbar["markerfacecolor"] = "white" if kwargs_plot_errorbar["markerfacecolor"] == "white" else kwargs_plot_errorbar["color"]
+                #kwargs_plot_errorbar["alpha"] = 0.8
+                label = grooming_styles[grooming_method].label
+                if hybrid_min_kt > 0:
+                    #label += r", $k_{\text{T}}^{\text{meas.}} >$" + f" {hybrid_min_kt:.1f} GeV/$c$"
+                    label += "\n" + r"$k_{\text{T}}^{\text{meas.}} >$" + f" {hybrid_min_kt:.1f} GeV/$c$"
+                # And plot
+                ax.errorbar(
+                    purity_hist.axes[0].bin_centers,
+                    purity_hist.values,
+                    yerr=purity_hist.errors,
+                    xerr=purity_hist.axes[0].bin_widths / 2,
+                    label=label,
+                    # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
+                    zorder=3 + _plot_counter,
+                    **kwargs_plot_errorbar,
+                )
+                _plot_counter += 1
+
+        # Add a line at 1 for reference.
+        ax.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+
+    # Presentation and labeling
+    # Apply the PlotConfig
+    plot_config.apply(fig=fig, axes=axes)
+
+    # Store and reset
+    grooming_methods_label = "_".join(grooming_methods)
+    filename = f"{plot_config.name}_{grooming_methods_label}"
+
+    fig.savefig(output_dir / f"{filename}.pdf")
+    logger.debug(f"filename: {filename}")
+    plt.close(fig)
+
+
+def plot_PbPb_subjet_purity_for_letter(
+    collision_systems: list[str],
+    hists: dict[str, dict[str, dict[str, binned_data.BinnedData]]],
+    grooming_methods: list[str],
+    hybrid_min_kt_values: dict[str, list[float]],
+    output_dir: Path,
+    subjet_for_purity: str = "subleading",
+    jet_R_str: str = "R02",
+    alice_status: str = "work_in_progress",
+    text_font_size: int = 31,
+) -> None:
+    """ Plot PbPb (subleading) subjet purity for the letter.
+
+    Args:
+        collision_systems: List of collision systems to plot.
+        hists: Dict of [collision_system][grooming_method][hist_name].
+        grooming_methods: Grooming methods to plot
+        hybrid_min_kt_values: Hybrid min kt values to plot as a function of collision system
+        output_dir: Output dir
+        subjet_for_purity: Subjet for which to plot the purity. Default: "subleading"
+    """
+    # Setup
+    # Skip soft drop whenever the min kt selection is not 0 since it's not meaningful for SD z_cut 0.2
+    configurations_to_skip_for_plotting = {}
+    for collision_system in collision_systems:
+        configurations_to_skip_for_plotting[collision_system] = [
+            ("soft_drop_z_cut_02", v)
+            for v in hybrid_min_kt_values[collision_system] if v != 0
+        ]
+    # Matching between hybrid level and det-level
+    matching_level = "hybrid_det_level"
+    # As a function of det level pt
+    matching_jet_pt_level = "det_level"
+    # We also need to keep track of the fact that there's a hybrid jet pt selection
+    hybrid_jet_pt_bin = helpers.JetPtRange(40, 120)
+    det_level_jet_pt_display_range = helpers.JetPtRange(35, 125)
+    # This is to label the histogram in the file.
+    hist_suffix = hybrid_jet_pt_bin.histogram_str(label="hybrid")
+
+    text_left = fr"$\textbf{{{plot_style.label_to_display_string['ALICE'][alice_status]}}}$"
+    # Couldn't use label_to_display string since I wanted a generic Pb-Pb label
+    text_left += "\n" + r"$\text{PYTHIA8} \bigotimes \text{Pb--Pb}$" #\;\sqrt{s_{\text{NN}}} = 5.02$ TeV"
+    text_left += "\n" + r"$\sqrt{s_{\text{NN}}} = 5.02$ TeV"
+    text_right = plot_style.label_to_display_string["jets"]["general"]
+    # Maybe "measured"?
+    text_right += "\n" + fr"${hybrid_jet_pt_bin.display_str(label='meas.')}\:\text{{GeV}}/c$"
+    text_right += "\n" + plot_style.label_to_display_string["jets"][jet_R_str]
+
+    panels = []
+    x_axis_label = {
+        "det_level": "det. level",
+        "hybrid": "hybrid",
+    }
+    # Left most: semi-central
+    panels.append(
+        pb.Panel(
+            axes=[
+                pb.AxisConfig("x", label=r"$p_{\text{T,ch jet}}^{\text{" + x_axis_label[matching_jet_pt_level] + r"}}\:(\text{GeV}/c)$", range=tuple(det_level_jet_pt_display_range), font_size=text_font_size),
+                pb.AxisConfig(
+                    "y",
+                    label=fr"{subjet_for_purity.capitalize()} prong purity",
+                    range=(0, 1.45),
+                    font_size=text_font_size,
+                ),
+            ],
+            text=[
+                pb.TextConfig(x=0.02, y=0.98, text=text_left, font_size=text_font_size),
+                # Add the collision system in a separate location in the bottom right
+                # Otherwise, it will overlap with the data
+                pb.TextConfig(x=0.96, y=0.74, text=_event_activity_full_label_map["semi_central"], font_size=text_font_size),
+            ],
+            #legend=pb.LegendConfig(location="lower left", font_size=round(text_font_size * 0.8), anchor=(0.0, 0.10), marker_label_spacing=-0.2),
+            #legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.04, 0.08), marker_label_spacing=-0.2),
+            legend=pb.LegendConfig(location="lower center", font_size=text_font_size, anchor=(0.5, 0.06), marker_label_spacing=-0.2),
+        ),
+    )
+    # Right most: Central
+    panels.append(
+        pb.Panel(
+            axes=[
+                pb.AxisConfig("x", label=r"$p_{\text{T,ch jet}}^{\text{" + x_axis_label[matching_jet_pt_level] + r"}}\:(\text{GeV}/c)$", range=tuple(det_level_jet_pt_display_range), font_size=text_font_size),
+            ],
+            text=[
+                pb.TextConfig(x=0.98, y=0.98, text=text_right, font_size=text_font_size),
+                # Add the collision system in a separate location in the bottom right
+                # Otherwise, it will overlap with the data
+                pb.TextConfig(x=0.04, y=0.74, text=_event_activity_full_label_map["central"], font_size=text_font_size),
+            ],
+            #legend=pb.LegendConfig(location="lower left", font_size=round(text_font_size * 0.8), anchor=(0.0, 0.10), marker_label_spacing=-0.2),
+            #legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.04, 0.08), marker_label_spacing=-0.2),
+            legend=pb.LegendConfig(location="lower center", font_size=text_font_size, anchor=(0.5, 0.06), marker_label_spacing=-0.2),
+        ),
+    )
+
+    _plot_subjet_matching_purity(
+        collision_systems=collision_systems,
+        hists=hists,
+        grooming_methods=grooming_methods,
+        subjet_for_purity=subjet_for_purity,
+        matching_level=matching_level,
+        matching_jet_pt_level=matching_jet_pt_level,
+        hist_suffix=hist_suffix,
+        all_methods_on_one_figure=True,
+        plot_config=pb.PlotConfig(
+            name=f"subjet_matching_{matching_level}",
+            panels=panels,
+            figure=pb.Figure(
+                edge_padding={"left": 0.08, "bottom": 0.10, "top": 0.995, "right": 0.995}
+            ),
+        ),
+        output_dir=output_dir,
+        hybrid_min_kt_values=hybrid_min_kt_values,
+        configurations_to_skip_for_plotting=configurations_to_skip_for_plotting,
+    )
