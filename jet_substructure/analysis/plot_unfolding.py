@@ -2976,6 +2976,9 @@ def calculate_systematics(  # noqa: C901
             model_dependence_n_bins = len(unfolded[f"model_dependence{_nominal_name_label}"].data.values)
             nominal_data_n_bins = len(unfolded["default"].data.values)
             if model_dependence_n_bins < nominal_data_n_bins:
+                logger.warning(
+                    "Left padding to match model dependence uncertainty size. This is due to using model dependence from one system on another. It's expected if using a central uncertainty for semi-central"
+                )
                 additional_bins_to_bad_with_zero = nominal_data_n_bins - model_dependence_n_bins
                 # logger.info(f"Before: {model_dependence_relative=} {model_dependence_n_bins=} {nominal_data_n_bins=} {additional_bins_to_bad_with_zero=}")
                 model_dependence_relative = np.pad(model_dependence_relative, (additional_bins_to_bad_with_zero, 0))
@@ -3017,7 +3020,9 @@ def calculate_systematics(  # noqa: C901
         #       least there points. We'll only do it if the lower value is 3, just to be safe (but by using the minium),
         #       it will be exactly the same).
         if np.isclose(kt_range_to_smooth[0], 3.0):
-            logger.info("Adjusting minimum smoothing range to 2.0 to ensure we have enough points for smoothing.")
+            logger.info(
+                "Adjusting minimum smoothing range to 2.0 to ensure we have enough points for smoothing. Excepted if using with central DyG (or an associated uncertainty e.g. model dep translated to semi-central)"
+            )
             kt_range_to_smooth[0] = 2.0
 
         # Now, construct the slices
@@ -3030,25 +3035,33 @@ def calculate_systematics(  # noqa: C901
 
         # And finally onto the (potential) smoothing
         for _name, _error_values in unfolded["default"].data.metadata["y_systematic"].items():
-            # logger.info(f"{_name=}, {selected_range=}")
+            logger.debug(f"{_name=}, {selected_range=}, {_axis[selected_range].bin_edges=}")
             if _name in smooth_systematic_uncertainty_contributions.contributors:
-                logger.info(f"Smoothing {_name}")
+                logger.debug(f"Smoothing {_name}")
+                # logger.debug(
+                #     f"Start: low: {_error_values.low / unfolded['default'].data.values}, high: {_error_values.high / unfolded['default'].data.values}"
+                # )
+                # NOTE: We want to smooth relative uncertainties. Otherwise, the higher kt values
+                #       have little impact on the smoothing!
                 errors_to_operate_on = full_results_helpers.AsymmetricErrors(
                     low=binned_data.BinnedData(
                         axes=_axis,
-                        values=_error_values.low,
+                        values=_error_values.low / unfolded["default"].data.values,
                         variances=_empty_variances,
                     )[selected_range].values,
                     high=binned_data.BinnedData(
                         axes=_axis,
-                        values=_error_values.high,
+                        values=_error_values.high / unfolded["default"].data.values,
                         variances=_empty_variances,
                     )[selected_range].values,
                 )
+                # logger.debug(f"Pre  smoothing: {errors_to_operate_on=}")
                 try:
                     errors_to_operate_on.smooth(smooth_systematic_uncertainty_contributions.contributors[_name])
                 except IndexError as e:
                     logger.warning(f"Skipping smoothing for {_name} because of '{e}'")
+                # logger.debug(f"Post smoothing: {errors_to_operate_on=}")
+
                 # Cross check
                 # NOTE: If we actually apply smoothing, this cross check will fail. But it allows us to cross check
                 #       that we're inserting at the right place.
@@ -3056,8 +3069,11 @@ def calculate_systematics(  # noqa: C901
                 #np.testing.assert_allclose(_error_values.low[selected_range_to_insert], errors_to_operate_on.low)
                 #np.testing.assert_allclose(_error_values.high[selected_range_to_insert], errors_to_operate_on.high)
                 # Add back into the original AsymmetricErrors object
-                _error_values.low[selected_range_to_insert] = errors_to_operate_on.low
-                _error_values.high[selected_range_to_insert] = errors_to_operate_on.high
+                _error_values.low[selected_range_to_insert] = errors_to_operate_on.low * unfolded["default"].data[selected_range].values
+                _error_values.high[selected_range_to_insert] = errors_to_operate_on.high * unfolded["default"].data[selected_range].values
+                # logger.debug(
+                #     f"Final: low: {_error_values.low / unfolded['default'].data.values}, high: {_error_values.high / unfolded['default'].data.values}"
+                # )
 
     # Cross check to make sure that I haven't copied and pasted incorrectly.
     assert not any(
