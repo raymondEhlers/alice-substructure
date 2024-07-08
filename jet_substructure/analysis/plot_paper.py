@@ -3957,8 +3957,8 @@ def _plot_subjet_matching_purity(  # noqa: C901
                 #kwargs_plot_errorbar["alpha"] = 0.8
                 label = grooming_styles[grooming_method].label
                 if hybrid_min_kt > 0:
-                    #label += r", $k_{\text{T}}^{\text{meas.}} >$" + f" {hybrid_min_kt:.1f} GeV/$c$"
-                    label += "\n" + r"$k_{\text{T}}^{\text{meas.}} >$" + f" {hybrid_min_kt:.1f} GeV/$c$"
+                    #label += r", $k_{\text{T,g}}^{\text{meas}} >$" + f" {hybrid_min_kt:.1f} GeV/$c$"
+                    label += "\n" + r"$k_{\text{T,g}}^{\text{meas}} >$" + f" {hybrid_min_kt:.1f} GeV/$c$"
                 # And plot
                 ax.errorbar(
                     purity_hist.axes[0].bin_centers,
@@ -4038,7 +4038,7 @@ def plot_PbPb_subjet_purity_for_letter(
 
     panels = []
     x_axis_label = {
-        "det_level": "det. level",
+        "det_level": "det",
         "hybrid": "hybrid",
     }
     # Left most: semi-central
