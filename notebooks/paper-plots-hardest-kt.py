@@ -247,14 +247,37 @@ non_closure_configuration = {
     for _method in _grooming_methods_using_new_conventions
 }
 # Smoothing for systematic uncertainty contributions
-smooth_systematic_uncertainty_contributions = {
-    #grooming_method: ["model_dependence"]
+_uncertainty_smoothing_configuration = {
     # Reasoning:
-    # - The random bin fluctuates way up at 3-4, so we need to smooth it out.
-    # - Model dependence fluctuates down at high kt, which seems unphysical.
-    #grooming_method: {"unfolding": 1, "model_dependence": 1}
+    # - Model dependence fluctuates larger and then small at high kt, which seems unphysical.
+    # - NOTE: The random binning fluctuates way up at 3-4, but since we combine them together
+    #         as the std dev (via _unfolding_related_systematic_treatment), we in practice don't
+    #         need to smooth it out due to that bin. (i.e. the unfolding is rarely the
+    #         leading uncertainty)
+    grooming_method: unfolding_analysis.UncertaintySmoothingConfiguration(
+        contributors={"model_dependence": 1, "unfolding": 1},
+        # It's pp, so there's no reduced kt range selection (we just select the full range)
+        kt_range_to_smooth=helpers.KtRange(0.25, 6),
+    )
     for grooming_method in _grooming_methods_using_new_conventions
 }
+_uncertainty_smoothing_configuration.update({
+    "dynamical_kt": unfolding_analysis.UncertaintySmoothingConfiguration(
+        # Reasoning:
+        # - model dependence: 3-4 jumps quite large, so smooth it out.
+        # - It doesn't need the unfolding smoothing because it only jumps 1-2% at 1.5-2
+        contributors={"model_dependence": 1},
+        #contributors={},
+        kt_range_to_smooth=helpers.KtRange(0.25, 6),
+    ),
+    "soft_drop_z_cut_02": unfolding_analysis.UncertaintySmoothingConfiguration(
+        # Reasoning:
+        # - model dependence: 3-4 jumps quite large
+        # - unfolding: 1.5-2 jumps larger
+        contributors={"model_dependence": 1, "unfolding": 1},
+        kt_range_to_smooth=helpers.KtRange(0.25, 6),
+    ),
+})
 
 # We include the prior in the unfolding uncertaintiy.
 # The model (generator) dependence is via the modification of the model used for the response matrix.
@@ -283,6 +306,8 @@ pp_R02_unfolding_closure_outputs, pp_R02_unfolding_closure_pure_matches_outputs,
     model_dependence_configuration=_model_dependence_configuration,
 )
 
+# We don't need to adjust the n_iter for any of the model dependence, so we just leave that out here...
+
 # Focus down onto just the unfolded distributions
 pp_R02_unfolded_with_systematics, pp_R02_true_reference = plot_unfolding.unfolded_outputs_with_systematics(
     grooming_methods=grooming_methods,
@@ -291,7 +316,7 @@ pp_R02_unfolded_with_systematics, pp_R02_true_reference = plot_unfolding.unfolde
     true_jet_pt_range=true_jet_pt_range,
     calculate_quadrature_assuming_all_are_symmetric=calculate_quadrature_assuming_all_are_symmetric,
     unfolding_related_systematic_treatment=_unfolding_related_systematic_treatment,
-    smooth_systematic_uncertainty_contributions=smooth_systematic_uncertainty_contributions,
+    smooth_systematic_uncertainty_contributions=_uncertainty_smoothing_configuration,
     model_dependence_configuration=_model_dependence_configuration,
     non_closure_configuration=non_closure_configuration,
     background_subtraction_configuration=None,
@@ -305,7 +330,6 @@ print(pp_R02_unfolded_with_systematics["dynamical_kt"].data.metadata["y_systemat
 # %%
 plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
     grooming_methods=grooming_methods,
-    #grooming_methods=grooming_methods_for_letter,
     unfolded_with_systematics=pp_R02_unfolded_with_systematics,
     unfolding_systematics_outputs=pp_R02_unfolding_systematics_outputs,
     unfolding_closure_outputs=pp_R02_unfolding_closure_outputs,
@@ -423,7 +447,7 @@ if _use_qm22_inputs:
 _max_n_iter = {
     # Need +1 for convenience with range iteration
     "soft_drop_z_cut_04": 30,
-    # Needed for model dependence
+    # Need larger range to select a higher iter for the model dependence
     "soft_drop_z_cut_02": 30,
     "dynamical_kt": 30,
 }
@@ -433,16 +457,17 @@ _max_n_iter.update({
 
 # Double counting cut
 # It's all the same here, but the QM22 results don't include the label
+#_double_counting_cut = {
+#    _method: ""
+#    for _method in _grooming_methods_using_qm_result_conventions
+#}
 _double_counting_cut = {
-    _method: ""
-    for _method in _grooming_methods_using_qm_result_conventions
-}
-_double_counting_cut.update({
     _method: "min_true_10_pt_hat_3"
     for _method in _grooming_methods_using_new_conventions
-})
+}
 # Model dependence.
-# Copied over from central
+# We use the central model dependence as a proxy since we don't have a semi-central model dependence available.
+# Consequently, we've copied over these values from the central configuration
 _model_dependence_configuration = {}
 _model_dependence_configuration.update({
     _method: unfolding_analysis.ModelDependenceConfiguration(
@@ -458,7 +483,8 @@ _model_dependence_update_n_iter = {
     "dynamical_kt": {
         "embed_pythia_fastsim": 17,
         # The usual n_iter seems to be reasonable for JEWEL
-        # NOTE: We still set it manually for semi-central because it needs to match the **central** n_iter value instead...
+        # NOTE: We still set it manually here for this semi-central case because it needs to match the **central** n_iter value instead...
+        #       (otherwise, it could be None, as in the case when we use it for central)
         "embed_jewel_no_recoils_fastsim": 9,
     },
     "soft_drop_z_cut_02": {
@@ -467,52 +493,61 @@ _model_dependence_update_n_iter = {
     }
 }
 # Background subtraction configurations
+#_background_subtraction_configuration = {
+#    _method: unfolding_analysis.BackgroundSubtractionConfiguration(
+#        contributors=["Rmax005", "Rmax070"]
+#    )
+#    for _method in _grooming_methods_using_qm_result_conventions
+#}
 _background_subtraction_configuration = {
-    _method: unfolding_analysis.BackgroundSubtractionConfiguration(
-        contributors=["Rmax005", "Rmax070"]
-    )
-    for _method in _grooming_methods_using_qm_result_conventions
-}
-_background_subtraction_configuration.update({
     _method: unfolding_analysis.BackgroundSubtractionConfiguration(
         contributors=["Rmax005", "Rmax050"]
     )
     for _method in _grooming_methods_using_new_conventions
-})
+}
 # Add in the closure test to provide the non-closure uncertainty
+#_non_closure_configuration = {
+#    grooming_method: unfolding_analysis.NonClosureConfiguration(
+#        contributors=["reweight_response"],
+#        approach_to_combining="max",
+#    )
+#    for grooming_method in _grooming_methods_using_qm_result_conventions
+#}
 _non_closure_configuration = {
     grooming_method: unfolding_analysis.NonClosureConfiguration(
-        contributors=["reweight_response"],
-        approach_to_combining="max",
-    )
-    for grooming_method in _grooming_methods_using_qm_result_conventions
-}
-_non_closure_configuration.update({
-    grooming_method: unfolding_analysis.NonClosureConfiguration(
         # NOTE: I exclude the reweight_response because I think it's overlapping with the model dependence
-        contributors=["reweight_pseudo_data", "thermal_model"],
         #contributors=["reweight_response", "reweight_pseudo_data", "thermal_model"],
+        contributors=["reweight_pseudo_data", "thermal_model"],
         approach_to_combining="max",
     )
     for grooming_method in _grooming_methods_using_new_conventions
-})
+}
 
 # Smoothing for systematic uncertainty contributions
 _uncertainty_smoothing_configuration = {
     # Reasoning:
     grooming_method: unfolding_analysis.UncertaintySmoothingConfiguration(
-        # We skip the background subtraction because we don't have the pathalogical bin that we had in central.
-        #contributors={"tracking_efficiency": 1, "model_dependence": 1, "background_sub": 1, "non_closure": 1},
-        contributors={"tracking_efficiency": 1, "model_dependence": 1, "non_closure": 1},
-        kt_range_to_smooth=PbPb_kt_measured_range_by_grooming_method(event_activity="central")[grooming_method],
+        # Default to no smoothing.
+        contributors={},
+        kt_range_to_smooth=PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central")[grooming_method],
     )
     for grooming_method in _grooming_methods_using_new_conventions
 }
 _uncertainty_smoothing_configuration.update({
     "dynamical_kt": unfolding_analysis.UncertaintySmoothingConfiguration(
         # Nothing seems to be fluctuating so much, so seems to be okay.
+        # (It's entirely dominated by the model dependence...)
         contributors={},
-        kt_range_to_smooth=PbPb_kt_measured_range_by_grooming_method(event_activity="central")["dynamical_kt"],
+        kt_range_to_smooth=PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central")["dynamical_kt"],
+    ),
+    "soft_drop_z_cut_02": unfolding_analysis.UncertaintySmoothingConfiguration(
+        # Reasoning:
+        # - Tracking eff (2-3 bin drops significantly)
+        # - Model dependence (unphysical jumps)
+        # - Non-closure (2-3 bin drops significantly)
+        # We skip the background subtraction because we don't have the pathalogical bin that we had in central.
+        contributors={"tracking_efficiency": 1, "model_dependence": 1, "non_closure": 1},
+        kt_range_to_smooth=PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central")["soft_drop_z_cut_02"],
     ),
 })
 
@@ -561,8 +596,8 @@ semi_central_R02_unfolded_with_systematics, semi_central_R02_true_reference = pl
 )
 
 # %%
-print(list(semi_central_R02_unfolding_systematics_outputs["dynamical_kt_z_cut_02"].keys()))
-print(list(semi_central_R02_unfolding_closure_outputs["dynamical_kt_z_cut_02"].keys()))
+print(list(semi_central_R02_unfolding_systematics_outputs["dynamical_kt"].keys()))
+print(list(semi_central_R02_unfolding_closure_outputs["dynamical_kt"].keys()))
 
 # %%
 plot_unfolding.steer_plotting_of_kt_unfolding_outputs(
@@ -654,7 +689,7 @@ _n_iter_compare = {
 _max_n_iter = {
     # Need +1 for convenience with range iteration
     "soft_drop_z_cut_04": 30,
-    # Needed for model dependence
+    # Need larger range to select a higher iter for the model dependence
     "soft_drop_z_cut_02": 30,
     "dynamical_kt": 30,
 }
@@ -669,8 +704,7 @@ _double_counting_cut = {
 }
 # Model dependence.
 #_model_dependence_configuration = None
-_model_dependence_configuration = {}
-_model_dependence_configuration.update({
+_model_dependence_configuration = {
     _method: unfolding_analysis.ModelDependenceConfiguration(
         # Use the default n_iter for all grooming methods, but optimize below as necessary.
         nominal="embed_pythia_fastsim",
@@ -678,7 +712,7 @@ _model_dependence_configuration.update({
         approach_to_combining="max",
         skip_double_counting_label=False,
     ) for _method in _grooming_methods_using_new_conventions
-})
+}
 _model_dependence_update_n_iter = {
     # Selected based on usual convergence criteria...
     "dynamical_kt": {
@@ -702,8 +736,8 @@ _background_subtraction_configuration = {
 _non_closure_configuration = {
     grooming_method: unfolding_analysis.NonClosureConfiguration(
         # NOTE: I exclude the reweight_response because I think it's overlapping with the model dependence
-        contributors=["reweight_pseudo_data", "thermal_model"],
         #contributors=["reweight_pseudo_data", "reweight_response", "thermal_model"],
+        contributors=["reweight_pseudo_data", "thermal_model"],
         approach_to_combining="max",
     )
     for grooming_method in grooming_methods
@@ -711,20 +745,32 @@ _non_closure_configuration = {
 
 # Smoothing for systematic uncertainty contributions
 _uncertainty_smoothing_configuration = {
-    # Reasoning:
-    # The 3-4 bin flutuates down a lot in a way that doesn't seem super physical.
-    # So, this suggests smoothing for all uncertainties (unfolding is soo small that doesn't matter)
     grooming_method: unfolding_analysis.UncertaintySmoothingConfiguration(
-        contributors={"tracking_efficiency": 1, "model_dependence": 1, "background_sub": 1, "non_closure": 1},
+        # By default, no smoothing
+        contributors={},
         kt_range_to_smooth=PbPb_kt_measured_range_by_grooming_method(event_activity="central")[grooming_method],
     )
     for grooming_method in _grooming_methods_using_new_conventions
 }
 _uncertainty_smoothing_configuration.update({
     "dynamical_kt": unfolding_analysis.UncertaintySmoothingConfiguration(
-        # Nothing seems to be fluctuating so much, so seems to be okay.
-        contributors={},
+        # Reasoning:
+        # Non-closure. It is bouncing up and down a bit arbitrarily
+        contributors={"non_closure": 1},
         kt_range_to_smooth=PbPb_kt_measured_range_by_grooming_method(event_activity="central")["dynamical_kt"],
+    ),
+    "soft_drop_z_cut_02": unfolding_analysis.UncertaintySmoothingConfiguration(
+        # Reasoning:
+        # - Tracking eff (3-4 bin drops significantly)
+        # - Model dependence (unphysical jumps)
+        # - Background sub (mid kt, 3-4 bin drops significantly)
+        # - Non-closure (low kt, 3-4 bin drops significantly)
+        # - Note: tracking eff is not smoothed because it causes it to be artificially flat (e.g. it is effectively
+        #   a flat 2%, which appears implausible based on DyG + semi-central SD). So leave it.
+        #   It has minimal impact on the sum, but seems a more plausible estimate.
+        # So, this suggests smoothing for all uncertainties (unfolding is so small that doesn't matter)
+        contributors={"model_dependence": 1, "background_sub": 1, "non_closure": 1},
+        kt_range_to_smooth=PbPb_kt_measured_range_by_grooming_method(event_activity="central")["soft_drop_z_cut_02"],
     ),
 })
 
@@ -1893,7 +1939,6 @@ for grooming_method in grooming_methods:
 # ### R = 0.2
 
 # %%
-
 jet_R = 0.2
 jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
@@ -2347,7 +2392,7 @@ def define_paper_table_dfs(
     collision_system: str,
     grooming_methods: list[str],
     event_activity_to_kt_range: dict[str, helpers.KtRange] | dict[str, dict[str, helpers.KtRange]],
-) -> dict[str, tuple[list[str], pd.DataFrame, pd.DataFrame]]:
+) -> dict[str, tuple[list[str], pd.DataFrame]]:
     """ Going source-by-source of the uncertainties, we want to extract the minimum and maximum over the measured range.
 
     """
@@ -2355,6 +2400,12 @@ def define_paper_table_dfs(
     for ev, kt_range in event_activity_to_kt_range.items():
         if isinstance(kt_range, helpers.KtRange):
             event_activity_to_kt_range[ev] = {grooming_method: kt_range for grooming_method in grooming_methods}
+
+    # Setup
+    collision_system_to_centrality = {
+        "central": r"0--10\%",
+        "semi_central": r"30--50\%"
+    }
 
     tables = {}
     for grooming_method in grooming_methods:
@@ -2366,28 +2417,37 @@ def define_paper_table_dfs(
         # Create dataframes for absolute and relative uncertainties.
         # We want to keep the maximum uncertainties regardless of the low or high direction
         sources = list(h.metadata["y_systematic"].keys())
+        # NOTE: The we need to determine the largest and smallest contributors using the relative uncertainty.
+        #       Otherwise, we'll always be dominated by the low kt bins - i.e. those which have the highest yield
+        #       and therefore the largest absolute error, regardless of whether those are the values of interest.
+        # First, we'll symmetrize the uncertainties, since we don't want this to e.g. report zero for the minimum
+        # because one side is 0.
         uncertainties = {
-            f"{k}_{r}": getattr(np, r)(np.abs(v.low), np.abs(v.high))
+            k: v.high / h.values if np.allclose(v.low, v.high)
+            else np.maximum(v.low / h.values, v.high / h.values)
             for k, v in h.metadata["y_systematic"].items()
-            for r in ["minimum", "maximum"]
         }
-        df_absolute = pd.DataFrame(uncertainties)
-        # It's nice to keep track of this as well..
-        df_absolute["stat"] = (
-            h.errors
-        )
+        # Add in the stat uncertainty just to keep track of it
+        uncertainties["stat"] = h.errors / h.values
+        # Now, calculate the min and max per source
+        # NOTE: We wrap it into a list because there's only a single value per source.
+        uncertainties = {
+            f"{k}_{op}": getattr(np, op)(v)
+            for k, v in uncertainties.items()
+            for op in ["min", "max"]
+        }
+        # Add in centrality information if applicable
+        if collision_system in collision_system_to_centrality:
+            uncertainties["centrality"] = collision_system_to_centrality[collision_system]
+        #logger.info(f"{uncertainties=}")
 
-        #df_absolute = pd.DataFrame(
-        #    {
-        #        f"{k}_{direction}": getattr(v, direction)
-        #        for i, (k, v) in enumerate(hists[_current_grooming_method].data.metadata["y_systematic"].items())
-        #        for direction in ["low", "high"]
-        #    }
-        #)
+        df_relative = pd.DataFrame({grooming_method: uncertainties}).transpose()
 
-        df_relative = df_absolute.divide(h.values, axis=0)
+        # NOTE: We can't convert back like this because we've already condensed down to a single minimum and maximum per source.
+        #       But I also don't think we need the absolute uncertainties, so we just leave it aside.
+        #df_absolute = df_relative.multiply(h.values, axis=0)
 
-        tables[grooming_method] = (sources, df_absolute, df_relative)
+        tables[grooming_method] = (sources, df_relative)
 
     return tables
 
@@ -2418,25 +2478,50 @@ grooming_method_to_display_name = {
     "soft_drop_z_cut_02": r"SD $z_{\mathrm{cut}}$ = 0.2",
 }
 uncertainties_display_tables = {}
-for collision_system in tables:
-    uncertainties_display_tables[collision_system] = None
-    min_max_values_per_grooming_method = {}
-    for grooming_method in grooming_methods_for_letter:
-        sources, _, df_relative = tables[collision_system][grooming_method]
-        min_max_values = {}
-        for source in sources:
-            min_max_values[f"{source}_minimum"] = df_relative[f"{source}_maximum"].min()
-            min_max_values[f"{source}_maximum"] = df_relative[f"{source}_maximum"].max()
-        min_max_values_per_grooming_method[grooming_method_to_display_name[grooming_method]] = min_max_values
-    # NOTE: The transpose ensures that the sources columns, while each grooming method is a new row
-    uncertainties_display_tables[collision_system] = pd.DataFrame(min_max_values_per_grooming_method).transpose()
+# pp
+uncertainties_display_tables["pp"] = pd.concat(
+    [
+        tables["pp"][grooming_method][1]
+        for grooming_method in grooming_methods_for_letter
+    ],
+    #keys=grooming_methods_for_letter,
+    #names=["grooming_method"],
+).rename(index=grooming_method_to_display_name)
+uncertainties_display_tables["pp"]
+# PbPb
+uncertainties_display_tables["PbPb"] = pd.concat(
+    [
+        tables[collision_system][grooming_method][1]
+        for collision_system in ["central", "semi_central"]
+        for grooming_method in grooming_methods_for_letter
+    ],
+    #keys=grooming_methods_for_letter,
+    #names=["grooming_method"],
+).rename(index=grooming_method_to_display_name)
+uncertainties_display_tables["PbPb"]
+
+# %%
+# This operation was necessary in the previous iteration of this code, but this new code is simpler, and thus this doesn't seem to be necessary
+#uncertainties_display_tables = {}
+#for collision_system in tables:
+#    uncertainties_display_tables[collision_system] = None
+#    min_max_values_per_grooming_method = {}
+#    for grooming_method in grooming_methods_for_letter:
+#        sources, _, df_relative = tables[collision_system][grooming_method]
+#        min_max_values = {}
+#        for source in sources:
+#            min_max_values[f"{source}_minimum"] = df_relative[f"{source}_maximum"].min()
+#            min_max_values[f"{source}_maximum"] = df_relative[f"{source}_maximum"].max()
+#        min_max_values_per_grooming_method[grooming_method_to_display_name[grooming_method]] = min_max_values
+#    # NOTE: The transpose ensures that the sources columns, while each grooming method is a new row
+#    uncertainties_display_tables[collision_system] = pd.DataFrame(min_max_values_per_grooming_method).transpose()
 
 # %%
 uncertainties_display_tables
 
 
 # %%
-def format_range(min_val: float, max_val: float, sig_digits: int):
+def format_range(min_val: float, max_val: float, sig_digits: int) -> str:  # noqa: ARG001
     #return fr"{min_val * 100:.{sig_digits}g} -- {max_val * 100:.{sig_digits}g}\%"
     min_value = f"{round(min_val * 100):g}" if not np.isnan(min_val) else "NaN"
     max_value = f"{round(max_val * 100):g}" if not np.isnan(max_val) else "NaN"
@@ -2444,22 +2529,28 @@ def format_range(min_val: float, max_val: float, sig_digits: int):
 
 output_display_tables = {}
 for collision_system, df in uncertainties_display_tables.items():
-    #for source in df.columns:  # noqa: C401
-    columns = set("_".join(k.split("_")[:-1]) for k in df.columns)  # noqa: C401
-    # Remove the "stat" category, which ends up empty
-    columns.discard("")
+    # Collect the uncertainty sources to format with the min and max
+    # NOTE: We skip the stat uncert and the centrality - we'll bring along the centrality below.
+    columns = [k for k in df.columns if k not in ["stat_min", "stat_max", "centrality"]]
     print(f"{columns}")
+    columns = set("_".join(k.split("_")[:-1]) for k in columns)  # noqa: C401
+    print(f"{columns}")
+
     output_display_values = {}
     for source in columns:
         print(f"handling source: {source}")
         #df[source] = df.apply(lambda row: format_range(row[f"{source}_minimum"], row[f"{source}_maximum"], 2), axis=1)
         # Add a column for each source, set to the formatted range
-        output_display_values[source] = df.apply(lambda row: format_range(row[f"{source}_minimum"], row[f"{source}_maximum"], 1), axis=1)
+        output_display_values[source] = df.apply(lambda row, source=source: format_range(row[f"{source}_min"], row[f"{source}_max"], 1), axis=1)
+    # Add back in the centrality:
+    if "centrality" in df.columns:
+        output_display_values["centrality"] = df["centrality"]
     output_display_tables[collision_system] = pd.DataFrame(output_display_values)
 
 # %%
 # How to order and rename the columns for putting into the supplement text
 order_and_rename_columns = {
+    "centrality": "",
     "tracking_efficiency": "Trk. Eff.",
     "model_dependence": "Generator",
     "unfolding": "Unfolding",
@@ -2470,9 +2561,10 @@ order_and_rename_columns = {
 
 # %%
 # Check how we're doing...
-output_display_tables["pp"][["tracking_efficiency", "model_dependence", "unfolding", "quadrature"]]
+output_display_tables["PbPb"][["centrality", "tracking_efficiency", "model_dependence", "unfolding", "quadrature"]]
 
 # %%
+# Rename columns
 latex_tables = {}
 for collision_system in output_display_tables:
     selected_order_and_rename_columns = {k: v for k, v in order_and_rename_columns.items() if k in output_display_tables[collision_system].columns}
@@ -2501,7 +2593,7 @@ central_R02_unfolded_with_systematics["dynamical_kt"].data.axes[0].bin_centers
 # %%
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import numpy as np
+import numpy as np  # noqa: F811
 
 # %%
 fig, ax = plt.subplots(figsize=(8, 6))
