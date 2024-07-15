@@ -3844,7 +3844,7 @@ def _construct_subjet_matching_purity_hist(
     try:
         normalization = _project_matching_RDF(hists[hist_name], hybrid_min_kt=hybrid_min_kt)
     except KeyError as e:
-        msg = f"Skipping grooming method {grooming_method} since the hist doesn't appear to be available"
+        msg = f"Skipping grooming method {grooming_method} since the hist doesn't appear to be available. {e}"
         logger.info(msg)
         raise
     # binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5), :: bh.sum])
@@ -3878,7 +3878,7 @@ def _construct_subjet_matching_purity_hist(
     return purity_hist
 
 
-def _plot_subjet_matching_purity(  # noqa: C901
+def _plot_subjet_matching_purity(
     hists: dict[str, dict[str, dict[str, binned_data.BinnedData]]],
     collision_systems: list[str],
     grooming_methods: list[str],
@@ -3924,7 +3924,34 @@ def _plot_subjet_matching_purity(  # noqa: C901
 
     grooming_styles = plot_style.define_paper_grooming_styles()
 
+    # NOTE: Minimum of 3 is important for the error bars to show up on points properly (July 2024, I don't recall
+    #       exactly why this is, but it's hard won, so I'll keep it in place).
+    # Desired zorder:
+    # 3. soft_drop_z_cut_02 error bars + marker
+    # 4. dyg_1.x error bars + markers with white fill. The white fill is needed to block the error bars which
+    #    will come through a transparent fill otherwise.
+    # 5. dyg_0
+    # 8. Re-plot dyg_1.x markers with transparent fill
+    # NOTE: This only works when DyG is listed first. So we plot DyG with and w/out zcut first,
+    #       then SD, then re-plot dyg_1.x . It may be possible to simplify this further, but this
+    #       seems to work, so good enough. This must be because the error bars are placed on a lower
+    #       zorder than the markers when using errorbar(...). (e.g. if I pass zorder=3, the bar lines
+    #       are at 3, but then the marker is at e.g. 5), but I haven't checked the docs (July 2024)
+    #       for exactly what is done... But again, good enough :-)
+    z_order_offset_counter = {
+        #("soft_drop_z_cut_02", 0.0) : 6,
+        #("dynamical_kt", 0.0) : 7,
+        ## The offset ones.
+        #("dynamical_kt", 1.0) : 5,
+        #("dynamical_kt", 1.5) : 5,
+        ("soft_drop_z_cut_02", 0.0) : 3,
+        ("dynamical_kt", 0.0) : 5,
+        # The offset ones.
+        ("dynamical_kt", 1.0) : 4,
+        ("dynamical_kt", 1.5) : 4,
+    }
     for (ax, collision_system) in zip(axes, collision_systems):
+        purity_hists_to_repeat = {}
         _plot_counter = 0
         # Reversed because we want soft drop to be on the bottom
         for grooming_method in grooming_methods:
@@ -3948,32 +3975,61 @@ def _plot_subjet_matching_purity(  # noqa: C901
                 # Presentation
                 # Plot options
                 kwargs_plot_errorbar = grooming_styles[grooming_method].kwargs_for_plot_errorbar()
+                kwargs_plot_errorbar["zorder"] = z_order_offset_counter[(grooming_method, hybrid_min_kt)]
                 if hybrid_min_kt > 0:
                     kwargs_plot_errorbar["marker"] = "d"
                     kwargs_plot_errorbar["markersize"] += 2
                     kwargs_plot_errorbar["markerfacecolor"] = "white"
-                #kwargs_plot_errorbar["markeredgecolor"] = kwargs_plot_errorbar["color"]
+                    kwargs_plot_errorbar["markeredgewidth"] = 3
                 kwargs_plot_errorbar["markerfacecolor"] = "white" if kwargs_plot_errorbar["markerfacecolor"] == "white" else kwargs_plot_errorbar["color"]
-                #kwargs_plot_errorbar["alpha"] = 0.8
                 label = grooming_styles[grooming_method].label
                 if hybrid_min_kt > 0:
                     #label += r", $k_{\text{T,g}}^{\text{meas}} >$" + f" {hybrid_min_kt:.1f} GeV/$c$"
                     label += "\n" + r"$k_{\text{T,g}}^{\text{meas}} >$" + f" {hybrid_min_kt:.1f} GeV/$c$"
                 # And plot
-                ax.errorbar(
+                line, caps, bars = ax.errorbar(
                     purity_hist.axes[0].bin_centers,
                     purity_hist.values,
                     yerr=purity_hist.errors,
                     xerr=purity_hist.axes[0].bin_widths / 2,
                     label=label,
-                    # NOTE: Minimum of 3 is important for the error bars to show up on top of points properly
-                    zorder=3 + _plot_counter,
                     **kwargs_plot_errorbar,
                 )
                 _plot_counter += 1
+                # Move the marker up above the error bars
+                #logger.info(f"Setting marker zorder for {grooming_method} to {z_order_offset_counter[(grooming_method, hybrid_min_kt)] + 2}")
+                #line.set_zorder(z_order_offset_counter[(grooming_method, hybrid_min_kt)] + 2)
+                # Further customization
+                if (grooming_method, hybrid_min_kt) == ("soft_drop_z_cut_02", 0.0):
+                    # Move the marker up above the error bars and the DyG kt req marker.
+                    line.set_zorder(6)
+                if grooming_method == "dynamical_kt" and hybrid_min_kt > 0:
+                    # Move the marker up above the error bars.
+                    line.set_zorder(5)
+
+                if hybrid_min_kt > 0:
+                    # Keep these around to plot again, but this time only the markers - no error bars
+                    # (see a few lines down). This way, it effectively allows the inside of the open
+                    # markers to be transparent (note that we can't use 'none' directly because then
+                    # the error bars of the actual point will show through, which is ugly).
+                    purity_hists_to_repeat[(grooming_method, hybrid_min_kt)] = (purity_hist, label, kwargs_plot_errorbar)
 
         # Add a line at 1 for reference.
         ax.axhline(y=1, color="black", linestyle="dashed", zorder=1)
+
+        for _k, (purity_hist, _label, kwargs_plot_errorbar) in purity_hists_to_repeat.items():
+            logger.info(f"Repeating with ax.plot for marker transparency for {_k}")
+            # We want the inside of the marker to be transparent, but to plot the edges on
+            # top of the previous plot. 8 will be above everything
+            kwargs_plot_errorbar["zorder"] = 8
+            kwargs_plot_errorbar["markerfacecolor"] = "none"
+            ax.plot(
+                purity_hist.axes[0].bin_centers,
+                purity_hist.values,
+                # Don't label it - we want the label from when it was plotted previously.
+                #label=_label,
+                **kwargs_plot_errorbar,
+            )
 
     # Presentation and labeling
     # Apply the PlotConfig
