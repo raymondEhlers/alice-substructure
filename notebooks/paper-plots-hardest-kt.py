@@ -2293,6 +2293,7 @@ for grooming_method in grooming_methods:
 # %%
 jet_R = 0.2
 jet_R_str = f"R{int(jet_R*10):02}"
+# This is effectively encoded in the nb_utils, but we leave it here for clarity (because that's where it's going anyway)
 _input_dir = output_dir / "embed_pythia" / "RDF"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
@@ -2552,9 +2553,9 @@ for collision_system, df in uncertainties_display_tables.items():
 order_and_rename_columns = {
     "centrality": "",
     "tracking_efficiency": "Trk. Eff.",
-    "model_dependence": "Generator",
-    "unfolding": "Unfolding",
     "background_sub": "Bkgd. Sub.",
+    "unfolding": "Unfolding",
+    "model_dependence": "Generator",
     "non_closure": "Non-closure",
     "quadrature": "Total",
 }
@@ -2564,7 +2565,7 @@ order_and_rename_columns = {
 output_display_tables["PbPb"][["centrality", "tracking_efficiency", "model_dependence", "unfolding", "quadrature"]]
 
 # %%
-# Rename columns
+# Rename columns and write LaTeX tables
 latex_tables = {}
 for collision_system in output_display_tables:
     selected_order_and_rename_columns = {k: v for k, v in order_and_rename_columns.items() if k in output_display_tables[collision_system].columns}
