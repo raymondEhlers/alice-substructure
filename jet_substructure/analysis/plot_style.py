@@ -520,7 +520,9 @@ def define_paper_model_styles() -> dict[str, dict[str, Any]]:
             # Violet
             #"color": "#2c4875",
             # Taken from central event-activity
-            "color": "#4bafd0",
+            #"color": "#4bafd0",
+            # Take from semi-central event-activity
+            "color": "#FF8301",
         },
         "PbPb_jewel_no_recoils": {
             # Take from Sherpa Ahadic
@@ -529,10 +531,10 @@ def define_paper_model_styles() -> dict[str, dict[str, Any]]:
             "marker": "X",
             # Orange
             #"color": "#d35400",
-            # Take from semi-central event-activity
-            "color": "#FF8301",
             # Violet-ish
             #"color": "#8a508f",
+            # Blue from DyG in response to comment from Cvetan (and swapped w/ with recoils)
+            "color": "#2980b9",
         },
     }
 
