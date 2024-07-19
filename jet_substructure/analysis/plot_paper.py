@@ -2000,7 +2000,6 @@ def _plot_pp_PbPb_comparison_single_grooming_method(
         if collision_system == "pp":
             continue
 
-        # TODO: MARK
         _plot_pp_PbPb_ratio_on_axis(
             h=h,
             ratio_reference_hist_unselected=ratio_reference_hist_unselected,
@@ -2767,6 +2766,8 @@ def _plot_pp_PbPb_comparison_only_ratios_for_letter(
         model_legend_elements.append(
             mpl.patches.Patch(
                 facecolor=model_kwargs["color"],
+                # This alpha value has to match that one used in the actual figure.
+                alpha=0.7,
                 # NOTE: Same note as above
                 label=model_calculation.label(collision_system="PbPb")
             )
@@ -3556,6 +3557,8 @@ def _plot_pp_PbPb_only_spectra_ratios_for_letter(
         model_legend_elements.append(
             mpl.patches.Patch(
                 facecolor=model_kwargs["color"],
+                # This alpha value has to match that one used in the actual figure.
+                alpha=0.7,
                 # NOTE: Same note as above
                 label=model_calculation.label(collision_system="PbPb")
             )
