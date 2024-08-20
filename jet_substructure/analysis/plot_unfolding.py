@@ -2681,7 +2681,7 @@ def calculate_systematics(  # noqa: C901
             unfolded["default"].data.values
             - unfolding_outputs["default"]
             .unfolded_substructure(
-                n_iter=unfolding_outputs["default"].n_iter_compare + 1,  # type: ignore[arg-type]
+                n_iter=unfolding_outputs["default"].n_iter_compare + 1,
                 true_jet_pt_range=true_jet_pt_range,
             )
             .values
@@ -6032,7 +6032,18 @@ def steer_plotting_of_kt_unfolding_outputs(
                 plot_png=plot_png,
             )
 
-        _prior_variation_name = prior_variation_output_name[grooming_method]
+        # TEMP hack...
+        #for name in ["model_dependence_embed_pythia_fastsim", "model_dependence_embed_jewel_no_recoils_fastsim"]:
+        #    plot_kt_unfolding(
+        #        unfolding_output=unfolding_systematics_outputs[grooming_method][name],
+        #        plot_png=plot_png,
+        #        #unfolding_kt_display_range=unfolding_kt_display_range[grooming_method],
+        #        unfolding_kt_display_range=helpers.KtRange(-0.25, 6.5),
+        #    )
+
+        continue
+
+        _prior_variation_name = prior_variation_output_name[grooming_method]  # type: ignore[unreachable]
         if _prior_variation_name is not None:
             _prior_variation_output = unfolding_systematics_outputs[grooming_method][_prior_variation_name]
         else:
@@ -6051,8 +6062,7 @@ def steer_plotting_of_kt_unfolding_outputs(
                 # TEMP: Skip not fast sim for expediency
                 if "fastsim" not in name:
                     continue
-                # ENDTEMP
-                # Skip, since we already plotted above.
+                # Skip the default, since we already plotted above.
                 if name == "default":
                     continue
                 plot_kt_unfolding(
