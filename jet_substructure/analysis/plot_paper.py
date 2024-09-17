@@ -35,13 +35,13 @@ pb.configure()
 
 _event_activity_short_label_map = {
     "pp": "pp",
-    "central": r"0-10\%",
-    "semi_central": r"30-50\%",
+    "central": r"0--10\%",
+    "semi_central": r"30--50\%",
 }
 _event_activity_full_label_map = {
     "pp": "pp",
-    "central": r"0-10\% $\text{Pb--Pb}$",
-    "semi_central": r"30-50\% $\text{Pb--Pb}$",
+    "central": r"0--10\% $\text{Pb--Pb}$",
+    "semi_central": r"30--50\% $\text{Pb--Pb}$",
 }
 FRACTION_OF_X_FOR_SYS_ERROR_BOX = 0.3
 
@@ -1494,6 +1494,14 @@ def _plot_spectra_only_impl(
     grooming_styles = plot_style.define_paper_grooming_styles()
     _event_activity_to_color = plot_style.define_paper_event_activity_comparison_styles()
 
+    # NOTE: I override this for the letter. It may cause issues with general loops, but it's not worth
+    #       worrying about right now (August 2024).
+    markers_per_collision_system = {
+        "pp": "d",
+        "semi_central": "o",
+        "central": "s",
+    }
+
     for _plot_counter, (collision_system, hist) in enumerate(hists.items()):
         # Axes: jet_pt, attr_name
         h = hist.data
@@ -1511,6 +1519,12 @@ def _plot_spectra_only_impl(
         kwargs_plot_errorbar["color"] = _event_activity_to_color[collision_system]
         kwargs_plot_errorbar["markeredgecolor"] = kwargs_plot_errorbar["color"]
         kwargs_plot_errorbar["markerfacecolor"] = "white" if kwargs_plot_errorbar["markerfacecolor"] == "white" else kwargs_plot_errorbar["color"]
+
+        # Manual override:
+        kwargs_plot_errorbar["marker"] = markers_per_collision_system[collision_system]
+        if kwargs_plot_errorbar["marker"] in ["P", "d", "D"]:
+            kwargs_plot_errorbar["markersize"] += 2  # type: ignore[operator]
+
         p = ax.errorbar(
             h.axes[0].bin_centers,
             h.values,
@@ -1526,6 +1540,7 @@ def _plot_spectra_only_impl(
         kwargs_plot_error_boxes = grooming_styles[grooming_method].kwargs_for_plot_error_boxes()
         kwargs_plot_error_boxes["color"] = p[0].get_color()
         kwargs_plot_error_boxes["zorder"] = 2
+        kwargs_plot_error_boxes["alpha"] = kwargs_plot_error_boxes["alpha"] * 1.25
         pachyderm.plot.error_boxes(
             ax=ax,
             x_data=h.axes[0].bin_centers,
@@ -3712,7 +3727,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(  # noqa: C901
                 # ALICE label
                 # Header ax, which only contains labels
                 pb.TextConfig(
-                    x=0.05, y=0.95,
+                    x=0.03, y=0.95,
                     text=fr"$\textbf{{{plot_style.label_to_display_string['ALICE'][alice_status]}}}$",
                     font_size=text_font_size,
                 ),
