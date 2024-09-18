@@ -111,6 +111,9 @@ _new_grooming_methods = [
     "soft_drop_z_cut_04",
 ]
 input_dir_tag = "2023-paper"
+# For final thermal model tests
+#input_dir_tag = "2024-paper"
+# End final thermal model tests
 ###################
 # Setup I/O options
 ###################
@@ -125,6 +128,9 @@ _grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inp
 # %%
 # NOTE: This is copied from the "Plots" section. I just need it all over, and easier to put it here.
 plot_output_dir_tag = "2024-paper-plots"
+# For final thermal model tests
+#plot_output_dir_tag = "2024-test-paper-plots"
+# End final thermal model tests
 grooming_methods_for_letter = ["dynamical_kt", "soft_drop_z_cut_02"]
 
 def PbPb_kt_measured_range_by_grooming_method(event_activity: str) -> dict[str, helpers.KtRange]:
@@ -2475,8 +2481,8 @@ tables
 
 # %%
 grooming_method_to_display_name = {
-    "dynamical_kt": r"DyG. $a$ = 1.0",
-    "soft_drop_z_cut_02": r"SD $z_{\mathrm{cut}}$ = 0.2",
+    "dynamical_kt": r"DyG. $a = 1.0$",
+    "soft_drop_z_cut_02": r"SD $z_{\mathrm{cut}} = 0.2$",
 }
 uncertainties_display_tables = {}
 # pp
@@ -2587,6 +2593,218 @@ for collision_system in latex_tables:
 
 # %%
 central_R02_unfolded_with_systematics["dynamical_kt"].data.axes[0].bin_centers
+
+# %% [markdown]
+# # JEWEL comparison plot (excerpt)
+
+# %% [markdown]
+# ### R = 0.2
+
+# %%
+jet_R = 0.2
+jet_R_str = f"R{int(jet_R*10):02}"
+_output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
+_output_dir.mkdir(parents=True, exist_ok=True)
+
+def create_plots() -> None:
+    _additional_hists = {
+        "semi_central": semi_central_R02_unfolded_with_systematics,
+        "central": central_R02_unfolded_with_systematics,
+    }
+    models_calculation = {
+        "jewel_recoils": jewel_recoils_predictions_R02,
+        "jewel_no_recoils": jewel_no_recoils_predictions_R02,
+    }
+    event_activity_to_kt_range={
+        "pp": {gm: helpers.KtRange(0.25, 6) for gm in grooming_methods},
+        "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+        "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+    }
+    kt_display_range = (0.0, 6.25)
+    text_font_size = 24
+    _ratio_range = (0.3, 1.7)
+    for event_activity in ["central"]:
+        from jet_substructure.analysis import full_results_helpers, plot_style
+
+        grooming_styles = plot_style.define_paper_grooming_styles()
+        hists={
+            "pp": pp_R02_unfolded_with_systematics,
+            event_activity: _additional_hists[event_activity],
+        }
+        for grooming_method in grooming_methods_for_letter:
+            style = grooming_styles[grooming_method]
+
+            plot_config = pb.PlotConfig(
+                name=f"JEWEL_comparison_{grooming_method}_{event_activity}",
+                panels=[
+                    # Main panel
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig(
+                                "y",
+                                label=r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$",
+                                log=True,
+                                #range=(7e-3, 1),
+                                range=(4e-3, 1),
+                                font_size=text_font_size,
+                            ),
+                        ],
+                        text=[
+                            #pb.TextConfig(x=0.98, y=0.98, text=text, font_size=text_font_size),
+                            # Add the grooming label in a separate location in the bottom left
+                            # Otherwise, it will overlap with the data
+                            pb.TextConfig(x=0.02, y=0.02, text=style.label, font_size=text_font_size),
+                        ],
+                        legend=pb.LegendConfig(location="lower left", font_size=text_font_size, anchor=(0.025, 0.10), marker_label_spacing=0.),
+                    ),
+                    pb.Panel(
+                        axes=[
+                            pb.AxisConfig("x", label=r"$k_{\text{T,g}}\:(\text{GeV}/c)$", range=kt_display_range, font_size=text_font_size),
+                            pb.AxisConfig("y", label=r"$\frac{\text{Pb--Pb}}{\text{pp}}$",
+                                        range=_ratio_range,
+                                        # Make the label a bit bigger since it's stack on top
+                                        font_size=text_font_size * 1.05
+                                        ),
+                        ],
+                        #legend=pb.LegendConfig(location="lower left", font_size=22, anchor=(0.01, 0.02), ncol=2, marker_label_spacing=0.05, label_spacing=0.1, handle_height=1.3, column_spacing=0.30)
+                    ),
+                ],
+                figure=pb.Figure(edge_padding={"left": 0.1525, "bottom": 0.095, "top": 0.975}),
+            )
+
+            fig, (ax, ax_ratio) = plt.subplots(
+                2,
+                1,
+                figsize=(10, 10),
+                gridspec_kw={"height_ratios": [3, 1]},
+                sharex=True,
+            )
+
+            for collision_system in ["pp", event_activity]:
+                # Axes: jet_pt, attr_name
+                h_input = hists[collision_system][grooming_method].data
+
+                # Select range to display.
+                h = full_results_helpers.select_hist_range(h_input, event_activity_to_kt_range[collision_system][grooming_method])
+
+                # Spectra
+                for model_name, model_calculation in models_calculation.items():
+                    model = model_calculation.spectra(event_activity=collision_system).get(grooming_method, None)
+                    if not model:
+                        logger.debug(f"{model_calculation.ratio(event_activity=collision_system)}")
+                        logger.debug(
+                            f"Skipping model {model_name}, grooming method: {grooming_method}, {collision_system} because predictions aren't available"
+                        )
+                        continue
+
+                    # Select the relevant kt range
+                    #model = full_results_helpers.select_hist_range(
+                    #    model, event_activity_to_kt_range[collision_system][grooming_method]
+                    #)
+
+                    # We want the model ratio binning to match the data ratio binning, so we rebin here as necessary,
+                    # making a note that this is what we've done. This predominately applies to the hybrid model, which
+                    # is binned more finely. Since I said I would rebin, and it's not especially fair to compare models
+                    # with different binning, it's better to just normalize it here.
+                    #if (
+                    #    len(h.axes[0].bin_edges) != len(model.axes[0].bin_edges) or
+                    #    not np.allclose(h.axes[0].bin_centers, model.axes[0].bin_centers)
+                    #):
+                    #    logger.info(f"Rebinned model '{model_name}' to match data binning for {grooming_method}, {collision_system}")
+                    #    model = full_results_helpers.rebin_bin_width_scaled_hist(
+                    #        h_to_rebin=model,
+                    #        h_target_axis=h.axes[0],
+                    #        # This is okay since the data is explicitly constructed without systematic uncertainties.
+                    #        okay_for_systematic_not_to_exist=True,
+                    #    )
+
+                    # Fill between
+                    # This could definitely be coded more elegantly, but good enough to get something out.
+                    temp_kwargs = plot_paper.retrieve_model_styles(
+                        event_activity="PbPb" if collision_system != "pp" else "pp",
+                        model_name=model_name if collision_system != "pp" else "jewel",
+                    )
+                    temp_kwargs["facecolor"] = temp_kwargs.pop("color")
+                    temp_kwargs["label"] = model_calculation.label(collision_system=collision_system)
+                    temp_kwargs.pop("marker")
+                    # Skip plotting for JEWEL w/ recoils for pp (just so we don't have it twice...)
+                    if not (model_name == "jewel_recoils" and collision_system == "pp"):
+                        ax.fill_between(
+                            model.axes[0].bin_centers,
+                            model.values - model.errors,
+                            model.values + model.errors,
+                            alpha=0.7,
+                            **temp_kwargs,
+                        )
+
+                    # pp ratios aren't meaningful
+                    if collision_system == "pp":
+                        continue
+
+                    # Ratio
+                    model = model_calculation.ratio(event_activity=collision_system).get(grooming_method, None)
+                    if not model:
+                        logger.debug(f"{model_calculation.ratio(event_activity=collision_system)}")
+                        logger.debug(
+                            f"Skipping model {model_name}, grooming method: {grooming_method}, {collision_system} because predictions aren't available"
+                        )
+                        continue
+
+                    # Select the relevant kt range
+                    #model = full_results_helpers.select_hist_range(
+                    #    model, event_activity_to_kt_range[collision_system][grooming_method]
+                    #)
+
+                    # We want the model ratio binning to match the data ratio binning, so we rebin here as necessary,
+                    # making a note that this is what we've done. This predominately applies to the hybrid model, which
+                    # is binned more finely. Since I said I would rebin, and it's not especially fair to compare models
+                    # with different binning, it's better to just normalize it here.
+                    #if (
+                    #    len(h.axes[0].bin_edges) != len(model.axes[0].bin_edges) or
+                    #    not np.allclose(h.axes[0].bin_centers, model.axes[0].bin_centers)
+                    #):
+                    #    logger.info(f"Rebinned model '{model_name}' to match data binning for {grooming_method}, {collision_system}")
+                    #    model = full_results_helpers.rebin_bin_width_scaled_hist(
+                    #        h_to_rebin=model,
+                    #        h_target_axis=h.axes[0],
+                    #        # This is okay since the data is explicitly constructed without systematic uncertainties.
+                    #        okay_for_systematic_not_to_exist=True,
+                    #    )
+
+                    # Fill between
+                    # NOTE: This is assuming we'll only plot PbPb model colors here, but I think that's a reasonable assumption,
+                    #       since that's the only models that could compare to the PbPb/pp ratio
+                    temp_kwargs = plot_paper.retrieve_model_styles(event_activity="PbPb", model_name=model_name)
+                    temp_kwargs["facecolor"] = temp_kwargs.pop("color")
+                    temp_kwargs["label"] = model_calculation.label(collision_system="PbPb")
+                    temp_kwargs.pop("marker")
+                    ax_ratio.fill_between(
+                        model.axes[0].bin_centers,
+                        model.values - model.errors,
+                        model.values + model.errors,
+                        alpha=0.7,
+                        **temp_kwargs,
+                    )
+
+            # Reference value for ratio
+            ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
+
+            plot_config.apply(fig=fig, axes=(ax, ax_ratio))
+
+            # Plot, save, and cleanup
+            filename = f"{plot_config.name}"
+            fig.savefig(_output_dir / f"{filename}.pdf")
+            plt.close(fig)
+
+# Just put into a figure so we don't pollute the global namespace
+create_plots()
+
+# %%
+jewel_no_recoils_predictions_R02.spectra(event_activity="central")["dynamical_kt"]
+
+# %%
+
+# %%
 
 # %% [markdown]
 # # Debug area
