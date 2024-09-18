@@ -1629,6 +1629,22 @@ available_datasets:
         entries_per_job: 1.5e5
         files:
             - "trains/embed_thermal_model/0062/production.yaml"
+    # Thermal model without selections on the hybrid level, such that all combinatoric jets are included
+    LHC20g4_embedded_into_thermal_model_central_R02_0063: &LHC18qr_central_R02_mammoth_thermal_model_input
+        name: "LHC20g4_embedded_into_thermal_model_central_R02_0063"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            data: "data"
+        # Branches which don't exist for all prefixes
+        branches: []
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/embed_thermal_model/0063/production.yaml"
+
     #----------------------------------------------------
     # Pythia fastsim embedded into central data, R = 0.2
     #----------------------------------------------------
@@ -3148,7 +3164,17 @@ analysis_configurations:
                 PbPb: *LHC18qr_central_R02_mammoth_Rmax050
                 embed_pythia: *LHC18qr_central_R02_mammoth_embedded_Rmax050
             thermal_model:
+                # Use standard data
                 PbPb: *LHC18qr_central_R02_mammoth
+                # Use thermal model with no selections on hybrid level (e.g. treated as data)
+                # See notes in `kt tasks` in Obsidian. In summary,
+                # For DyG, it makes no difference in the non-closure.
+                # For SD, it makes a tiny increase in the non-closure (at most around 1%),
+                #       but it's a subleading uncertainty, so the impact on the final uncertainty in
+                #       quadrature is negligible (fraction of a percent). Thus, it's not worth messing
+                #       with given the advanced state of the result. For future results, it may be
+                #       better to use this approach from the beginning just to avoid any concerns.
+                #PbPb: *LHC18qr_central_R02_mammoth_thermal_model_input
                 embed_pythia: *LHC18qr_central_R02_mammoth_embedded_thermal_model
             jewel_recoils_part_level:
                 PbPb: *JEWEL_recoils_central_part_level

@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.14.5
+#       jupytext_version: 1.16.2
 #   kernelspec:
 #     display_name: Substructure w/ ROOT 6.28.04, conda
 #     language: python
@@ -36,9 +36,9 @@ print(os.getenv("DASK_CONFIG"))
 # +
 from importlib import reload
 
+from jet_substructure.analysis import parsl as job_runner
 from mammoth import job_utils
 
-from jet_substructure.analysis import parsl as job_runner
 # -
 
 # ## Reload
@@ -62,20 +62,24 @@ facility: job_utils.FACILITIES = "rehlers_mbp_m1pro"
 conda_environment_name = "substructure_c_28_04"
 
 # Base analysis settings
-#base_dataset_name = "pp_R02"
-#collision_system = "pp"
+base_dataset_name = "pp_R02"
+collision_system = "pp"
+dataset_type = "jewel"
 #collision_system = "pythia"
-base_dataset_name = "PbPb_semi_central_R02_pass3"
+#base_dataset_name = "PbPb_semi_central_R02_pass3"
 #collision_system = "PbPb"
-collision_system = "embed_pythia"
+#collision_system = "embed_pythia"
 #base_dataset_name = "PbPb_central_R02_pass3"
 #collision_system = "PbPb"
 #collision_system = "embed_pythia"
-dataset_type = "nominal"
+#dataset_type = "nominal"
+#collision_system = "PbPb"
+#dataset_type = "jewel_recoils_part_level"
+#dataset_type = "jewel_no_recoils_part_level"
 # Detailed analysis settings
 jobs_to_execute = [
-    #"root_data_frame",
-    "root_data_frame_response",
+    "root_data_frame",
+    #"root_data_frame_response",
 ]
 grooming_methods = [
     # "leading_kt",
@@ -85,11 +89,11 @@ grooming_methods = [
     "dynamical_core",
     "dynamical_kt",
     "dynamical_time",
-    #"soft_drop_z_cut_02",
-    #"soft_drop_z_cut_04",
-    #"dynamical_core_z_cut_02",
-    #"dynamical_kt_z_cut_02",
-    #"dynamical_time_z_cut_02",
+    "soft_drop_z_cut_02",
+    "soft_drop_z_cut_04",
+    "dynamical_core_z_cut_02",
+    "dynamical_kt_z_cut_02",
+    "dynamical_time_z_cut_02",
 ]
 # Just need the default object
 unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings()
@@ -113,7 +117,7 @@ if debug_mode:
 
 # Keep the job executor just to keep it alive
 if job_executor is None or job_cluster is None:
-    job_executor, job_cluster = job_runner.setup_job_framework(
+    job_executor, job_cluster, exeuction_settings = job_runner.setup_job_framework(
         job_framework=job_framework,
         jobs_to_execute=jobs_to_execute,
         task_config=task_config,
@@ -141,15 +145,27 @@ conda_environment_name = "substructure_c_28_04"
 # pp
 #base_dataset_name = "pp_R02"
 #collision_system = "pp"
+#dataset_type = "nominal"
 #base_dataset_name = "pp_R04"
 #collision_system = "pp"
 # Semi-central
 #base_dataset_name = "PbPb_semi_central_R02_pass3"
 #collision_system = "PbPb"
+#dataset_type = "tracking_efficiency"
 # Central
+#base_dataset_name = "PbPb_central_R02_pass3"
+#collision_system = "PbPb"
+#dataset_type = "tracking_efficiency"
+# Central model dependence
 base_dataset_name = "PbPb_central_R02_pass3"
 collision_system = "PbPb"
 dataset_type = "nominal"
+#dataset_type = "thermal_model"
+# NOTE: Below is from trying to do the model dependence without embedding. Which, dumb...
+#       In this case, the "pp" here was intentional!
+#collision_system = "pp"
+#dataset_type = "pythia_fastsim"
+
 # Detailed analysis settings
 jobs_to_execute = [
     "unfolding",
@@ -159,14 +175,14 @@ grooming_methods = [
     # "leading_kt_z_cut_02",
     # "leading_kt_z_cut_04",
     # "dynamical_z",
-    "dynamical_core",
+    #"dynamical_core",
     "dynamical_kt",
-    "dynamical_time",
+    #"dynamical_time",
     "soft_drop_z_cut_02",
-    "soft_drop_z_cut_04",
-    "dynamical_core_z_cut_02",
-    "dynamical_kt_z_cut_02",
-    "dynamical_time_z_cut_02",
+    #"soft_drop_z_cut_04",
+    #"dynamical_core_z_cut_02",
+    #"dynamical_kt_z_cut_02",
+    #"dynamical_time_z_cut_02",
 ]
 unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
     variable_to_unfold="kt",
@@ -177,7 +193,7 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
         #########
         # Nominal
         #########
-        ##"default",
+        #"default",
         #"default_delta_R",
         #"default_z",
         # Systematics
@@ -193,10 +209,13 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
         ## PbPb background
         #"background_low",
         #"background_high",
-        ## PbPb unfolding
-        #"reweight_prior",
-        # PbPb thermal model
-        "thermal_model",
+        # pp/PbPb unfolding
+        "reweight_prior",
+        ## PbPb thermal model
+        #"thermal_model",
+        ## PbPb: JEWEL model dependence
+        #"jewel_no_recoils_fastsim",
+        #"pythia_fastsim",
 
         ####################
         # Binning variations
@@ -276,7 +295,8 @@ unfolding_runtime_settings = job_runner.UnfoldingRuntimeSettings(
         #"peter_binning_background_low",
         #"peter_binning_background_high",
     ],
-    #output_dir_tag="2023-pre-PF-DyG-untagged-tests",
+    fastsim_with_embedding_model_dependence_closure_dataset_override=False,
+    #output_dir_tag="2024-paper-test",
     output_dir_tag="2023-paper",
 )
 
@@ -302,7 +322,7 @@ if debug_mode:
 
 # Keep the job executor just to keep it alive
 if job_executor is None or job_cluster is None:
-    job_executor, job_cluster = job_runner.setup_job_framework(
+    job_executor, job_cluster, exeuction_settings = job_runner.setup_job_framework(
         job_framework=job_framework,
         jobs_to_execute=jobs_to_execute,
         task_config=task_config,
@@ -320,8 +340,11 @@ job_executor
 
 # ## Submit jobs
 
+# +
 from jet_substructure.cpp import data_frame
+
 reload(data_frame)
+# -
 
 futures = job_runner.setup_and_submit_tasks(
     job_framework=job_framework,
@@ -342,8 +365,11 @@ _res = [f.result() for f in futures]
 
 _res
 
+# +
 import numpy as np
+
 np.where([f.status == "error" for f in futures])
+# -
 
 # ## Cleanup
 
