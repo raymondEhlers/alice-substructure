@@ -2606,15 +2606,26 @@ jet_R_str = f"R{int(jet_R*10):02}"
 _output_dir = output_dir / "comparison" / "unfolding" / plot_output_dir_tag / substructure_variable / jet_R_str
 _output_dir.mkdir(parents=True, exist_ok=True)
 
-def create_plots() -> None:
+def create_plots(models: list[str]) -> None:
     _additional_hists = {
         "semi_central": semi_central_R02_unfolded_with_systematics,
         "central": central_R02_unfolded_with_systematics,
     }
-    models_calculation = {
-        "jewel_recoils": jewel_recoils_predictions_R02,
-        "jewel_no_recoils": jewel_no_recoils_predictions_R02,
-    }
+    models_calculation = {}
+    if "hybrid" in models:
+        models_calculation.update({
+            "hybrid_without_moliere": hybrid_model_with_wake_without_moliere_predictions_R02,
+            "hybrid_moliere": hybrid_model_with_wake_with_moliere_predictions_R02,
+        })
+    if "JETSCAPE" in models:
+        models_calculation.update({
+            "jetscape": jetscape_predictions_R02,
+        })
+    if "JEWEL" in models:
+        models_calculation.update({
+            "jewel_recoils": jewel_recoils_predictions_R02,
+            "jewel_no_recoils": jewel_no_recoils_predictions_R02,
+        })
     event_activity_to_kt_range={
         "pp": {gm: helpers.KtRange(0.25, 6) for gm in grooming_methods},
         "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
@@ -2635,7 +2646,7 @@ def create_plots() -> None:
             style = grooming_styles[grooming_method]
 
             plot_config = pb.PlotConfig(
-                name=f"JEWEL_comparison_{grooming_method}_{event_activity}",
+                name=f"{'_'.join(models)}_comparison_{grooming_method}_{event_activity}",
                 panels=[
                     # Main panel
                     pb.Panel(
@@ -2680,7 +2691,8 @@ def create_plots() -> None:
                 sharex=True,
             )
 
-            for collision_system in ["pp", event_activity]:
+            #for collision_system in ["pp", event_activity]:
+            for collision_system in ["pp"]:
                 # Axes: jet_pt, attr_name
                 h_input = hists[collision_system][grooming_method].data
 
@@ -2697,15 +2709,15 @@ def create_plots() -> None:
                         )
                         continue
 
-                    # Select the relevant kt range
+                    ## Select the relevant kt range
                     #model = full_results_helpers.select_hist_range(
                     #    model, event_activity_to_kt_range[collision_system][grooming_method]
                     #)
 
-                    # We want the model ratio binning to match the data ratio binning, so we rebin here as necessary,
-                    # making a note that this is what we've done. This predominately applies to the hybrid model, which
-                    # is binned more finely. Since I said I would rebin, and it's not especially fair to compare models
-                    # with different binning, it's better to just normalize it here.
+                    ## We want the model ratio binning to match the data ratio binning, so we rebin here as necessary,
+                    ## making a note that this is what we've done. This predominately applies to the hybrid model, which
+                    ## is binned more finely. Since I said I would rebin, and it's not especially fair to compare models
+                    ## with different binning, it's better to just normalize it here.
                     #if (
                     #    len(h.axes[0].bin_edges) != len(model.axes[0].bin_edges) or
                     #    not np.allclose(h.axes[0].bin_centers, model.axes[0].bin_centers)
@@ -2728,7 +2740,8 @@ def create_plots() -> None:
                     temp_kwargs["label"] = model_calculation.label(collision_system=collision_system)
                     temp_kwargs.pop("marker")
                     # Skip plotting for JEWEL w/ recoils for pp (just so we don't have it twice...)
-                    if not (model_name == "jewel_recoils" and collision_system == "pp"):
+                    models_to_skip_plotting_for_pp = ["jewel_recoils", "hybrid_without_moliere"]
+                    if not (model_name in models_to_skip_plotting_for_pp and collision_system == "pp"):
                         ax.fill_between(
                             model.axes[0].bin_centers,
                             model.values - model.errors,
@@ -2797,7 +2810,7 @@ def create_plots() -> None:
             plt.close(fig)
 
 # Just put into a figure so we don't pollute the global namespace
-create_plots()
+create_plots(models = ["hybrid", "JETSCAPE", "JEWEL"])
 
 # %%
 jewel_no_recoils_predictions_R02.spectra(event_activity="central")["dynamical_kt"]
