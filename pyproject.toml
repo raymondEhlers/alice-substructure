@@ -41,6 +41,7 @@ dependencies = [
     "awkward0 >=0",
     "mplhep >=0.3.4",
     "boost-histogram >=1.2",
+    "hepdata-lib>=0.17.0",
     # My packages last:
     # - pachyderm
     # For pdm: it's in the dev dependencies since we want it to be editable, but we can
