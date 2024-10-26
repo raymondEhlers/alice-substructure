@@ -2366,7 +2366,7 @@ plot_paper.plot_PbPb_subjet_purity_for_letter(
 plt.close("all")
 
 # %% [markdown]
-# # Tables
+# # Latex tables for paper
 
 # %%
 import pandas as pd
@@ -2595,7 +2595,314 @@ for collision_system in latex_tables:
 central_R02_unfolded_with_systematics["dynamical_kt"].data.axes[0].bin_centers
 
 # %% [markdown]
-# # JEWEL comparison plot (excerpt)
+# # Hepdata
+
+# %% [markdown]
+# ## Letter
+
+# %%
+import hepdata_lib
+
+from jet_substructure.analysis import full_results_helpers, plot_style
+
+# Setup for hep data
+# Note:
+# - use 3 significant digits for values
+# - use 2 significant digits for uncertainties
+n_significant_digits_values = 3
+n_significant_digits_uncertainty = 2
+submission = hepdata_lib.Submission()
+table_index = 0
+
+# Parameters
+paper_grooming_styles = plot_style.define_paper_grooming_styles()
+_event_activity_full_label_map = {
+    "pp": "pp",
+    "central": r"0--10% Pb-Pb",
+    "semi_central": r"30--50% Pb-Pb",
+}
+jet_R = 0.2
+_jet_pt_bin = helpers.JetPtRange(60, 80)
+parameters = {
+    "jet_pt_bin": fr"${_jet_pt_bin.display_str(label='')}\:\text{{GeV}}/c$",
+    "soft_drop_z_cut_02": paper_grooming_styles["soft_drop_z_cut_02"].label + r", \beta = 0",
+    "dynamical_kt": paper_grooming_styles["dynamical_kt"].label,
+}
+hists={
+    "pp": pp_R02_unfolded_with_systematics,
+    "semi_central": semi_central_R02_unfolded_with_systematics,
+    "central": central_R02_unfolded_with_systematics,
+}
+event_activity_to_kt_range={
+    "pp": {grooming_method: helpers.KtRange(0.25, 6) for grooming_method in grooming_methods},
+    "semi_central": PbPb_kt_measured_range_by_grooming_method(event_activity="semi_central"),
+    "central": PbPb_kt_measured_range_by_grooming_method(event_activity="central"),
+}
+
+
+# %%
+def reactions_label(collision_system: str, is_ratio: str) -> list[str]:
+    if is_ratio:
+        return ["P P --> jet+X", "Pb Pb --> jet+X"]
+    if collision_system != "pp":
+        return ["P P --> jet+X"]
+    return ["Pb Pb --> jet+X"]
+def centrality_numerical_range(collision_system: str) -> str:
+    if collision_system == "central":
+        return "[0, 10]"
+    if collision_system == "semi_central":
+        return "[30, 50]"
+    return ""
+
+
+# %% [markdown]
+# ### Figure 1
+
+# %%
+# Individual tables...
+figure_1_tables = []
+table_index = 0
+for grooming_method in grooming_methods_for_letter:
+    #location = "Figure 1" + ("(left)" if grooming_method == "dynamical_kt" else "(right)")
+    #location += ", "
+    for collision_system in ["pp", "semi_central", "central"]:
+        # Individual tables
+        table = hepdata_lib.Table(f'Table {table_index}')
+
+        # Header
+        table.keywords["reactions"] = reactions_label(collision_system, is_ratio=False)
+        table.keywords["cmenergies"] = ['5020']
+        # Basic description
+        table.description = r"Groomed $k_{\text{T,g}} spectra measured in " + _event_activity_full_label_map[collision_system] + "."
+        # Measurement parameters
+        table.description += "\n" + f"{parameters['jet_pt_bin']}, {parameters[grooming_method]}"
+        table.location = "Figure 1 " + ("(left)" if grooming_method == "dynamical_kt" else "(right)")
+        #x_label = r"$k_{\text{T}}\:(\text{GeV}/c)$"
+        #y_label = r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$"
+        x_label = r"$k_{\text{T}}$"
+        y_label = r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}$"
+
+        # Retrieve data
+        h = hists[collision_system][grooming_method].data
+        # Select range to display.
+        h = full_results_helpers.select_hist_range(h, event_activity_to_kt_range[collision_system][grooming_method])
+
+        # Axes
+        x = hepdata_lib.Variable(name=x_label, is_independent=True, is_binned=True, units=r"GeV/c")
+        x.digits = n_significant_digits_values
+        # Bin edges of the form [(low, high), ...]
+        x.values = list(zip(h.axes[0].bin_edges[:-1], h.axes[0].bin_edges[1:]))
+        y = hepdata_lib.Variable(name=y_label, is_independent=False, is_binned=False, units=r"(GeV/c)^{-1}")
+        y.digits = n_significant_digits_values
+        y.values = h.values
+
+        y.add_qualifier("RE", ",".join(reactions_label(collision_system, is_ratio=False)))
+        cent_range = centrality_numerical_range(collision_system)
+        if cent_range:
+            y.add_qualifier("CENTRALITY", cent_range)
+        y.add_qualifier("SQRT(S)", 5.02, "TeV")
+        y.add_qualifier("ETARAP", "|0.9-R|")
+        y.add_qualifier("jet radius", str(jet_R))
+        y.add_qualifier("jet method", "Anti-$k_{T}$")
+
+        # Define uncertainties
+        # Stat
+        uncertainties = []
+        stat = hepdata_lib.Uncertainty("stat", is_symmetric=True)
+        stat.values = [float(f"{dy:.2g}") for dy in h.errors]
+        uncertainties.append(stat)
+
+        # Systematics
+        systematic_uncertainties = []
+        # Break out the signed uncertainties
+        signed_uncertainties_to_report = ["tracking_efficiency", "model_dependence"]
+        systematic_uncertainty_display_names = {
+            "tracking_efficiency": "sys,trk_eff",
+            "model_dependence": "sys,gen",
+        }
+        for k in signed_uncertainties_to_report:
+            uncertainty_values = h.metadata["y_systematic"][k]
+            # low is an absolute value (below the nominal value), so we should assign that to -1 when it's nonzero and -1 otherwise
+            # high is an absolute value (above the nominal value), so we should assign that to 1 when it nonzero and -1 otherwise
+            sign_from_low = np.where(h.metadata["y_systematic"]["tracking_efficiency"].low != 0, -1, 1)
+            sign_from_high = np.where(h.metadata["y_systematic"]["tracking_efficiency"].high != 0, 1, -1)
+            # Cross check
+            assert np.allclose(sign_from_low, sign_from_high)
+            sign = sign_from_high
+            values = np.where(sign == -1, uncertainty_values.low, uncertainty_values.high)
+            # Encode the signed values
+            values = sign * values
+            sys_uncert = hepdata_lib.Uncertainty(systematic_uncertainty_display_names[k], is_symmetric=True)
+            sys_uncert.values = [float(f"{dy:.2g}") for dy in values]
+            systematic_uncertainties.append(sys_uncert)
+
+        # Recalculate standard quadrature sum of the rest of the systematics
+        keys_to_skip = ["quadrature", *signed_uncertainties_to_report]
+        uncertainty_values = full_results_helpers.AsymmetricErrors(
+            low=np.sqrt(
+                np.sum(
+                    [
+                        v.low ** 2
+                        for k, v in h.metadata["y_systematic"].items()
+                        if k not in keys_to_skip
+                    ],
+                    axis=0,
+                )
+            ),
+            high=np.sqrt(
+                np.sum(
+                    [
+                        v.high ** 2
+                        for k, v in h.metadata["y_systematic"].items()
+                        if k not in keys_to_skip
+                    ],
+                    axis=0,
+                )
+            ),
+        )
+        label = "unfold" if collision_system == "pp" else "unfold,bkg,non_closure"
+        sys_uncert = hepdata_lib.Uncertainty(f"sys,{label}", is_symmetric=True)
+        sys_uncert.values = [float(f"{dy:.2g}") for dy in uncertainty_values.high]
+        systematic_uncertainties.append(sys_uncert)
+
+        #if self.centrality == [0,10]:
+        #    h_sys = hepdata_lib.root_utils.get_hist_1d_points(h_sys)
+        #    sys = hepdata_lib.Uncertainty('sys', is_symmetric=True)
+        #    sys.values = [float('{:.2g}'.format(dy)) for dy in h_sys['dy']]
+        #elif self.centrality == [30,50]:
+        #    h_sys = hepdata_lib.root_utils.get_graph_points(h_sys)
+        #    sys = hepdata_lib.Uncertainty('sys', is_symmetric=False)
+        #    sys.values = [(float('{:.2g}'.format(dy[0])), float('{:.2g}'.format(dy[1]))) for dy in h_sys['dy']]
+        #y.add_uncertainty(sys)
+
+        # Add tables to submission
+        table.add_variable(x)
+        table.add_variable(y)
+        y.add_uncertainty(stat)
+        for sys_uncert in systematic_uncertainties:
+            y.add_uncertainty(sys_uncert)
+
+        figure_1_tables.append(table)
+        table_index += 1
+
+# %%
+import numpy as np
+from_low = np.where(h.metadata["y_systematic"]["tracking_efficiency"].low != 0, -1, 1)
+from_high = np.where(h.metadata["y_systematic"]["tracking_efficiency"].high != 0, 1, -1)
+# low is an absolute value (below the nominal value), so we should assign that to -1 when it's nonzero and -1 otherwise
+# high is an absolute value (above the nominal value), so we should assign that to 1 when it nonzero and -1 otherwise
+assert np.allclose(from_low, from_high)
+#h.metadata["y_systematic"]["tracking_efficiency"].low
+
+# %%
+# Attempted to use a shared table for e.g. Fig 1 left and Fig 1 right.
+# However, this doesn't work since the measured range is not consistent for DyG, so we just have to split it out :-(
+figure_1_tables = []
+table_index = 0
+for grooming_method in grooming_methods_for_letter:
+    # Shared tables
+    table = hepdata_lib.Table(f"Table {table_index}, Fig. 1")
+
+    # Header
+    table.keywords["reactions"] = reactions_label(collision_system, is_ratio=True)
+    table.keywords["cmenergies"] = ['5020']
+    # Basic description
+    table.description = r"Groomed $k_{\text{T,g}} spectra measured in"
+    table.description += ", ".join([_event_activity_full_label_map[s] for s in ["pp", "central"]])
+    table.description += f"and {_event_activity_full_label_map['semi_central']} collisions."
+    # Measurement parameters
+    table.description += "\n" + f"{parameters['jet_pt_bin']}, {parameters[grooming_method]}"
+    table.location = "Figure 1" + ("(left)" if grooming_method == "dynamical_kt" else "(right)")
+    #x_label = r"$k_{\text{T}}\:(\text{GeV}/c)$"
+    #y_label = r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$"
+    x_label = r"$k_{\text{T}}$"
+    y_label = r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}$"
+
+    first_loop = True
+
+    for collision_system in ["pp", "semi_central", "central"]:
+        # Individual tables
+        #table = hepdata_lib.Table(f'Table {table_index}')
+
+        ## Header
+        #table.keywords["reactions"] = reactions_label(collision_system, is_ratio=False)
+        #table.keywords["cmenergies"] = ['5020']
+        ## Basic description
+        #table.description = r"Groomed $k_{\text{T,g}} spectra measured in " + _event_activity_full_label_map[collision_system] + "."
+        ## Measurement parameters
+        #table.description += "\n" + f"{parameters['jet_pt_bin']}, {parameters[grooming_method]}"
+        #table.location = "Figure 1" + ("(left)" if grooming_method == "dynamical_kt" else "(right)")
+        ##x_label = r"$k_{\text{T}}\:(\text{GeV}/c)$"
+        ##y_label = r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}\:(\text{GeV}/c)^{-1}$"
+        #x_label = r"$k_{\text{T}}$"
+        #y_label = r"$1/N_{\text{jets}}\:\text{d}N/\text{d}k_{\text{T,g}}$"
+
+        # Retrieve data
+        h = hists[collision_system][grooming_method].data
+        # Select range to display.
+        h = full_results_helpers.select_hist_range(h, event_activity_to_kt_range[collision_system][grooming_method])
+
+        # Axes
+        if first_loop:
+            x = hepdata_lib.Variable(name=x_label, is_independent=True, is_binned=True, units=r"GeV/c")
+            x.digits = n_significant_digits_values
+            # Bin edges of the form [(low, high), ...]
+            x.values = list(zip(h.axes[0].bin_edges[:-1], h.axes[0].bin_edges[1:]))
+            table.add_variable(x)
+            first_loop = False
+
+        y = hepdata_lib.Variable(name=y_label, is_independent=False, is_binned=False, units=r"(GeV/c)^{-1}")
+        y.digits = n_significant_digits_values
+        y.values = h.values
+
+        y.add_qualifier("RE", reactions_label(collision_system, is_ratio=False))
+        cent_range = centrality_numerical_range(collision_system)
+        if cent_range:
+            y.add_qualifier("CENTRALITY", cent_range)
+        y.add_qualifier("SQRT(S)", 5.02, "TeV")
+        y.add_qualifier("ETARAP", "|0.9-R|")
+        y.add_qualifier("jet radius", str(jet_R))
+        y.add_qualifier("jet method", "Anti-$k_{T}$")
+
+        # Define uncertainties
+        # Stat
+        stat = hepdata_lib.Uncertainty("stat", is_symmetric=True)
+        stat.values = [float(f"{dy:.2g}") for dy in h.errors]
+
+        # Systematics
+        # TODO: ...
+        #if self.centrality == [0,10]:
+        #    h_sys = hepdata_lib.root_utils.get_hist_1d_points(h_sys)
+        #    sys = hepdata_lib.Uncertainty('sys', is_symmetric=True)
+        #    sys.values = [float('{:.2g}'.format(dy)) for dy in h_sys['dy']]
+        #elif self.centrality == [30,50]:
+        #    h_sys = hepdata_lib.root_utils.get_graph_points(h_sys)
+        #    sys = hepdata_lib.Uncertainty('sys', is_symmetric=False)
+        #    sys.values = [(float('{:.2g}'.format(dy[0])), float('{:.2g}'.format(dy[1]))) for dy in h_sys['dy']]
+        #y.add_uncertainty(sys)
+
+        # Add tables to submission
+        table.add_variable(y)
+        y.add_uncertainty(stat)
+
+    figure_1_tables.append(table)
+    table_index += 1
+
+# %%
+len(figure_1_tables)
+
+# %%
+figure_1_tables[0].name
+for t in figure_1_tables:
+    submission.add_table(t)
+
+# %%
+# Write out the outputs
+hepdata_output_dir = output_dir / "hepdata" / "letter"
+submission.create_files(str(hepdata_output_dir))
+
+# %% [markdown]
+# # Model-only comparison plot (excerpt for checks - not for paper)
 
 # %% [markdown]
 # ### R = 0.2
