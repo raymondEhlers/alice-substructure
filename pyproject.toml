@@ -141,7 +141,9 @@ exclude = [
     "exploration_scripts",
     "external",
 ]
-select = [
+
+[tool.ruff.lint]
+extend-select = [
     "E", "F", "W", # flake8
     "C901",        # mccabe
     "B", "B904",   # flake8-bugbear
@@ -174,7 +176,6 @@ unfixable = [
     "T20",  # Removes print statements
     "F841", # Removes unused variables
 ]
-target-version = 'py38'
 
 [tool.ruff.lint.per-file-ignores]
 "notebooks/**" = [
@@ -184,10 +185,10 @@ target-version = 'py38'
   "B018",     # For useless variables. Sometimes we have useless statements to print them
 ]
 
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 12
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["jet_substructure", "mammoth", "pachyderm"]
 
 [tool.pylint]
