@@ -6,19 +6,19 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Mapping, Sequence
 
 import boost_histogram as bh
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import pachyderm.plot
-from pachyderm import binned_data
 
 import jet_substructure.analysis.plot_style as pb
+import pachyderm.plot
 from jet_substructure.analysis import plot_from_skim
 from jet_substructure.base import helpers
+from pachyderm import binned_data
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ def plot_compare_grooming_methods_for_attribute(
         bh_hist = hists[f"{grooming_method}_{prefix}_{attr_name}_{tag}"]
         # Need to project to just the attr of interest.
         h = binned_data.BinnedData.from_existing_data(
-            bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :]
+            bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :]  # type: ignore[misc]
         )
 
         # Normalize
@@ -102,7 +102,7 @@ def plot_compare_grooming_methods_for_attribute(
             linestyle="",
             label=style.label,
             zorder=style.zorder,
-            **kwargs,
+            **kwargs,  # type: ignore[arg-type]
         )
 
     # Labeling and presentation

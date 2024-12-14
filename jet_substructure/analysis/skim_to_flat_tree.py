@@ -11,21 +11,22 @@ import argparse
 import functools
 import logging
 import operator
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type, Union, cast
+from typing import Any, cast
 
 import attr
 import enlighten
 import IPython
 import numpy as np
+import numpy.typing as npt
 import uproot3
-from pachyderm import yaml
 from pathos.multiprocessing import ProcessingPool as Pool
 
 from jet_substructure.analysis import analyze_tree
 from jet_substructure.base import analysis_objects, data_manager, helpers, substructure_methods
 from jet_substructure.base.helpers import UprootArray
-
+from pachyderm import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -63,12 +64,13 @@ class Calculation:
         # at all due to the grooming (such as a z cut). Thus, we use the selected splittings directly.
         return len(self.splittings.flatten())
 
-    def __getitem__(self, mask: np.ndarray) -> Calculation:
+    def __getitem__(self, mask: npt.NDArray[np.bool_]) -> Calculation:
         """ Mask the stored values, returning a new object. """
         # Validation
         if len(self.input_jets) != len(mask):
+            msg = f"Mask length is different than array lengths. mask length: {len(mask)}, array lengths: {len(self.input_jets)}"
             raise ValueError(
-                f"Mask length is different than array lengths. mask length: {len(mask)}, array lengths: {len(self.input_jets)}"
+                msg
             )
 
         # Return the masked arrays in a new object.
@@ -87,15 +89,15 @@ class Calculation:
 @attr.s
 class GroomingResultForTree:
     grooming_method: str = attr.ib()
-    delta_R: np.ndarray = attr.ib()
-    z: np.ndarray = attr.ib()
-    kt: np.ndarray = attr.ib()
-    n_to_split: np.ndarray = attr.ib()
-    n_groomed_to_split: np.ndarray = attr.ib()
+    delta_R: npt.NDArray[np.float32] = attr.ib()
+    z: npt.NDArray[np.float32] = attr.ib()
+    kt: npt.NDArray[np.float32] = attr.ib()
+    n_to_split: npt.NDArray[np.int64] = attr.ib()
+    n_groomed_to_split: npt.NDArray[np.int64] = attr.ib()
     # For SoftDrop, this is equivalent to n_sd.
-    n_passed_grooming: np.ndarray = attr.ib()
+    n_passed_grooming: npt.NDArray[np.int64] = attr.ib()
 
-    def asdict(self, prefix: str) -> Iterable[Tuple[str, np.ndarray]]:
+    def asdict(self, prefix: str) -> Iterable[tuple[str, npt.NDArray[np.float32 | np.int64]]]:
         for k, v in attr.asdict(self, recurse=False).items():
             # Skip the label
             if isinstance(v, str):
@@ -106,7 +108,7 @@ class GroomingResultForTree:
 def _define_calculation_functions(
     dataset: analysis_objects.Dataset,
     iterative_splittings: bool,
-) -> Dict[str, functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]]]:
+) -> dict[str, functools.partial[tuple[UprootArray[float], UprootArray[int], UprootArray[int]]]]:
     """Define the calculation functions of interest.
 
     Note:
@@ -146,7 +148,7 @@ def _define_calculation_functions(
 
 def _select_and_retrieve_splittings(
     jets: substructure_methods.SubstructureJetArray, mask: UprootArray[bool], iterative_splittings: bool
-) -> Tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray, UprootArray[int]]:
+) -> tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray, UprootArray[int]]:
     """Generalization of the function in analyze_tree to add the splitting index."""
     restricted_jets, restricted_splittings = analyze_tree._select_and_retrieve_splittings(
         jets, mask, iterative_splittings
@@ -164,7 +166,7 @@ def calculate_splitting_number(
     selected_splittings: substructure_methods.JetSplittingArray,
     restricted_splittings_indices: UprootArray[int],
     debug: bool = False,
-) -> np.ndarray:
+) -> npt.NDArray[np.int64]:
     # logger.debug("Calculating splitting number")
     # Setup
     # We need the parent index of all of the splittings and of those which we have selected.
@@ -172,7 +174,7 @@ def calculate_splitting_number(
     # the necessary splitting history to reconstruct the splitting.
     all_splittings_parent_index = all_splittings.parent_index
     parent_index = selected_splittings.parent_index
-    counts = np.zeros_like(all_splittings_parent_index, dtype=np.int)
+    counts = np.zeros_like(all_splittings_parent_index, dtype=np.int64)
 
     # First, increment all which have a selected splitting, meaning that if the splitting is at
     # the origin, it is the considered the 1st splitting (so we're reserving 0 for the untagged).
@@ -200,7 +202,7 @@ def calculate_splitting_number(
         accept_mask = (parent_repeated_to_be_same_shape == restricted_splittings_indices).any()
 
         if debug:
-            IPython.start_ipython(user_ns=locals())
+            IPython.start_ipython(user_ns=locals())  # type: ignore[no-untyped-call]
         # In the case that the parent_index of our splitting is in the selected splittings,
         # and it hasn't gotten to the origin, we can finally increment our count.
         # NOTE: Need to pad, fill, and flatten to match the shape of the accept_mask (which is just an ndarray mask)
@@ -216,7 +218,7 @@ def calculate_splitting_number(
 #    all_splittings: substructure_methods.JetSplittingArray,
 #    restricted_splittings_indices: UprootArray[int],
 #    z_cutoff: float,
-# ) -> Tuple[np.ndarray, UprootArray[int]]:
+# ) -> Tuple[npt.NDArray[np.float32], UprootArray[int]]:
 #    """
 #
 #    """
@@ -246,7 +248,7 @@ def calculate_splitting_number(
 #    all_splittings: substructure_methods.JetSplittingArray,
 #    restricted_splittings_indices: UprootArray[int],
 #    z_cutoff: float,
-# ) -> Tuple[np.ndarray, UprootArray[int]]:
+# ) -> Tuple[npt.NDArray[np.float32], UprootArray[int]]:
 #    # Start with the origin (NOTE: the relevant origin is 0 because -1 is a dummy node to start the splittings)
 #    parent_index = all_splittings.localindex.zeros_like()
 #    # Initial value should be outside of the standard range.
@@ -265,7 +267,7 @@ def prong_matching(
     generator_like_jets_label: str,
     grooming_method: str,
     match_using_distance: bool = True,
-) -> Dict[str, np.ndarray]:
+) -> dict[str, npt.NDArray[np.int32]]:
     """Performs prong matching for the provided collections.
 
     Note:
@@ -284,13 +286,13 @@ def prong_matching(
     """
     # We can only perform matching if there are selected splittings.
     # Need to mask for calculations which have no indices (ie didn't find any that met criteria.
-    mask = (generator_like_jets_calculation.indices.counts != 0) & (measured_like_jets_calculation.indices.counts != 0)
+    mask = (generator_like_jets_calculation.indices.counts != 0) & (measured_like_jets_calculation.indices.counts != 0)  # type: ignore[comparison-overlap]
     try:
-        masked_generator_like_jets_calculation = generator_like_jets_calculation[mask]
-        masked_measured_like_jets_calculation = measured_like_jets_calculation[mask]
+        masked_generator_like_jets_calculation = generator_like_jets_calculation[mask]  # type: ignore[index]
+        masked_measured_like_jets_calculation = measured_like_jets_calculation[mask]  # type: ignore[index]
     except IndexError as e:
         logger.warning(e)
-        IPython.start_ipython(user_ns=locals())
+        IPython.start_ipython(user_ns=locals())  # type: ignore[no-untyped-call]
 
     # Matching
     grooming_results = {}
@@ -314,8 +316,8 @@ def prong_matching(
     for label, matching in [("leading", leading_matching), ("subleading", subleading_matching)]:
         # We'll store the output in an array, and then store that in the overall output with a mask
         # We need the additional mask because we can't perform matching for every jet (single particle jets, etc).
-        output = np.zeros(len(generator_like_jets_calculation.input_jets), dtype=np.int)
-        matching_output = np.zeros(len(matching.properly), dtype=np.int)
+        output = np.zeros(len(generator_like_jets_calculation.input_jets), dtype=np.int32)
+        matching_output = np.zeros(len(matching.properly), dtype=np.int32)
         matching_output[matching.properly] = 1
         matching_output[matching.mistag] = 2
         matching_output[matching.failed] = 3
@@ -327,7 +329,7 @@ def prong_matching(
     return grooming_results
 
 
-def calculate_and_skim_embedding(  # noqa: C901
+def calculate_and_skim_embedding(
     tree: data_manager.Tree,
     dataset: analysis_objects.Dataset,
     iterative_splittings: bool,
@@ -353,7 +355,7 @@ def calculate_and_skim_embedding(  # noqa: C901
 
     # Use the train configuration to extract the train number and pt hard bin, which are used to get the scale factor.
     y = yaml.yaml()
-    with open(tree.filename.parent / "config.yaml", "r") as f:
+    with (Path(tree.filename.parent) / "config.yaml").open() as f:
         train_config = y.load(f)
     train_number = train_config["number"]
     pt_hard_bin = train_config["pt_hard_bin"]
@@ -389,18 +391,18 @@ def calculate_and_skim_embedding(  # noqa: C901
 
     # Mask the jets
     masked_true_jets, masked_true_jet_splittings, masked_true_jet_splittings_indices = _select_and_retrieve_splittings(
-        true_jets, mask, iterative_splittings
+        true_jets, mask, iterative_splittings  # type: ignore[arg-type]
     )
     (
         masked_det_level_jets,
         masked_det_level_jet_splittings,
         masked_det_level_jet_splittings_indices,
-    ) = _select_and_retrieve_splittings(det_level_jets, mask, iterative_splittings)
+    ) = _select_and_retrieve_splittings(det_level_jets, mask, iterative_splittings)  # type: ignore[arg-type]
     (
         masked_hybrid_jets,
         masked_hybrid_jet_splittings,
         masked_hybrid_jet_splittings_indices,
-    ) = _select_and_retrieve_splittings(hybrid_jets, mask, iterative_splittings)
+    ) = _select_and_retrieve_splittings(hybrid_jets, mask, iterative_splittings)  # type: ignore[arg-type]
 
     grooming_results = {}
     if create_friend_tree:
@@ -410,18 +412,18 @@ def calculate_and_skim_embedding(  # noqa: C901
     else:
         grooming_results["scale_factor"] = np.ones_like(true_jets.jet_pt[mask]) * scale_factor
         # Add jet pt for all prefixes.
-        grooming_results["jet_pt_true"] = masked_true_jets.jet_pt
-        grooming_results["jet_pt_det_level"] = masked_det_level_jets.jet_pt
-        grooming_results["jet_pt_hybrid"] = masked_hybrid_jets.jet_pt
+        grooming_results["jet_pt_true"] = masked_true_jets.jet_pt  # type: ignore[assignment]
+        grooming_results["jet_pt_det_level"] = masked_det_level_jets.jet_pt  # type: ignore[assignment]
+        grooming_results["jet_pt_hybrid"] = masked_hybrid_jets.jet_pt  # type: ignore[assignment]
         # Add jet eta phi.
-        for prefix, jets in zip(prefixes, [masked_true_jets, masked_det_level_jets, masked_hybrid_jets]):
+        for prefix, jets in zip(prefixes, [masked_true_jets, masked_det_level_jets, masked_hybrid_jets], strict=True):
             jet_four_vec = jets.constituents.four_vectors().sum()
             grooming_results[f"jet_eta_{prefix}"] = jet_four_vec.eta
             grooming_results[f"jet_phi_{prefix}"] = jet_four_vec.phi
         # Leading track
-        grooming_results["leading_track_true"] = masked_true_jets.leading_track_pt
-        grooming_results["leading_track_det_level"] = masked_det_level_jets.leading_track_pt
-        grooming_results["leading_track_hybrid"] = masked_hybrid_jets.leading_track_pt
+        grooming_results["leading_track_true"] = masked_true_jets.leading_track_pt  # type: ignore[assignment]
+        grooming_results["leading_track_det_level"] = masked_det_level_jets.leading_track_pt  # type: ignore[assignment]
+        grooming_results["leading_track_hybrid"] = masked_hybrid_jets.leading_track_pt  # type: ignore[assignment]
 
         # Perform our calculations.
         functions = _define_calculation_functions(dataset, iterative_splittings=iterative_splittings)
@@ -477,9 +479,9 @@ def calculate_and_skim_embedding(  # noqa: C901
                     n_to_split=n_to_split,
                     n_groomed_to_split=n_groomed_to_split,
                     # Number of splittings which pass the grooming condition. For SoftDrop, this is n_sd.
-                    n_passed_grooming=calculation.possible_indices.counts,
+                    n_passed_grooming=calculation.possible_indices.counts,  # type: ignore[arg-type]
                 )
-                grooming_results.update(grooming_result.asdict(prefix=prefix))
+                grooming_results.update(grooming_result.asdict(prefix=prefix))  # type: ignore[arg-type]
 
             # Hybrid-det level matching.
             # We match using distance here because the labels don't align anymore due to the subtraction mixing the labels.
@@ -491,7 +493,7 @@ def calculate_and_skim_embedding(  # noqa: C901
                 grooming_method=func_name,
                 match_using_distance=False,
             )
-            grooming_results.update(hybrid_det_level_matching_results)
+            grooming_results.update(hybrid_det_level_matching_results)  # type: ignore[arg-type]
             # Det level-true matching
             # We match using labels here because otherwise the reconstruction can cause the particles to move
             # enough that they may not match within a particular distance.
@@ -503,7 +505,7 @@ def calculate_and_skim_embedding(  # noqa: C901
                 grooming_method=func_name,
                 match_using_distance=False,
             )
-            grooming_results.update(det_level_true_matching_results)
+            grooming_results.update(det_level_true_matching_results)  # type: ignore[arg-type]
 
             # Look for leading kt just because it's easier to understand conceptually.
             hybrid_det_level_leading_matching = grooming_results[f"{func_name}_hybrid_det_level_matching_leading"]
@@ -511,13 +513,13 @@ def calculate_and_skim_embedding(  # noqa: C901
             if (
                 draw_example_splittings
                 and func_name == "leading_kt"
-                and (hybrid_det_level_leading_matching.properly & hybrid_det_level_subleading_matching.failed).any()
+                and (hybrid_det_level_leading_matching.properly & hybrid_det_level_subleading_matching.failed).any()  # type: ignore[attr-defined]
             ):
                 from jet_substructure.analysis import draw_splitting
 
                 # Find a sufficiently interesting jet (ie high enough pt)
                 mask_jets_of_interest = (
-                    (hybrid_det_level_leading_matching.properly & hybrid_det_level_subleading_matching.failed)
+                    (hybrid_det_level_leading_matching.properly & hybrid_det_level_subleading_matching.failed)  # type: ignore[attr-defined]
                     & (masked_hybrid_jets.jet_pt > 80)
                     & (det_level_jets_calculation.splittings.kt > 10).flatten()
                 )
@@ -566,7 +568,7 @@ def calculate_and_skim_data(
     tree: data_manager.Tree,
     dataset: analysis_objects.Dataset,
     iterative_splittings: bool,
-    prefixes: Optional[Sequence[str]] = None,
+    prefixes: Sequence[str] | None = None,
 ) -> bool:
     # Validation
     if prefixes is None:
@@ -593,23 +595,23 @@ def calculate_and_skim_data(
     # Special selections for pythia.
     # Apparently I can get pt hard < 5. Which is bizarre. Filter these out when applicable.
     if dataset.collision_system == "pythia":
-        mask = mask & (tree["ptHard"] >= 5.0)
+        mask = mask & (tree["ptHard"] >= 5.0)  # type: ignore[operator]
 
-    masked_jets: Dict[
-        str, Tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray, UprootArray[int]]
+    masked_jets: dict[
+        str, tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray, UprootArray[int]]
     ] = {}
-    for prefix, input_jets in zip(prefixes, all_jets):
+    for prefix, input_jets in zip(prefixes, all_jets, strict=True):
         masked_jets[prefix] = _select_and_retrieve_splittings(
             input_jets,
-            mask,
+            mask,  # type: ignore[arg-type]
             iterative_splittings=iterative_splittings,
         )
 
     # Results output
-    grooming_results: Dict[str, np.ndarray] = {}
+    grooming_results: dict[str, npt.NDArray[np.float32 | np.int64]] = {}
     # Add jet pt for all prefixes.
     for prefix, jets in masked_jets.items():
-        grooming_results[f"jet_pt_{prefix}"] = jets[0].jet_pt
+        grooming_results[f"jet_pt_{prefix}"] = jets[0].jet_pt  # type: ignore[assignment]
 
     # Add scale factors when appropriate (ie for pythia)
     if dataset.collision_system == "pythia":
@@ -626,12 +628,12 @@ def calculate_and_skim_data(
         scale_factors[21] = scale_factors[20]
 
         pt_hard_bins = tree["ptHardBin"][mask]
-        logger.debug(f"Pt hard bins contained in the file: {np.unique(pt_hard_bins)}")
+        logger.debug(f"Pt hard bins contained in the file: {np.unique(pt_hard_bins)}")  # type: ignore[call-overload]
         grooming_results.update(
             {
                 "scale_factor": np.array([scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
-                "pt_hard_bin": pt_hard_bins,
-                "pt_hard": tree["ptHard"][mask],
+                "pt_hard_bin": pt_hard_bins,  # type: ignore[dict-item]
+                "pt_hard": tree["ptHard"][mask],  # type: ignore[dict-item]
             }
         )
 
@@ -677,7 +679,7 @@ def calculate_and_skim_data(
                 n_to_split=n_to_split,
                 n_groomed_to_split=n_groomed_to_split,
                 # Number of splittings which pass the grooming condition. For SoftDrop, this is n_sd.
-                n_passed_grooming=calculation.possible_indices.counts,
+                n_passed_grooming=calculation.possible_indices.counts,  # type: ignore[arg-type]
             )
             # Cross check
             mask = grooming_result.kt < 0
@@ -707,8 +709,8 @@ def run(
     iterative_splittings: bool,
     calculate_and_skim_func: Callable[[data_manager.Tree, analysis_objects.Dataset, bool], bool],
     number_of_cores: int,
-    additional_kwargs_for_analysis: Optional[Mapping[str, Any]] = None,
-    override_filenames: Optional[Sequence[Union[str, Path]]] = None,
+    additional_kwargs_for_analysis: Mapping[str, Any] | None = None,
+    override_filenames: Sequence[str | Path] | None = None,
 ) -> None:
     # Validation
     if additional_kwargs_for_analysis is None:
@@ -717,7 +719,7 @@ def run(
         override_filenames = []
 
     # Setup
-    settings_class_map: Mapping[str, Type[analysis_objects.AnalysisSettings]] = {
+    settings_class_map: Mapping[str, type[analysis_objects.AnalysisSettings]] = {
         "pythia": analysis_objects.PtHardAnalysisSettings,
         "embedPythia": analysis_objects.PtHardAnalysisSettings,
     }
@@ -736,7 +738,7 @@ def run(
         filenames=(override_filenames if override_filenames else dataset.filenames),
         tree_name=dataset.tree_name,
         # Mypy is getting confused by Sequence[str] because str is an iterable, so we ignore the type...
-        branches=dataset.branches,  # type: ignore
+        branches=dataset.branches,  # type: ignore[arg-type]
     )
     logger.info("Setup complete. Beginning processing of trees.")
 
@@ -772,7 +774,7 @@ def run(
     progress_manager.stop()
 
 
-def parse_arguments() -> Tuple[str, List[Path], bool]:
+def parse_arguments() -> tuple[str, list[Path], bool]:
     parser = argparse.ArgumentParser(description="Skim provided files in a given dataset.")
 
     parser.add_argument("-d", "--datasetName", type=str)

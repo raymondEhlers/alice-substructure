@@ -7,32 +7,24 @@ from __future__ import annotations
 
 import copy
 import logging
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Dict,
     Generic,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
     TypeVar,
-    Union,
 )
 
 import attr
 import boost_histogram as bh
 import numpy as np
-from pachyderm import binned_data
+import numpy.typing as npt
 
 from jet_substructure.base import helpers
 from jet_substructure.base.helpers import UprootArray
-
+from pachyderm import binned_data
 
 if TYPE_CHECKING:
     from jet_substructure.base import substructure_methods
@@ -59,7 +51,7 @@ class Identifier:
         return f"{self.iterative_splittings_label.capitalize()} splittings\n${self.jet_pt_bin.display_str(label=jet_pt_label)}$"
 
     @classmethod
-    def from_existing(cls: Type[_T_Identifier], existing: _T_Identifier) -> _T_Identifier:
+    def from_existing(cls: type[_T_Identifier], existing: _T_Identifier) -> _T_Identifier:
         return cls(
             iterative_splittings=existing.iterative_splittings,
             jet_pt_bin=existing.jet_pt_bin,
@@ -92,7 +84,7 @@ class MatchingHybridIdentifier(Identifier):
 
     @classmethod
     def from_existing(
-        cls: Type[_T_MatchingHybridIdentifier], existing: _T_MatchingHybridIdentifier
+        cls: type[_T_MatchingHybridIdentifier], existing: _T_MatchingHybridIdentifier
     ) -> _T_MatchingHybridIdentifier:
         return cls(
             iterative_splittings=existing.iterative_splittings, jet_pt_bin=existing.jet_pt_bin, min_kt=existing.min_kt
@@ -100,11 +92,11 @@ class MatchingHybridIdentifier(Identifier):
 
     @classmethod
     def from_existing_identifier(
-        cls: Type["MatchingHybridIdentifier"],
+        cls: type[MatchingHybridIdentifier],
         existing: Identifier,
         hybrid_jet_pt_bin: helpers.RangeSelector,
         min_kt: float,
-    ) -> "MatchingHybridIdentifier":
+    ) -> MatchingHybridIdentifier:
         return cls(
             iterative_splittings=existing.iterative_splittings,
             jet_pt_bin=hybrid_jet_pt_bin,
@@ -118,13 +110,13 @@ class AnalysisSettings:
     z_cutoff: float = attr.ib()
 
     @classmethod
-    def _extract_values_from_dataset_config(cls: Type["AnalysisSettings"], config: Mapping[str, Any]) -> Dict[str, Any]:
+    def _extract_values_from_dataset_config(cls: type[AnalysisSettings], config: Mapping[str, Any]) -> dict[str, Any]:
         return {
             "jet_R": config["jet_R"],
         }
 
     @classmethod
-    def from_config(cls: Type["AnalysisSettings"], config: Mapping[str, Any], z_cutoff: float) -> "AnalysisSettings":
+    def from_config(cls: type[AnalysisSettings], config: Mapping[str, Any], z_cutoff: float) -> AnalysisSettings:
         return cls(
             z_cutoff=z_cutoff,
             **cls._extract_values_from_dataset_config(config),
@@ -136,15 +128,15 @@ class PtHardAnalysisSettings(AnalysisSettings):
     scale_factors: Mapping[int, float] = attr.ib()
     train_number_to_pt_hard_bin: Mapping[int, int] = attr.ib()
 
-    def asdict(self) -> Dict[str, Any]:
+    def asdict(self) -> dict[str, Any]:
         return attr.asdict(self, recurse=False)
 
     @classmethod
     def _extract_values_from_dataset_config(
-        cls: Type["PtHardAnalysisSettings"], config: Mapping[str, Any]
-    ) -> Dict[str, Any]:
+        cls: type[PtHardAnalysisSettings], config: Mapping[str, Any]
+    ) -> dict[str, Any]:
         # Extract the base class values first, then add our additional values.
-        values = super(PtHardAnalysisSettings, cls)._extract_values_from_dataset_config(config)
+        values = super()._extract_values_from_dataset_config(config)
         values.update(
             {
                 "scale_factors": config["scale_factors"],
@@ -179,22 +171,22 @@ class Dataset:
 
     @classmethod
     def from_config_file(
-        cls: Type["Dataset"],
+        cls: type[Dataset],
         collision_system: str,
         config_filename: Path,
         hists_filename_stem: str,
         output_base: Path,
-        settings_class: Type[AnalysisSettings],
+        settings_class: type[AnalysisSettings],
         z_cutoff: float,
-        override_filenames: Optional[Sequence[Union[str, Path]]] = None,
+        override_filenames: Sequence[str | Path] | None = None,
         # "pgz" = pickled gz file.
         hists_file_extension: str = "pgz",
-    ) -> "Dataset":
+    ) -> Dataset:
         # Grab the configuration
         from pachyderm import yaml
 
         y = yaml.yaml()
-        with open(config_filename, "r") as f:
+        with Path(config_filename).open() as f:
             config = y.load(f)
 
         # Extract only the values from the config that we need to construct the object.
@@ -225,7 +217,7 @@ class MatchingResult:
     mistag: UprootArray[bool] = attr.ib()
     failed: UprootArray[bool] = attr.ib()
 
-    def __getitem__(self, mask: UprootArray[bool]) -> "MatchingResult":
+    def __getitem__(self, mask: UprootArray[bool]) -> MatchingResult:
         return type(self)(
             properly=self.properly[mask],
             mistag=self.mistag[mask],
@@ -235,17 +227,17 @@ class MatchingResult:
 
 @attr.s
 class FillHistogramInput:
-    jets: "substructure_methods.SubstructureJetArray" = attr.ib()
-    _splittings: "substructure_methods.JetSplittingArray" = attr.ib()
+    jets: substructure_methods.SubstructureJetArray = attr.ib()
+    _splittings: substructure_methods.JetSplittingArray = attr.ib()
     values: UprootArray[float] = attr.ib()
     indices: UprootArray[int] = attr.ib()
 
     @property
-    def splittings(self) -> "substructure_methods.JetSplittingArray":
+    def splittings(self) -> substructure_methods.JetSplittingArray:
         try:
             return self._restricted_splittings
         except AttributeError:
-            self._restricted_splittings: "substructure_methods.JetSplittingArray" = self._splittings[self.indices]
+            self._restricted_splittings: substructure_methods.JetSplittingArray = self._splittings[self.indices]
         return self._restricted_splittings
 
     @property
@@ -258,12 +250,13 @@ class FillHistogramInput:
         """
         return len(self.jets)
 
-    def __getitem__(self, mask: np.ndarray) -> FillHistogramInput:
+    def __getitem__(self, mask: npt.NDArray[np.bool_]) -> FillHistogramInput:
         """ Mask the stored values, returning a new object. """
         # Validation
         if len(self.jets) != len(mask):
+            msg = f"Mask length is different than array lengths. mask length: {len(mask)}, array lengths: {len(self.jets)}"
             raise ValueError(
-                f"Mask length is different than array lengths. mask length: {len(mask)}, array lengths: {len(self.jets)}"
+                msg
             )
 
         # Return the masked arrays in a new object.
@@ -283,8 +276,8 @@ def _calculate_splitting_number(indices: UprootArray[int]) -> UprootArray[int]:
     # If there were no splittings, we want to set that to 0.
     splitting_number = splitting_number.pad(1).fillna(0)
     # Must flatten because the indices are still jagged.
-    splitting_number = splitting_number.flatten()
-    return splitting_number
+    splitting_number = splitting_number.flatten()  # type: ignore[assignment]
+    return splitting_number  # noqa: RET504
 
 
 @attr.s
@@ -293,7 +286,7 @@ class SubstructureHistsBase:
     title: str = attr.ib()
     iterative_splittings: bool = attr.ib()
 
-    def __add__(self, other: "SubstructureHistsBase") -> "SubstructureHistsBase":
+    def __add__(self, other: SubstructureHistsBase) -> SubstructureHistsBase:
         """ Handles a = b + c """
         new = copy.deepcopy(self)
         new += other
@@ -301,19 +294,19 @@ class SubstructureHistsBase:
 
     def __radd__(self, other: SubstructureHistsBase) -> SubstructureHistsBase:
         """ For use with sum(...). """
-        if other == 0:
+        if other == 0:  # type: ignore[comparison-overlap]
             return self
-        else:
-            return self + other
+        return self + other
 
     def __iadd__(self, other: SubstructureHistsBase) -> SubstructureHistsBase:
-        raise NotImplementedError("Daughter classes must implement.")
+        msg = "Daughter classes must implement."
+        raise NotImplementedError(msg)
 
     @property
-    def attributes_to_skip(self) -> List[str]:
+    def attributes_to_skip(self) -> list[str]:
         return ["name", "title", "iterative_splittings"]
 
-    def __iter__(self) -> Iterator[Tuple[str, Union[bh.Histogram, binned_data.BinnedData]]]:
+    def __iter__(self) -> Iterator[tuple[str, bh.Histogram | binned_data.BinnedData]]:
         return iter(
             {k: v for k, v in attr.asdict(self, recurse=False).items() if k not in self.attributes_to_skip}.items()
         )
@@ -327,7 +320,8 @@ class SubstructureHistsBase:
         # Ensure that we're not somehow half converted. If so, something rather odd has occurred.
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
             types = {k: type(v) for k, v in self}
-            raise ValueError(f"Not all hists are boost histograms! Cannot convert to binned data! Types: {types}")
+            msg = f"Not all hists are boost histograms! Cannot convert to binned data! Types: {types}"
+            raise ValueError(msg)
 
         for k, v in self:
             setattr(self, k, binned_data.BinnedData.from_existing_data(v))
@@ -339,52 +333,56 @@ class SubstructureHists(SubstructureHistsBase):
     title: str = attr.ib()
     iterative_splittings: bool = attr.ib()
     n_jets: float = attr.ib()
-    jet_pt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    values: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    kt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    z: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    delta_R: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    theta: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    splitting_number: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    splitting_number_perturbative: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    lund_plane: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    total_number_of_splittings: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    jet_pt: bh.Histogram | binned_data.BinnedData = attr.ib()
+    values: bh.Histogram | binned_data.BinnedData = attr.ib()
+    kt: bh.Histogram | binned_data.BinnedData = attr.ib()
+    z: bh.Histogram | binned_data.BinnedData = attr.ib()
+    delta_R: bh.Histogram | binned_data.BinnedData = attr.ib()
+    theta: bh.Histogram | binned_data.BinnedData = attr.ib()
+    splitting_number: bh.Histogram | binned_data.BinnedData = attr.ib()
+    splitting_number_perturbative: bh.Histogram | binned_data.BinnedData = attr.ib()
+    lund_plane: bh.Histogram | binned_data.BinnedData = attr.ib()
+    total_number_of_splittings: bh.Histogram | binned_data.BinnedData = attr.ib()
 
     @property
-    def attributes_to_skip(self) -> List[str]:
+    def attributes_to_skip(self) -> list[str]:
         attrs = super().attributes_to_skip
         attrs.extend(["n_jets"])
         return attrs
 
-    def __iadd__(self, other: SubstructureHistsBase) -> "SubstructureHists":
+    def __iadd__(self, other: SubstructureHistsBase) -> SubstructureHists:
         """ Handles a += b """
         # Validation
         if not isinstance(other, type(self)):
-            raise TypeError(f"Must pass type {type(self)}. Passed: {type(other)}.")
+            msg = f"Must pass type {type(self)}. Passed: {type(other)}."
+            raise TypeError(msg)
         if self.iterative_splittings != other.iterative_splittings:
-            raise TypeError(
-                f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
+            msg = (
+                f"The types of splittings are different! self: {self.iterative_splittings}, "
+                f"other: {other.iterative_splittings}"
             )
+            raise TypeError(msg)
 
         self.name = f"{self.name}_{other.name}" if self.name != other.name else self.name
         self.title = f"{self.title}_{other.title}" if self.title != other.title else self.title
         # Don't need to update iterative_splittings since they must be the same!
         self.n_jets += other.n_jets
-        for (k, v), (k_other, v_other) in zip(self, other):
-            v += v_other
+        for (k, v), (k_other, v_other) in zip(self, other, strict=True):  # noqa: B007
+            v += v_other  # type: ignore[operator]  # noqa: PLW2901
 
         return self
 
-    def __truediv__(self, other: "SubstructureHists") -> "SubstructureHists":
+    def __truediv__(self, other: SubstructureHists) -> SubstructureHists:
         data = []
-        for (k, v), (k_other, v_other) in zip(self, other):
+        for (k, v), (k_other, v_other) in zip(self, other, strict=True):
             # Sanity check
             if k != k_other:
-                raise ValueError(f"Somehow keys mismatch. self key: {k}, other key: {k_other}")
+                msg = f"Somehow keys mismatch. self key: {k}, other key: {k_other}"
+                raise ValueError(msg)
             # First, normalize the hists by the number of jets.
             temp_v = v / self.n_jets
             temp_v_other = v_other / other.n_jets
-            data.append(temp_v / temp_v_other)
+            data.append(temp_v / temp_v_other)  # type: ignore[operator]
 
         return type(self)(
             f"{self.name}_{other.name}",
@@ -396,8 +394,8 @@ class SubstructureHists(SubstructureHistsBase):
 
     @classmethod
     def create_boost_histograms(
-        cls: Type["SubstructureHists"], name: str, title: str, iterative_splittings: bool, values_axis: bh.Histogram
-    ) -> "SubstructureHists":
+        cls: type[SubstructureHists], name: str, title: str, iterative_splittings: bool, values_axis: bh.Histogram
+    ) -> SubstructureHists:
         kt_axis = bh.axis.Regular(50, 0, 25)
         z_axis = bh.axis.Regular(20, 0, 0.5)
         delta_R_axis = bh.axis.Regular(20, 0, 0.4)
@@ -411,7 +409,7 @@ class SubstructureHists(SubstructureHistsBase):
             iterative_splittings=iterative_splittings,
             n_jets=0,
             jet_pt=bh.Histogram(bh.axis.Regular(150, 0, 150), storage=bh.storage.Weight()),
-            values=bh.Histogram(values_axis, storage=bh.storage.Weight()),
+            values=bh.Histogram(values_axis, storage=bh.storage.Weight()),  # type: ignore[call-overload]
             kt=bh.Histogram(kt_axis, storage=bh.storage.Weight()),
             z=bh.Histogram(z_axis, storage=bh.storage.Weight()),
             delta_R=bh.Histogram(delta_R_axis, storage=bh.storage.Weight()),
@@ -426,38 +424,37 @@ class SubstructureHists(SubstructureHistsBase):
         self,
         inputs: FillHistogramInput,
         jet_R: float,
-        splitting_number: Optional[UprootArray[int]] = None,
+        splitting_number: UprootArray[int] | None = None,
         weight: float = 1.0,
     ) -> None:
         # Validation
         # Give a useful error message
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
-            raise ValueError("Not all hists are boost histograms! Cannot fill!")
+            msg = "Not all hists are boost histograms! Cannot fill!"
+            raise ValueError(msg)
 
         # And then help out mypy...
-        assert (
-            isinstance(self.values, bh.Histogram)
-            and isinstance(self.jet_pt, bh.Histogram)
-            and isinstance(self.kt, bh.Histogram)
-            and isinstance(self.z, bh.Histogram)
-            and isinstance(self.delta_R, bh.Histogram)
-            and isinstance(self.theta, bh.Histogram)
-            and isinstance(self.splitting_number, bh.Histogram)
-            and isinstance(self.splitting_number_perturbative, bh.Histogram)
-            and isinstance(self.total_number_of_splittings, bh.Histogram)
-            and isinstance(self.lund_plane, bh.Histogram)
-        )
+        assert isinstance(self.values, bh.Histogram)
+        assert isinstance(self.jet_pt, bh.Histogram)
+        assert isinstance(self.kt, bh.Histogram)
+        assert isinstance(self.z, bh.Histogram)
+        assert isinstance(self.delta_R, bh.Histogram)
+        assert isinstance(self.theta, bh.Histogram)
+        assert isinstance(self.splitting_number, bh.Histogram)
+        assert isinstance(self.splitting_number_perturbative, bh.Histogram)
+        assert isinstance(self.total_number_of_splittings, bh.Histogram)
+        assert isinstance(self.lund_plane, bh.Histogram)
         # Need to store the number of jets along the histograms.
         self.n_jets += inputs.n_jets * weight
-        self.jet_pt.fill(inputs.jets.jet_pt, weight=weight)
-        self.values.fill(inputs.values, weight=weight)
+        self.jet_pt.fill(inputs.jets.jet_pt, weight=weight)  # type: ignore[arg-type]
+        self.values.fill(inputs.values, weight=weight)  # type: ignore[arg-type]
         self.kt.fill(inputs.splittings.kt.flatten(), weight=weight)
         self.z.fill(inputs.splittings.z.flatten(), weight=weight)
         self.delta_R.fill(inputs.splittings.delta_R.flatten(), weight=weight)
         self.theta.fill(inputs.splittings.theta(jet_R).flatten(), weight=weight)
         if splitting_number is None:
             splitting_number = _calculate_splitting_number(inputs.indices)
-        self.splitting_number.fill(splitting_number, weight=weight)
+        self.splitting_number.fill(splitting_number, weight=weight)  # type: ignore[arg-type]
         # Select only splittings with kt > 5.
         # +1 because splittings counts from 1, but indexing starts from 0.
         # NOTE: We aren't counting 0 here if it fails, so we aren't preserving counts!
@@ -483,47 +480,50 @@ class SubstructureToyHists(SubstructureHistsBase):
     title: str = attr.ib()
     iterative_splittings: bool = attr.ib()
     n_jets: float = attr.ib()
-    values: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    kt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    z: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    delta_R: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    theta: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    values: bh.Histogram | binned_data.BinnedData = attr.ib()
+    kt: bh.Histogram | binned_data.BinnedData = attr.ib()
+    z: bh.Histogram | binned_data.BinnedData = attr.ib()
+    delta_R: bh.Histogram | binned_data.BinnedData = attr.ib()
+    theta: bh.Histogram | binned_data.BinnedData = attr.ib()
 
     @property
-    def attributes_to_skip(self) -> List[str]:
+    def attributes_to_skip(self) -> list[str]:
         attrs = super().attributes_to_skip
         attrs.extend(["n_jets"])
         return attrs
 
-    def __iadd__(self, other: SubstructureHistsBase) -> "SubstructureToyHists":
+    def __iadd__(self, other: SubstructureHistsBase) -> SubstructureToyHists:
         """ Handles a += b """
         # Validation
         if not isinstance(other, type(self)):
-            raise TypeError(f"Must pass type {type(self)}. Passed: {type(other)}.")
+            msg = f"Must pass type {type(self)}. Passed: {type(other)}."
+            raise TypeError(msg)
         if self.iterative_splittings != other.iterative_splittings:
+            msg = f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
             raise TypeError(
-                f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
+                msg
             )
 
         self.name = f"{self.name}_{other.name}" if self.name != other.name else self.name
         self.title = f"{self.title}_{other.title}" if self.title != other.title else self.title
         # Don't need to update iterative_splittings since they must be the same!
         self.n_jets += other.n_jets
-        for (k, v), (k_other, v_other) in zip(self, other):
-            v += v_other
+        for (k, v), (k_other, v_other) in zip(self, other, strict=True):  # noqa: B007
+            v += v_other  # type: ignore[operator]  # noqa: PLW2901
 
         return self
 
-    def __truediv__(self, other: "SubstructureToyHists") -> "SubstructureToyHists":
+    def __truediv__(self, other: SubstructureToyHists) -> SubstructureToyHists:
         data = []
-        for (k, v), (k_other, v_other) in zip(self, other):
+        for (k, v), (k_other, v_other) in zip(self, other, strict=True):
             # Sanity check
             if k != k_other:
-                raise ValueError(f"Somehow keys mismatch. self key: {k}, other key: {k_other}")
+                msg = f"Somehow keys mismatch. self key: {k}, other key: {k_other}"
+                raise ValueError(msg)
             # First, normalize the hists by the number of jets.
             temp_v = v / self.n_jets
             temp_v_other = v_other / other.n_jets
-            data.append(temp_v / temp_v_other)
+            data.append(temp_v / temp_v_other)  # type: ignore[operator]
 
         return type(self)(
             f"{self.name}_{other.name}",
@@ -535,8 +535,8 @@ class SubstructureToyHists(SubstructureHistsBase):
 
     @classmethod
     def create_boost_histograms(
-        cls: Type["SubstructureToyHists"], name: str, title: str, iterative_splittings: bool, values_axis: bh.Histogram
-    ) -> "SubstructureToyHists":
+        cls: type[SubstructureToyHists], name: str, title: str, iterative_splittings: bool, values_axis: bh.Histogram
+    ) -> SubstructureToyHists:
         z_axis = bh.axis.Regular(20, 0, 0.5)
         delta_R_axis = bh.axis.Regular(20, 0, 0.4)
         theta_axis = bh.axis.Regular(20, 0, 1)
@@ -545,7 +545,7 @@ class SubstructureToyHists(SubstructureHistsBase):
             title=title,
             iterative_splittings=iterative_splittings,
             n_jets=0,
-            values=bh.Histogram(values_axis, values_axis, storage=bh.storage.Weight()),
+            values=bh.Histogram(values_axis, values_axis, storage=bh.storage.Weight()),  # type: ignore[call-overload]
             kt=bh.Histogram(bh.axis.Regular(100, -5, 5), bh.axis.Regular(100, -5, 5), storage=bh.storage.Weight()),
             z=bh.Histogram(z_axis, z_axis, storage=bh.storage.Weight()),
             delta_R=bh.Histogram(delta_R_axis, delta_R_axis, storage=bh.storage.Weight()),
@@ -562,19 +562,19 @@ class SubstructureToyHists(SubstructureHistsBase):
         # Validation
         # Give a useful error message
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
-            raise ValueError("Not all hists are boost histograms! Cannot fill!")
+            msg = "Not all hists are boost histograms! Cannot fill!"
+            raise ValueError(msg)
 
         # And then help out mypy...
-        assert (
-            isinstance(self.values, bh.Histogram)
-            and isinstance(self.kt, bh.Histogram)
-            and isinstance(self.z, bh.Histogram)
-            and isinstance(self.delta_R, bh.Histogram)
-            and isinstance(self.theta, bh.Histogram)
-        )
+        assert isinstance(self.values, bh.Histogram)
+        assert isinstance(self.kt, bh.Histogram)
+        assert isinstance(self.z, bh.Histogram)
+        assert isinstance(self.delta_R, bh.Histogram)
+        assert isinstance(self.theta, bh.Histogram)
+
         # Need to store the number of jets along the histograms.
         self.n_jets += data_inputs.n_jets * weight
-        self.values.fill(true_inputs.values, data_inputs.values, weight=weight)
+        self.values.fill(true_inputs.values, data_inputs.values, weight=weight)  # type: ignore[arg-type]
         self.kt.fill(
             np.log(true_inputs.splittings.kt.flatten()), np.log(data_inputs.splittings.kt.flatten()), weight=weight
         )
@@ -596,14 +596,14 @@ class MatchingSelections:
     leading: MatchingResult = attr.ib()
     subleading: MatchingResult = attr.ib()
 
-    def __getitem__(self, name: str) -> np.ndarray:
+    def __getitem__(self, name: str) -> npt.NDArray[np.bool_]:
         """ Helper to retrieve the masks. """
-        return getattr(self, name)
+        return getattr(self, name)  # type: ignore[no-any-return]
 
     @property
-    def all(self) -> np.ndarray:
+    def all(self) -> npt.NDArray[np.bool_]:
         return (
-            self.leading.properly
+            self.leading.properly  # type: ignore[return-value]
             | self.leading.mistag
             | self.leading.failed
             | self.subleading.properly
@@ -612,35 +612,35 @@ class MatchingSelections:
         )
 
     @property
-    def pure(self) -> np.ndarray:
-        return self.leading.properly & self.subleading.properly
+    def pure(self) -> npt.NDArray[np.bool_]:
+        return self.leading.properly & self.subleading.properly  # type: ignore[return-value]
 
     @property
-    def leading_untagged_subleading_correct(self) -> np.ndarray:
-        return self.leading.failed & self.subleading.properly
+    def leading_untagged_subleading_correct(self) -> npt.NDArray[np.bool_]:
+        return self.leading.failed & self.subleading.properly  # type: ignore[return-value]
 
     @property
-    def leading_correct_subleading_untagged(self) -> np.ndarray:
-        return self.leading.properly & self.subleading.failed
+    def leading_correct_subleading_untagged(self) -> npt.NDArray[np.bool_]:
+        return self.leading.properly & self.subleading.failed  # type: ignore[return-value]
 
     @property
-    def leading_untagged_subleading_mistag(self) -> np.ndarray:
-        return self.leading.failed & self.subleading.mistag
+    def leading_untagged_subleading_mistag(self) -> npt.NDArray[np.bool_]:
+        return self.leading.failed & self.subleading.mistag  # type: ignore[return-value]
 
     @property
-    def leading_mistag_subleading_untagged(self) -> np.ndarray:
-        return self.leading.mistag & self.subleading.failed
+    def leading_mistag_subleading_untagged(self) -> npt.NDArray[np.bool_]:
+        return self.leading.mistag & self.subleading.failed  # type: ignore[return-value]
 
     @property
-    def swap(self) -> np.ndarray:
-        return self.leading.mistag & self.subleading.mistag
+    def swap(self) -> npt.NDArray[np.bool_]:
+        return self.leading.mistag & self.subleading.mistag  # type: ignore[return-value]
 
     @property
-    def both_untagged(self) -> np.ndarray:
-        return self.leading.failed & self.subleading.failed
+    def both_untagged(self) -> npt.NDArray[np.bool_]:
+        return self.leading.failed & self.subleading.failed  # type: ignore[return-value]
 
 
-_matching_name_to_axis_value: Dict[str, int] = {
+_matching_name_to_axis_value: dict[str, int] = {
     "all": 0,
     "pure": 1,
     "leading_untagged_subleading_correct": 2,
@@ -666,26 +666,28 @@ class SubstructureResponseHists(SubstructureHistsBase):
     use_matching_axis: bool = attr.ib()
     measured_like_n_jets: float = attr.ib()
     generator_like_n_jets: float = attr.ib()
-    residuals_jet_pt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    residuals_kt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    response_kt: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    residuals_jet_pt: bh.Histogram | binned_data.BinnedData = attr.ib()
+    residuals_kt: bh.Histogram | binned_data.BinnedData = attr.ib()
+    response_kt: bh.Histogram | binned_data.BinnedData = attr.ib()
     # NOTE: Intentionally not an attr.ib() property. We want it to be a ClassVar.
-    matching_name_to_axis_value: ClassVar[Dict[str, int]] = _matching_name_to_axis_value
+    matching_name_to_axis_value: ClassVar[dict[str, int]] = _matching_name_to_axis_value
 
     @property
-    def attributes_to_skip(self) -> List[str]:
+    def attributes_to_skip(self) -> list[str]:
         attrs = super().attributes_to_skip
         attrs.extend(["axis_map", "use_matching_axis", "measured_like_n_jets", "generator_like_n_jets"])
         return attrs
 
-    def __iadd__(self, other: SubstructureHistsBase) -> "SubstructureResponseHists":
+    def __iadd__(self, other: SubstructureHistsBase) -> SubstructureResponseHists:
         """ Handles a += b """
         # Validation
         if not isinstance(other, type(self)):
-            raise TypeError(f"Must pass type {type(self)}. Passed: {type(other)}.")
+            msg = f"Must pass type {type(self)}. Passed: {type(other)}."
+            raise TypeError(msg)
         if self.iterative_splittings != other.iterative_splittings:
+            msg = f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
             raise TypeError(
-                f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
+                msg
             )
 
         self.name = f"{self.name}_{other.name}" if self.name != other.name else self.name
@@ -693,14 +695,14 @@ class SubstructureResponseHists(SubstructureHistsBase):
         # Don't need to update iterative_splittings since they must be the same!
         self.measured_like_n_jets += other.measured_like_n_jets
         self.generator_like_n_jets += other.generator_like_n_jets
-        for (k, v), (k_other, v_other) in zip(self, other):
-            v += v_other
+        for (k, v), (k_other, v_other) in zip(self, other, strict=True):  # noqa: B007
+            v += v_other  # type: ignore[operator] # noqa: PLW2901
 
         return self
 
     @classmethod
     def create_boost_histograms(
-        cls: Type["SubstructureResponseHists"],
+        cls: type[SubstructureResponseHists],
         name: str,
         title: str,
         iterative_splittings: bool,
@@ -708,7 +710,7 @@ class SubstructureResponseHists(SubstructureHistsBase):
         use_matching_axis: bool,
         measured_like_jet_pt_axis: bh.axis.Regular,
         generator_like_jet_pt_axis: bh.axis.Regular,
-    ) -> "SubstructureResponseHists":
+    ) -> SubstructureResponseHists:
         kt_axis = bh.axis.Regular(25, 0, 25)
         if use_matching_axis:
             number_of_matching_axes = len(cls.matching_name_to_axis_value)
@@ -755,18 +757,17 @@ class SubstructureResponseHists(SubstructureHistsBase):
         generator_like_inputs: FillHistogramInput,
         matching_selections: MatchingSelections,
         weight: float,
-        jet_R: float,
+        jet_R: float,  # noqa: ARG002
     ) -> None:
         # Validation
         # Give a useful error message
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
-            raise ValueError("Not all hists are boost histograms! Cannot fill!")
+            msg = "Not all hists are boost histograms! Cannot fill!"
+            raise ValueError(msg)
         # And then help out mypy...
-        assert (
-            isinstance(self.residuals_jet_pt, bh.Histogram)
-            and isinstance(self.residuals_kt, bh.Histogram)
-            and isinstance(self.response_kt, bh.Histogram)
-        )
+        assert isinstance(self.residuals_jet_pt, bh.Histogram)
+        assert isinstance(self.residuals_kt, bh.Histogram)
+        assert isinstance(self.response_kt, bh.Histogram)
         # Need to store the number of jets along the histograms.
         self.measured_like_n_jets += measured_like_inputs.n_jets * weight
         self.generator_like_n_jets += generator_like_inputs.n_jets * weight
@@ -788,9 +789,9 @@ class SubstructureResponseHists(SubstructureHistsBase):
 
             # Jet pt residuals
             self.residuals_jet_pt.fill(
-                measured_like_jet_pt,
-                generator_like_jet_pt,
-                (measured_like_jet_pt - generator_like_jet_pt) / generator_like_jet_pt,
+                measured_like_jet_pt,  # type: ignore[arg-type]
+                generator_like_jet_pt,  # type: ignore[arg-type]
+                (measured_like_jet_pt - generator_like_jet_pt) / generator_like_jet_pt,  # type: ignore[arg-type]
                 matching_axis_value,
                 weight=weight,
             )
@@ -802,17 +803,17 @@ class SubstructureResponseHists(SubstructureHistsBase):
             measured_like_kt = measured_like_inputs.splittings.kt.pad(1).fillna(0).flatten()[mask]
             generator_like_kt = generator_like_inputs.splittings.kt.pad(1).fillna(0).flatten()[mask]
             self.residuals_kt.fill(
-                measured_like_jet_pt,
+                measured_like_jet_pt,  # type: ignore[arg-type]
                 measured_like_kt,
-                generator_like_jet_pt,
+                generator_like_jet_pt,  # type: ignore[arg-type]
                 (measured_like_kt - generator_like_kt) / generator_like_kt,
                 matching_axis_value,
                 weight=weight,
             )
             self.response_kt.fill(
-                measured_like_jet_pt,
+                measured_like_jet_pt,  # type: ignore[arg-type]
                 measured_like_kt,
-                generator_like_jet_pt,
+                generator_like_jet_pt,  # type: ignore[arg-type]
                 generator_like_kt,
                 matching_axis_value,
                 weight=weight,
@@ -821,20 +822,20 @@ class SubstructureResponseHists(SubstructureHistsBase):
 
 @attr.s
 class SubstructureResponseExtendedHists(SubstructureResponseHists):
-    response_z: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    response_delta_R: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    response_theta: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    response_splitting_number: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
+    response_z: bh.Histogram | binned_data.BinnedData = attr.ib()
+    response_delta_R: bh.Histogram | binned_data.BinnedData = attr.ib()
+    response_theta: bh.Histogram | binned_data.BinnedData = attr.ib()
+    response_splitting_number: bh.Histogram | binned_data.BinnedData = attr.ib()
 
     @property
-    def attributes_to_skip(self) -> List[str]:
+    def attributes_to_skip(self) -> list[str]:
         attrs = super().attributes_to_skip
         attrs.extend(["n_hybrid_jets", "n_true_jets"])
         return attrs
 
     @classmethod
     def create_boost_histograms(
-        cls: Type["SubstructureResponseExtendedHists"],
+        cls: type[SubstructureResponseExtendedHists],
         name: str,
         title: str,
         iterative_splittings: bool,
@@ -842,7 +843,7 @@ class SubstructureResponseExtendedHists(SubstructureResponseHists):
         use_matching_axis: bool,
         measured_like_jet_pt_axis: bh.axis.Regular,
         generator_like_jet_pt_axis: bh.axis.Regular,
-    ) -> "SubstructureResponseExtendedHists":
+    ) -> SubstructureResponseExtendedHists:
         # Create a temporary object to handle create the hists that it already knows. We'll then assign those.
         # NOTE: Can't use super here because it will pass this object in the place of the super class.
         #       Usually this is what someone would want, but not here - we literally want to construct the
@@ -865,7 +866,7 @@ class SubstructureResponseExtendedHists(SubstructureResponseHists):
             number_of_matching_axes = len(cls.matching_name_to_axis_value)
             matching_axis = bh.axis.Regular(number_of_matching_axes, 0, number_of_matching_axes)
         else:
-            use_matching_axis = bh.axis.Regular(1, 0, 1)
+            use_matching_axis = bh.axis.Regular(1, 0, 1)  # type: ignore[assignment]
         return cls(
             name=name,
             title=title,
@@ -930,15 +931,14 @@ class SubstructureResponseExtendedHists(SubstructureResponseHists):
         # Validation
         # Give a useful error message
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
-            raise ValueError("Not all hists are boost histograms! Cannot fill!")
+            msg = "Not all hists are boost histograms! Cannot fill!"
+            raise ValueError(msg)
 
         # And then help out mypy...
-        assert (
-            isinstance(self.response_z, bh.Histogram)
-            and isinstance(self.response_delta_R, bh.Histogram)
-            and isinstance(self.response_theta, bh.Histogram)
-            and isinstance(self.response_splitting_number, bh.Histogram)
-        )
+        assert isinstance(self.response_z, bh.Histogram)
+        assert isinstance(self.response_delta_R, bh.Histogram)
+        assert isinstance(self.response_theta, bh.Histogram)
+        assert isinstance(self.response_splitting_number, bh.Histogram)
 
         for matching_type, matching_axis_value in self.matching_name_to_axis_value.items():
             # Setup
@@ -956,34 +956,34 @@ class SubstructureResponseExtendedHists(SubstructureResponseHists):
             generator_like_jet_pt = generator_like_inputs.jets.jet_pt[mask]
 
             self.response_z.fill(
-                measured_like_jet_pt,
+                measured_like_jet_pt,  # type: ignore[arg-type]
                 measured_like_inputs.splittings.z.pad(1).fillna(0).flatten()[mask],
-                generator_like_jet_pt,
+                generator_like_jet_pt,  # type: ignore[arg-type]
                 generator_like_inputs.splittings.z.pad(1).fillna(0).flatten()[mask],
                 matching_axis_value,
                 weight=weight,
             )
             self.response_delta_R.fill(
-                measured_like_jet_pt,
+                measured_like_jet_pt,  # type: ignore[arg-type]
                 measured_like_inputs.splittings.delta_R.pad(1).fillna(0).flatten()[mask],
-                generator_like_jet_pt,
+                generator_like_jet_pt,  # type: ignore[arg-type]
                 generator_like_inputs.splittings.delta_R.pad(1).fillna(0).flatten()[mask],
                 matching_axis_value,
                 weight=weight,
             )
             self.response_theta.fill(
-                measured_like_jet_pt,
+                measured_like_jet_pt,  # type: ignore[arg-type]
                 measured_like_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten()[mask],
-                generator_like_jet_pt,
+                generator_like_jet_pt,  # type: ignore[arg-type]
                 generator_like_inputs.splittings.theta(jet_R).pad(1).fillna(0).flatten()[mask],
                 matching_axis_value,
                 weight=weight,
             )
             self.response_splitting_number.fill(
-                measured_like_jet_pt,
-                _calculate_splitting_number(measured_like_inputs.indices)[mask],
-                generator_like_jet_pt,
-                _calculate_splitting_number(generator_like_inputs.indices)[mask],
+                measured_like_jet_pt,  # type: ignore[arg-type]
+                _calculate_splitting_number(measured_like_inputs.indices)[mask],  # type: ignore[arg-type]
+                generator_like_jet_pt,  # type: ignore[arg-type]
+                _calculate_splitting_number(generator_like_inputs.indices)[mask],  # type: ignore[arg-type]
                 matching_axis_value,
                 weight=weight,
             )
@@ -994,15 +994,15 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
     name: str = attr.ib()
     title: str = attr.ib()
     iterative_splittings: bool = attr.ib()
-    all: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    pure: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    leading_untagged_subleading_correct: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    leading_correct_subleading_untagged: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    leading_untagged_subleading_mistag: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    leading_mistag_subleading_untagged: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    swap: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    both_untagged: Union[bh.Histogram, binned_data.BinnedData] = attr.ib()
-    matching_name_to_axis_value: ClassVar[Dict[str, int]] = _matching_name_to_axis_value
+    all: bh.Histogram | binned_data.BinnedData = attr.ib()
+    pure: bh.Histogram | binned_data.BinnedData = attr.ib()
+    leading_untagged_subleading_correct: bh.Histogram | binned_data.BinnedData = attr.ib()
+    leading_correct_subleading_untagged: bh.Histogram | binned_data.BinnedData = attr.ib()
+    leading_untagged_subleading_mistag: bh.Histogram | binned_data.BinnedData = attr.ib()
+    leading_mistag_subleading_untagged: bh.Histogram | binned_data.BinnedData = attr.ib()
+    swap: bh.Histogram | binned_data.BinnedData = attr.ib()
+    both_untagged: bh.Histogram | binned_data.BinnedData = attr.ib()
+    matching_name_to_axis_value: ClassVar[dict[str, int]] = _matching_name_to_axis_value
 
     # @property
     # def attributes_to_skip(self) -> List[str]:
@@ -1010,29 +1010,31 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
     #    attrs.extend(["n_jets"])
     #    return attrs
 
-    def __iadd__(self, other: SubstructureHistsBase) -> "SubstructureMatchingSubjetHists":
+    def __iadd__(self, other: SubstructureHistsBase) -> SubstructureMatchingSubjetHists:
         """ Handles a += b """
         # Validation
         if not isinstance(other, type(self)):
-            raise TypeError(f"Must pass type {type(self)}. Passed: {type(other)}.")
+            msg = f"Must pass type {type(self)}. Passed: {type(other)}."
+            raise TypeError(msg)
         if self.iterative_splittings != other.iterative_splittings:
+            msg = f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
             raise TypeError(
-                f"The types of splittings are different! self: {self.iterative_splittings}, other: {other.iterative_splittings}"
+                msg
             )
 
         self.name = f"{self.name}_{other.name}" if self.name != other.name else self.name
         self.title = f"{self.title}_{other.title}" if self.title != other.title else self.title
         # Don't need to update iterative_splittings since they must be the same!
         # self.n_jets += self.n_jets
-        for (k, v), (k_other, v_other) in zip(self, other):
-            v += v_other
+        for (k, v), (k_other, v_other) in zip(self, other, strict=True):  # noqa: B007
+            v += v_other  # type: ignore[operator] # noqa: PLW2901
 
         return self
 
     @classmethod
     def create_boost_histograms(
-        cls: Type["SubstructureMatchingSubjetHists"], name: str, title: str, iterative_splittings: bool
-    ) -> "SubstructureMatchingSubjetHists":
+        cls: type[SubstructureMatchingSubjetHists], name: str, title: str, iterative_splittings: bool
+    ) -> SubstructureMatchingSubjetHists:
         jet_pt_axis = bh.axis.Regular(75, 0, 150)
         kt_axis = bh.axis.Regular(25, 0, 25)
         hybrid_jet_pt_axis = bh.axis.Regular(8, 0, 160)
@@ -1068,7 +1070,8 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
         # Validation
         # Give a useful error message
         if not all(isinstance(hist, bh.Histogram) for _, hist in self):
-            raise ValueError("Not all hists are boost histograms! Cannot fill!")
+            msg = "Not all hists are boost histograms! Cannot fill!"
+            raise ValueError(msg)
 
         # Fill the matching hists.
         for matching_type, matching_hist in self:
@@ -1078,10 +1081,10 @@ class SubstructureMatchingSubjetHists(SubstructureHistsBase):
             # Then make our selections and fill.
             selection = matching_selections[matching_type]
             matching_hist.fill(
-                hybrid_inputs.jets.jet_pt[selection],
-                hybrid_inputs.splittings.kt[selection],
-                matched_inputs.jets.jet_pt[selection],
-                matched_inputs.splittings.kt[selection],
+                hybrid_inputs.jets.jet_pt[selection],  # type: ignore[arg-type]
+                hybrid_inputs.splittings.kt[selection],  # type: ignore[arg-type]
+                matched_inputs.jets.jet_pt[selection],  # type: ignore[arg-type]
+                matched_inputs.splittings.kt[selection],  # type: ignore[arg-type]
                 weight=weight,
             )
 
@@ -1109,40 +1112,40 @@ class Hists(Generic[T_SubstructureHists]):
     leading_kt: T_SubstructureHists = attr.ib()
     leading_kt_hard_cutoff: T_SubstructureHists = attr.ib()
 
-    def __iter__(self) -> Iterator[Tuple[str, T_SubstructureHists]]:
+    def __iter__(self) -> Iterator[tuple[str, T_SubstructureHists]]:
         # We don't want to recurse because we have to handle the dict conversion more careful
         # for the SubstructureHists
         return iter(attr.asdict(self, recurse=False).items())
 
-    def __add__(self, other: "Hists[T_SubstructureHists]") -> "Hists[T_SubstructureHists]":
+    def __add__(self, other: Hists[T_SubstructureHists]) -> Hists[T_SubstructureHists]:
         """ Handles a = b + c. """
         new = copy.deepcopy(self)
         new += other
         return new
 
     def __iadd__(
-        self: "Hists[T_SubstructureHists]", other: "Hists[T_SubstructureHists]"
-    ) -> "Hists[T_SubstructureHists]":
+        self: Hists[T_SubstructureHists], other: Hists[T_SubstructureHists]
+    ) -> Hists[T_SubstructureHists]:
         """ Handles a += b. """
         # Add the stored values together.
-        for (k, v), (k_other, v_other) in zip(self, other):
+        for (k, v), (k_other, v_other) in zip(self, other, strict=True):
             # Validation
             if k != k_other:
-                raise ValueError(f"Somehow keys mismatch. self key: {k}, other key: {k_other}")
+                msg = f"Somehow keys mismatch. self key: {k}, other key: {k_other}"
+                raise ValueError(msg)
 
             # Assumes that they are passed by reference.
-            v += v_other  # type: ignore
+            v += v_other  # type: ignore[misc]  # noqa: PLW2901
 
         return self
 
-    def __radd__(self, other: "Hists[T_SubstructureHists]") -> "Hists[T_SubstructureHists]":
+    def __radd__(self, other: Hists[T_SubstructureHists]) -> Hists[T_SubstructureHists]:
         """ For use with sum(...). """
         if other == 0:
             return self
-        else:
-            # Help out mypy
-            assert not isinstance(other, int)
-            return self + other
+        # Help out mypy
+        assert not isinstance(other, int)
+        return self + other
 
     def convert_boost_histograms_to_binned_data(self) -> None:
         for _, v in self:
@@ -1156,37 +1159,37 @@ def create_substructure_hists(iterative_splittings: bool, z_cutoff: float) -> Hi
         title="Inclusive",
         iterative_splittings=iterative_splittings,
         # This isn't really going to be meaningful for the inclusive case...
-        values_axis=bh.axis.Regular(10, 0, 100),
+        values_axis=bh.axis.Regular(10, 0, 100),  # type: ignore[arg-type]
     )
     dynamical_z = SubstructureHists.create_boost_histograms(
         name="dynamical_z",
         title="zDrop",
         iterative_splittings=iterative_splittings,
-        values_axis=bh.axis.Regular(50, 0, 50),
+        values_axis=bh.axis.Regular(50, 0, 50),  # type: ignore[arg-type]
     )
     dynamical_kt = SubstructureHists.create_boost_histograms(
         name="dynamical_kt",
         title="ktDrop",
         iterative_splittings=iterative_splittings,
-        values_axis=kt_axis,
+        values_axis=kt_axis,  # type: ignore[arg-type]
     )
     dynamical_time = SubstructureHists.create_boost_histograms(
         name="dynamical_time",
         title="timeDrop",
         iterative_splittings=iterative_splittings,
-        values_axis=bh.axis.Regular(50, 0, 50),
+        values_axis=bh.axis.Regular(50, 0, 50),  # type: ignore[arg-type]
     )
     leading_kt = SubstructureHists.create_boost_histograms(
         name="leading_kt",
         title=r"Leading $k_{\text{T}}$",
         iterative_splittings=iterative_splittings,
-        values_axis=kt_axis,
+        values_axis=kt_axis,  # type: ignore[arg-type]
     )
     leading_kt_hard_cutoff = SubstructureHists.create_boost_histograms(
         name="leading_kt_hard_cutoff",
         title=fr"$z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
         iterative_splittings=iterative_splittings,
-        values_axis=kt_axis,
+        values_axis=kt_axis,  # type: ignore[arg-type]
     )
 
     # TODO: SD
@@ -1207,40 +1210,40 @@ def create_substructure_toy_hists(iterative_splittings: bool, z_cutoff: float) -
         title="Inclusive",
         iterative_splittings=iterative_splittings,
         # This isn't really going to be meaningful for the inclusive case...
-        values_axis=bh.axis.Regular(10, 0, 100),
+        values_axis=bh.axis.Regular(10, 0, 100),  # type: ignore[arg-type]
     )
     dynamical_z = SubstructureToyHists.create_boost_histograms(
         name="dynamical_z",
         title="zDrop",
         iterative_splittings=iterative_splittings,
-        values_axis=bh.axis.Regular(50, 0, 50),
+        values_axis=bh.axis.Regular(50, 0, 50),  # type: ignore[arg-type]
     )
     dynamical_kt = SubstructureToyHists.create_boost_histograms(
         name="dynamical_kt",
         title="ktDrop",
         iterative_splittings=iterative_splittings,
-        values_axis=kt_axis,
+        values_axis=kt_axis,  # type: ignore[arg-type]
     )
     dynamical_time = SubstructureToyHists.create_boost_histograms(
         name="dynamical_time",
         title="timeDrop",
         iterative_splittings=iterative_splittings,
-        values_axis=bh.axis.Regular(50, 0, 50),
+        values_axis=bh.axis.Regular(50, 0, 50),  # type: ignore[arg-type]
     )
     leading_kt = SubstructureToyHists.create_boost_histograms(
         name="leading_kt",
         title=r"Leading $k_{\text{T}}$",
         iterative_splittings=iterative_splittings,
-        values_axis=kt_axis,
+        values_axis=kt_axis,  # type: ignore[arg-type]
     )
     leading_kt_hard_cutoff = SubstructureToyHists.create_boost_histograms(
         name="leading_kt_hard_cutoff",
         title=fr"$z > {z_cutoff}$ Leading $k_{{\text{{T}}}}$",
         iterative_splittings=iterative_splittings,
-        values_axis=kt_axis,
+        values_axis=kt_axis,  # type: ignore[arg-type]
     )
 
-    # TODO: SD
+    # NOTE: Needs SD
     return Hists(
         inclusive=inclusive,
         dynamical_z=dynamical_z,
@@ -1255,7 +1258,7 @@ _T_ResponseHists = TypeVar("_T_ResponseHists", SubstructureResponseHists, Substr
 
 
 def _create_substructure_response_hists(
-    response_hists_class: Type[_T_ResponseHists],
+    response_hists_class: type[_T_ResponseHists],
     iterative_splittings: bool,
     z_cutoff: float,
     axis_map: Mapping[str, str],
@@ -1318,7 +1321,7 @@ def _create_substructure_response_hists(
         generator_like_jet_pt_axis=generator_like_jet_pt_axis,
     )
 
-    # TODO: SD
+    # NOTE: Needs SD
     return Hists(
         inclusive=inclusive,
         dynamical_z=dynamical_z,
@@ -1414,19 +1417,20 @@ class SingleTreeResultBase:
     def keys(self) -> Iterator[str]:
         return iter(attr.fields_dict(type(self)).keys())
 
-    def items(self) -> Iterator[Tuple[str, Dict[Identifier, Hists[T_SubstructureHists]]]]:
+    def items(self) -> Iterator[tuple[str, dict[Identifier, Hists[T_SubstructureHists]]]]:
         return iter(attr.asdict(self, recurse=False).items())
 
-    def values(self) -> Iterator[Dict[Identifier, Hists[T_SubstructureHists]]]:
+    def values(self) -> Iterator[dict[Identifier, Hists[T_SubstructureHists]]]:
         return iter(attr.astuple(self, recurse=False))
 
     def create_hists(self, dataset: Dataset, **selections: Any) -> bool:
-        raise NotImplementedError("Needs to be implemented by the daughter class")
+        msg = "Needs to be implemented by the daughter class"
+        raise NotImplementedError(msg)
 
 
 @attr.s
 class SingleTreeResult(SingleTreeResultBase):
-    hists: Dict[Identifier, Hists[SubstructureHists]] = attr.ib(factory=dict)
+    hists: dict[Identifier, Hists[SubstructureHists]] = attr.ib(factory=dict)
 
     def create_hists(self, dataset: Dataset, **selections: Any) -> bool:
         for kwargs in helpers.dict_product(selections):
@@ -1441,7 +1445,7 @@ class SingleTreeResult(SingleTreeResultBase):
 
 @attr.s
 class SingleTreeToyResult(SingleTreeResultBase):
-    hists: Dict[Identifier, Hists[SubstructureToyHists]] = attr.ib(factory=dict)
+    hists: dict[Identifier, Hists[SubstructureToyHists]] = attr.ib(factory=dict)
 
     def create_hists(self, dataset: Dataset, **selections: Any) -> bool:
         for kwargs in helpers.dict_product(selections):
@@ -1456,12 +1460,12 @@ class SingleTreeToyResult(SingleTreeResultBase):
 
 @attr.s
 class SingleTreeEmbeddingResult(SingleTreeResultBase):
-    true_hists: Dict[Identifier, Hists[SubstructureHists]] = attr.ib(factory=dict)
-    det_level_hists: Dict[Identifier, Hists[SubstructureHists]] = attr.ib(factory=dict)
-    hybrid_hists: Dict[Identifier, Hists[SubstructureHists]] = attr.ib(factory=dict)
-    detector_particle_response: Dict[Identifier, Hists[SubstructureResponseHists]] = attr.ib(factory=dict)
-    hybrid_detector_response: Dict[Identifier, Hists[SubstructureResponseHists]] = attr.ib(factory=dict)
-    hybrid_particle_response: Dict[Identifier, Hists[SubstructureResponseExtendedHists]] = attr.ib(factory=dict)
+    true_hists: dict[Identifier, Hists[SubstructureHists]] = attr.ib(factory=dict)
+    det_level_hists: dict[Identifier, Hists[SubstructureHists]] = attr.ib(factory=dict)
+    hybrid_hists: dict[Identifier, Hists[SubstructureHists]] = attr.ib(factory=dict)
+    detector_particle_response: dict[Identifier, Hists[SubstructureResponseHists]] = attr.ib(factory=dict)
+    hybrid_detector_response: dict[Identifier, Hists[SubstructureResponseHists]] = attr.ib(factory=dict)
+    hybrid_particle_response: dict[Identifier, Hists[SubstructureResponseExtendedHists]] = attr.ib(factory=dict)
 
     def create_hists(self, dataset: Dataset, **selections: Any) -> bool:
         for kwargs in helpers.dict_product(selections):
@@ -1511,10 +1515,11 @@ class SingleTreeEmbeddingResult(SingleTreeResultBase):
             )
 
             # Cross check that we have a reasonable jet_pt_bin
-            true_hists_jet_pt_bins = [identifier.jet_pt_bin for identifier in self.true_hists.keys()]
+            true_hists_jet_pt_bins = [identifier.jet_pt_bin for identifier in self.true_hists.keys()]  # noqa: SIM118
             if kwargs["jet_pt_bin"] not in true_hists_jet_pt_bins:
+                msg = "Expected jet pt bin {kwargs['jet_pt_bin']} used for the response and matching to be in the true hists. However, the true_hists only contain: {true_hists_jet_pt_bins}"
                 raise ValueError(
-                    "Expected jet pt bin {kwargs['jet_pt_bin']} used for the response and matching to be in the true hists. However, the true_hists only contain: {true_hists_jet_pt_bins}"
+                    msg
                 )
 
         return True

@@ -7,12 +7,10 @@ from __future__ import annotations
 
 import copy
 import logging
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
-    Mapping,
-    Sequence,
 )
 
 import cycler
@@ -55,7 +53,7 @@ def hist_stat_tests_KS_chi2(
         # When below 1, take the upper error, and do the opposite above 1
         # NOTE: We basically assume that they're one sigma
         y_systematic_values = np.where(ratio.values <= 1, y_systematic.high, y_systematic.low)
-        for i, (_value, _error) in enumerate(zip(hist.values, hist.errors), start=1):
+        for i, (_value, _error) in enumerate(zip(hist.values, hist.errors, strict=True), start=1):
             data_hist.SetBinError(i, np.sqrt(_error ** 2 + y_systematic_values[i-1] ** 2))
 
         reference_hist = data_hist.Clone("reference")
@@ -100,7 +98,7 @@ def plausible_stat_test(ratio: binned_data.BinnedData, n_samples: int, n_sigma_s
     rng = np.random.default_rng()
 
     # Sample possible values
-    for i, (value, error) in enumerate(zip(ratio.values, ratio.errors)):
+    for i, (value, error) in enumerate(zip(ratio.values, ratio.errors, strict=True)):
         #logger.debug(f"{i=}: {value=}, {error=}")
         samples[i, :] = rng.normal(loc=value, scale=error * n_sigma_stat, size=n_samples)
 
@@ -1500,7 +1498,7 @@ def _plot_simple_kt_with_systematics(
             linestyle="",
             label=style.label,
             zorder=style.zorder,
-            **kwargs,
+            **kwargs,  # type: ignore[arg-type]
         )
 
         # Systematic uncertainty
@@ -4112,7 +4110,7 @@ def plot_kt_unfolding(
         # TODO: 120 should work... For some reason, it doesn't seem to work when I try with the model dependence...
         #_small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 60, 80, 100, 120])
         _small_jet_pt_bins = np.array([unfolding_output.smeared_jet_pt_range.min, 60, 80, 100])
-    for _low, _high in zip(_small_jet_pt_bins[:-1], _small_jet_pt_bins[1:]):
+    for _low, _high in zip(_small_jet_pt_bins[:-1], _small_jet_pt_bins[1:], strict=True):  # noqa: RUF007
         _small_jet_pt_range = helpers.JetPtRange(_low, _high)
         text = f"${_small_jet_pt_range.display_str(label='data')}$"
         plot_refolded(

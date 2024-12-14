@@ -8,24 +8,24 @@ from __future__ import annotations
 import functools
 import logging
 import typing
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, TypeVar, cast
-
+from typing import Any, TypeVar, cast
 
 try:
-    from typing import Final  # type: ignore
+    from typing import Final
 except ImportError:
-    from typing_extensions import Final
+    from typing import Final
 
 import awkward as ak
 import numpy as np
+import numpy.typing as npt
 import pyarrow as pa
 import pyarrow.parquet as pq
 import uproot
 import vector
 
 from jet_substructure.base.helpers import ArrayOrScalar, UprootArray
-
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ def _dynamical_hardness_measure(delta_R: float, z: float, parent_pt: float, R: f
     ...
 
 
-def _dynamical_hardness_measure(delta_R, z, parent_pt, R, a):  # type: ignore
+def _dynamical_hardness_measure(delta_R, z, parent_pt, R, a):  # type: ignore[no-untyped-def]
     """Implements the dynamical hardness measure used in dynamical grooming.
 
     Args:
@@ -120,7 +120,7 @@ Returns:
 """
 
 
-def find_leading(values: UprootArray[_T]) -> Tuple[np.ndarray, UprootArray[int]]:
+def find_leading(values: UprootArray[_T]) -> tuple[npt.NDArray[np.float32], UprootArray[int]]:
     """Calculate hardest value given a set of values.
 
     Used for dynamical grooming, hardest kt, etc.
@@ -164,10 +164,10 @@ class JetConstituentCommon:
 
     def delta_R(self: _T_JetConstituent, other: _T_JetConstituent) -> ArrayOrScalar[float]:
         """Separation between jet constituents."""
-        return cast(ArrayOrScalar[float], np.sqrt((self.phi - other.phi) ** 2 + (self.eta - other.eta) ** 2))  # type: ignore
+        return cast(ArrayOrScalar[float], np.sqrt((self.phi - other.phi) ** 2 + (self.eta - other.eta) ** 2))  # type: ignore[arg-type]
 
 
-class JetConstituent(ak.Record, JetConstituentCommon):  # type: ignore
+class JetConstituent(ak.Record, JetConstituentCommon):  # type: ignore[misc]
     """A single jet constituent.
 
     Args:
@@ -182,11 +182,11 @@ class JetConstituent(ak.Record, JetConstituentCommon):  # type: ignore
     phi: float
     id: int
 
-    def four_vector(self, mass_hypothesis: float = 0.139) -> None:
-        return vector.obj(pt=self.pt, eta=self.eta, phi=self.phi, m=mass_hypothesis)
+    def four_vector(self, mass_hypothesis: float = 0.139) -> vector.MomentumObject4D:
+        return vector.MomentumObject4D(pt=self.pt, eta=self.eta, phi=self.phi, m=mass_hypothesis)  # type: ignore[no-any-return]
 
 
-class JetConstituentArray(ak.Array, JetConstituentCommon):  # type: ignore
+class JetConstituentArray(ak.Array, JetConstituentCommon):  # type: ignore[misc]
     """Methods for operating on jet constituents arrays.
 
     These methods operate on externally stored arrays. This is solely a mixin.
@@ -230,7 +230,7 @@ class SubjetCommon:
     def parent_splitting(self, splittings: JetSplittingArray) -> JetSplitting:
         ...
 
-    def parent_splitting(self, splittings):  # type: ignore
+    def parent_splitting(self, splittings):  # type: ignore[no-untyped-def]
         """Retrieve the parent splitting of this subjet.
 
         Args:
@@ -241,7 +241,7 @@ class SubjetCommon:
         return splittings[self.parent_splitting_index]
 
 
-class Subjet(ak.Record, SubjetCommon):  # type: ignore
+class Subjet(ak.Record, SubjetCommon):  # type: ignore[misc]
     """Single subjet."""
 
     part_of_iterative_splitting: bool
@@ -249,7 +249,7 @@ class Subjet(ak.Record, SubjetCommon):  # type: ignore
     constituents_indices: UprootArray[int]
 
 
-class SubjetArray(ak.Array, SubjetCommon):  # type: ignore
+class SubjetArray(ak.Array, SubjetCommon):  # type: ignore[misc]
     """Array of subjets."""
 
     part_of_iterative_splitting: UprootArray[bool]
@@ -289,7 +289,7 @@ class JetSplittingCommon:
             None.
         """
         # parent_pt = subleading / z = kt / sin(delta_R) / z
-        return cast(UprootArray[float], self.kt / np.sin(self.delta_R) / self.z)  # type: ignore
+        return cast(UprootArray[float], self.kt / np.sin(self.delta_R) / self.z)  # type: ignore[arg-type]
 
     def theta(self, jet_R: float) -> ArrayOrScalar[float]:
         """Theta of the splitting.
@@ -304,7 +304,7 @@ class JetSplittingCommon:
         return self.delta_R / jet_R
 
 
-class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
+class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore[misc]
     """Single jet splitting."""
 
     kt: float
@@ -338,7 +338,7 @@ class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
         Returns:
             Dynamical core of the splitting.
         """
-        return dynamical_core(self.delta_R, self.z, self.parent_pt, R)  # type: ignore
+        return dynamical_core(self.delta_R, self.z, self.parent_pt, R)  # type: ignore[return-value]
 
     def dynamical_z(self, R: float) -> float:
         """Dynamical z of the splitting.
@@ -350,7 +350,7 @@ class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
         Returns:
             Dynamical z of the splitting.
         """
-        return dynamical_z(self.delta_R, self.z, self.parent_pt, R)  # type: ignore
+        return dynamical_z(self.delta_R, self.z, self.parent_pt, R)  # type: ignore[return-value]
 
     def dynamical_kt(self, R: float) -> float:
         """Dynamical kt of the splitting.
@@ -362,7 +362,7 @@ class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
         Returns:
             Dynamical kt of the splitting.
         """
-        return dynamical_kt(self.delta_R, self.z, self.parent_pt, R)  # type: ignore
+        return dynamical_kt(self.delta_R, self.z, self.parent_pt, R)  # type: ignore[return-value]
 
     def dynamical_time(self, R: float) -> float:
         """Dynamical time of the splitting.
@@ -374,10 +374,10 @@ class JetSplitting(ak.Record, JetSplittingCommon):  # type: ignore
         Returns:
             Dynamical time of the splitting.
         """
-        return dynamical_time(self.delta_R, self.z, self.parent_pt, R)  # type: ignore
+        return dynamical_time(self.delta_R, self.z, self.parent_pt, R)  # type: ignore[return-value]
 
 
-class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
+class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore[misc]
     """Array of jet splittings."""
 
     kt: UprootArray[float]
@@ -395,7 +395,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
         """
         return cast(SubjetArray, self[subjets.iterative_splitting_index])
 
-    def dynamical_core(self, R: float) -> Tuple[np.ndarray, UprootArray[int], UprootArray[int]]:
+    def dynamical_core(self, R: float) -> tuple[npt.NDArray[np.float32], UprootArray[int], UprootArray[int]]:
         """Dynamical core of the jet splittings.
 
         Args:
@@ -406,7 +406,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
         values, indices = find_leading(dynamical_core(self.delta_R, self.z, self.parent_pt, R))
         return values, indices, ak.local_index(self.z, axis=-1)
 
-    def dynamical_z(self, R: float) -> Tuple[np.ndarray, UprootArray[int], UprootArray[int]]:
+    def dynamical_z(self, R: float) -> tuple[npt.NDArray[np.float32], UprootArray[int], UprootArray[int]]:
         """Dynamical z of the jet splittings.
 
         Args:
@@ -417,7 +417,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
         values, indices = find_leading(dynamical_z(self.delta_R, self.z, self.parent_pt, R))
         return values, indices, ak.local_index(self.z, axis=-1)
 
-    def dynamical_kt(self, R: float) -> Tuple[np.ndarray, UprootArray[int], UprootArray[int]]:
+    def dynamical_kt(self, R: float) -> tuple[npt.NDArray[np.float32], UprootArray[int], UprootArray[int]]:
         """Dynamical kt of the jet splittings.
 
         Args:
@@ -428,7 +428,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
         values, indices = find_leading(dynamical_kt(self.delta_R, self.z, self.parent_pt, R))
         return values, indices, ak.local_index(self.z, axis=-1)
 
-    def dynamical_time(self, R: float) -> Tuple[np.ndarray, UprootArray[int], UprootArray[int]]:
+    def dynamical_time(self, R: float) -> tuple[npt.NDArray[np.float32], UprootArray[int], UprootArray[int]]:
         """Dynamical time of the jet splittings.
 
         Args:
@@ -439,7 +439,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
         values, indices = find_leading(dynamical_time(self.delta_R, self.z, self.parent_pt, R))
         return values, indices, ak.local_index(self.z, axis=-1)
 
-    def leading_kt(self, z_cutoff: Optional[float] = None) -> Tuple[np.ndarray, UprootArray[int], UprootArray[int]]:
+    def leading_kt(self, z_cutoff: float | None = None) -> tuple[npt.NDArray[np.float32], UprootArray[int], UprootArray[int]]:
         """Leading kt of the jet splittings.
 
         Args:
@@ -457,7 +457,7 @@ class JetSplittingArray(ak.Array, JetSplittingCommon):  # type: ignore
         values, indices = find_leading(self.kt[indices_passing_cutoff])
         return values, indices_passing_cutoff[indices], indices_passing_cutoff
 
-    def soft_drop(self, z_cutoff: float) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
+    def soft_drop(self, z_cutoff: float) -> tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
         """Calculate soft drop of the splittings.
 
         Note:
@@ -512,7 +512,7 @@ def _convert_tree_to_parquet(
     branches: Sequence[str],
     prefix_branches: Sequence[str],
     output_filename: Path,
-    entries: Tuple[Optional[int], Optional[int]],
+    entries: tuple[int | None, int | None],
     verbose: bool = False,
 ) -> bool:
     """Convert open tree to parquet.
@@ -545,7 +545,7 @@ def _convert_tree_to_parquet(
         tree.show()
 
     # Determine branches.
-    all_branches: List[str] = []
+    all_branches: list[str] = []
     all_branches.extend(branches)
     for prefix in prefixes:
         all_branches.extend([b.format(prefix=prefix) for b in prefix_branches])
@@ -573,9 +573,9 @@ def convert_tree_to_parquet(
     prefixes: Sequence[str],
     branches: Sequence[str],
     prefix_branches: Sequence[str],
-    output_filename: Optional[Path] = None,
-    entries: Optional[Tuple[Optional[int], Optional[int]]] = None,
-) -> Tuple[bool, Path]:
+    output_filename: Path | None = None,
+    entries: tuple[int | None, int | None] | None = None,
+) -> tuple[bool, Path]:
     """Convert a ROOT tree to a parquet file using awkward.
 
     The main benefit is that it can open _much_ faster via parquet compared to uproot because it doesn't
@@ -622,7 +622,7 @@ def convert_tree_to_parquet(
     return result, output_filename
 
 
-def parquet_to_substructure_analysis(filename: Path, prefixes: Mapping[str, str]) -> Dict[str, ak.Array]:
+def parquet_to_substructure_analysis(filename: Path, prefixes: Mapping[str, str]) -> dict[str, ak.Array]:
     """Convert an existing parquet file to arrays for substructure analysis.
 
     Note:

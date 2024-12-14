@@ -13,20 +13,20 @@ import gzip
 import logging
 import pickle
 import zlib
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
+from typing import TypeVar, cast
 
 import attr
 import awkward0 as ak0
 import enlighten
 import IPython
 import numpy as np
-from pachyderm import binned_data, yaml
 from pathos.multiprocessing import ProcessingPool as Pool
 
 from jet_substructure.base import analysis_objects, data_manager, helpers, substructure_methods
 from jet_substructure.base.helpers import UprootArray
-
+from pachyderm import binned_data, yaml
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class SubstructureResult:
             # If there were no splittings, we want to set that to 0.
             splitting_number = splitting_number.pad(1).fillna(0)
             # Must flatten because the indices are still jagged.
-            self._splitting_number: UprootArray[int] = splitting_number.flatten()
+            self._splitting_number: UprootArray[int] = splitting_number.flatten()  # type: ignore[assignment]
 
         return self._splitting_number
 
@@ -67,15 +67,15 @@ def setup_yaml() -> yaml.ruamel.yaml.YAML:
 
 
 def _convert_and_write_hists(
-    hists: Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]],
+    hists: dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]],
     tree_filename: Path,
     yaml_filename: Path,
     y: yaml.ruamel.yaml.YAML,
-) -> Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]:
+) -> dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]:
     # Convert to BinnedData and store the hists
     for h in hists.values():
         h.convert_boost_histograms_to_binned_data()
-    with open(yaml_filename, "w") as f:
+    with Path(yaml_filename).open("w") as f:
         logger.info(f"Writing hists of the tree {tree_filename} to {yaml_filename}")
         y.dump(hists, f)
 
@@ -103,7 +103,7 @@ def _construct_jets_from_tree(
         jets = cast(substructure_methods.SubstructureJetArray, tree[constructed_name])
         # Check whether the JaggedArrays which are stored in the file were constructed properly
         try:
-            jets.constituents.max_pt
+            jets.constituents.max_pt  # noqa: B018
         except AttributeError:
             jets = substructure_methods.SubstructureJetArray._from_serialization(
                 jet_pt=jets.jet_pt,
@@ -137,7 +137,7 @@ def _construct_jets_from_tree(
 
 def load_jets_from_tree(
     tree: data_manager.Tree, prefixes: Sequence[str]
-) -> Tuple[bool, Tuple[substructure_methods.SubstructureJetArray, ...]]:
+) -> tuple[bool, tuple[substructure_methods.SubstructureJetArray, ...]]:
     """Create jets from a tree with given prefix(es).
 
     Args:
@@ -170,7 +170,7 @@ def load_jets_from_tree(
 
 def _calculate_inclusive(
     splittings: substructure_methods.JetSplittingArray,
-) -> Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
+) -> tuple[UprootArray[float], UprootArray[int], UprootArray[int]]:
     """Calculate the inclusive splittings.
 
     Note:
@@ -183,18 +183,18 @@ def _calculate_inclusive(
     Returns:
         Ones in the same length as the indices, indices for all splittings.
     """
-    return splittings.kt.ones_like().flatten(), splittings.localindex, splittings.localindex
+    return splittings.kt.ones_like().flatten(), splittings.localindex, splittings.localindex  # type: ignore[return-value]
 
 
 def _define_calculation_funcs(
     dataset: analysis_objects.Dataset,
-) -> Tuple[
-    functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
-    functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
-    functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
-    functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
-    functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
-    functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+) -> tuple[
+    functools.partial[tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    functools.partial[tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    functools.partial[tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    functools.partial[tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    functools.partial[tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    functools.partial[tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
 ]:
     """Define the calculation functions of interest.
 
@@ -230,7 +230,7 @@ def _define_calculation_funcs(
 
 
 def _fill_substructure_hists_with_calculation(
-    calculation: functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    calculation: functools.partial[tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
     fill_attr_name: str,
     restricted_jets: substructure_methods.SubstructureJetArray,
     restricted_jets_splittings: substructure_methods.JetSplittingArray,
@@ -270,8 +270,8 @@ def analyze_single_tree(
     if pkl_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
         with gzip.GzipFile(pkl_filename, "r") as pkl_file:
-            results = analysis_objects.SingleTreeResult(**pickle.load(pkl_file))  # type: ignore
-            return results
+            results = analysis_objects.SingleTreeResult(**pickle.load(pkl_file))
+            return results  # noqa: RET504
 
     # Since we're actually processing, we setup the output hists
     iterables = {
@@ -296,7 +296,7 @@ def analyze_single_tree(
         # The jet_pt_mask is just a hack for selecting everything.
         _, temp_iterative_splittings = _select_and_retrieve_splittings(
             jets,
-            jet_pt_mask=np.ones_like(jets) > 0,
+            jet_pt_mask=np.ones_like(jets) > 0,  # type: ignore[arg-type]
             iterative_splittings=True,
         )
         assert (jets.splittings[iterative_splittings_mask] == temp_iterative_splittings).all().all()
@@ -318,7 +318,7 @@ def analyze_single_tree(
     with progress_manager.counter(
         total=len(results.hists), desc="Analyzing", unit="variation", leave=False
     ) as selections_counter:
-        for identifier, h in selections_counter(results.hists.items()):
+        for identifier, h in selections_counter(results.hists.items()):  # noqa: B007
             # Restrict the jets
             restricted_jets, restricted_jets_splittings = _select_and_retrieve_splittings(
                 jets,
@@ -348,14 +348,14 @@ def analyze_single_tree(
 
     # Store hists with pickle because it takes too longer otherwise (and for consistency).
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
-        pickle.dump(dict(results.items()), pkl_file)  # type: ignore
+        pickle.dump(dict(results.items()), pkl_file)
 
     logger.info(f"Finished processing tree from file {tree.filename}")
     return results
 
 
 def _fill_toy_hists_with_calculation(
-    calculation: functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    calculation: functools.partial[tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
     fill_attr_name: str,
     restricted_data_jets: substructure_methods.SubstructureJetArray,
     restricted_data_jets_splittings: substructure_methods.JetSplittingArray,
@@ -409,8 +409,8 @@ def analyze_single_tree_toy(
     if pkl_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
         with gzip.GzipFile(pkl_filename, "r") as pkl_file:
-            results = analysis_objects.SingleTreeToyResult(**pickle.load(pkl_file))  # type: ignore
-            return results
+            results = analysis_objects.SingleTreeToyResult(**pickle.load(pkl_file))
+            return results  # noqa: RET504
 
     # Since we're actually processing, we setup the output hists
     iterables = {
@@ -441,7 +441,7 @@ def analyze_single_tree_toy(
     with progress_manager.counter(
         total=len(results.hists), desc="Analyzing", unit="toy variation", leave=False
     ) as selections_counter:
-        for identifier, h in selections_counter(results.hists.items()):
+        for identifier, h in selections_counter(results.hists.items()):  # noqa: B007
             # We want to restrict a constant hybrid jet pt range for both true and hybrid.
             # This will allow us to compare to measured jet pt ranges.
             jet_pt_mask = identifier.jet_pt_bin.mask_array(data_jets.jet_pt)
@@ -480,7 +480,7 @@ def analyze_single_tree_toy(
 
     # Store hists with pickle because it takes too longer otherwise.
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
-        pickle.dump(dict(results.items()), pkl_file)  # type: ignore
+        pickle.dump(dict(results.items()), pkl_file)
 
     logger.info(f"Finished processing tree from file {tree.filename}")
     return results
@@ -488,7 +488,7 @@ def analyze_single_tree_toy(
 
 def _select_and_retrieve_splittings(
     jets: substructure_methods.SubstructureJetArray, jet_pt_mask: UprootArray[bool], iterative_splittings: bool
-) -> Tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray]:
+) -> tuple[substructure_methods.SubstructureJetArray, substructure_methods.JetSplittingArray]:
     # Ensure that there are sufficient counts
     restricted_jets = jets[jet_pt_mask]
     if iterative_splittings:
@@ -526,7 +526,7 @@ def _subjets_contributing_to_splittings(
 
 def _get_leading_and_subleading_subjets(
     subjets_unsorted: substructure_methods.SubjetArray,
-) -> Tuple[substructure_methods.SubjetArray, substructure_methods.SubjetArray]:
+) -> tuple[substructure_methods.SubjetArray, substructure_methods.SubjetArray]:
     """Determine the leading and subleading subjets based on the sum of subjet constituents pt.
 
     Args:
@@ -553,7 +553,7 @@ def _get_leading_and_subleading_subjets(
 
 def _split_array(
     a: substructure_methods.SubjetArray, n: int
-) -> Iterable[Tuple[substructure_methods.SubjetArray, slice]]:
+) -> Iterable[tuple[substructure_methods.SubjetArray, slice]]:
     """Split an array into n chunks.
 
     Currently the typing suggests that it will only work for SubjetArray, but it should work for any array.
@@ -563,7 +563,7 @@ def _split_array(
     k, m = divmod(len(a), n)
     return (
         (
-            a[i * k + min(i, m) : (i + 1) * k + min(i + 1, m)],  # noqa: E203 . Conflicts with black...
+            a[i * k + min(i, m) : (i + 1) * k + min(i + 1, m)],
             slice(i * k + min(i, m), (i + 1) * k + min(i + 1, m)),
         )
         for i in range(n)
@@ -597,7 +597,7 @@ def _determine_matching_types(
     # numpy array, and in this case, we don't want such a conversion.
     for (matched_subset, selected_range), (hybrid_subset, _) in zip(
         _split_array(matched_subjets.constituents, number_of_chunks),
-        _split_array(hybrid_subjets.constituents, number_of_chunks),
+        _split_array(hybrid_subjets.constituents, number_of_chunks), strict=False,
     ):
         constituent_pairs = matched_subset.argcross(hybrid_subset)
         matched_leading_indices, hybrid_leading_indices = constituent_pairs.unzip()
@@ -639,7 +639,7 @@ def determine_matched_jets(
     hybrid_inputs: analysis_objects.FillHistogramInput,
     matched_inputs: analysis_objects.FillHistogramInput,
     match_using_distance: bool = False,
-) -> Tuple[analysis_objects.MatchingResult, analysis_objects.MatchingResult]:
+) -> tuple[analysis_objects.MatchingResult, analysis_objects.MatchingResult]:
     """Determine the matching between subjets.
 
     The passed jets need to have the selected indices already applied.
@@ -655,10 +655,10 @@ def determine_matched_jets(
     """
     # Setup
     # Mask if one of the inputs doesn't have a selected splitting (appears to only matter at detector level if we have a z_cut)
-    mask = (matched_inputs.indices.counts != 0) & (hybrid_inputs.indices.counts != 0)
+    mask = (matched_inputs.indices.counts != 0) & (hybrid_inputs.indices.counts != 0)  # type: ignore[comparison-overlap]
     # try:
-    restricted_matched_inputs = matched_inputs[mask]
-    restricted_hybrid_inputs = hybrid_inputs[mask]
+    restricted_matched_inputs = matched_inputs[mask]  # type: ignore[index]
+    restricted_hybrid_inputs = hybrid_inputs[mask]  # type: ignore[index]
     # except IndexError as e:
     #    logger.warning(e)
     #    IPython.start_ipython(user_ns=locals())
@@ -697,7 +697,7 @@ def determine_matched_jets(
 
 
 def _fill_embedded_hists_with_calculation(
-    calculation: functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
+    calculation: functools.partial[tuple[UprootArray[float], UprootArray[int], UprootArray[int]]],
     fill_attr_name: str,
     identifier: analysis_objects.Identifier,
     restricted_true_jets: substructure_methods.SubstructureJetArray,
@@ -711,13 +711,9 @@ def _fill_embedded_hists_with_calculation(
     hybrid_hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
     jet_R: float,
     weight: float,
-    detector_particle_response_hists: Optional[
-        analysis_objects.Hists[analysis_objects.SubstructureResponseHists]
-    ] = None,
-    hybrid_detector_response_hists: Optional[analysis_objects.Hists[analysis_objects.SubstructureResponseHists]] = None,
-    hybrid_particle_response_hists: Optional[
-        analysis_objects.Hists[analysis_objects.SubstructureResponseExtendedHists]
-    ] = None,
+    detector_particle_response_hists: analysis_objects.Hists[analysis_objects.SubstructureResponseHists] | None = None,
+    hybrid_detector_response_hists: analysis_objects.Hists[analysis_objects.SubstructureResponseHists] | None = None,
+    hybrid_particle_response_hists: analysis_objects.Hists[analysis_objects.SubstructureResponseExtendedHists] | None = None,
 ) -> None:
     # Calculate the inputs
     true_inputs = analysis_objects.FillHistogramInput(
@@ -763,8 +759,9 @@ def _fill_embedded_hists_with_calculation(
         != (hybrid_particle_response_hists is not None)
     ):
         # These should always be paired together, so something has gone wrong. Raise to notify.
+        msg = f"Passed one of detector-particle, hybrid-detector, or hybrid-particle response hists, but not the other. Detector-particle: {detector_particle_response_hists}, hybrid-detector: {hybrid_detector_response_hists}, hybrid_particle: {hybrid_particle_response_hists}"
         raise ValueError(
-            f"Passed one of detector-particle, hybrid-detector, or hybrid-particle response hists, but not the other. Detector-particle: {detector_particle_response_hists}, hybrid-detector: {hybrid_detector_response_hists}, hybrid_particle: {hybrid_particle_response_hists}"
+            msg
         )
 
     # Because of the validation, the time for filling the matching is equivalent to when we should fill the response hists.
@@ -776,16 +773,16 @@ def _fill_embedded_hists_with_calculation(
         # the inputs to be the right length to work the output from the matching.
         # Mask if one of the inputs doesn't have a selected splitting (that appears to only matter at detector
         # level if we have a z_cut).
-        mask = (det_level_inputs.indices.counts != 0) & (hybrid_inputs.indices.counts != 0)
+        mask = (det_level_inputs.indices.counts != 0) & (hybrid_inputs.indices.counts != 0)  # type: ignore[comparison-overlap]
         try:
-            restricted_det_level_inputs = det_level_inputs[mask]
-            restricted_hybrid_inputs = hybrid_inputs[mask]
+            restricted_det_level_inputs = det_level_inputs[mask]  # type: ignore[index]
+            restricted_hybrid_inputs = hybrid_inputs[mask]  # type: ignore[index]
             # True inputs aren't necessarily appropriate here because we're matching between hybrid-det level,
             # but include it so we can include the matching in the hybrid-particle response.
-            restricted_true_inputs = true_inputs[mask]
+            restricted_true_inputs = true_inputs[mask]  # type: ignore[index]
         except IndexError as e:
             logger.warning(e)
-            IPython.start_ipython(user_ns=locals())
+            IPython.start_ipython(user_ns=locals())  # type: ignore[no-untyped-call]
 
         # Perform the matching
         # TODO: Does this work with the leading cutoff?? Not yet.
@@ -798,7 +795,7 @@ def _fill_embedded_hists_with_calculation(
             )
         except ValueError as e:
             logger.warning(e)
-            IPython.start_ipython(user_ns=locals())
+            IPython.start_ipython(user_ns=locals())  # type: ignore[no-untyped-call]
 
         # TODO: These matching selections are wrong for particle-detector. Should be okay for hybrid-particle (because we're most interested in hybrid-det matching there).
 
@@ -839,7 +836,7 @@ def _fill_embedded_hists_with_calculation(
         )
 
 
-def analyze_single_tree_embedding(  # noqa: C901
+def analyze_single_tree_embedding(
     tree: data_manager.Tree,
     dataset: analysis_objects.Dataset,
     jet_pt_bins: Sequence[helpers.RangeSelector],
@@ -870,8 +867,8 @@ def analyze_single_tree_embedding(  # noqa: C901
     if pkl_filename.exists() and not force_reprocessing:
         logger.info(f"Skipping processing of tree {tree.filename} by loading data from stored hists.")
         with gzip.GzipFile(pkl_filename, "r") as pkl_file:
-            results = analysis_objects.SingleTreeEmbeddingResult(**pickle.load(pkl_file))  # type: ignore
-            # true_hists, det_level_hists, hybrid_hists, response_hists, matching_hists =   # type: ignore
+            results = analysis_objects.SingleTreeEmbeddingResult(**pickle.load(pkl_file))
+            # true_hists, det_level_hists, hybrid_hists, response_hists, matching_hists =
             # NOTE: This is transient for loading files this way. However, it won't be transient if we load
             #       for just plotting (as it will be saved in the merge hists)
             if scale_n_jets_when_loading_hists:
@@ -880,7 +877,7 @@ def analyze_single_tree_embedding(  # noqa: C901
                 )
                 for result_hists in [results.true_hists, results.det_level_hists, results.hybrid_hists]:
                     for temp_hists in result_hists.values():
-                        for technique, technique_hists in temp_hists:
+                        for technique, technique_hists in temp_hists:  # noqa: B007
                             technique_hists.n_jets *= scale_factor
             return results
 
@@ -917,7 +914,7 @@ def analyze_single_tree_embedding(  # noqa: C901
     ) as selections_counter:
         # NOTE: It's important to iterate with true_hists rather than response_hists because true_hists will have
         #       more selections, and is required to contain the response_hists selection(s).
-        for identifier, h in selections_counter(results.true_hists.items()):
+        for identifier, h in selections_counter(results.true_hists.items()):  # noqa: B007
             # Jet quality selections.
             # We want to restrict a constant hybrid jet pt range for both true and hybrid.
             # This will allow us to compare to measured jet pt ranges.
@@ -982,7 +979,7 @@ def analyze_single_tree_embedding(  # noqa: C901
     # NOTE: We expand out the values when pickling in case the object changes.
     logger.debug("Done processing. Writing out results.")
     with gzip.GzipFile(pkl_filename, "w") as pkl_file:
-        pickle.dump(dict(results.items()), pkl_file)  # type: ignore
+        pickle.dump(dict(results.items()), pkl_file)
 
     logger.info(f"Finished processing tree from file {tree.filename}")
     return results
@@ -1099,9 +1096,9 @@ def _wrap_multiprocessing(
     tree: Callable[[], data_manager.Tree],
     analysis_function: Callable[
         [data_manager.Tree],
-        Sequence[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]],
+        Sequence[dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]],
     ],
-) -> Sequence[Dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]]:
+) -> Sequence[dict[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.T_SubstructureHists]]]:
     """Wrap analysis function to instantiate the fully lazy tree.
 
     To be used in conjunction with multiprocessing (which is why we need to delay instantiating the tree).
@@ -1140,8 +1137,8 @@ def merge_results(existing: _T_Result, new_result: _T_Result) -> _T_Result:
                 h.convert_boost_histograms_to_binned_data()
 
     # TODO: ****Check****: Does this actually modify the object contained within??
-    for (name, hist_result), (new_name, new_hist_result) in zip(existing.items(), new_result.items()):
-        for k in hist_result.keys():
+    for (name, hist_result), (new_name, new_hist_result) in zip(existing.items(), new_result.items(), strict=False):  # noqa: B007
+        for k in hist_result:
             hist_result[k] += new_hist_result[k]
 
     return existing
@@ -1150,7 +1147,7 @@ def merge_results(existing: _T_Result, new_result: _T_Result) -> _T_Result:
 _T_Result = TypeVar("_T_Result", bound=analysis_objects.SingleTreeResultBase)
 
 
-def run_shared(  # noqa: C901
+def run_shared(
     collision_system: str,
     analysis_function: Callable[
         [data_manager.Tree, analysis_objects.Dataset, Sequence[helpers.RangeSelector], str, bool],
@@ -1164,9 +1161,9 @@ def run_shared(  # noqa: C901
     plot_only: bool = False,
     force_reprocessing: bool = False,
     number_of_cores: int = 1,
-    override_filenames: Optional[Sequence[Union[str, Path]]] = None,
-    additional_kwargs_for_analysis: Optional[Dict[str, str]] = None,
-) -> Tuple[_T_Result, analysis_objects.Dataset]:
+    override_filenames: Sequence[str | Path] | None = None,
+    additional_kwargs_for_analysis: dict[str, str] | None = None,
+) -> tuple[_T_Result, analysis_objects.Dataset]:
     """Run the given analysis function.
 
     Args:
@@ -1195,7 +1192,7 @@ def run_shared(  # noqa: C901
 
     # Configuration
     # Only need to set options which vary from the default.
-    settings_class_map: Mapping[str, Type[analysis_objects.AnalysisSettings]] = {
+    settings_class_map: Mapping[str, type[analysis_objects.AnalysisSettings]] = {
         "embedPythia": analysis_objects.PtHardAnalysisSettings,
     }
     dataset = analysis_objects.Dataset.from_config_file(
@@ -1221,7 +1218,7 @@ def run_shared(  # noqa: C901
             # Read the stored hists.
             # We don't use YAML because it would be super slow!
             with gzip.GzipFile(dataset.hists_filename, "r") as pkl_file:
-                output_hists = pickle.load(pkl_file)  # type: ignore
+                output_hists = pickle.load(pkl_file)
 
             return output_hists, dataset
 
@@ -1233,7 +1230,7 @@ def run_shared(  # noqa: C901
         filenames=dataset.filenames,
         tree_name=dataset.tree_name,
         # Mypy is getting confused by Sequence[str] because str is an iterable, so we ignore the type...
-        branches=dataset.branches,  # type: ignore
+        branches=dataset.branches,  # type: ignore[arg-type]
     )
     logger.info("Setup complete. Beginning processing of trees.")
 
@@ -1276,21 +1273,20 @@ def run_shared(  # noqa: C901
     # NOTE: We don't expand out the values stored in the output hists here.
     #       Otherwise, we couldn't easily recreate the type when we load it for plotting only.
     with gzip.GzipFile(dataset.hists_filename, "w") as pkl_file:
-        pickle.dump(output_hists, pkl_file)  # type: ignore
+        pickle.dump(output_hists, pkl_file)
 
     progress_manager.stop()
 
     return output_hists, dataset
 
 
-def parse_arguments(name: str) -> List[Path]:
+def parse_arguments(name: str) -> list[Path]:
     parser = argparse.ArgumentParser(description=f"Run {name}")
 
     parser.add_argument("-f", "--filenames", nargs="+", default=[])
     args = parser.parse_args()
     # Validation for filenames
-    filenames = [Path(f) for f in args.filenames]
-    return filenames
+    return [Path(f) for f in args.filenames]
 
 
 def embed_pythia_entry_point() -> None:
@@ -1402,4 +1398,4 @@ if __name__ == "__main__":
     # Comparison
     # plot_results.compare_kt(all_data_hists=data_hists.hists, all_embedded_hists=embedded_hists.hybrid_hists, data_dataset=data_dataset, embedded_dataset=embedded_dataset)
 
-    IPython.start_ipython(user_ns=locals())
+    IPython.start_ipython(user_ns=locals())  # type: ignore[no-untyped-call]

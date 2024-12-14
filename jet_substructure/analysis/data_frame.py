@@ -13,8 +13,8 @@ import gzip
 import itertools
 import logging
 import pickle
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Sequence
 
 import attr
 import boost_histogram as bh
@@ -30,7 +30,7 @@ from jet_substructure.base import analysis_objects, helpers, skim_analysis_objec
 logger = logging.getLogger(__name__)
 
 
-_matching_name_to_axis_value: Dict[str, int] = {
+_matching_name_to_axis_value: dict[str, int] = {
     "all": 0,
     "pure": 1,
     "leading_untagged_subleading_correct": 2,
@@ -54,7 +54,7 @@ _matching_name_to_axis_value: Dict[str, int] = {
 # }
 
 
-def _set_output_filename(instance: "SkimDataset", attribute: attr.Attribute[str], value: str) -> None:
+def _set_output_filename(instance: SkimDataset, attribute: attr.Attribute[str], value: str) -> None:
     if value == "":
         value = instance.collision_system
     if instance.prefix:
@@ -65,21 +65,21 @@ def _set_output_filename(instance: "SkimDataset", attribute: attr.Attribute[str]
 @attr.s
 class SkimDataset:
     collision_system: str = attr.ib()
-    train_numbers: List[int] = attr.ib()
+    train_numbers: list[int] = attr.ib()
     prefix: str = attr.ib(default="")
-    hists: Dict[str, bh.Histogram] = attr.ib(factory=dict)
+    hists: dict[str, bh.Histogram] = attr.ib(factory=dict)
     _output_filename_identifier: str = attr.ib(default="", validator=_set_output_filename)
     merged_skim: bool = attr.ib(default=False)
-    _path_list: List[Path] = attr.ib(factory=list)
+    _path_list: list[Path] = attr.ib(factory=list)
 
     @property
-    def path_list(self) -> List[Path]:
+    def path_list(self) -> list[Path]:
         if self._path_list:
             input_path_list = self._path_list
         else:
             # base_path = Path("trains") / self.collision_system / "{train_number}" / "skim"
             base_path = Path("trains") / self.collision_system / "{train_number}"
-            if self.merged_skim:
+            if self.merged_skim:  # noqa: SIM108
                 base_path = base_path / "merged" / "*.root"
             else:
                 base_path = base_path / "AnalysisResults*.root"
@@ -95,7 +95,7 @@ class SkimDataset:
             #    Path("trains/embedPythia/5903/skim/merged/AnalysisResults.merged.01.root")
             # ]
         )
-        return path_list
+        return path_list  # noqa: RET504
 
     @property
     def output_path(self) -> Path:
@@ -114,7 +114,7 @@ class SkimDataset:
         return True
 
 
-def _merge_hists(a: Dict[str, bh.Histogram], b: Dict[str, bh.Histogram]) -> Dict[str, bh.Histogram]:
+def _merge_hists(a: dict[str, bh.Histogram], b: dict[str, bh.Histogram]) -> dict[str, bh.Histogram]:
     """Merge hists stored in a file."""
     for k in b:
         a[k] += b[k]
@@ -140,7 +140,7 @@ def dask_df_from_delayed() -> None:
     import dask.dataframe as dd
     from dask import delayed
 
-    @delayed  # type: ignore
+    @delayed  # type: ignore[misc]
     def get_df(file: Path, treepath: str, branches: Sequence[str]) -> pd.DataFrame:
         tree = uproot3.open(file)[treepath]
         return tree.pandas.df(branches=branches)
@@ -159,7 +159,7 @@ def dask_df_from_delayed() -> None:
 
 
 # def df_from_file(filenames: Sequence[Path], branches: Sequence[str]):
-def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Path]) -> None:  # noqa: 901
+def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Path]) -> None:  # noqa: ARG001
     # It's dumb to reimport, but we need to do  it here for it to be available immediately in IPython.
     from pathlib import Path  # noqa: F401
 
@@ -242,7 +242,7 @@ def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Pat
             for response_type in response_types:
                 # kt response
                 hists[
-                    f"{grooming_method}_{str(response_type)}_kt_response_matching_type_{matching_type}"
+                    f"{grooming_method}_{response_type!s}_kt_response_matching_type_{matching_type}"
                 ] = bh.Histogram(
                     bh.axis.Regular(28, 0, 140),
                     bh.axis.Regular(26, -1, 25),
@@ -253,7 +253,7 @@ def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Pat
                 # Delta R response
                 # Axes: measured_pt, measured_R, generator_pt, generator_R
                 hists[
-                    f"{grooming_method}_{str(response_type)}_delta_R_response_matching_type_{matching_type}"
+                    f"{grooming_method}_{response_type!s}_delta_R_response_matching_type_{matching_type}"
                 ] = bh.Histogram(
                     bh.axis.Regular(28, 0, 140),
                     bh.axis.Regular(21, -0.02, 0.4),
@@ -296,16 +296,16 @@ def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Pat
         #       it's not worth investigating further at the moment.
         for hybrid_jet_pt_bin in [helpers.RangeSelector(40, 120), helpers.RangeSelector(20, 200)]:
             hists[
-                f"{grooming_method}_hybrid_det_level_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"
+                f"{grooming_method}_hybrid_det_level_jet_pt_residual_mean_hybrid_{hybrid_jet_pt_bin!s}"
             ] = bh.Histogram(
                 bh.axis.Regular(25, 0, 250),
                 storage=bh.storage.WeightedMean(),
             )
-            hists[f"{grooming_method}_hybrid_true_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"] = bh.Histogram(
+            hists[f"{grooming_method}_hybrid_true_jet_pt_residual_mean_hybrid_{hybrid_jet_pt_bin!s}"] = bh.Histogram(
                 bh.axis.Regular(25, 0, 250),
                 storage=bh.storage.WeightedMean(),
             )
-            hists[f"{grooming_method}_det_true_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"] = bh.Histogram(
+            hists[f"{grooming_method}_det_true_jet_pt_residual_mean_hybrid_{hybrid_jet_pt_bin!s}"] = bh.Histogram(
                 bh.axis.Regular(25, 0, 250),
                 storage=bh.storage.WeightedMean(),
             )
@@ -381,26 +381,26 @@ def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Pat
                     # NOTE: Add temp_ onto the names to avoid interfering with the general hybrid jet pt mask
                     #       which is used all over the place.
                     temp_hybrid_jet_pt_mask = temp_hybrid_jet_pt_bin.mask_array(df["jet_pt_hybrid"])
-                    masked_df = df[mask & temp_hybrid_jet_pt_mask]
+                    masked_df = df[mask & temp_hybrid_jet_pt_mask]  # type: ignore[operator]
                     # Residual mean and width
                     # We store the unnnormalized residual so we can use this profile hist to extract both the
                     # mean and the width. Note that it's slightly less accurate because then normalize by the bin center
                     # rather than the exact true jet pt per fill, but it's close enough for our purposes.
                     hists[
-                        f"{grooming_method}_hybrid_det_level_jet_pt_residual_mean_hybrid_{str(temp_hybrid_jet_pt_bin)}"
+                        f"{grooming_method}_hybrid_det_level_jet_pt_residual_mean_hybrid_{temp_hybrid_jet_pt_bin!s}"
                     ].fill(
                         masked_df["jet_pt_true"].to_numpy(),
                         sample=(masked_df["jet_pt_hybrid"] - masked_df["jet_pt_det_level"]).to_numpy(),
                         weight=masked_df["scale_factor"].to_numpy(),
                     )
                     hists[
-                        f"{grooming_method}_hybrid_true_jet_pt_residual_mean_hybrid_{str(temp_hybrid_jet_pt_bin)}"
+                        f"{grooming_method}_hybrid_true_jet_pt_residual_mean_hybrid_{temp_hybrid_jet_pt_bin!s}"
                     ].fill(
                         masked_df["jet_pt_true"].to_numpy(),
                         sample=(masked_df["jet_pt_hybrid"] - masked_df["jet_pt_true"]).to_numpy(),
                         weight=masked_df["scale_factor"].to_numpy(),
                     )
-                    hists[f"{grooming_method}_det_true_jet_pt_residual_mean_hybrid_{str(temp_hybrid_jet_pt_bin)}"].fill(
+                    hists[f"{grooming_method}_det_true_jet_pt_residual_mean_hybrid_{temp_hybrid_jet_pt_bin!s}"].fill(
                         masked_df["jet_pt_true"].to_numpy(),
                         sample=(masked_df["jet_pt_det_level"] - masked_df["jet_pt_true"]).to_numpy(),
                         weight=masked_df["scale_factor"].to_numpy(),
@@ -465,7 +465,7 @@ def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Pat
 
                     for response_type in response_types:
                         # Axes: measured_like_pt, measured_like_kt, generator_like_pt, generator_like_kt
-                        hists[f"{grooming_method}_{str(response_type)}_kt_response_matching_type_{matching_type}"].fill(
+                        hists[f"{grooming_method}_{response_type!s}_kt_response_matching_type_{matching_type}"].fill(
                             masked_df[f"jet_pt_{response_type.measured_like}"].to_numpy(),
                             masked_df[f"{grooming_method}_{response_type.measured_like}_kt"].to_numpy(),
                             masked_df[f"jet_pt_{response_type.generator_like}"].to_numpy(),
@@ -474,7 +474,7 @@ def df_from_file_embedding(dataset: SkimDataset, path_list_friends: Sequence[Pat
                         )
                         # Axes: measured_like_pt, measured_like_R, generator_like_pt, generator_like_R
                         hists[
-                            f"{grooming_method}_{str(response_type)}_delta_R_response_matching_type_{matching_type}"
+                            f"{grooming_method}_{response_type!s}_delta_R_response_matching_type_{matching_type}"
                         ].fill(
                             masked_df[f"jet_pt_{response_type.measured_like}"].to_numpy(),
                             masked_df[f"{grooming_method}_{response_type.measured_like}_delta_R"].to_numpy(),
@@ -546,7 +546,7 @@ def _fill_grooming_hists(
     grooming_method: str,
     hists: Mapping[str, bh.Histogram],
     prefix: str,
-    suffix: Optional[str] = None,
+    suffix: str | None = None,
 ) -> None:
     """Fill grooming hists using the df.
 
@@ -644,7 +644,7 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
         # "soft_drop_z_cut_02",
         # "soft_drop_z_cut_04",
     ]
-    direct_comparison_grooming_methods: List[str] = [
+    direct_comparison_grooming_methods: list[str] = [
         # "leading_kt_z_cut_02_first_split",
         # "leading_kt_z_cut_04_first_split",
     ]
@@ -740,7 +740,7 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
             # Add scale_factor weight as 1 if it's not included. This way, we can always weight from the
             # scale factor of the masked_df.
             if "scale_factor" not in df:
-                df = df.assign(scale_factor=np.ones_like(df[f"{prefix}_jet_pt"]))
+                df = df.assign(scale_factor=np.ones_like(df[f"{prefix}_jet_pt"]))  # noqa: PLW2901
             # Jet pt bin
             jet_pt_bin = helpers.RangeSelector(min=40, max=120)
             jet_pt_mask = jet_pt_bin.mask_array(df[f"{prefix}_jet_pt"])
@@ -829,11 +829,11 @@ def df_from_file_data(dataset: SkimDataset) -> None:  # noqa: 901
 #        )
 #
 #    # Marge and write the data hists
-#    hists = functools.reduce(merge_hists, [pickle.load(gzip.GzipFile(f"output/{collision_system}/skim/{train_number}/{collision_system}.pgz", "r")) for train_number in range(5884, 5904)])  # type: ignore
+#    hists = functools.reduce(merge_hists, [pickle.load(gzip.GzipFile(f"output/{collision_system}/skim/{train_number}/{collision_system}.pgz", "r")) for train_number in range(5884, 5904)])
 #    pkl_filename = Path(f"output/{collision_system}/skim/{collision_system}.pgz")
 #    logger.info(f"Saving hists to {pkl_filename}")
 #    with gzip.GzipFile(pkl_filename, "w") as pkl_file:
-#        pickle.dump(hists, pkl_file)  # type: ignore
+#        pickle.dump(hists, pkl_file)
 
 
 def merge_output(train_numbers: Sequence[int], output_filename: Path, output_path: Path, prefix: str = "") -> Path:
@@ -903,7 +903,7 @@ def plot_all() -> None:
         # "soft_drop_z_cut_02",
         # "soft_drop_z_cut_04",
     ]
-    direct_comparison_grooming_methods: List[str] = [
+    direct_comparison_grooming_methods: list[str] = [
         # "leading_kt_z_cut_02_first_split",
         # "leading_kt_z_cut_04_first_split",
     ]
@@ -914,17 +914,17 @@ def plot_all() -> None:
     logger.info("Loading embedded response data")
     pkl_filename = Path("output") / "embedPythia" / "skim" / "embedded.pgz"
     with gzip.GzipFile(pkl_filename, "r") as pkl_file:
-        response_hists = pickle.load(pkl_file)  # type: ignore
+        response_hists = pickle.load(pkl_file)
 
     logger.info("Loading embedPythia data")
     pkl_filename = Path("output") / "embedPythia" / "skim" / "embedPythia.pgz"
     with gzip.GzipFile(pkl_filename, "r") as pkl_file:
-        embed_pythia_hists = pickle.load(pkl_file)  # type: ignore
+        embed_pythia_hists = pickle.load(pkl_file)
 
     logger.info("Loading PbPb data")
     pkl_filename = Path("output") / "PbPb" / "skim" / "PbPb.pgz"
     with gzip.GzipFile(pkl_filename, "r") as pkl_file:
-        PbPb_hists = pickle.load(pkl_file)  # type: ignore
+        PbPb_hists = pickle.load(pkl_file)
 
     # Add some helpful imports and definitions
     from importlib import reload  # noqa: F401
@@ -995,12 +995,13 @@ def run_plot(datasets: Mapping[str, SkimDataset], remerge: bool = False) -> None
 
 def define_embedding_datasets(
     output_identifier: str = "",
-    train_number: Optional[int] = None,
-    train_numbers: Optional[Sequence[int]] = None,
+    train_number: int | None = None,
+    train_numbers: Sequence[int] | None = None,
     merged_skim: bool = False,
-) -> Dict[str, SkimDataset]:
+) -> dict[str, SkimDataset]:
     if train_number is None and train_numbers is None:
-        raise ValueError("Must pass either train number or train_numbers")
+        msg = "Must pass either train number or train_numbers"
+        raise ValueError(msg)
     if train_numbers is None:
         # Help out mypy
         assert train_number is not None

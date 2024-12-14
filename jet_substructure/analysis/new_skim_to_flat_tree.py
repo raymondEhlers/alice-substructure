@@ -10,28 +10,24 @@ from __future__ import annotations
 import functools
 import logging
 import warnings
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 
 import attr
 import awkward as ak
-from networkx.drawing.nx_pylab import draw
 import numba as nb
 import numpy as np
 import numpy.typing as npt
 import uproot
-
 
 # We know already - nothing to be done...
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", FutureWarning)
     import uproot3
 
-from pachyderm import yaml
-
 from jet_substructure.base import new_methods, skim_analysis_objects
 from jet_substructure.base.helpers import UprootArray
-
+from pachyderm import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -69,12 +65,13 @@ class Calculation:
         # at all due to the grooming (such as a z cut). Thus, we use the selected splittings directly.
         return len(self.splittings.flatten())
 
-    def __getitem__(self, mask: np.ndarray) -> Calculation:
+    def __getitem__(self, mask: npt.NDArray[np.bool_]) -> Calculation:
         """Mask the stored values, returning a new object."""
         # Validation
         if len(self.input_jets) != len(mask):
+            msg = f"Mask length is different than array lengths. mask length: {len(mask)}, array lengths: {len(self.input_jets)}"
             raise ValueError(
-                f"Mask length is different than array lengths. mask length: {len(mask)}, array lengths: {len(self.input_jets)}"
+                msg
             )
 
         # Return the masked arrays in a new object.
@@ -105,15 +102,15 @@ class MaskedJets:
 @attr.s
 class GroomingResultForTree:
     grooming_method: str = attr.ib()
-    delta_R: np.ndarray = attr.ib()
-    z: np.ndarray = attr.ib()
-    kt: np.ndarray = attr.ib()
-    n_to_split: np.ndarray = attr.ib()
-    n_groomed_to_split: np.ndarray = attr.ib()
+    delta_R: npt.NDArray[np.float32] = attr.ib()
+    z: npt.NDArray[np.float32] = attr.ib()
+    kt: npt.NDArray[np.float32] = attr.ib()
+    n_to_split: npt.NDArray[np.int64] = attr.ib()
+    n_groomed_to_split: npt.NDArray[np.int64] = attr.ib()
     # For SoftDrop, this is equivalent to n_sd.
-    n_passed_grooming: np.ndarray = attr.ib()
+    n_passed_grooming: npt.NDArray[np.int64] = attr.ib()
 
-    def asdict(self, prefix: str) -> Iterable[Tuple[str, np.ndarray]]:
+    def asdict(self, prefix: str) -> Iterable[tuple[str, npt.NDArray[np.float32 | np.int64]]]:
         for k, v in attr.asdict(self, recurse=False).items():
             # Skip the label
             if isinstance(v, str):
@@ -124,7 +121,7 @@ class GroomingResultForTree:
 def _define_calculation_functions(
     jet_R: float,
     iterative_splittings: bool,
-) -> Dict[str, functools.partial[Tuple[UprootArray[float], UprootArray[int], UprootArray[int]]]]:
+) -> dict[str, functools.partial[tuple[UprootArray[float], UprootArray[int], UprootArray[int]]]]:
     """Define the calculation functions of interest.
 
     Note:
@@ -151,14 +148,14 @@ def _define_calculation_functions(
     # TODO: This currently only works for iterative splittings...
     #       Calculating recursive is way harder in any array-like manner.
     if iterative_splittings:
-        functions["soft_drop_z_cut_02"] = functools.partial(new_methods.JetSplittingArray.soft_drop, z_cutoff=0.2)
-        functions["soft_drop_z_cut_04"] = functools.partial(new_methods.JetSplittingArray.soft_drop, z_cutoff=0.4)
-    return functions
+        functions["soft_drop_z_cut_02"] = functools.partial(new_methods.JetSplittingArray.soft_drop, z_cutoff=0.2)  # type: ignore[arg-type]
+        functions["soft_drop_z_cut_04"] = functools.partial(new_methods.JetSplittingArray.soft_drop, z_cutoff=0.4)  # type: ignore[arg-type]
+    return functions  # type: ignore[return-value]
 
 
 def _select_and_retrieve_splittings(
     jets: ak.Array, mask: UprootArray[bool], iterative_splittings: bool
-) -> Tuple[ak.Array, new_methods.JetSplittingArray, UprootArray[int]]:
+) -> tuple[ak.Array, new_methods.JetSplittingArray, UprootArray[int]]:
     """Generalization of the function in analyze_tree to add the splitting index."""
     # Ensure that there are sufficient counts
     restricted_jets = jets[mask]
@@ -181,20 +178,20 @@ def _select_and_retrieve_splittings(
     return restricted_jets, restricted_splittings, restricted_splittings_indices
 
 
-@nb.njit  # noqa: C901
-def calculate_splitting_number(  # noqa: C901
+@nb.njit  # type: ignore[misc]
+def calculate_splitting_number(
     all_splittings: new_methods.JetSplittingArray,
     selected_splittings: new_methods.JetSplittingArray,
     restricted_splittings_indices: UprootArray[int],
     debug: bool = False,
-) -> np.ndarray:
+) -> npt.NDArray[np.int64]:
     # NOTE: I would like to use uint8 here, but it's not implemented in uproot3's writing.
     #       However, int8 gives us enough range, so it's fine to use it instead.
     #       Further, root doesn't handle int8 correctly, so we have to use int16.
     output = np.zeros(len(selected_splittings), dtype=np.int16)
 
     for i, (selected_splitting, restricted_splitting_indices, available_splittings_parents) in enumerate(
-        zip(selected_splittings, restricted_splittings_indices, all_splittings.parent_index)
+        zip(selected_splittings, restricted_splittings_indices, all_splittings.parent_index, strict=False)
     ):
         # restricted_splitting_indices = restricted_splittings_indices[i]
         # available_splittings_parents = all_splittings[i].parent_index
@@ -206,41 +203,41 @@ def calculate_splitting_number(  # noqa: C901
 
             parent_index = parent_indices[0]
             if debug:
-                print("parent_index", parent_index, "restricted_splitting_indices", restricted_splitting_indices)
+                print("parent_index", parent_index, "restricted_splitting_indices", restricted_splitting_indices)  # noqa: T201
             # print("i", i, "parent_indices", parent_indices, "parent_index", parent_index, "restricted_splitting_indices", restricted_splitting_indices)
             # if i == 27:
             #    print("parent_indices", parent_indices, "parent_index", parent_index, "restricted_splitting_indices", restricted_splitting_indices)
             while parent_index != -1:
                 # Apparently contains isn't implemented either. So we just implement by hand.
                 # if parent_index in restricted_splitting_indices:
-                for index in restricted_splitting_indices:
+                for index in restricted_splitting_indices:  # type: ignore[attr-defined]
                     # print("parent_index: {parent_index}, index: {index}".format(parent_index=parent_index, index=index))
                     if debug:
-                        print("parent_index", parent_index, "index", index)
+                        print("parent_index", parent_index, "index", index)  # noqa: T201
                     # print("parent_index, index: %d, %d" % (parent_index, index))
                     # print("i", i, "parent_index", parent_index, "index", index)
                     if parent_index == index:
                         if debug:
-                            print("Found parent index:", index)
+                            print("Found parent index:", index)  # noqa: T201
                         output[i] += 1
                         # import IPython; IPython.embed()
-                        parent_index = available_splittings_parents[parent_index]
+                        parent_index = available_splittings_parents[parent_index]  # type: ignore[index]
                         if debug:
-                            print("New parent index:", parent_index)
+                            print("New parent index:", parent_index)  # noqa: T201
                         # print("Breaking...")
                         break
                 else:
                     # We didn't find it, but we need to advance forward.
-                    parent_index = available_splittings_parents[parent_index]
+                    parent_index = available_splittings_parents[parent_index]  # type: ignore[index]
 
             if debug:
-                print("output[i]", output[i])
+                print("output[i]", output[i])  # noqa: T201
 
-    return output
+    return output  # type: ignore[return-value]
 
 
-@nb.njit  # type: ignore
-def _find_contributing_subjets(input_jet: ak.Array, groomed_index: int) -> List[ak.Array]:
+@nb.njit  # type: ignore[misc]
+def _find_contributing_subjets(input_jet: ak.Array, groomed_index: int) -> list[ak.Array]:
     """Find subjets which contribute to a given grooming index.
 
     Args:
@@ -257,8 +254,8 @@ def _find_contributing_subjets(input_jet: ak.Array, groomed_index: int) -> List[
     return [sj for sj in input_jet.subjets if sj.parent_splitting_index == groomed_index]
 
 
-@nb.njit
-def _sort_subjets(input_jet, input_subjets):
+@nb.njit  # type: ignore[misc]
+def _sort_subjets(input_jet, input_subjets):  # type: ignore[no-untyped-def]
     pts = []
     for sj in input_subjets:
         px = 0
@@ -278,8 +275,8 @@ def _sort_subjets(input_jet, input_subjets):
     return leading, subleading
 
 
-@nb.njit  # type: ignore
-def _subjet_shared_momentum(
+@nb.njit  # type: ignore[misc]
+def _subjet_shared_momentum(  # type: ignore[no-untyped-def]
     generator_like_subjet,
     generator_like_jet,
     measured_like_subjet,
@@ -310,8 +307,8 @@ def _subjet_shared_momentum(
     return sum_pt
 
 
-@nb.njit  # type: ignore
-def subjet_pt(subjet, jet) -> float:
+@nb.njit  # type: ignore[misc]
+def subjet_pt(subjet, jet) -> float:  # type: ignore[no-untyped-def]
     px = 0
     py = 0
     # pt = 0
@@ -321,18 +318,18 @@ def subjet_pt(subjet, jet) -> float:
         py += constituent.pt * np.sin(constituent.phi)
         # pt += constituent.pt
     # return pt
-    return np.sqrt(px ** 2 + py ** 2)
+    return np.sqrt(px ** 2 + py ** 2)  # type: ignore[no-any-return]
 
 
-@nb.njit  # type: ignore
-def _subjet_contained_in_subjet(
+@nb.njit  # type: ignore[misc]
+def _subjet_contained_in_subjet(  # type: ignore[no-untyped-def]
     generator_like_subjet,
     generator_like_jet,
     measured_like_subjet,
     measured_like_jet,
     match_using_distance: bool = False,
 ) -> bool:
-    return (
+    return (  # type: ignore[no-any-return]
         _subjet_shared_momentum(
             generator_like_subjet=generator_like_subjet,
             generator_like_jet=generator_like_jet,
@@ -344,8 +341,8 @@ def _subjet_contained_in_subjet(
     ) > 0.5
 
 
-@nb.njit
-def determine_matched_jets_numba(
+@nb.njit  # type: ignore[misc]
+def determine_matched_jets_numba(  # type: ignore[no-untyped-def]
     generator_like_jets,
     generator_like_splittings,
     generator_like_groomed_values,
@@ -355,7 +352,7 @@ def determine_matched_jets_numba(
     measured_like_groomed_values,
     measured_like_groomed_indices,
     match_using_distance: bool,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.int64]]:
     n_jets = len(measured_like_jets)
     leading_matching = np.full(n_jets, -1, dtype=np.int16)
     subleading_matching = np.full(n_jets, -1, dtype=np.int16)
@@ -364,12 +361,12 @@ def determine_matched_jets_numba(
         i,
         (
             generator_like_jet,
-            generator_like_splitting,
-            generator_like_groomed_value,
+            generator_like_splitting,  # noqa: B007
+            generator_like_groomed_value,  # noqa: B007
             generator_like_groomed_index_array,
             measured_like_jet,
-            measured_like_splitting,
-            measured_like_groomed_value,
+            measured_like_splitting,  # noqa: B007
+            measured_like_groomed_value,  # noqa: B007
             measured_like_groomed_index_array,
         ),
     ) in enumerate(
@@ -381,7 +378,7 @@ def determine_matched_jets_numba(
             measured_like_jets,
             measured_like_splittings,
             measured_like_groomed_values,
-            measured_like_groomed_indices,
+            measured_like_groomed_indices, strict=False,
         )
     ):
         # Find the selected index if it's available.
@@ -451,7 +448,7 @@ def determine_matched_jets_numba(
         else:
             subleading_matching[i] = 3
 
-    return leading_matching, subleading_matching
+    return leading_matching, subleading_matching  # type: ignore[return-value]
 
 
 def prong_matching_numba_wrapper(
@@ -461,7 +458,7 @@ def prong_matching_numba_wrapper(
     generator_like_jets_label: str,
     grooming_method: str,
     match_using_distance: bool = False,
-) -> Dict[str, np.ndarray]:
+) -> dict[str, npt.NDArray[np.int64]]:
     """Performs prong matching for the provided collections.
 
     Note:
@@ -501,8 +498,8 @@ def prong_matching_numba_wrapper(
     return grooming_results
 
 
-@nb.njit
-def _subjet_momentum_fraction_in_jet(
+@nb.njit  # type: ignore[misc]
+def _subjet_momentum_fraction_in_jet(  # type: ignore[no-untyped-def]
     generator_like_subjet,
     generator_like_jet,
     measured_like_jet,
@@ -534,16 +531,16 @@ def _subjet_momentum_fraction_in_jet(
             # Otherwise, the run the risk of summing a generator-like constituent pt twice.
             break
 
-    return sum_pt / subjet_pt(generator_like_subjet, generator_like_jet)
+    return sum_pt / subjet_pt(generator_like_subjet, generator_like_jet)  # type: ignore[no-any-return]
 
 
-@nb.njit
-def generator_subjet_momentum_fraction_in_measured_jet_numba(
+@nb.njit  # type: ignore[misc]
+def generator_subjet_momentum_fraction_in_measured_jet_numba(  # type: ignore[no-untyped-def]
     generator_like_jets,
     generator_like_splittings,
     generator_like_groomed_indices,
     measured_like_jets,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
     """Determine the generator-like subjet momentum fraction stored in a measured-like jet.
 
     Note:
@@ -559,7 +556,7 @@ def generator_subjet_momentum_fraction_in_measured_jet_numba(
         i,
         (
             generator_like_jet,
-            generator_like_splitting,
+            generator_like_splitting,  # noqa: B007
             generator_like_groomed_index_array,
             measured_like_jet,
         ),
@@ -568,7 +565,7 @@ def generator_subjet_momentum_fraction_in_measured_jet_numba(
             generator_like_jets,
             generator_like_splittings,
             generator_like_groomed_indices,
-            measured_like_jets,
+            measured_like_jets, strict=False,
         )
     ):
         # Find the selected index if it's available.
@@ -607,7 +604,7 @@ def generator_subjet_momentum_fraction_in_measured_jet_numba_wrapper(
     generator_like_jets_calculation: Calculation,
     generator_like_jets_label: str,
     grooming_method: str,
-) -> Dict[str, np.ndarray]:
+) -> dict[str, npt.NDArray[np.float32]]:
     grooming_results = {}
 
     leading_momentum_fraction, subleading_momentum_fraction = generator_subjet_momentum_fraction_in_measured_jet_numba(
@@ -632,8 +629,8 @@ def generator_subjet_momentum_fraction_in_measured_jet_numba_wrapper(
 
 
 def _calculate_jet_kinematics(
-    constituents: new_methods.JetConstituentArray, float_type: Optional[npt.DTypeLike] = None
-) -> Tuple[ak.Array, ak.Array]:
+    constituents: new_methods.JetConstituentArray, float_type: npt.DTypeLike | None = None
+) -> tuple[ak.Array, ak.Array]:
     """Calculate jet kinematics.
 
     Since `vector` isn't yet available, we perform the four vector calculations by hand.
@@ -646,16 +643,15 @@ def _calculate_jet_kinematics(
     """
     # jet_four_vec = jets.jet_constituents.four_vectors().sum()
     # Since vector isn't ready yet, just do this by hand...
-    px = ak.sum(constituents.pt * np.cos(constituents.phi), axis=1)  # type: ignore
-    py = ak.sum(constituents.pt * np.sin(constituents.phi), axis=1)  # type: ignore
-    pz = ak.sum(constituents.pt * np.sinh(constituents.eta), axis=1)  # type: ignore
+    px = ak.sum(constituents.pt * np.cos(constituents.phi), axis=1)  # type: ignore[call-overload]
+    py = ak.sum(constituents.pt * np.sin(constituents.phi), axis=1)  # type: ignore[call-overload]
+    pz = ak.sum(constituents.pt * np.sinh(constituents.eta), axis=1)  # type: ignore[call-overload]
     # Formulas just from inverting the above.
     eta = np.arcsinh(pz / np.sqrt(px ** 2 + py ** 2))
     phi = np.arctan2(py, px)
     if float_type is None:
         return eta, phi
-    else:
-        return ak.values_astype(eta, float_type), ak.values_astype(phi, float_type)
+    return ak.values_astype(eta, float_type), ak.values_astype(phi, float_type)
 
 
 def calculate_embedding_skim_impl(  # noqa: C901
@@ -674,7 +670,7 @@ def calculate_embedding_skim_impl(  # noqa: C901
     draw_example_splittings: bool = False,
     write_feather: bool = False,
     write_parquet: bool = False,
-) -> Tuple[bool, Path, str]:
+) -> tuple[bool, Path, str]:
     """Determine the response and prong matching for jets substructure techniques.
 
     Args:
@@ -720,7 +716,7 @@ def calculate_embedding_skim_impl(  # noqa: C901
     mask = all_jets["hybrid"].jet_pt > 0
 
     # Mask the jets
-    masked_jets: Dict[str, MaskedJets] = {}
+    masked_jets: dict[str, MaskedJets] = {}
     for prefix, input_jets in all_jets.items():
         masked_jets[prefix] = MaskedJets(
             *_select_and_retrieve_splittings(
@@ -937,7 +933,7 @@ def calculate_embedding_skim_impl(  # noqa: C901
     return True, output_filename, "processed"
 
 
-def calculate_embedding_skim(  # noqa: C901
+def calculate_embedding_skim(
     input_filename: Path,
     iterative_splittings: bool,
     prefixes: Mapping[str, str],
@@ -950,7 +946,7 @@ def calculate_embedding_skim(  # noqa: C901
     draw_example_splittings: bool = False,
     write_feather: bool = False,
     write_parquet: bool = False,
-) -> Tuple[bool, Path, str]:
+) -> tuple[bool, Path, str]:
     # Validation
     # Bail out early if the file already exists.
     if output_filename.exists():
@@ -959,7 +955,7 @@ def calculate_embedding_skim(  # noqa: C901
     # Setup
     # Use the train configuration to extract the train number and pt hard bin, which are used to get the scale factor.
     y = yaml.yaml()
-    with open(train_directory / "config.yaml", "r") as f:
+    with (Path(train_directory) / "config.yaml").open() as f:
         train_config = y.load(f)
     train_number = train_config["number"]
     pt_hard_bin = train_config["pt_hard_bin"]
@@ -986,7 +982,7 @@ def calculate_embedding_skim(  # noqa: C901
     )
 
 
-def calculate_data_skim_impl(  # noqa: C901
+def calculate_data_skim_impl(
     all_jets: ak.Array,
     input_filename: Path,
     collision_system: str,
@@ -996,10 +992,10 @@ def calculate_data_skim_impl(  # noqa: C901
     output_filename: Path,
     output_tree_name: str = "tree",
     create_friend_tree: bool = False,
-    scale_factors: Optional[Mapping[int, float]] = None,
+    scale_factors: Mapping[int, float] | None = None,
     write_feather: bool = False,
     write_parquet: bool = False,
-) -> Tuple[bool, Path, str]:
+) -> tuple[bool, Path, str]:
     # Setup
     # Output consistent types.
     float_type = np.float32
@@ -1007,7 +1003,7 @@ def calculate_data_skim_impl(  # noqa: C901
 
     # Dataset wide masks
     # Select everything by default. We know that there must be at least one set of jets, so we're safe to select on 0.
-    mask = all_jets[list(prefixes.keys())[0]].jet_pt > 0
+    mask = all_jets[list(prefixes.keys())[0]].jet_pt > 0  # noqa: RUF015
     # Special selections for pythia.
     # Apparently I can get pt hard < 5. Which is bizarre, at least according to the binning...
     # Filter these out when applicable.
@@ -1015,7 +1011,7 @@ def calculate_data_skim_impl(  # noqa: C901
         # The jets object will contain the pt hard bin if it's available.
         mask = mask & (all_jets["pt_hard"] >= 5.0)
 
-    masked_jets: Dict[str, MaskedJets] = {}
+    masked_jets: dict[str, MaskedJets] = {}
     # for prefix, input_jets in all_jets.items():
     for prefix in prefixes:
         input_jets = all_jets[prefix]
@@ -1121,7 +1117,7 @@ def calculate_data_skim_impl(  # noqa: C901
 
             # Need to mask because we didn't when masking the original jets.
             pt_hard_bins = np.array(all_jets["pt_hard_bin"][mask], dtype=np.int16)
-            logger.debug(f"Pt hard bins contained in the file: {np.unique(pt_hard_bins)}")  # type: ignore
+            logger.debug(f"Pt hard bins contained in the file: {np.unique(pt_hard_bins)}")
             pythia_specific_columns = {
                 "scale_factor": np.array([output_scale_factors[b] for b in pt_hard_bins], dtype=np.float32),
                 "pt_hard_bin": pt_hard_bins,
@@ -1158,7 +1154,7 @@ def calculate_data_skim_impl(  # noqa: C901
     return True, output_filename, "processed"
 
 
-def calculate_data_skim(  # noqa: C901
+def calculate_data_skim(
     input_filename: Path,
     collision_system: str,
     iterative_splittings: bool,
@@ -1167,13 +1163,14 @@ def calculate_data_skim(  # noqa: C901
     output_filename: Path,
     output_tree_name: str = "tree",
     create_friend_tree: bool = False,
-    scale_factors: Optional[Mapping[int, float]] = None,
+    scale_factors: Mapping[int, float] | None = None,
     write_feather: bool = False,
     write_parquet: bool = False,
-) -> Tuple[bool, Path, str]:
+) -> tuple[bool, Path, str]:
     # Validation
     if scale_factors is None and collision_system == "pythia":
-        raise ValueError("Need scale factors for pythia to be provided externally.")
+        msg = "Need scale factors for pythia to be provided externally."
+        raise ValueError(msg)
     # Bail out early if the file already exists.
     if output_filename.exists():
         return True, output_filename, "already exists"
@@ -1202,8 +1199,8 @@ def calculate_data_skim(  # noqa: C901
 def cross_check_task_names_to_export(
     grooming_method: str,
     prefixes: Mapping[str, str],
-) -> Dict[str, npt.DTypeLike]:
-    branch_names: Dict[str, npt.DTypeLike] = {}
+) -> dict[str, npt.DTypeLike]:
+    branch_names: dict[str, npt.DTypeLike] = {}
 
     substructure_variables = [
         "{grooming_method}_{prefix}_delta_R",
@@ -1265,7 +1262,7 @@ def skim_cross_check_task_to_uniform_output(
     Returns:
         True if successful.
     """
-    filename = f"{str(input_filename)}:{input_tree_name}"
+    filename = f"{input_filename!s}:{input_tree_name}"
     # Iterate over relatively small sizes to ensure that we don't blow up the memory usage.
     for i, array in enumerate(uproot.iterate(filename, step_size="200 MB")):
         renames = skim_analysis_objects.cross_check_task_branch_name_shim(
@@ -1292,8 +1289,8 @@ def skim_cross_check_task_to_uniform_output(
 
         # Setup outputs and write the tree.
         outputs = {}
-        for k, v in branch_names.items():
-            outputs[k] = ak.values_astype(array[k], to=v)
+        for _k, _v in branch_names.items():
+            outputs[_k] = ak.values_astype(array[_k], to=_v)
         outputs_np = {k: np.asarray(v) for k, v in outputs.items()}
         branches = {k: v.dtype for k, v in outputs_np.items()}
         logger.info(f"Writing cross check task skim to {_output_filename}")

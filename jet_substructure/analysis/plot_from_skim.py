@@ -8,8 +8,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import List, Mapping, Optional, Sequence, Tuple
 
 import attr
 import boost_histogram as bh
@@ -82,7 +82,7 @@ def _plot_subjet_matching(
     matching_level: str,
     matching_jet_pt_prefix: str,
     hist_suffix: str,
-    hybrid_jet_pt_bin: helpers.RangeSelector,
+    hybrid_jet_pt_bin: helpers.RangeSelector,  # noqa: ARG001
     plot_config: PlotConfig,
     output_dir: Path,
     min_kt_hybrid: float = 0,
@@ -190,7 +190,7 @@ def plot_prong_matching(
     output_dir: Path,
     rdf_plots: bool,
     plot_png: bool = False,
-    min_kt_hybrid_values: Optional[Sequence[float]] = None,
+    min_kt_hybrid_values: Sequence[float] | None = None,
     system_label: str | None = None,
 ) -> None:
     # Validation
@@ -207,7 +207,7 @@ def plot_prong_matching(
     ]:
         for min_kt_hybrid in min_kt_hybrid_values:
             for grooming_method in grooming_methods:
-                if system_label:
+                if system_label:  # noqa: SIM108
                     text = system_label
                 else:
                     text = ""
@@ -235,7 +235,7 @@ def plot_prong_matching(
                                 legend=LegendConfig(location="upper left", ncol=2, font_size=14),
                                 text=TextConfig(x=0.975, y=0.8, text=text),
                             ),
-                            figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
+                            figure=Figure(edge_padding=dict(right=0.99, top=0.96)),  # noqa: C408
                         ),
                         output_dir=output_dir,
                         rdf_plots=rdf_plots,
@@ -268,7 +268,7 @@ def plot_prong_matching(
                             legend=LegendConfig(location="upper left", ncol=2, font_size=14),
                             text=TextConfig(x=0.975, y=0.8, text=text_n_to_split_less_than_3),
                         ),
-                        figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
+                        figure=Figure(edge_padding=dict(right=0.99, top=0.96)),  # noqa: C408
                     ),
                     output_dir=output_dir,
                     rdf_plots=rdf_plots,
@@ -293,7 +293,7 @@ def plot_prong_matching(
                             legend=LegendConfig(location="upper left", ncol=2, font_size=14),
                             text=TextConfig(x=0.975, y=0.8, text=text_n_to_split_greater_than_4),
                         ),
-                        figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
+                        figure=Figure(edge_padding=dict(right=0.99, top=0.96)),  # noqa: C408
                     ),
                     output_dir=output_dir,
                     rdf_plots=rdf_plots,
@@ -309,7 +309,7 @@ def _plot_subjet_matching_purity(  # noqa: C901
     matching_jet_pt_prefix: str,
     subjet_for_purity: str,
     hist_suffix: str,
-    hybrid_jet_pt_bin: helpers.RangeSelector,
+    hybrid_jet_pt_bin: helpers.RangeSelector,  # noqa: ARG001
     plot_config: PlotConfig,
     output_dir: Path,
     min_kt_hybrid: float = 0,
@@ -339,8 +339,9 @@ def _plot_subjet_matching_purity(  # noqa: C901
         # logger.debug(hist_name)
         try:
             normalization = _project_matching_RDF(hists[hist_name], min_kt_hybrid=min_kt_hybrid)
-        except KeyError as e:
-            logger.info(f"Skipping grooming method {grooming_method} since the hist doesn't appear to be available")
+        except KeyError:
+            msg = f"Skipping grooming method {grooming_method} since the hist doesn't appear to be available"
+            logger.info(msg)
             continue
         # binned_data.BinnedData.from_existing_data(hists[hist_name][:: bh.rebin(5), :: bh.sum])
 
@@ -352,7 +353,7 @@ def _plot_subjet_matching_purity(  # noqa: C901
             hist_name += f"_{hist_suffix}"
         # First, we take the pure manually
         purity_hist = _project_matching_RDF(hists[hist_name], min_kt_hybrid=min_kt_hybrid)
-        for matching_type in matching_type_label_map.keys():
+        for matching_type in matching_type_label_map:
             # leading can end up matching to subleading, so we have to be a bit more careful for it.
             if (subjet_for_purity == "leading" and matching_type.startswith(f"{subjet_for_purity}_correct")) or (
                 subjet_for_purity == "subleading" and f"{subjet_for_purity}_correct" in matching_type
@@ -388,7 +389,7 @@ def _plot_subjet_matching_purity(  # noqa: C901
             linestyle="",
             label=style.label,
             zorder=style.zorder,
-            **kwargs,
+            **kwargs,  # type: ignore[arg-type]
         )
 
     # Presentation and labeling
@@ -427,7 +428,7 @@ def plot_prong_matching_purity(
     all_available_methods: Sequence[str],
     output_dir: Path,
     plot_png: bool = False,
-    min_kt_hybrid_values: Optional[Sequence[float]] = None,
+    min_kt_hybrid_values: Sequence[float] | None = None,
 ) -> None:
     # Validation
     if min_kt_hybrid_values is None:
@@ -435,9 +436,9 @@ def plot_prong_matching_purity(
     # Setup
     hybrid_jet_pt_bin = helpers.JetPtRange(min=40, max=120)
 
-    for matching_level, n_split_prefix, n_split_label, matching_jet_pt_prefix in [
+    for matching_level, n_split_prefix, n_split_label, matching_jet_pt_prefix in [  # noqa: B007
         ("hybrid_det_level", "det_level", "det", "det_level"),
-        # TODO: Re-enable!
+        # NOTE: Want to re-enable if I want to do comprehensive comparisons.
         # ("det_level_true", "matched", "true", "true"),
     ]:
         for min_kt_hybrid in min_kt_hybrid_values:
@@ -465,7 +466,7 @@ def plot_prong_matching_purity(
                             legend=LegendConfig(location="upper left", ncol=2, font_size=14),
                             text=TextConfig(x=0.975, y=0.025, text=text),
                         ),
-                        figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
+                        figure=Figure(edge_padding=dict(right=0.99, top=0.96)),  # noqa: C408
                     ),
                     output_dir=output_dir,
                     plot_png=plot_png,
@@ -504,7 +505,8 @@ def _plot_fraction_of_subjet_pt_in_hybrid(
         if hist_suffix:
             hist_name += f"_{hist_suffix}"
     else:
-        raise NotImplementedError("Not yet ready for non-RDF skim.")
+        msg = "Not yet ready for non-RDF skim."
+        raise NotImplementedError(msg)
 
     for matching_type in matching_types:
         logger.debug(
@@ -587,7 +589,7 @@ def plot_subjet_momentum_fraction_in_hybrid(
                         legend=LegendConfig(location="upper left", ncol=2, font_size=14),
                         text=TextConfig(x=0.025, y=0.75, text=text),
                     ),
-                    figure=Figure(edge_padding=dict(right=0.99, top=0.96)),
+                    figure=Figure(edge_padding=dict(right=0.99, top=0.96)),  # noqa: C408
                 ),
                 output_dir=output_dir,
                 rdf_plots=rdf_plots,
@@ -680,7 +682,7 @@ def _plot_residual_by_matching_type(
             )
         plot_config.apply(fig=f, axes=[a])
     # Set range so that it's consistent.
-    ax_simplified.set_ylim([-0.01, 0.18])
+    ax_simplified.set_ylim((-0.01, 0.18))
 
     # Store and cleanup
     filename = f"{plot_config.name}_iterative_splittings_{grooming_method}"
@@ -719,7 +721,7 @@ def plot_residuals_by_matching_type(
                     text=TextConfig(x=0.97, y=0.97, text=text),
                     legend=LegendConfig(location="upper left", font_size=14),
                 ),
-                figure=Figure(edge_padding=dict(bottom=0.12)),
+                figure=Figure(edge_padding=dict(bottom=0.12)),  # noqa: C408
             ),
             output_dir=output_dir,
         )
@@ -741,7 +743,7 @@ def plot_residuals_by_matching_type(
                     text=TextConfig(x=0.97, y=0.97, text=text),
                     legend=LegendConfig(location="upper left", font_size=14),
                 ),
-                figure=Figure(edge_padding=dict(bottom=0.12)),
+                figure=Figure(edge_padding=dict(bottom=0.12)),  # noqa: C408
             ),
             output_dir=output_dir,
         )
@@ -763,7 +765,7 @@ def plot_residuals_by_matching_type(
                     text=TextConfig(x=0.97, y=0.97, text=text),
                     legend=LegendConfig(location="upper left", font_size=14),
                 ),
-                figure=Figure(edge_padding=dict(bottom=0.12)),
+                figure=Figure(edge_padding=dict(bottom=0.12)),  # noqa: C408
             ),
             output_dir=output_dir,
             min_hybrid_kt=5,
@@ -777,8 +779,8 @@ def _plot_residual_mean_and_width(
     plot_config_mean: PlotConfig,
     plot_config_width: PlotConfig,
     output_dir: Path,
-    rdf_plots: bool,
-    plot_png: bool,
+    rdf_plots: bool,  # noqa: ARG001
+    plot_png: bool,  # noqa: ARG001
 ) -> None:
     logger.debug(
         f"Plotting jet pt residual mean and width for {grooming_method} with hybrid jet pt: {hybrid_jet_pt_bin}"
@@ -792,7 +794,7 @@ def _plot_residual_mean_and_width(
         ("hybrid_true", "Combined", "black"),
         ("det_true", "Detector", "blue"),
     ]:
-        bh_hist = hists[f"{grooming_method}_{jet_types}_jet_pt_residual_mean_hybrid_{str(hybrid_jet_pt_bin)}"]
+        bh_hist = hists[f"{grooming_method}_{jet_types}_jet_pt_residual_mean_hybrid_{hybrid_jet_pt_bin!s}"]
         # Select in hybrid jet pt during conversion.
         # NOTE: We need to use bh to do the sum and projection because it's a profile hist, which requires extra care.
         h = binned_data.BinnedData.from_existing_data(bh_hist)
@@ -828,10 +830,10 @@ def _plot_residual_mean_and_width(
     plot_config_width.apply(fig=fig_width, ax=ax_width)
 
     # Store and cleanup
-    filename_mean = f"{plot_config_mean.name}_hybrid_{str(hybrid_jet_pt_bin)}_iterative_splittings_{grooming_method}"
+    filename_mean = f"{plot_config_mean.name}_hybrid_{hybrid_jet_pt_bin!s}_iterative_splittings_{grooming_method}"
     fig_mean.savefig(output_dir / f"{filename_mean}_mean.pdf")
     plt.close(fig_mean)
-    filename_width = f"{plot_config_width.name}_hybrid_{str(hybrid_jet_pt_bin)}_iterative_splittings_{grooming_method}"
+    filename_width = f"{plot_config_width.name}_hybrid_{hybrid_jet_pt_bin!s}_iterative_splittings_{grooming_method}"
     fig_width.savefig(output_dir / f"{filename_width}_width.pdf")
     plt.close(fig_width)
 
@@ -926,7 +928,7 @@ def plot_residuals(
                         text=TextConfig(x=0.97, y=0.97, text=text),
                         legend=LegendConfig(location="upper center", font_size=14),
                     ),
-                    figure=Figure(edge_padding=dict(left=0.13, bottom=0.12)),
+                    figure=Figure(edge_padding=dict(left=0.13, bottom=0.12)),  # noqa: C408
                 ),
                 plot_config_width=PlotConfig(
                     name="jet_pt_residual_width",
@@ -942,7 +944,7 @@ def plot_residuals(
                         text=TextConfig(x=0.97, y=0.97, text=text),
                         legend=LegendConfig(location="upper center", font_size=14),
                     ),
-                    figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
+                    figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),  # noqa: C408
                 ),
                 output_dir=output_dir,
                 rdf_plots=rdf_plots,
@@ -969,7 +971,7 @@ def plot_residuals(
                     text=TextConfig(x=0.97, y=0.97, text=text),
                     legend=LegendConfig(location="upper left", font_size=14),
                 ),
-                figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
+                figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),  # noqa: C408
             ),
             output_dir=output_dir,
             # rdf_plots=rdf_plots,
@@ -1130,7 +1132,7 @@ def plot_response_matrix_without_matching_type(
                         text=TextConfig(x=0.03, y=0.97, text=text),
                         # legend=LegendConfig(location="upper left", font_size=14),
                     ),
-                    figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+                    figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
                 ),
                 output_dir=output_dir,
                 rdf_plots=rdf_plots,
@@ -1147,7 +1149,7 @@ def _plot_response_by_matching_type(
     matching_level: str,
     hist_suffix: str,
     subjet_name: str,
-    subjet_pt_fraction_range: Tuple[float, float],
+    subjet_pt_fraction_range: tuple[float, float],
     hybrid_jet_pt_bin: helpers.RangeSelector,
     plot_config: PlotConfig,
     output_dir: Path,
@@ -1288,7 +1290,7 @@ def plot_response_by_matching_type(
                             text=TextConfig(x=0.03, y=0.97, text=text),
                             # legend=LegendConfig(location="upper left", font_size=14),
                         ),
-                        figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
+                        figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),  # noqa: C408
                     ),
                     output_dir=output_dir,
                     rdf_plots=rdf_plots,
@@ -1301,13 +1303,13 @@ def plot_response_by_matching_type(
                     for subjet_name in ["leading", "subleading"]:
                         logger.debug(f"Plotting for {subjet_name} subjet")
                         for subjet_pt_fraction_range in zip(
-                            list(np.linspace(0, 1, 11))[:-1], list(np.linspace(0, 1, 11))[1:]
+                            list(np.linspace(0, 1, 11))[:-1], list(np.linspace(0, 1, 11))[1:], strict=True
                         ):
                             temp_text = text + "\n" + f"{subjet_name.capitalize()} subjet"
                             temp_text += "\n" + grooming_styling[grooming_method].label
                             temp_text += (
                                 "\n"
-                                + f"{subjet_name}"
+                                + str(subjet_name)
                                 + r" $p_{\text{T}}$ fraction: ("
                                 + ", ".join([f"{round(v, 2)}" for v in subjet_pt_fraction_range])
                                 + ")"
@@ -1339,7 +1341,7 @@ def plot_response_by_matching_type(
                                         text=TextConfig(x=0.03, y=0.97, text=temp_text),
                                         # legend=LegendConfig(location="upper left", font_size=14),
                                     ),
-                                    figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
+                                    figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),  # noqa: C408
                                 ),
                                 output_dir=output_dir,
                                 rdf_plots=rdf_plots,
@@ -1379,7 +1381,7 @@ def plot_response_by_matching_type(
                             text=TextConfig(x=0.03, y=0.97, text=text_n_to_split_less_than_3),
                             # legend=LegendConfig(location="upper left", font_size=14),
                         ),
-                        figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
+                        figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),  # noqa: C408
                     ),
                     output_dir=output_dir,
                     rdf_plots=rdf_plots,
@@ -1417,7 +1419,7 @@ def plot_response_by_matching_type(
                             text=TextConfig(x=0.03, y=0.97, text=text_n_to_split_greater_than_4),
                             # legend=LegendConfig(location="upper left", font_size=14),
                         ),
-                        figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
+                        figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),  # noqa: C408
                     ),
                     output_dir=output_dir,
                     rdf_plots=rdf_plots,
@@ -1448,7 +1450,7 @@ def plot_response_by_matching_type(
                             text=TextConfig(x=0.03, y=0.97, text=text),
                             # legend=LegendConfig(location="upper left", font_size=14),
                         ),
-                        figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),
+                        figure=Figure(edge_padding=dict(left=0.10, bottom=0.12)),  # noqa: C408
                     ),
                     output_dir=output_dir,
                     plot_png=plot_png,
@@ -1631,7 +1633,7 @@ def plot_compare_kt(
                         ],
                     ),
                 ],
-                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
             ),
             output_dir=output_dir,
         )
@@ -1678,7 +1680,7 @@ def plot_compare_kt_skim(
                         ],
                     ),
                 ],
-                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
             ),
             output_dir=output_dir,
         )
@@ -1716,7 +1718,7 @@ def _plot_kt_vs_jet_pt_raw_with_labels(
     try:
         bh_hist = hists[f"{grooming_method}_{prefix}_{substructure_variable}_stats{tag}"]
         # h = binned_data.BinnedData.from_existing_data(
-        #    bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1 :: bh.rebin(2)]  # noqa: E203
+        #    bh_hist[bh.loc(40) : bh.loc(120) : bh.rebin(4), 1 :: bh.rebin(2)]
         # )
     except KeyError as e:
         # Cleanup
@@ -1792,13 +1794,11 @@ def plot_kt_vs_jet_pt_stats(
     system_label: str,
     jet_R: float = 0.2,
     substructure_var_range: helpers.RangeSelector | None = None,
-) -> List[Path]:
+) -> list[Path]:
     # Validation
     if substructure_var_range is None:
-        if jet_R == 0.4:
-            substructure_var_range = helpers.KtRange(-0.5, 25)
-        else:
-            substructure_var_range = helpers.KtRange(-0.5, 15)
+        substructure_var_range = helpers.KtRange(-0.5, 25 if jet_R == 0.4 else 15)
+
     # Setup
     # We want to round the jet pt up to ensure that we don't cut it off when rebinning
     # (ie. if 85 is the max, round up to 90. But if 120 is max, leave at 120)
@@ -1856,13 +1856,10 @@ def plot_Rg_vs_jet_pt_stats(
     jet_R: float = 0.2,
     substructure_var_range: helpers.RangeSelector | None = None,
     smeared_kt_min: float | None = None
-) -> List[Path]:
+) -> list[Path]:
     # Validation
     if substructure_var_range is None:
-        if jet_R == 0.4:
-            substructure_var_range = helpers.KtRange(-0.1, 0.5)
-        else:
-            substructure_var_range = helpers.KtRange(-0.1, 0.3)
+        substructure_var_range = helpers.KtRange(-0.1, 0.5 if jet_R == 0.4 else 0.3)
 
     # Setup
     # We want to round the jet pt up to ensure that we don't cut it off when rebinning
@@ -1921,10 +1918,10 @@ def plot_zg_vs_jet_pt_stats(
     output_dir: Path,
     plot_png: bool,
     system_label: str,
-    jet_R: float = 0.2,
+    jet_R: float = 0.2,  # noqa: ARG001
     substructure_var_range: helpers.RangeSelector | None = None,
     smeared_kt_min: float | None = None
-) -> List[Path]:
+) -> list[Path]:
     # Validation
     if substructure_var_range is None:
         substructure_var_range = helpers.KtRange(-0.1, 0.55)
@@ -2110,7 +2107,7 @@ def plot_distance_comparison(
                     text=TextConfig(x=0.97, y=0.97, text=text),
                     legend=LegendConfig(location="center right", font_size=12),
                 ),
-                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
             ),
             output_dir=output_dir,
         )
@@ -2134,7 +2131,7 @@ def plot_distance_comparison(
                     text=TextConfig(x=0.97, y=0.97, text=text),
                     legend=LegendConfig(location="center right", font_size=12),
                 ),
-                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+                figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
             ),
             output_dir=output_dir,
         )
@@ -2239,7 +2236,7 @@ def _plot_compare_grooming_methods_for_attribute(
             linestyle="",
             label=style.label,
             zorder=style.zorder,
-            **kwargs,
+            **kwargs,  # type: ignore[arg-type]
         )
 
     # Labeling and presentation
@@ -2291,7 +2288,7 @@ def compare_grooming_methods_for_substructure_prod(
                 text=TextConfig(x=0.97, y=0.97, text=text),
                 legend=LegendConfig(location="lower left", font_size=14),
             ),
-            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
         ),
         output_dir=output_dir,
     )
@@ -2313,7 +2310,7 @@ def compare_grooming_methods_for_substructure_prod(
                 text=TextConfig(x=0.97, y=0.97, text=text),
                 legend=LegendConfig(location="center right", font_size=14),
             ),
-            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
         ),
         output_dir=output_dir,
     )
@@ -2335,7 +2332,7 @@ def compare_grooming_methods_for_substructure_prod(
                 text=TextConfig(x=0.97, y=0.97, text=text),
                 legend=LegendConfig(location="upper right", font_size=14),
             ),
-            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
         ),
         output_dir=output_dir,
     )
@@ -2357,7 +2354,7 @@ def compare_grooming_methods_for_substructure_prod(
                 text=TextConfig(x=0.97, y=0.97, text=text),
                 legend=LegendConfig(location="center right", font_size=14),
             ),
-            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
         ),
         output_dir=output_dir,
     )
@@ -2379,7 +2376,7 @@ def compare_grooming_methods_for_substructure_prod(
                 text=TextConfig(x=0.97, y=0.97, text=text),
                 legend=LegendConfig(location="center right", font_size=14),
             ),
-            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
         ),
         output_dir=output_dir,
     )
@@ -2401,7 +2398,7 @@ def compare_grooming_methods_for_substructure_prod(
                 text=TextConfig(x=0.97, y=0.97, text=text),
                 legend=LegendConfig(location="center right", font_size=14),
             ),
-            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
         ),
         output_dir=output_dir,
     )
@@ -2430,7 +2427,7 @@ def compare_grooming_methods_for_substructure_prod(
                 text=TextConfig(x=0.97, y=0.97, text=text),
                 legend=LegendConfig(location="lower left", font_size=14),
             ),
-            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
         ),
         output_dir=output_dir,
     )
@@ -2452,7 +2449,7 @@ def compare_grooming_methods_for_substructure_prod(
                 text=TextConfig(x=0.97, y=0.97, text=text),
                 legend=LegendConfig(location="center right", font_size=14),
             ),
-            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
         ),
         output_dir=output_dir,
     )
@@ -2474,7 +2471,7 @@ def compare_grooming_methods_for_substructure_prod(
                 text=TextConfig(x=0.97, y=0.97, text=text),
                 legend=LegendConfig(location="upper center", font_size=14),
             ),
-            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),
+            figure=Figure(edge_padding=dict(left=0.12, bottom=0.12)),  # noqa: C408
         ),
         output_dir=output_dir,
     )
@@ -2729,7 +2726,7 @@ def _plot_compare_grooming_methods_for_attribute_data_embed(
 _default_jet_pt_bin = helpers.RangeSelector(min=40, max=120)
 
 def compare_grooming_methods_for_substructure_data_embed_prod(
-    hists: Tuple[PlotHists, PlotHists],
+    hists: tuple[PlotHists, PlotHists],
     grooming_methods: Sequence[str],
     output_dir: Path,
     rdf_plots: bool = False,
@@ -3087,7 +3084,7 @@ def _plot_lund_plane(
         h = binned_data.BinnedData.from_existing_data(hists[hist_name])
     else:
         bh_hist = hists[f"{grooming_method}_{prefix}_lund_plane"]
-        h = binned_data.BinnedData.from_existing_data(bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :, :])  # type: ignore[no-redef,misc]
+        h = binned_data.BinnedData.from_existing_data(bh_hist[bh.loc(jet_pt_bin.min) : bh.loc(jet_pt_bin.max) : bh.sum, :, :])  # type: ignore[misc]
 
     # Scale by bin width
     x_bin_widths, y_bin_widths = np.meshgrid(*h.axes.bin_widths)
