@@ -6,20 +6,20 @@
 """
 
 import logging
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import attr
 import boost_histogram as bh
-import matplotlib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+
 import pachyderm.plot
-from pachyderm import binned_data
 
 # from jet_substructure.analysis import analysis_methods
 from jet_substructure.base import analysis_objects, helpers
-
+from pachyderm import binned_data
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +27,10 @@ pachyderm.plot.configure()
 # Enable ticks on all sides
 # Unfortunately, some of this is overriding the pachyderm plotting style.
 # That will have to be updated eventually...
-matplotlib.rcParams["xtick.top"] = True
-matplotlib.rcParams["xtick.minor.top"] = True
-matplotlib.rcParams["ytick.right"] = True
-matplotlib.rcParams["ytick.minor.right"] = True
+mpl.rcParams["xtick.top"] = True
+mpl.rcParams["xtick.minor.top"] = True
+mpl.rcParams["ytick.right"] = True
+mpl.rcParams["ytick.minor.right"] = True
 
 
 @attr.s
@@ -42,14 +42,14 @@ class PlotConfig:
     log_y: bool = attr.ib(default=True)
 
 
-def _plot_distribution(  # noqa: C901
+def _plot_distribution(
     attribute_name: str,
     hists: analysis_objects.Hists[analysis_objects.SubstructureHists],
     identifier: analysis_objects.Identifier,
     jet_type_label: str,
     plot_config: PlotConfig,
     path: Path,
-    ratio_denominator_hists: Optional[analysis_objects.Hists[analysis_objects.SubstructureHists]] = None,
+    ratio_denominator_hists: analysis_objects.Hists[analysis_objects.SubstructureHists] | None = None,
 ) -> None:
     # Setup
     if ratio_denominator_hists:
@@ -74,14 +74,14 @@ def _plot_distribution(  # noqa: C901
         if technique == "inclusive":
             continue
 
-        h: Union[bh.Histogram, binned_data.BinnedData] = getattr(technique_hists, attribute_name)
+        h: bh.Histogram | binned_data.BinnedData = getattr(technique_hists, attribute_name)
         h = binned_data.BinnedData.from_existing_data(h)
 
         # Rebin by a factor of 2 for the kt.
         if attribute_name == "kt":
             rebin_factor = 2
             bh_hist = h.to_boost_histogram()
-            bh_hist = bh_hist[:: bh.rebin(rebin_factor)]
+            bh_hist = bh_hist[:: bh.rebin(rebin_factor)]  # type: ignore[misc]
             h = binned_data.BinnedData.from_existing_data(bh_hist)
             h /= rebin_factor
 
@@ -102,14 +102,14 @@ def _plot_distribution(  # noqa: C901
         if ratio_denominator_hists:
             ratio_denominator = getattr(ratio_denominator_hists, technique)
 
-            h_denominator: Union[bh.Histogram, binned_data.BinnedData] = getattr(ratio_denominator, attribute_name)
+            h_denominator: bh.Histogram | binned_data.BinnedData = getattr(ratio_denominator, attribute_name)
             h_denominator = binned_data.BinnedData.from_existing_data(h_denominator)
 
             # Rebin by a factor of 2 for the kt.
             if attribute_name == "kt":
                 rebin_factor = 2
                 bh_hist_denominator = h_denominator.to_boost_histogram()
-                bh_hist_denominator = bh_hist_denominator[:: bh.rebin(rebin_factor)]
+                bh_hist_denominator = bh_hist_denominator[:: bh.rebin(rebin_factor)]  # type: ignore[misc]
                 h_denominator = binned_data.BinnedData.from_existing_data(bh_hist_denominator)
                 h_denominator /= rebin_factor
 
@@ -170,7 +170,7 @@ def _plot_distribution(  # noqa: C901
     fig.align_ylabels()
 
     # Store and cleanup
-    filename = f"{plot_config.name}_{str(identifier)}"
+    filename = f"{plot_config.name}_{identifier!s}"
     if ratio_denominator_hists:
         filename = f"{filename}_ratio"
     fig.savefig(path / f"{filename}.pdf")
@@ -197,7 +197,7 @@ def _plot_total_number_of_splittings(
     logger.info(f"Plotting total_number_of_splittings, {identifier} with ratio")
 
     recursive_hists = masked_recursive_hists.inclusive
-    h: Union[bh.Histogram, binned_data.BinnedData] = recursive_hists.total_number_of_splittings
+    h: bh.Histogram | binned_data.BinnedData = recursive_hists.total_number_of_splittings
     h = binned_data.BinnedData.from_existing_data(h)
 
     # Scale by bin widths and number of jets
@@ -216,7 +216,7 @@ def _plot_total_number_of_splittings(
 
     # Plot iterative splittings
     iterative_hists = masked_iterative_hists.inclusive
-    h_iterative: Union[bh.Histogram, binned_data.BinnedData] = iterative_hists.total_number_of_splittings
+    h_iterative: bh.Histogram | binned_data.BinnedData = iterative_hists.total_number_of_splittings
     h_iterative = binned_data.BinnedData.from_existing_data(h_iterative)
 
     # Scale by bin widths and number of jets
@@ -283,7 +283,7 @@ def _plot_total_number_of_splittings(
     fig.align_ylabels()
 
     # Store and cleanup
-    filename = f"{plot_config.name}_inclusive_{str(identifier)}_ratio"
+    filename = f"{plot_config.name}_inclusive_{identifier!s}_ratio"
     fig.savefig(path / f"{filename}.pdf")
     plt.close(fig)
 
@@ -304,7 +304,7 @@ def _plot_distribution_in_different_pt_bins(
             splittings_label = f"{identifier.iterative_splittings_label}_splittings"
 
             technique_hists = getattr(selected_hists, selected_technique)
-            h: Union[bh.histogram, binned_data.BinnedData] = getattr(technique_hists, attribute_name)
+            h: bh.Histogram | binned_data.BinnedData = getattr(technique_hists, attribute_name)
             if isinstance(h, bh.Histogram):
                 h = binned_data.BinnedData.from_existing_data(h)
 
@@ -380,7 +380,7 @@ def _plot_lund_plane(
     fig, ax = plt.subplots(figsize=(8, 6))
     logger.info(f"Plotting lund plane for {technique}, {identifier}")
 
-    h: Union[bh.Histogram, binned_data.BinnedData] = hists.lund_plane
+    h: bh.Histogram | binned_data.BinnedData = hists.lund_plane
     if isinstance(h, bh.Histogram):
         h = binned_data.BinnedData.from_existing_data(h)
 
@@ -410,7 +410,7 @@ def _plot_lund_plane(
         h.axes[0].bin_edges.T,
         h.axes[1].bin_edges.T,
         h.values.T,
-        norm=matplotlib.colors.LogNorm(**z_axis_range),
+        norm=mpl.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -443,11 +443,11 @@ def _plot_lund_plane(
     )
 
     # Store and reset
-    fig.savefig(path / f"lund_plane_{str(identifier)}_{technique}.pdf")
+    fig.savefig(path / f"lund_plane_{identifier!s}_{technique}.pdf")
     plt.close(fig)
 
 
-def lund_plane(  # noqa: C901
+def lund_plane(
     all_hists: Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
     jet_type_label: str,
     path: Path,
@@ -505,7 +505,7 @@ def lund_plane(  # noqa: C901
         log_y=False,
     )
 
-    distributions: List[Tuple[str, PlotConfig]] = [
+    distributions: list[tuple[str, PlotConfig]] = [
         ("kt", kt_label),
         ("z", z_label),
         ("delta_R", delta_R_label),
@@ -588,8 +588,13 @@ def lund_plane(  # noqa: C901
 
 
 def _project_matching(
-    input_hist: binned_data.BinnedData, axis_to_keep: int, identifier: analysis_objects.MatchingHybridIdentifier
+    input_hist: binned_data.BinnedData | bh.Histogram, axis_to_keep: int, identifier: analysis_objects.MatchingHybridIdentifier
 ) -> binned_data.BinnedData:
+    # Validation
+    import boost_histogram as bh
+    if isinstance(input_hist, bh.Histogram):
+        input_hist = binned_data.BinnedData.from_existing_data(input_hist)
+
     # Setup
     # Axes: 0 = matched_jet_pt, 1 = matched_kt, 2 = hybrid_jet_pt, 3 = hybrid_kt
     # Determine the range for hybrid jet pt.
@@ -614,7 +619,6 @@ def _project_matching(
 
     # Sanity check
     if axis_to_keep == 0:
-        import boost_histogram as bh
 
         bh_hist = input_hist.to_boost_histogram()
         logger.debug(f"bh_hist shape: {bh_hist.view().value.shape}")
@@ -855,7 +859,7 @@ def _plot_matching(
     )
 
     # Store and reset
-    fig.savefig(path / f"subjet_matching_{axis_parameter}_{technique}_{str(identifier)}.pdf")
+    fig.savefig(path / f"subjet_matching_{axis_parameter}_{technique}_{identifier!s}.pdf")
     plt.close(fig)
 
     # Labeling
@@ -875,7 +879,7 @@ def _plot_matching(
     # Axis labels
     ax.set_ylabel("Tagging fraction")
     ax.set_xlabel(x_axis_label)
-    ax.set_ylim([1e-3, 10])
+    ax.set_ylim((1e-3, 10))
     ax.set_yscale("log")
     ax.legend(frameon=False, loc="upper left", ncol=2, fontsize=14)
     fig_single.tight_layout()
@@ -891,7 +895,7 @@ def _plot_matching(
     )
 
     # Store and reset
-    fig_single.savefig(path / f"subjet_matching_{axis_parameter}_{technique}_{str(identifier)}_single_figure.pdf")
+    fig_single.savefig(path / f"subjet_matching_{axis_parameter}_{technique}_{identifier!s}_single_figure.pdf")
     plt.close(fig_single)
 
 
@@ -926,9 +930,9 @@ def _plot_matching_response_pt(
 
         # Project into our axes of interest (namely, the attribute at hybrid and true level).
         h_proj = binned_data.BinnedData(
-            axes=[h.axes[0], h.axes[2].bin_edges[hybrid_jet_pt_axis_range]],
-            values=np.sum(h.values[:, :, hybrid_jet_pt_range, :], axis=(1, 3)),
-            variances=np.sum(h.variances[:, :, hybrid_jet_pt_range, :], axis=(1, 3)),
+            axes=[h.axes[0], h.axes[2].bin_edges[hybrid_jet_pt_axis_range]],  # type: ignore[arg-type]
+            values=np.sum(h.values[:, :, hybrid_jet_pt_range, :], axis=(1, 3)),  # type: ignore[index]
+            variances=np.sum(h.variances[:, :, hybrid_jet_pt_range, :], axis=(1, 3)),  # type: ignore[index]
         )
 
         # If there aren't counts, we  need to stop here.
@@ -939,7 +943,7 @@ def _plot_matching_response_pt(
         # Rebin the matching axis because the granularity is super high there (much more so than the hybrid)
         rebin_factor = 5
         bh_proj = h_proj.to_boost_histogram()
-        bh_proj = bh_proj[:: bh.rebin(rebin_factor), :]
+        bh_proj = bh_proj[:: bh.rebin(rebin_factor), :]  # type: ignore[misc]
         h_proj = binned_data.BinnedData.from_existing_data(bh_proj)
         h_proj /= rebin_factor
 
@@ -970,7 +974,7 @@ def _plot_matching_response_pt(
             h_proj.axes[1].bin_edges.T,
             h_proj.axes[0].bin_edges.T,
             h_proj.values,
-            norm=matplotlib.colors.LogNorm(**z_axis_range),
+            norm=mpl.colors.LogNorm(**z_axis_range),
         )
         fig.colorbar(mesh, pad=0.02)
 
@@ -1006,7 +1010,7 @@ def _plot_matching_response_pt(
 
         # Store and reset
         fig.savefig(
-            path / f"matching_response_pt_det_hybrid_{str(identifier)}_{technique}_matchingType_{matching_type}.pdf"
+            path / f"matching_response_pt_det_hybrid_{identifier!s}_{technique}_matchingType_{matching_type}.pdf"
         )
         plt.close(fig)
 
@@ -1042,8 +1046,8 @@ def _plot_matching_response_kt(
         # Project into our axes of interest (namely, the attribute at hybrid and true level).
         h_proj = binned_data.BinnedData(
             axes=[h.axes[1], h.axes[3]],
-            values=np.sum(h.values[:, :, hybrid_jet_pt_range, :], axis=(0, 2)),
-            variances=np.sum(h.variances[:, :, hybrid_jet_pt_range, :], axis=(0, 2)),
+            values=np.sum(h.values[:, :, hybrid_jet_pt_range, :], axis=(0, 2)),  # type: ignore[index]
+            variances=np.sum(h.variances[:, :, hybrid_jet_pt_range, :], axis=(0, 2)),  # type: ignore[index]
         )
 
         # If there aren't counts, we  need to stop here.
@@ -1078,7 +1082,7 @@ def _plot_matching_response_kt(
             h_proj.axes[1].bin_edges.T,
             h_proj.axes[0].bin_edges.T,
             h_proj.values,
-            norm=matplotlib.colors.LogNorm(**z_axis_range),
+            norm=mpl.colors.LogNorm(**z_axis_range),
         )
         fig.colorbar(mesh, pad=0.02)
 
@@ -1114,7 +1118,7 @@ def _plot_matching_response_kt(
 
         # Store and reset
         fig.savefig(
-            path / f"matching_response_kt_det_hybrid_{str(identifier)}_{technique}_matchingType_{matching_type}.pdf"
+            path / f"matching_response_kt_det_hybrid_{identifier!s}_{technique}_matchingType_{matching_type}.pdf"
         )
         plt.close(fig)
 
@@ -1191,7 +1195,7 @@ def _plot_toy(
     fig, ax = plt.subplots(figsize=(8, 6))
     logger.info(f"Plotting toy hist for {technique}, {identifier}, {attribute_name}")
 
-    h: Union[bh.Histogram, binned_data.BinnedData] = getattr(hists, attribute_name)
+    h: bh.Histogram | binned_data.BinnedData = getattr(hists, attribute_name)
     if isinstance(h, bh.Histogram):
         h = binned_data.BinnedData.from_existing_data(h)
 
@@ -1223,7 +1227,7 @@ def _plot_toy(
         h.axes[0].bin_edges.T,
         h.axes[1].bin_edges.T,
         h.values.T,
-        norm=matplotlib.colors.LogNorm(**z_axis_range),
+        norm=mpl.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -1256,7 +1260,7 @@ def _plot_toy(
     )
 
     # Store and reset
-    fig.savefig(path / f"{attribute_name}_{str(identifier)}_{technique}.pdf")
+    fig.savefig(path / f"{attribute_name}_{identifier!s}_{technique}.pdf")
     plt.close(fig)
 
 
@@ -1269,7 +1273,7 @@ def toy(
     path.mkdir(parents=True, exist_ok=True)
 
     # Plot labels
-    label_map: Dict[str, str] = {
+    label_map: dict[str, str] = {
         "hybrid": "hybrid",
         "pythia": "pythia",
     }
@@ -1295,7 +1299,7 @@ def toy(
         y_label=r"$\theta^{\text{" + label + r"}}\:(\text{GeV}/c)$",
     )
 
-    distributions: List[Tuple[str, PlotConfig]] = [
+    distributions: list[tuple[str, PlotConfig]] = [
         ("kt", kt_label),
         ("z", z_label),
         ("delta_R", delta_R_label),
@@ -1330,7 +1334,7 @@ def _plot_response(
 ) -> None:
     # Setup
     logger.info(f"Plotting response hist for {technique}, {identifier}, {attribute_name}")
-    h: Union[bh.Histogram, binned_data.BinnedData] = getattr(hists, f"response_{attribute_name}")
+    h: bh.Histogram | binned_data.BinnedData = getattr(hists, f"response_{attribute_name}")
     if isinstance(h, bh.Histogram):
         h = binned_data.BinnedData.from_existing_data(h)
 
@@ -1400,7 +1404,7 @@ def _plot_response(
             h_proj.axes[0].bin_edges.T,
             h_proj.axes[1].bin_edges.T,
             h_proj.values.T,
-            norm=matplotlib.colors.LogNorm(**z_axis_range),
+            norm=mpl.colors.LogNorm(**z_axis_range),
         )
         fig.colorbar(mesh, pad=0.02)
 
@@ -1435,7 +1439,7 @@ def _plot_response(
         )
 
         # Store and reset
-        fig.savefig(path / f"response_{attribute_name}_{str(identifier)}_{technique}_matchingType_{matching_type}.pdf")
+        fig.savefig(path / f"response_{attribute_name}_{identifier!s}_{technique}_matchingType_{matching_type}.pdf")
         plt.close(fig)
 
 
@@ -1449,7 +1453,7 @@ def _plot_response_pt(
 ) -> None:
     # Setup
     logger.info(f"Plotting jet pt response hist for {technique}, {identifier}, {attribute_name}")
-    h: Union[bh.Histogram, binned_data.BinnedData] = getattr(hists, f"response_{attribute_name}")
+    h: bh.Histogram | binned_data.BinnedData = getattr(hists, f"response_{attribute_name}")
     if isinstance(h, bh.Histogram):
         h = binned_data.BinnedData.from_existing_data(h)
 
@@ -1503,7 +1507,7 @@ def _plot_response_pt(
         h.axes[0].bin_edges.T,
         h.axes[2].bin_edges.T,
         h_proj.values.T,
-        norm=matplotlib.colors.LogNorm(**z_axis_range),
+        norm=mpl.colors.LogNorm(**z_axis_range),
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -1536,7 +1540,7 @@ def _plot_response_pt(
     )
 
     # Store and reset
-    fig.savefig(path / f"response_pt_{attribute_name}_{str(identifier)}_{technique}.pdf")
+    fig.savefig(path / f"response_pt_{attribute_name}_{identifier!s}_{technique}.pdf")
     plt.close(fig)
 
 
@@ -1552,7 +1556,7 @@ def _plot_response_jet_spectra(
     fig, ax = plt.subplots(figsize=(8, 6))
     logger.info(f"Plotting response jet spectra for {technique}, {identifier}, {attribute_name}")
 
-    h: Union[bh.Histogram, binned_data.BinnedData] = getattr(hists, f"response_{attribute_name}")
+    h: bh.Histogram | binned_data.BinnedData = getattr(hists, f"response_{attribute_name}")
     if isinstance(h, bh.Histogram):
         h = binned_data.BinnedData.from_existing_data(h)
 
@@ -1624,7 +1628,7 @@ def _plot_response_jet_spectra(
     )
 
     # Store and reset
-    fig.savefig(path / f"response_spectra_{attribute_name}_{str(identifier)}_{technique}.pdf")
+    fig.savefig(path / f"response_spectra_{attribute_name}_{identifier!s}_{technique}.pdf")
     plt.close(fig)
 
 
@@ -1640,7 +1644,7 @@ def _plot_response_kt_distributions(
     fig, ax = plt.subplots(figsize=(8, 6))
     logger.info(f"Plotting response kt spectra for {technique}, {identifier}, {attribute_name}")
 
-    h: Union[bh.Histogram, binned_data.BinnedData] = getattr(hists, f"response_{attribute_name}")
+    h: bh.Histogram | binned_data.BinnedData = getattr(hists, f"response_{attribute_name}")
     if isinstance(h, bh.Histogram):
         h = binned_data.BinnedData.from_existing_data(h)
 
@@ -1712,7 +1716,7 @@ def _plot_response_kt_distributions(
     )
 
     # Store and reset
-    fig.savefig(path / f"response_kt_spectra_{attribute_name}_{str(identifier)}_{technique}.pdf")
+    fig.savefig(path / f"response_kt_spectra_{attribute_name}_{identifier!s}_{technique}.pdf")
     plt.close(fig)
 
 
@@ -1751,7 +1755,7 @@ def responses(
         y_label=r"$n^{\text{part}}$",
     )
 
-    distributions: List[Tuple[str, PlotConfig]] = [
+    distributions: list[tuple[str, PlotConfig]] = [
         ("kt", kt_label),
         ("z", z_label),
         ("delta_R", delta_R_label),
@@ -1847,22 +1851,22 @@ def _plot_compare_kt(
     rebin_factor = 2
     # Data
     bh_data = h_data.to_boost_histogram()
-    bh_data = bh_data[:: bh.rebin(rebin_factor)]
+    bh_data = bh_data[:: bh.rebin(rebin_factor)]  # type: ignore[misc]
     h_data = binned_data.BinnedData.from_existing_data(bh_data)
     h_data /= rebin_factor
     # Embed
     bh_embed = h_embed.to_boost_histogram()
-    bh_embed = bh_embed[:: bh.rebin(rebin_factor)]
+    bh_embed = bh_embed[:: bh.rebin(rebin_factor)]  # type: ignore[misc]
     h_embed = binned_data.BinnedData.from_existing_data(bh_embed)
     h_embed /= rebin_factor
     # Det
     bh_det = h_det.to_boost_histogram()
-    bh_det = bh_det[:: bh.rebin(rebin_factor)]
+    bh_det = bh_det[:: bh.rebin(rebin_factor)]  # type: ignore[misc]
     h_det = binned_data.BinnedData.from_existing_data(bh_det)
     h_det /= rebin_factor
     # True
     bh_true = h_true.to_boost_histogram()
-    bh_true = bh_true[:: bh.rebin(rebin_factor)]
+    bh_true = bh_true[:: bh.rebin(rebin_factor)]  # type: ignore[misc]
     h_true = binned_data.BinnedData.from_existing_data(bh_true)
     h_true /= rebin_factor
 
@@ -1969,7 +1973,7 @@ def _plot_compare_kt(
     fig.align_ylabels()
 
     # Store and reset
-    fig.savefig(path / f"kt_spectra_comparison_{str(identifier)}_{technique}.pdf")
+    fig.savefig(path / f"kt_spectra_comparison_{identifier!s}_{technique}.pdf")
     plt.close(fig)
 
 
@@ -1981,16 +1985,16 @@ def compare_kt(
     all_det_hists: Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
     all_true_hists: Mapping[analysis_objects.Identifier, analysis_objects.Hists[analysis_objects.SubstructureHists]],
     data_dataset: analysis_objects.Dataset,
-    embedded_dataset: analysis_objects.Dataset,
+    embedded_dataset: analysis_objects.Dataset,  # noqa: ARG001
 ) -> None:
     for (
         (data_identifier, data_hists),
-        (embedded_identifier, embedded_hists),
-        (det_identifier, det_hists),
-        (true_identifier, true_hists),
-    ) in zip(all_data_hists.items(), all_embedded_hists.items(), all_det_hists.items(), all_true_hists.items()):
+        (embedded_identifier, embedded_hists),  # noqa: B007
+        (det_identifier, det_hists),  # noqa: B007
+        (true_identifier, true_hists),  # noqa: B007
+    ) in zip(all_data_hists.items(), all_embedded_hists.items(), all_det_hists.items(), all_true_hists.items(), strict=True):
         for (technique, d_hists), (_, e_hists), (_, pythia_d_hists), (_, t_hists) in zip(
-            data_hists, embedded_hists, det_hists, true_hists
+            data_hists, embedded_hists, det_hists, true_hists, strict=True
         ):
             if d_hists.n_jets == 0 or e_hists.n_jets == 0 or pythia_d_hists.n_jets == 0 or t_hists.n_jets == 0:
                 logger.warning(f"No jets within {data_identifier}_{technique}. Skipping bin!")

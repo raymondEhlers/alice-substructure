@@ -58,7 +58,7 @@ def _project_matching(bh_hist: bh.Histogram, axis_to_keep: int) -> binned_data.B
         slice(None, None, bh.sum),
         slice(None, None, bh.sum),
     ]
-    selections[axis_to_keep] = slice(None)
+    selections[axis_to_keep] = slice(None)  # type: ignore[assignment]
 
     bh_hist = bh_hist[tuple(selections)]  # type: ignore[assignment]
 
@@ -1050,7 +1050,7 @@ def _plot_response_without_matching_type(
         h.axes[0].bin_edges.T,
         h.axes[1].bin_edges.T,
         h.values.T,
-        norm=mpl.colors.LogNorm(**z_axis_range),
+        norm=mpl.colors.LogNorm(**z_axis_range),  # type: ignore[arg-type]
     )
     fig.colorbar(mesh, pad=0.02)
 
@@ -1210,7 +1210,7 @@ def _plot_response_by_matching_type(
             h.axes[0].bin_edges.T,
             h.axes[1].bin_edges.T,
             h.values.T,
-            norm=mpl.colors.LogNorm(**z_axis_range),
+            norm=mpl.colors.LogNorm(**z_axis_range),  # type: ignore[arg-type]
         )
         fig.colorbar(mesh, pad=0.02)
 

@@ -183,7 +183,7 @@ class JetConstituent(ak.Record, JetConstituentCommon):  # type: ignore[misc]
     id: int
 
     def four_vector(self, mass_hypothesis: float = 0.139) -> vector.MomentumObject4D:
-        return vector.MomentumObject4D(pt=self.pt, eta=self.eta, phi=self.phi, m=mass_hypothesis)  # type: ignore[no-any-return]
+        return vector.MomentumObject4D(pt=self.pt, eta=self.eta, phi=self.phi, m=mass_hypothesis)
 
 
 class JetConstituentArray(ak.Array, JetConstituentCommon):  # type: ignore[misc]

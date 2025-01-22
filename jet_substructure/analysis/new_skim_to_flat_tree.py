@@ -148,8 +148,8 @@ def _define_calculation_functions(
     # TODO: This currently only works for iterative splittings...
     #       Calculating recursive is way harder in any array-like manner.
     if iterative_splittings:
-        functions["soft_drop_z_cut_02"] = functools.partial(new_methods.JetSplittingArray.soft_drop, z_cutoff=0.2)  # type: ignore[arg-type]
-        functions["soft_drop_z_cut_04"] = functools.partial(new_methods.JetSplittingArray.soft_drop, z_cutoff=0.4)  # type: ignore[arg-type]
+        functions["soft_drop_z_cut_02"] = functools.partial(new_methods.JetSplittingArray.soft_drop, z_cutoff=0.2)  # type: ignore[assignment,arg-type]
+        functions["soft_drop_z_cut_04"] = functools.partial(new_methods.JetSplittingArray.soft_drop, z_cutoff=0.4)  # type: ignore[assignment,arg-type]
     return functions  # type: ignore[return-value]
 
 
@@ -254,7 +254,7 @@ def _find_contributing_subjets(input_jet: ak.Array, groomed_index: int) -> list[
     return [sj for sj in input_jet.subjets if sj.parent_splitting_index == groomed_index]
 
 
-@nb.njit  # type: ignore[misc]
+@nb.njit
 def _sort_subjets(input_jet, input_subjets):  # type: ignore[no-untyped-def]
     pts = []
     for sj in input_subjets:

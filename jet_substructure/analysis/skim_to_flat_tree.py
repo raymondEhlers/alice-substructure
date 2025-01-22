@@ -747,13 +747,13 @@ def run(
     dm_iterator = dm.lazy_iteration(fully_lazy=(number_of_cores > 1))
     wrapper = functools.partial(
         calculate_and_skim_func,
-        dataset=dataset,
+        dataset=dataset,  # type: ignore[call-arg]
         iterative_splittings=iterative_splittings,
         **additional_kwargs_for_analysis,
     )
     wrapper_multiprocessing = functools.partial(
         analyze_tree._wrap_multiprocessing,
-        analysis_function=wrapper,
+        analysis_function=wrapper,  # type: ignore[arg-type]
     )
     with progress_manager.counter(total=len(dm), desc="Skimming", unit="tree") as tree_counter:
         if number_of_cores > 1:

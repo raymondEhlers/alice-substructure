@@ -1242,11 +1242,11 @@ def run_shared(
         jet_pt_bins=jet_pt_bins,
         hists_filename_stem=dataset.hists_filename.stem,
         force_reprocessing=force_reprocessing,
-        **additional_kwargs_for_analysis,
+        **additional_kwargs_for_analysis,  # type: ignore[call-arg]
     )
     analyze_single_tree_func_multiprocessing = functools.partial(
         _wrap_multiprocessing,
-        analysis_function=analyze_single_tree_func,
+        analysis_function=analyze_single_tree_func,  # type: ignore[arg-type]
     )
 
     # Iterate over trees.

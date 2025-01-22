@@ -6,8 +6,9 @@
 import base64
 import logging
 import math
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence
+from typing import Any
 
 import uproot
 
@@ -39,7 +40,7 @@ z_cut_02_grooming_methods = all_grooming_methods[9:] + [all_grooming_methods[7]]
 
 def load_histograms(
     filename: str, collision_system: str, tag: str, base_path: Path, verbose: bool = False
-) -> Dict[str, binned_data.BinnedData]:
+) -> dict[str, binned_data.BinnedData]:
     """Load histograms stored in a file.
 
     Args:
@@ -96,7 +97,7 @@ def _image_to_base64(filename: Path) -> str:
 
 def display_images(
     rows: Sequence[Sequence[str]], fig_output_dir: Path, embed_with_base64: bool = False, render_display: bool = True
-) -> Optional[str]:
+) -> str | None:
     """Display stored images in a layout using HTML + CSS.
 
     For each row, the width is determined by the number of images, such that they their widths
@@ -222,7 +223,7 @@ def display_images_ipywidgets(rows: Sequence[Sequence[str]], fig_output_dir: Pat
         The compiled HTML containing the image.
     """
     # Delay the import so we don't have to rely on a package that's only used as a backup method.
-    from ipywidgets import HBox, Image, VBox
+    from ipywidgets import HBox, Image, VBox  # pyright: ignore[reportMissingImports]
 
     layout = []
     for row in rows:
