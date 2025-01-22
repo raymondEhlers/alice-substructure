@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.16.2
+#       jupytext_version: 1.16.4
 #   kernelspec:
 #     display_name: .venv-3.11
 #     language: python
@@ -1433,6 +1433,7 @@ method_to_color = dict(zip(
         #"#7e459e","#cda9e0","#7385d9","#4bafd0","#147736","#27ae60","#b84c7d","#FF8301"
     ]
     # Nice teal: 008585
+    , strict=True
 ))
 
 method_to_color = dict(zip(
@@ -1458,6 +1459,7 @@ method_to_color = dict(zip(
         "#FF8301", "#ffb567",
     ]
     # Nice teal: 008585
+    , strict=True
 ))
 
 
@@ -2603,7 +2605,7 @@ central_R02_unfolded_with_systematics["dynamical_kt"].data.axes[0].bin_centers
 # %%
 import hepdata_lib
 
-from jet_substructure.analysis import full_results_helpers, plot_style
+from jet_substructure.analysis import full_results_helpers, plot_style  # noqa: F811
 
 # Setup for hep data
 # Note:
@@ -2704,7 +2706,7 @@ for grooming_method in grooming_methods_for_letter:
         x = hepdata_lib.Variable(name=x_label, is_independent=True, is_binned=True, units=r"GeV/c")
         x.digits = n_significant_digits_values
         # Bin edges of the form [(low, high), ...]
-        x.values = list(zip(h.axes[0].bin_edges[:-1], h.axes[0].bin_edges[1:]))
+        x.values = list(zip(h.axes[0].bin_edges[:-1], h.axes[0].bin_edges[1:], strict=True))
         y = hepdata_lib.Variable(name=y_label, is_independent=False, is_binned=False, units=r"(GeV/c)^{-1}")
         y.digits = n_significant_digits_values
         y.values = h.values
@@ -2790,6 +2792,7 @@ for grooming_method in grooming_methods_for_letter:
 # %%
 # Testing...
 import numpy as np
+
 from_low = np.where(h.metadata["y_systematic"]["tracking_efficiency"].low != 0, -1, 1)
 from_high = np.where(h.metadata["y_systematic"]["tracking_efficiency"].high != 0, 1, -1)
 # low is an absolute value (below the nominal value), so we should assign that to -1 when it's nonzero and -1 otherwise
@@ -2850,7 +2853,7 @@ for grooming_method in grooming_methods_for_letter:
             x = hepdata_lib.Variable(name=x_label, is_independent=True, is_binned=True, units=r"GeV/c")
             x.digits = n_significant_digits_values
             # Bin edges of the form [(low, high), ...]
-            x.values = list(zip(h.axes[0].bin_edges[:-1], h.axes[0].bin_edges[1:]))
+            x.values = list(zip(h.axes[0].bin_edges[:-1], h.axes[0].bin_edges[1:], strict=True))
             table.add_variable(x)
             first_loop = False
 
@@ -2956,7 +2959,7 @@ for grooming_method in grooming_methods_for_letter:
         x = hepdata_lib.Variable(name=x_label, is_independent=True, is_binned=True, units=r"GeV/c")
         x.digits = n_significant_digits_values
         # Bin edges of the form [(low, high), ...]
-        x.values = list(zip(ratio.axes[0].bin_edges[:-1], ratio.axes[0].bin_edges[1:]))
+        x.values = list(zip(ratio.axes[0].bin_edges[:-1], ratio.axes[0].bin_edges[1:], strict=True))
         y = hepdata_lib.Variable(name=y_label, is_independent=False, is_binned=False, units="")
         y.digits = n_significant_digits_values
         y.values = ratio.values
@@ -3285,7 +3288,7 @@ jewel_no_recoils_predictions_R02.spectra(event_activity="central")["dynamical_kt
 # %%
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import numpy as np  # noqa: F811
+import numpy as np
 
 # %%
 fig, ax = plt.subplots(figsize=(8, 6))
