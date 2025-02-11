@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import itertools
 import logging
+from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 from pathlib import Path
-from typing import Callable, Iterable, Mapping, MutableMapping, Sequence
 
 import attrs
 import boost_histogram as bh

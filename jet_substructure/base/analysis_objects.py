@@ -198,7 +198,7 @@ class Dataset:
         obj = cls(
             collision_system=collision_system,
             name=name,
-            filenames=filenames,
+            filenames=filenames,  # type: ignore[arg-type]
             tree_name=selected_dataset_config["tree_name"],
             branches=_dataset_config["branches"],
             settings=settings_class.from_config(config=selected_dataset_config, z_cutoff=z_cutoff),

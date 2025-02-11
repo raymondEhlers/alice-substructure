@@ -11,9 +11,10 @@ import copy
 import functools
 import logging
 import re
+from collections.abc import Callable, Mapping, MutableSequence, Sequence
 from concurrent.futures import Future
 from pathlib import Path
-from typing import Any, Callable, Mapping, MutableSequence, Sequence
+from typing import Any
 
 import attrs
 import dask.distributed

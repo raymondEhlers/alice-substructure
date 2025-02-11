@@ -14,8 +14,9 @@ Conventions:
 """
 
 import logging
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -37,12 +38,12 @@ TH2D = Any
 TMatrixD = Any
 
 
-def _pass_filenames_to_ROOT(filenames: Sequence[Path]) -> List[str]:
+def _pass_filenames_to_ROOT(filenames: Sequence[Path]) -> list[str]:
     """ Helper to convert Path to str for ROOT. """
     return [str(f) for f in filenames]
 
 
-def _array_to_ROOT(arr: Union[List[str], Union[npt.NDArray[np.float32], npt.NDArray[np.float64]]], type_name: str = "double") -> Any:
+def _array_to_ROOT(arr: list[str] | npt.NDArray[np.float32] | npt.NDArray[np.float64], type_name: str = "double") -> Any:
     """Convert numpy array to std::vector via ROOT.
 
     Because it apparently can't handle conversions directly. Which is really dumb...
@@ -126,11 +127,11 @@ def unfolding_2D(
     response: RooUnfoldResponse,
     input_spectra: TH2D,
     true_spectra: TH2D,
-    error_treatment: Optional[RooUnfoldErrorTreatment] = None,
+    error_treatment: RooUnfoldErrorTreatment | None = None,
     tag: str = "",
     max_iter: int = 30,
     n_iter_for_covariance: int = 8,
-) -> Dict[str, TH2D]:
+) -> dict[str, TH2D]:
     """Perform unfolding in 2D.
 
     Args:
@@ -250,7 +251,7 @@ def _setup_unfolding() -> None:
         ROOT.gInterpreter.ProcessLine(f""".L {unfolding_cxx!s} """)
 
 
-def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path, additional_tag: str = "") -> None:
+def _write_hists(hists: Sequence[dict[str, TH2D]], output_filename: Path, additional_tag: str = "") -> None:
     # Delayed import to avoid direct dependence.
     ROOT = root_utils.import_ROOT()
 
@@ -279,7 +280,7 @@ def _write_hists(hists: Sequence[Dict[str, TH2D]], output_filename: Path, additi
     f_out.Close()
 
 
-def _default_hists(settings: unfolding_base.Settings2D) -> Dict[str, TH2D]:
+def _default_hists(settings: unfolding_base.Settings2D) -> dict[str, TH2D]:
     ROOT = root_utils.import_ROOT()
 
     hists = {}
@@ -346,7 +347,7 @@ def _default_hists(settings: unfolding_base.Settings2D) -> Dict[str, TH2D]:
     return hists
 
 
-def _hists_to_map_for_ROOT(hists: Dict[str, TH2D]) -> Any:
+def _hists_to_map_for_ROOT(hists: dict[str, TH2D]) -> Any:
     # Delayed import to avoid direct dependence.
     ROOT = root_utils.import_ROOT()
 
@@ -374,7 +375,7 @@ def _branch_name_shim_to_map_for_ROOT(branch_renames: Mapping[str, str]) -> Any:
     return map
 
 
-def _collision_system_names(unfolding_for_pp: bool) -> Tuple[str, str]:
+def _collision_system_names(unfolding_for_pp: bool) -> tuple[str, str]:
     if unfolding_for_pp:
         return "pp", "pythia"
     return "PbPb", "embed_pythia"
@@ -576,7 +577,7 @@ def _get_data_stats(
 
 def _create_branch_rename_shim(
     response_filenames: Sequence[Path], response_tree_name: str, grooming_method: str
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Create cross check task branch rename shim.
 
     Used to standardize the output of the cross check task. However, ROOT makes
@@ -605,7 +606,7 @@ def _create_branch_rename_shim(
     return branch_renames  # noqa: RET504
 
 
-def _setup_root_logging(debug_cpp_code: bool = False) -> Tuple[Any, Any]:
+def _setup_root_logging(debug_cpp_code: bool = False) -> tuple[Any, Any]:
     """Setup ROOT logging via streams
 
     The main downside is that I'll only see output after it's done. But this way, I'll capture the logs
