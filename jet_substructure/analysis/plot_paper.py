@@ -1866,11 +1866,19 @@ def _plot_pp_PbPb_ratio_on_axis(
     # NOTE: This is a bit darker than usual because one of the uncertainties (3-4 central SD 0.2)
     #       seems to be quite difficult to see. Slightly darker seems to help.
     kwargs_plot_error_boxes["alpha"] = 0.4
+    # If the x error box width is too narrow, we can't see it behind the statistical error bar,
+    # so we want to provide a minimum size of 0.075 (which is the second smallest bin size for
+    # SD 0.2, which means in practice we're only adjusting the first bin to make it slightly bigger,
+    # going from 0.0375 -> 0.075).
+    x_errors_box_width = np.maximum(
+        np.ones_like(ratio.axes[0].bin_widths) * 0.075,
+        ratio.axes[0].bin_widths / 2 * FRACTION_OF_X_FOR_SYS_ERROR_BOX
+    )
     pachyderm.plot.error_boxes(
         ax=ax_ratio,
         x_data=ratio.axes[0].bin_centers,
         y_data=ratio.values,
-        x_errors=ratio.axes[0].bin_widths / 2 * FRACTION_OF_X_FOR_SYS_ERROR_BOX,
+        x_errors=x_errors_box_width,
         y_errors=np.array([y_systematic.low, y_systematic.high]),
         **kwargs_plot_error_boxes,
     )
