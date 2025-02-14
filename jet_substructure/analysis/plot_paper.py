@@ -732,7 +732,7 @@ def _plot_data_model_comparison_for_single_system(  # noqa: C901
             sharex="col",
             sharey="row",
         )
-        ax_pairs = [  # noqa: C416
+        ax_pairs = [
             (ax, ax_ratio)
             # NOTE: This is tricky because all_axes is 2x2 here, so stepping by 2 goes to
             #       the next row!
@@ -1810,6 +1810,7 @@ def _plot_pp_PbPb_ratio_on_axis(
     data_zorder_modifier: int,
     all_methods_on_one_figure: bool,
     calculate_n_sigma_stat_from_unity: bool,
+    calculate_n_sigma_all_uncert_from_unity: bool,
     models_calculation: Mapping[str, model_calculations.ModelCalculation] | None = None,
     data_point_color: str | None = None,
     data_label: str | None = None,
@@ -1884,7 +1885,7 @@ def _plot_pp_PbPb_ratio_on_axis(
     )
 
     if calculate_n_sigma_stat_from_unity:
-        # Calculate n-sigma from unity
+        # Calculate n-sigma from unity based solely on the stat uncertainty
         # NOTE: This is only calculated for the PbPb/pp ratio, not for the models
         n_sigma_stat = full_results_helpers.n_sigma_stat_from_unity(
             values=ratio.values, stat_uncertainty=ratio.errors
@@ -1892,6 +1893,18 @@ def _plot_pp_PbPb_ratio_on_axis(
         logger.info(f"n_sigma_stat: {n_sigma_stat}")
         output_str = f"{grooming_method}, {collision_system}: "
         for bc, val in zip(ratio.axes[0].bin_centers, n_sigma_stat, strict=True):
+            output_str += f"{bc:.2f}: {val:.2f}, "
+        logger.warning(output_str)
+    if calculate_n_sigma_all_uncert_from_unity:
+        # Calculate n-sigma from unity based on all uncertainties combined in quadrature
+        # NOTE: This is only calculated for the PbPb/pp ratio, not for the models
+        # NOTE: This is basically a copy of the above, just adjusting the function calls and the labeling
+        n_sigma_all_uncert = full_results_helpers.n_sigma_all_uncert_from_unity(
+            values=ratio.values, stat_uncertainty=ratio.errors, sys_uncertainty=y_systematic,
+        )
+        logger.info(f"n_sigma_all_uncert: {n_sigma_all_uncert}")
+        output_str = f"{grooming_method}, {collision_system}: "
+        for bc, val in zip(ratio.axes[0].bin_centers, n_sigma_all_uncert, strict=True):
             output_str += f"{bc:.2f}: {val:.2f}, "
         logger.warning(output_str)
 
@@ -1955,6 +1968,7 @@ def _plot_pp_PbPb_comparison_single_grooming_method(
     all_methods_on_one_figure: bool,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
     calculate_n_sigma_stat_from_unity: bool,
+    calculate_n_sigma_all_uncert_from_unity: bool,
     models_ratio: Mapping[str, model_calculations.ModelCalculation] | None = None,
 ) -> None:
     # Validation
@@ -2036,6 +2050,7 @@ def _plot_pp_PbPb_comparison_single_grooming_method(
             data_zorder_modifier=_plot_counter,
             all_methods_on_one_figure=all_methods_on_one_figure,
             calculate_n_sigma_stat_from_unity=calculate_n_sigma_stat_from_unity,
+            calculate_n_sigma_all_uncert_from_unity=calculate_n_sigma_all_uncert_from_unity,
             models_calculation=models_ratio,
             data_point_color=p[0].get_color() if plot_ratio_black_and_white else None,
         )
@@ -2201,6 +2216,7 @@ def _plot_pp_PbPb_comparison(  # noqa: C901
                 for k, v in event_activity_to_kt_range.items()
             },
             calculate_n_sigma_stat_from_unity=False,
+            calculate_n_sigma_all_uncert_from_unity=False,
             models_ratio=models_ratio,
         )
 
@@ -2660,6 +2676,7 @@ def _plot_pp_PbPb_only_ratio_for_single_grooming_method(
     all_methods_on_one_figure: bool,
     event_activity_to_kt_range: Mapping[str, helpers.KtRange],
     calculate_n_sigma_stat_from_unity: bool,
+    calculate_n_sigma_all_uncert_from_unity: bool,
     models_calculation: Mapping[str, model_calculations.ModelCalculation] | None = None,
     data_label: str | None = "ALICE data",
 ) -> None:
@@ -2709,6 +2726,7 @@ def _plot_pp_PbPb_only_ratio_for_single_grooming_method(
             data_zorder_modifier=_plot_counter,
             all_methods_on_one_figure=all_methods_on_one_figure,
             calculate_n_sigma_stat_from_unity=calculate_n_sigma_stat_from_unity,
+            calculate_n_sigma_all_uncert_from_unity=calculate_n_sigma_all_uncert_from_unity,
             models_calculation=models_calculation,
             data_point_color=_event_activity_to_color[collision_system] if plot_ratio_black_and_white else None,
             data_label=data_label,
@@ -2728,6 +2746,7 @@ def _plot_pp_PbPb_comparison_only_ratios_for_letter(
     all_methods_on_one_figure: bool,
     event_activity_to_kt_range: Mapping[str, Mapping[str, helpers.KtRange]],
     calculate_n_sigma_stat_from_unity: bool,
+    calculate_n_sigma_all_uncert_from_unity: bool,
     plot_config: pb.PlotConfig,
     output_dir: Path,
     models_calculation: dict[str, model_calculations.ModelCalculation] | None = None,
@@ -2777,6 +2796,7 @@ def _plot_pp_PbPb_comparison_only_ratios_for_letter(
                 for k, v in event_activity_to_kt_range.items()
             },
             calculate_n_sigma_stat_from_unity=calculate_n_sigma_stat_from_unity,
+            calculate_n_sigma_all_uncert_from_unity=calculate_n_sigma_all_uncert_from_unity,
             models_calculation=models_calculation,
             data_label="Data",
         )
@@ -2835,6 +2855,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
     text_font_size: int = 31,
     models_calculation: dict[str, model_calculations.ModelCalculation] | None = None,
     calculate_n_sigma_stat_from_unity: bool = False,
+    calculate_n_sigma_all_uncert_from_unity: bool = False,
     additional_label: str = "",
     logy: bool = False,
     two_column_header: bool = True,
@@ -2969,6 +2990,7 @@ def plot_pp_PbPb_comparison_only_ratios_for_letter(
         all_methods_on_one_figure=True,
         event_activity_to_kt_range=event_activity_to_kt_range,
         calculate_n_sigma_stat_from_unity=calculate_n_sigma_stat_from_unity,
+        calculate_n_sigma_all_uncert_from_unity=calculate_n_sigma_all_uncert_from_unity,
         plot_config=pb.PlotConfig(
             name=name,
             panels=panels,

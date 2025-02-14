@@ -345,3 +345,37 @@ def n_sigma_stat_from_unity(
         The number of sigma from unity for each value.
     """
     return np.abs(values - 1) / stat_uncertainty  # type: ignore[no-any-return]
+
+
+def n_sigma_all_uncert_from_unity(
+    values: npt.NDArray[np.float64],
+    stat_uncertainty: npt.NDArray[np.float64],
+    sys_uncertainty: AsymmetricErrors,
+) -> npt.NDArray[np.float64]:
+    """Calculate the number of sigma from unity for a given value and all of its uncertainties comobined in quadrature.
+
+    NOTE:
+        This only works for a ratio!
+
+    Args:
+        values: The values for which to calculate the number of sigma from unity.
+        stat_uncertainty: The statistical uncertainty on the values.
+        sys_uncertainty: The systematic uncertainty on the values.
+
+    Returns:
+        The number of sigma from unity for each value.
+    """
+    # For values where the ratio is greater than one, we want the lower band of the systematic,
+    # when it's below, we want the high edge of the systematic.
+    #logger.info("all_uncert:")
+    #logger.info(f"{values=}")
+    #logger.info(f"{stat_uncertainty=}")
+    #logger.info(f"{sys_uncertainty.low=}, {sys_uncertainty.high=}")
+    relevant_systematic_uncertainty_values = np.where(
+        values >= 1, sys_uncertainty.low, sys_uncertainty.high,
+    )
+    #logger.info(f"{relevant_systematic_uncertainty_values=}")
+    # Add stat and systematic uncertainties in quadrature
+    total_relative_uncertainty = np.sqrt((stat_uncertainty / values) ** 2 + (relevant_systematic_uncertainty_values / values) ** 2)
+    total_absolute_uncertainty = total_relative_uncertainty * values
+    return np.abs(values - 1) / total_absolute_uncertainty # type: ignore[no-any-return]
