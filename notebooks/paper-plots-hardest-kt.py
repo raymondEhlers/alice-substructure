@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.16.4
+#       jupytext_version: 1.16.6
 #   kernelspec:
 #     display_name: .venv-3.11
 #     language: python
@@ -2264,6 +2264,7 @@ plot_paper.plot_pp_PbPb_comparison_only_ratios_for_letter(
     jet_R_str=jet_R_str,
     alice_status=alice_status,
     calculate_n_sigma_stat_from_unity=True,
+    calculate_n_sigma_all_uncert_from_unity=True,
     additional_label="_".join(grooming_methods_for_letter),
     # NOTE: This seems to need to be smaller to fit the header. Still could be tuned...
     text_font_size=24,
@@ -2338,7 +2339,7 @@ for collision_system, production_number in collision_system_to_production_number
                 tag="RDF",
                 base_path=output_dir,
             )
-            _successfully_loaded_grooming_methods.append(grooming_method)
+            _successfully_loaded_grooming_methods.append((collision_system, grooming_method))
         except FileNotFoundError as e:
             logger.info(f"Skipping grooming method {grooming_method} because the output file isn't available ({e})")
 
@@ -2575,20 +2576,20 @@ output_display_tables["PbPb"][["centrality", "tracking_efficiency", "model_depen
 # %%
 # Rename columns and write LaTeX tables
 latex_tables = {}
-for collision_system in output_display_tables:
+for collision_system, _output_display_tables_values in output_display_tables.items():
     selected_order_and_rename_columns = {k: v for k, v in order_and_rename_columns.items() if k in output_display_tables[collision_system].columns}
     print(selected_order_and_rename_columns)
     latex_tables[collision_system] = (
-        output_display_tables[collision_system][
+        _output_display_tables_values[
             list(selected_order_and_rename_columns.keys())
         ].rename(columns=selected_order_and_rename_columns)
         .to_latex(escape=False)
     )
 
 # %%
-for collision_system in latex_tables:
+for collision_system, _values in latex_tables.items():
     print(f"{collision_system=}")
-    print(latex_tables[collision_system])
+    print(_values)
     print()
 #print(latex_tables["pp"])
 #output_display_tables["pp"][list(selected_order_and_rename_columns.keys())].rename(columns=selected_order_and_rename_columns)
