@@ -3034,11 +3034,11 @@ def _plot_pp_PbPb_only_spectra_ratios_on_axes(  # noqa: C901
             # NOTE: We decide to go down to 2.0 in the fit because going to 1.5 appears to imply
             #       that there are fluctuations in the data that aren't real. In practice, this really
             #       only impacts standard DyG for central.
-            if h.axes[0].bin_edges[0] >= 3.0:
-                h_for_fit = full_results_helpers.select_hist_range(
-                    hist[grooming_method].data,
-                    helpers.KtRange(2.0, event_activity_to_kt_range[collision_system][grooming_method].max)
-                )
+            #if h.axes[0].bin_edges[0] >= 3.0:
+            #    h_for_fit = full_results_helpers.select_hist_range(
+            #        hist[grooming_method].data,
+            #        helpers.KtRange(2.0, event_activity_to_kt_range[collision_system][grooming_method].max)
+            #    )
             from jet_substructure.analysis import fit_paper
             disable_y_scale = False
             if grooming_method == "dynamical_kt" and collision_system != "pp":
@@ -3099,6 +3099,7 @@ def _plot_pp_PbPb_only_spectra_ratios_on_axes(  # noqa: C901
                     ax=ax_QA,
                     ax_ratio=ax_ratio_QA,
                     fit_result=fit_result,
+                    plot_components_without_y_scale=False,
                 )
                 ax_ratio_QA.set_xlabel(r"$k_{\text{T,g}}\:(\text{GeV}/c)$")
                 ax_ratio_QA.set_ylabel("Data/fit")

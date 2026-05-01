@@ -127,7 +127,7 @@ _grooming_methods_using_new_conventions = _new_grooming_methods if _use_qm22_inp
 
 # %%
 # NOTE: This is copied from the "Plots" section. I just need it all over, and easier to put it here.
-plot_output_dir_tag = "2024-paper-plots"
+plot_output_dir_tag = "2024-paper-plots-fits"
 # For final thermal model tests
 #plot_output_dir_tag = "2024-test-paper-plots"
 # End final thermal model tests
@@ -1308,7 +1308,7 @@ hybrid_model_with_wake_without_moliere_predictions_R02.semi_central_ratio["soft_
 
 # %%
 alice_status = "final"
-plot_output_dir_tag = "2024-paper-plots"
+plot_output_dir_tag = "2024-paper-plots-fits"
 grooming_methods_for_letter = ["dynamical_kt", "soft_drop_z_cut_02"]
 
 def PbPb_kt_measured_range_by_grooming_method(event_activity: str) -> dict[str, helpers.KtRange]:

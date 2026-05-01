@@ -1666,6 +1666,22 @@ available_datasets:
         entries_per_job: 1.5e5
         files:
             - "trains/embed_pythia/0079/production.yaml"
+    LHC18b8_fastsim_embedded_into_LHC18qr_central_hybrid_level_as_data_R02_0079: &LHC18qr_central_R02_mammoth_embedded_pythia_fastsim_hybrid_level_as_data
+        name: "LHC18b8_fastsim_embedded_into_LHC18qr_central_hybrid_level_as_data_R02_0079"
+        tree_name: "tree"
+        # Map for the uniform prefix name to the analysis task prefix.
+        prefixes:
+            "data": "hybrid"
+            #"true": "true"
+            #det_level: "det_level"
+        # Branches which don't exist for all prefixes
+        branches: ["data_leading_track_pt"]
+        # Branches which contain a prefix. The prefix will be filled for each prefix defined above.
+        prefix_branches: *prefix_branches
+        jet_R: 0.2
+        entries_per_job: 1.5e5
+        files:
+            - "trains/embed_pythia/0079/production.yaml"
     #----------------------------------------------------
     # JEWEL no recoils fastsim embedded into central data, R = 0.2
     #----------------------------------------------------
@@ -3188,6 +3204,11 @@ analysis_configurations:
             embed_jewel_no_recoils_fastsim:
                 PbPb: *LHC18qr_central_R02_mammoth
                 embed_pythia: *LHC18qr_central_R02_mammoth_embedded_jewel_no_recoils_fastsim
+            # Tests for response to the paper referee.
+            # Look at what happens when I unfold the embedded pythia fastsim using JEWEL no recoils
+            embed_jewel_no_recoils_fastsim_pythia_closure:
+                PbPb: *LHC18qr_central_R02_mammoth_embedded_pythia_fastsim_hybrid_level_as_data
+                embed_pythia: *LHC18qr_central_R02_mammoth_embedded_jewel_no_recoils_fastsim
             # NOTE: These datasets were tried, but it was basically trying to do unfolding without embedding,
             #       which doesn't really make sense. So these aren't super meaningful, but I keep them around
             #       for historical record. They are replaced by the embedded fast sims above (recoils was too
@@ -3412,7 +3433,7 @@ analysis_configurations:
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "thermal_model"
                 # Models
-                # JEWEL, for model comparisons (i.e. )
+                # JEWEL, for model comparisons
                 jewel_recoils_part_level:
                     label: "jewel_recoils_part_level"
                     closures: false
@@ -3445,6 +3466,17 @@ analysis_configurations:
                     reweight_prior: false
                     double_counting_cut: "min_true_10_pt_hat_3"
                     datasets: "embed_pythia_fastsim"
+                # Tests for response to the paper referee.
+                # Look at what happens when I unfold the embedded pythia fastsim using JEWEL no recoils
+                # NOTE: If I want to run this unfolding with these datasets, I must set the `data` prefix in
+                #       `ROOT.unfolding.Prefixes` to "hybrid"!! As of 2025, this needs to be changed by hand in the code.
+                #       This is of course a giant hack, but it's not worth the effort to make it configurable...
+                jewel_no_recoils_pythia_closure_fastsim:
+                    label: "model_dependence_jewel_no_recoils_pythia_closure_fastsim"
+                    closures: false
+                    reweight_prior: false
+                    double_counting_cut: "min_true_10_pt_hat_3"
+                    datasets: "embed_jewel_no_recoils_fastsim_pythia_closure"
 
 
                 ####################

@@ -704,6 +704,8 @@ def run_unfolding(
         response_tree_name,
     )
     _root_prefixes = ROOT.unfolding.Prefixes(
+        # For the rare case that I need to run PYTHIA fastsim as the data and JEWEL fastsim as the response,
+        # change this first argument from "data" to "hybrid".
         "data",
         "hybrid" if not unfolding_for_pp else "data",
     )
@@ -1016,7 +1018,6 @@ def run_unfolding_tree(
     # embedded_filenames: Sequence[Path],
     # output_filename: Path,
 ) -> bool:
-    ...
 
     # Delayed import to avoid direct dependence.
     ROOT = root_utils.import_ROOT(n_cores=1)
