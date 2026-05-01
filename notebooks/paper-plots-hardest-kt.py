@@ -2015,11 +2015,11 @@ models_calculation = {
 fit_parameters = {
     "pp": {
         "soft_drop_z_cut_02": {
-            "tanh_transition_scale": 0.3,
+            "tanh_transition_scale": 0.25,
             "x0": 1.25,
         },
         "dynamical_kt": {
-            "tanh_transition_scale": 0.2,
+            "tanh_transition_scale": 0.25,
             "x0": 1.25,
         },
     },

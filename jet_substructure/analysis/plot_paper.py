@@ -3041,6 +3041,8 @@ def _plot_pp_PbPb_only_spectra_ratios_on_axes(  # noqa: C901
                 )
             from jet_substructure.analysis import fit_paper
             disable_y_scale = False
+            if grooming_method == "dynamical_kt" and collision_system != "pp":
+                disable_y_scale = True
             initial_arguments = {
                 "amplitude": -1,
                 "shift": -1,
@@ -3099,7 +3101,7 @@ def _plot_pp_PbPb_only_spectra_ratios_on_axes(  # noqa: C901
                     fit_result=fit_result,
                 )
                 ax_ratio_QA.set_xlabel(r"$k_{\text{T,g}}\:(\text{GeV}/c)$")
-                ax_ratio_QA.set_ylabel("Fit/data")
+                ax_ratio_QA.set_ylabel("Data/fit")
                 ax_QA.set_yscale("log")
                 #ax_QA.set_ylim([1e-3, 1])
                 ax_QA.legend()
@@ -3697,7 +3699,7 @@ def plot_pp_PbPb_only_spectra_ratios_for_letter(  # noqa: C901
     # NOTE: These are specialized to the letter. I haven't checked for the other methods.
     _ratio_range = {
         "pp": (0.6, 1.42),
-        "semi_central": (0.6, 1.35),
+        "semi_central": (0.6, 1.37),
         #"central": (0.49, 1.39),
         "central": (0.45, 1.37),
     }

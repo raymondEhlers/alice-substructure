@@ -62,6 +62,25 @@ def _power_law(
     return (amplitude * x) ** -power + intercept
 
 
+def _power_law_without_y_scale(
+    x: npt.NDArray[np.float64] | float, power: float, amplitude: float
+) -> npt.NDArray[np.float64] | float:
+    """Power law without y scale
+
+    ..math::
+
+        f = (amplitude * x)^-power
+
+    Args:
+        x: Value(s) where the power law should be evaluated.
+        power: Power of the power law.
+        amplitude: Amplitude of the power law.
+    Returns:
+        Evaluated function
+    """
+    return (amplitude * x) ** -power
+
+
 def _tanh_scale(x: npt.NDArray[np.float64] | float, x0: float, scale: float) -> npt.NDArray[np.float64] | float:
     """Tanh scaling function.
 
@@ -216,7 +235,7 @@ class FitFunction:
             f=self.f,
             parameters={
                 k: float(v)
-                for k, v in zip(function_argument_names, popt)
+                for k, v in zip(function_argument_names, popt, strict=True)
             },
             metadata=self.metadata
         )
@@ -244,7 +263,11 @@ def create_fit_function(
     """
     using_power_law_only = False
     if min(h.axes[0].bin_centers) > x0:
-        logger.info("Using power law only")
+        # Info the user and setup
+        msg = "Using power low only"
+        if disable_y_scale:
+            msg += " with a disabled y scale"
+        logger.info(f"{msg}!")
         using_power_law_only = True
         # Fix up the args for the power law only case
         initial_arguments = {
@@ -256,7 +279,9 @@ def create_fit_function(
         # are a restricted number of points.
         fit_func: F = _power_law  # type: ignore[assignment]
         if disable_y_scale:
-            initial_arguments["intercept"] = 0
+            # Since want to disable the y scale, we need to set a new function and remove irrelevant arguments.
+            initial_arguments.pop("intercept")
+            fit_func = _power_law_without_y_scale  # type: ignore[assignment]
     else:
         if disable_y_scale:  # noqa: SIM108
             fit_func = spectra_fit_function_without_y_scale  # type: ignore[assignment]
@@ -394,12 +419,15 @@ def fit_and_plot(
             )
         else:
             # Quadratic term
+            # NOTE: This may not always be defined (e.g. because we've disabled the intercept),
+            #       so we need to grab it more carefully.
+            intercept_value = fit_result.parameters.get("intercept", 0.)
             if not using_power_law_only:
                 ax.plot(
                     x_for_plotting,
                     (
                         _quadratic_polynomial(x_for_plotting, **fit_result.kw_parameters_by_name(["amplitude", "shift"]), intercept=0)
-                        + fit_result.parameters_by_name(["intercept"])  # type: ignore[operator]
+                        + intercept_value
                         - _quadratic_polynomial(x0, **fit_result.kw_parameters_by_name(["amplitude", "shift"]), intercept=0)
                     ),
                     linestyle="--",
@@ -411,7 +439,7 @@ def fit_and_plot(
                 x_for_plotting,
                 (
                     _power_law(x_for_plotting, *fit_result.parameters_by_name(power_law_kw_args), intercept=0)  # type: ignore[misc]
-                    + fit_result.parameters_by_name(["intercept"])  # type: ignore[operator]
+                    + intercept_value
                     - _power_law(x0, *fit_result.parameters_by_name(power_law_kw_args), intercept=0)  # type: ignore[misc]
                 ),
                 linestyle="--",
@@ -424,13 +452,14 @@ def fit_and_plot(
     if ax_ratio:
         ax_ratio.plot(
             h.axes[0].bin_centers,
-            fit_result(h.axes[0].bin_centers) / h.values,
+            h.values / fit_result(h.axes[0].bin_centers) ,
             marker="o",
             linewidth=0,
             zorder=10,
             label=plot_label,
             color=p[0].get_color(),
         )
+        ax_ratio.axhline(y=1, color="black", linestyle="dashed", zorder=0.9)
 
     return fit_result
 
